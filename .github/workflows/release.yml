@@ -10,6 +10,9 @@
 # Triggers:
 #   - push to main: Automated release trigger when changes land on the default branch.
 #   - workflow_dispatch: Manual release execution from the Actions tab.
+#   Release triggers only when the range contains at least one application change
+#   (feat, fix, perf, refactor, revert, or BREAKING CHANGE); ranges containing only
+#   docs, chore, test, style, or ci changes are skipped.
 #   Note on tag triggers: Tag-based triggers (e.g. on: push tags 'v*') are intentionally
 #   deferred. SemVer calculation is computed automatically from conventional commit
 #   messages (fix, feat, feat!, BREAKING CHANGE) since the latest tag on main.
@@ -25,7 +28,8 @@
 # How to cut a release:
 #   1. Merge PRs with Conventional Commit formatting into main.
 #   2. The workflow checks for commits since the last v* tag. If no new commits exist
-#      or the repository has not changed, the release steps are skipped.
+#      or the range contains no application changes (docs/chore/test/style/ci only),
+#      the release steps are skipped.
 #   3. If new commits exist, SemVer bump level (patch, minor, major) is computed,
 #      matrix builds run, archives are created, checksums computed, and the release
 #      is published to GitHub Releases.
@@ -106,6 +110,14 @@ jobs:
           fi
 
           echo "Found ${COMMITS_COUNT} commits since ${LATEST_TAG}."
+
+          # Skip release if no commits modify application code (docs/chore/test only)
+          APP_COUNT=$(git log "${LATEST_TAG}..HEAD" --format="%s%n%b" | grep -Ec '(^(feat|fix|perf|refactor|revert)(\([^)]+\))?!?:|BREAKING CHANGE:)' || true)
+          if [ "$APP_COUNT" -eq 0 ]; then
+            echo "No application changes since ${LATEST_TAG} (docs/chore/test only). Skipping release."
+            echo "skip_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           # Determine version bump based on conventional commits in range
           if git log "${LATEST_TAG}..HEAD" --format="%B" | grep -Eq '(^[a-z]+(\([^\)]+\))?!:|BREAKING CHANGE:)'; then
