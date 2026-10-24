@@ -23,6 +23,8 @@ src/
 ├── lib.rs             # Public contracts: app + domain + i18n + infra
 ├── i18n.rs            # Interface localization skeleton and translation lookup
 ├── app.rs             # UI shell: navigation state, delegates events to domain and ports
+├── app/
+│   └── theme.rs       # egui Visuals mapping adapter for domain Palette
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
 │   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)
@@ -40,6 +42,7 @@ src/
     ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence
     ├── scrobble.rs    # Scrobbler port and Last.fm client adapter
     ├── session*.rs    # SessionStore port and Keyring cookie persistence
+    ├── settings.rs    # SettingsStore port and atomic JSON persistence
     ├── stream.rs      # StreamResolver trait definition
     ├── tray.rs        # System tray handle and action event loop
     ├── updater*.rs    # Updater port and GitHub Releases release checker

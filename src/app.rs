@@ -3,14 +3,17 @@
 //! The shell holds no business rules; every user intent is forwarded to
 //! [`crate::domain`] and every side effect goes through injected adapters.
 
+pub mod theme;
+
 use eframe::egui;
 
-use crate::domain::{PlaybackQueue, SearchQuery};
+use crate::domain::{PlaybackQueue, SearchQuery, ThemeId};
+use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence, DiscordPresence,
-    GithubUpdater, LyricLine, LyricsSource, Presence, Scrobbler, SessionStore, StubScrobbler,
-    TrayAction, TrayHandle, Updater, decode_cover, fetch_artwork, is_newer, sanitize_cookie_input,
-    should_scrobble,
+    GithubUpdater, LyricLine, LyricsSource, MemorySettingsStore, Presence, Scrobbler, SessionStore,
+    Settings, SettingsStore, StubScrobbler, TrayAction, TrayHandle, Updater, decode_cover,
+    fetch_artwork, is_newer, sanitize_cookie_input, should_scrobble,
 };
 
 /// Navigation pages of the application shell.
@@ -86,6 +89,12 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub scrobbler: Box<dyn Scrobbler>,
     /// Playback start monotonic instant and unix timestamp pair.
     pub started_at: Option<(std::time::Instant, u64)>,
+    /// Active UI theme.
+    pub theme: ThemeId,
+    /// Active interface locale.
+    pub locale: Locale,
+    /// Injected settings storage adapter.
+    pub settings_store: Box<dyn SettingsStore>,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -118,12 +127,42 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             updater: GithubUpdater::new(),
             scrobbler: Box::new(StubScrobbler::new()),
             started_at: None,
+            theme: ThemeId::White,
+            locale: Locale::English,
+            settings_store: Box::new(MemorySettingsStore::default()),
         }
     }
 
     /// Injects an alternative scrobbler implementation.
     pub fn set_scrobbler(&mut self, scrobbler: Box<dyn Scrobbler>) {
         self.scrobbler = scrobbler;
+    }
+
+    /// Injects an alternative settings store implementation and synchronizes state.
+    pub fn set_settings_store(&mut self, store: Box<dyn SettingsStore>) {
+        let loaded = store.load();
+        self.theme = loaded.theme;
+        self.locale = loaded.locale;
+        self.settings_store = store;
+    }
+
+    /// Sets the active UI theme and persists the change.
+    pub fn set_theme(&mut self, theme: ThemeId) {
+        self.theme = theme;
+        self.persist_settings();
+    }
+
+    /// Sets the active interface locale and persists the change.
+    pub fn set_locale(&mut self, locale: Locale) {
+        self.locale = locale;
+        self.persist_settings();
+    }
+
+    fn persist_settings(&self) {
+        let settings = Settings { theme: self.theme, locale: self.locale };
+        if let Err(err) = self.settings_store.save(&settings) {
+            tracing::warn!("failed to persist settings: {err:#}");
+        }
     }
 
     /// Returns the current update check status.
@@ -560,6 +599,8 @@ fn render_library<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource,
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
+    render_library_preferences(ui, state);
+    ui.separator();
     render_library_sign_in(ui, state);
     ui.separator();
     render_library_updates(ui, state);
@@ -569,6 +610,69 @@ fn render_library<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource,
     render_library_liked(ui, state);
     ui.separator();
     render_library_albums(ui, state);
+}
+
+fn render_library_preferences<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.heading(tr(state.locale, "Theme"));
+    ui.horizontal(|ui| {
+        render_theme_button(ui, state, ThemeId::White, "White");
+        render_theme_button(ui, state, ThemeId::BlackOled, "Black OLED");
+        render_theme_button(ui, state, ThemeId::Mono, "Mono");
+    });
+    ui.add_space(4.0);
+    ui.heading(tr(state.locale, "Language"));
+    ui.horizontal(|ui| {
+        render_locale_button(ui, state, Locale::English, "English");
+        render_locale_button(ui, state, Locale::Spanish, "Spanish");
+    });
+}
+
+fn render_theme_button<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+    theme: ThemeId,
+    key: &str,
+) {
+    let label = tr(state.locale, key);
+    let is_selected = state.theme == theme;
+    if ui.selectable_label(is_selected, label).clicked() && !is_selected {
+        state.set_theme(theme);
+        theme::apply(ui.ctx(), &theme.palette());
+    }
+}
+
+fn render_locale_button<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+    locale: Locale,
+    key: &str,
+) {
+    let label = tr(state.locale, key);
+    let is_selected = state.locale == locale;
+    if ui.selectable_label(is_selected, label).clicked() && !is_selected {
+        state.set_locale(locale);
+    }
 }
 
 fn render_library_updates<
@@ -1440,5 +1544,23 @@ mod tests {
         // Advance to second track
         state.queue.advance();
         assert_eq!(state.resolve_cover_bytes(), Some((url2.to_string(), vec![30, 40])));
+    }
+
+    #[test]
+    fn theme_and_locale_setters_mutate_state_and_persist() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        state.set_settings_store(Box::new(store.clone()));
+
+        assert_eq!(state.theme, ThemeId::White);
+        assert_eq!(state.locale, Locale::English);
+
+        state.set_theme(ThemeId::BlackOled);
+        assert_eq!(state.theme, ThemeId::BlackOled);
+        assert_eq!(store.load().theme, ThemeId::BlackOled);
+
+        state.set_locale(Locale::Spanish);
+        assert_eq!(state.locale, Locale::Spanish);
+        assert_eq!(store.load().locale, Locale::Spanish);
     }
 }
