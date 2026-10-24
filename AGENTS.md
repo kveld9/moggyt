@@ -51,4 +51,5 @@ Run all five before finishing. `cargo run` launches the window.
   Agents open PRs and never merge them — the owner reviews (self-review checklist
   in `CONTRIBUTING.md`) and merges.
 - Never publish releases unless explicitly asked.
+- Releases are tag-triggered only: merging to main never ships; push tag vX.Y.Z to cut a release.
 - Never commit secrets, `.env`, debug output, or foreign files; keep the diff minimal.
