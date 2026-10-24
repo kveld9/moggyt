@@ -5,6 +5,7 @@
 //! without touching `domain` or `app`.
 
 mod audio;
+mod audio_rodio;
 mod cover;
 mod innertube;
 mod lyrics;
@@ -16,6 +17,7 @@ mod ytdlp;
 mod ytm;
 
 pub use audio::{AudioBackend, AudioStub};
+pub use audio_rodio::{RodioBackend, volume_to_amplitude};
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use innertube::{InnerTube, RawTrack, search_body, search_url};
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
