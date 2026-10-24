@@ -7,6 +7,13 @@ use std::time::Duration;
 /// InnerTube web API key for the WEB_REMIX client context.
 pub const YTM_API_KEY: &str = "AIzaSyC1xlcUPO2SCEmJEWeeIg4X6KyWnhDk-4M";
 
+/// InnerTube client version for the WEB_REMIX client context.
+///
+/// Verified against live API on 2026-10-24. WEB_REMIX client versions
+/// rotate over time; bump this value when YouTube starts rejecting search
+/// requests with HTTP 400 FAILED_PRECONDITION. No auto-discovery in v1.
+pub const YTM_CLIENT_VERSION: &str = "1.20251022.01.00";
+
 /// Returns the InnerTube search endpoint URL.
 pub fn search_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/search?key={YTM_API_KEY}&prettyPrint=false")
@@ -18,6 +25,7 @@ pub fn search_body(query: &str) -> Value {
         "context": {
             "client": {
                 "clientName": "WEB_REMIX",
+                "clientVersion": YTM_CLIENT_VERSION,
                 "hl": "en",
                 "gl": "US",
             }
@@ -129,9 +137,28 @@ fn collect_shelf_items(shelf: &Value, out: &mut Vec<RawTrack>) {
     }
 }
 
+fn collect_item_or_shelf_track(item: &Value, out: &mut Vec<RawTrack>) {
+    if let Some(shelf) = item.get("musicShelfRenderer") {
+        collect_shelf_items(shelf, out);
+    } else if let Some(track) = item.get("musicResponsiveListItemRenderer").and_then(parse_item) {
+        out.push(track);
+    }
+}
+
+fn collect_item_section_tracks(item_section: &Value, out: &mut Vec<RawTrack>) {
+    let Some(items) = item_section.get("contents").and_then(Value::as_array) else {
+        return;
+    };
+    for item in items {
+        collect_item_or_shelf_track(item, out);
+    }
+}
+
 fn collect_section_tracks(section: &Value, out: &mut Vec<RawTrack>) {
     if let Some(shelf) = section.get("musicShelfRenderer") {
         collect_shelf_items(shelf, out);
+    } else if let Some(item_section) = section.get("itemSectionRenderer") {
+        collect_item_section_tracks(item_section, out);
     }
 }
 
@@ -267,7 +294,46 @@ fn collect_shelf(shelf: &Value, hits: &mut SearchHits) {
     }
 }
 
+fn collect_item_or_shelf_all(item: &Value, hits: &mut SearchHits) {
+    if let Some(shelf) = item.get("musicShelfRenderer") {
+        collect_shelf(shelf, hits);
+    } else if let Some(track) = item.get("musicResponsiveListItemRenderer").and_then(parse_item) {
+        // Bare responsive items outside named shelves are always classified as Tracks.
+        hits.tracks.push(track);
+    }
+}
+
+fn collect_item_section_all(item_section: &Value, hits: &mut SearchHits) {
+    let Some(items) = item_section.get("contents").and_then(Value::as_array) else {
+        return;
+    };
+    for item in items {
+        collect_item_or_shelf_all(item, hits);
+    }
+}
+
+fn collect_section_all(section: &Value, hits: &mut SearchHits) {
+    if let Some(shelf) = section.get("musicShelfRenderer") {
+        collect_shelf(shelf, hits);
+    } else if let Some(item_section) = section.get("itemSectionRenderer") {
+        collect_item_section_all(item_section, hits);
+    }
+}
+
+fn collect_tab_all(tab: &Value, hits: &mut SearchHits) {
+    let path = "/tabRenderer/content/sectionListRenderer/contents";
+    let Some(sections) = tab.pointer(path).and_then(Value::as_array) else {
+        return;
+    };
+    for section in sections {
+        collect_section_all(section, hits);
+    }
+}
+
 /// Parses grouped search hits across all supported shelves.
+///
+/// Bare responsive list items inside `itemSectionRenderer` nodes are always
+/// classified as tracks; shelf title category routing applies inside named shelves.
 pub fn parse_search_all(value: &Value) -> SearchHits {
     let mut hits = SearchHits::empty();
     let Some(tabs) =
@@ -276,17 +342,7 @@ pub fn parse_search_all(value: &Value) -> SearchHits {
         return hits;
     };
     for tab in tabs {
-        let Some(sections) = tab
-            .pointer("/tabRenderer/content/sectionListRenderer/contents")
-            .and_then(Value::as_array)
-        else {
-            continue;
-        };
-        for section in sections {
-            if let Some(shelf) = section.get("musicShelfRenderer") {
-                collect_shelf(shelf, &mut hits);
-            }
-        }
+        collect_tab_all(tab, &mut hits);
     }
     hits
 }
@@ -412,6 +468,7 @@ mod tests {
         let body = search_body("midnight");
         assert_eq!(body["query"], "midnight");
         assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+        assert_eq!(body["context"]["client"]["clientVersion"], YTM_CLIENT_VERSION);
         assert_eq!(body["context"]["client"]["hl"], "en");
         assert_eq!(body["context"]["client"]["gl"], "US");
     }
@@ -565,5 +622,49 @@ mod tests {
             }}]}}
         });
         assert!(parse_search_all(&payload).is_empty());
+    }
+
+    #[test]
+    fn parse_search_tracks_live_shape_and_determinism() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let fixture_path = std::path::Path::new(manifest_dir)
+            .join("tests")
+            .join("fixtures")
+            .join("innertube_live_shape.json");
+        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
+
+        let first = parse_search_tracks(&payload);
+        let second = parse_search_tracks(&payload);
+        assert_eq!(first, second, "parsing must be deterministic");
+
+        let ids: Vec<&str> = first.iter().map(|t| t.video_id.as_str()).collect();
+        assert_eq!(ids, vec!["live-bare-1", "live-shelf-1"]);
+        assert_eq!(first[0].title, "Live Track Bare");
+        assert_eq!(first[0].artist, "Live Artist Bare");
+        assert_eq!(first[0].thumb_url, None);
+        assert_eq!(first[1].title, "Live Track Shelved");
+        assert_eq!(first[1].artist, "Live Artist Shelved");
+    }
+
+    #[test]
+    fn parse_search_all_live_shape_and_determinism() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let fixture_path = std::path::Path::new(manifest_dir)
+            .join("tests")
+            .join("fixtures")
+            .join("innertube_live_shape.json");
+        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
+
+        let first = parse_search_all(&payload);
+        let second = parse_search_all(&payload);
+        assert_eq!(first, second, "parsing must be deterministic");
+
+        let track_ids: Vec<&str> = first.tracks.iter().map(|t| t.video_id.as_str()).collect();
+        assert_eq!(track_ids, vec!["live-bare-1", "live-shelf-1"]);
+        assert!(first.albums.is_empty());
+        assert!(first.artists.is_empty());
+        assert!(first.playlists.is_empty());
     }
 }

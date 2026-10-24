@@ -1,0 +1,114 @@
+{
+  "contents": {
+    "tabbedSearchResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "musicCardShelfRenderer": {
+                      "header": {
+                        "musicCardShelfHeaderBasicRenderer": {
+                          "title": { "runs": [{ "text": "Artist Card" }] }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "itemSectionRenderer": {
+                      "contents": [
+                        {
+                          "musicResponsiveListItemRenderer": {
+                            "flexColumns": [
+                              {
+                                "musicResponsiveListItemFlexColumnRenderer": {
+                                  "text": { "runs": [{ "text": "Live Track Bare" }] }
+                                }
+                              },
+                              {
+                                "musicResponsiveListItemFlexColumnRenderer": {
+                                  "text": { "runs": [{ "text": "Live Artist Bare" }] }
+                                }
+                              }
+                            ],
+                            "navigationEndpoint": {
+                              "watchEndpoint": { "videoId": "live-bare-1" }
+                            },
+                            "overlay": {},
+                            "thumbnail": {
+                              "musicThumbnailRenderer": {
+                                "thumbnail": { "thumbs": [] }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "musicResponsiveListItemRenderer": {
+                            "flexColumns": [
+                              {
+                                "musicResponsiveListItemFlexColumnRenderer": {
+                                  "text": { "runs": [{ "text": "Live Track Missing ID" }] }
+                                }
+                              },
+                              {
+                                "musicResponsiveListItemFlexColumnRenderer": {
+                                  "text": { "runs": [{ "text": "Live Artist Skipped" }] }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "itemSectionRenderer": {
+                      "contents": [
+                        {
+                          "musicShelfRenderer": {
+                            "title": { "runs": [{ "text": "Songs" }] },
+                            "contents": [
+                              {
+                                "musicResponsiveListItemRenderer": {
+                                  "flexColumns": [
+                                    {
+                                      "musicResponsiveListItemFlexColumnRenderer": {
+                                        "text": { "runs": [{ "text": "Live Track Shelved" }] }
+                                      }
+                                    },
+                                    {
+                                      "musicResponsiveListItemFlexColumnRenderer": {
+                                        "text": { "runs": [{ "text": "Live Artist Shelved" }] }
+                                      }
+                                    }
+                                  ],
+                                  "overlay": {
+                                    "musicItemThumbnailOverlayRenderer": {
+                                      "content": {
+                                        "musicPlayButtonRenderer": {
+                                          "playNavigationEndpoint": {
+                                            "watchEndpoint": { "videoId": "live-shelf-1" }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
