@@ -64,6 +64,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      # Install ALSA dev headers required by rodio/cpal
+      - name: Install ALSA dev headers for rodio/cpal
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
