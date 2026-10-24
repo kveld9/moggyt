@@ -63,6 +63,8 @@ pub struct Track {
     pub album: Option<String>,
     /// Optional track duration in seconds.
     pub duration_secs: Option<u32>,
+    /// Highest-resolution InnerTube thumbnail URL when known.
+    pub artwork: Option<String>,
 }
 
 impl Track {
@@ -74,6 +76,7 @@ impl Track {
             artist: artist.to_owned(),
             album: None,
             duration_secs: None,
+            artwork: None,
         }
     }
 
@@ -91,6 +94,7 @@ impl Track {
             artist: artist.to_owned(),
             album,
             duration_secs,
+            artwork: None,
         }
     }
 
@@ -103,6 +107,12 @@ impl Track {
     /// Sets the optional duration in seconds, consuming self.
     pub fn with_duration(mut self, duration_secs: u32) -> Self {
         self.duration_secs = Some(duration_secs);
+        self
+    }
+
+    /// Sets the optional artwork URL, consuming self.
+    pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {
+        self.artwork = Some(artwork.into());
         self
     }
 
@@ -148,12 +158,16 @@ mod tests {
         let base = Track::new("id", "Title", "Artist");
         assert_eq!(base.album, None);
         assert_eq!(base.duration_secs, None);
+        assert_eq!(base.artwork, None);
 
-        let built = base.with_album("Album").with_duration(210);
-        let full = Track::new_full("id", "Title", "Artist", Some("Album".to_owned()), Some(210));
+        let built =
+            base.with_album("Album").with_duration(210).with_artwork("https://artwork.local/art");
+        let full = Track::new_full("id", "Title", "Artist", Some("Album".to_owned()), Some(210))
+            .with_artwork("https://artwork.local/art");
         assert_eq!(built, full);
         assert_eq!(built.album.as_deref(), Some("Album"));
         assert_eq!(built.duration_secs, Some(210));
+        assert_eq!(built.artwork.as_deref(), Some("https://artwork.local/art"));
         assert_eq!(built.display(), "Title - Artist");
     }
 }
