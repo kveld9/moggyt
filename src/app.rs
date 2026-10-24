@@ -7,8 +7,8 @@ use eframe::egui;
 
 use crate::domain::{PlaybackQueue, SearchQuery};
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, LyricLine, LyricsSource, SessionStore, TrayAction,
-    TrayHandle, sanitize_cookie_input,
+    AudioBackend, Catalog, CoverCache, DesktopPresence, LyricLine, LyricsSource, Presence,
+    SessionStore, TrayAction, TrayHandle, sanitize_cookie_input,
 };
 
 /// Navigation pages of the application shell.
@@ -44,6 +44,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub lyrics: L,
     pub covers: K,
     pub tray: Option<TrayHandle>,
+    pub presence: DesktopPresence,
+    pub last_presence_key: Option<(String, String)>,
     pub lyrics_key: Option<(String, String)>,
     pub lyrics_lines: Vec<LyricLine>,
     pub lyrics_offset_ms: i64,
@@ -65,6 +67,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             lyrics,
             covers,
             tray: None,
+            presence: DesktopPresence::new(),
+            last_presence_key: None,
             lyrics_key: None,
             lyrics_lines: Vec::new(),
             lyrics_offset_ms: 0,
@@ -74,6 +78,11 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Attaches an initialized system tray handle.
     pub fn set_tray(&mut self, handle: TrayHandle) {
         self.tray = Some(handle);
+    }
+
+    /// Attaches an initialized desktop media presence handle.
+    pub fn set_presence(&mut self, presence: DesktopPresence) {
+        self.presence = presence;
     }
 
     /// Dispatches a single tray action, returning true if quit was requested.
@@ -108,6 +117,33 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         };
         let actions = tray.drain();
         self.apply_actions(&actions)
+    }
+
+    /// Synchronizes current playback state and track metadata with desktop media presence.
+    fn sync_presence(&mut self) {
+        let is_playing = self.audio.is_playing();
+        let track_info = self.queue.current().map(|t| (t.artist.clone(), t.title.clone()));
+        match track_info {
+            Some((artist, title)) => self.sync_active_track(&artist, &title, is_playing),
+            None => self.sync_empty_track(),
+        }
+    }
+
+    fn sync_active_track(&mut self, artist: &str, title: &str, is_playing: bool) {
+        let key = (artist.to_string(), title.to_string());
+        if self.last_presence_key.as_ref() != Some(&key) {
+            self.presence.set_track(artist, title);
+            self.last_presence_key = Some(key);
+        }
+        self.presence.set_playing(is_playing);
+    }
+
+    fn sync_empty_track(&mut self) {
+        if self.last_presence_key.is_some() || self.presence.last_published().is_some() {
+            self.presence.clear();
+            self.last_presence_key = None;
+        }
+        self.presence.set_playing(false);
     }
 
     /// Handles a search submission: parses the raw input at the boundary,
@@ -286,6 +322,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
+        self.state.sync_presence();
         render_top_bar(ui, &mut self.state);
         render_player_bar(ui, &mut self.state);
         render_body(ui, &mut self.state);
@@ -925,5 +962,48 @@ mod tests {
         let quit = state.apply_actions(&[TrayAction::TogglePlay, TrayAction::Quit]);
         assert!(quit);
         assert!(!state.audio.is_playing());
+    }
+
+    #[test]
+    fn sync_presence_with_empty_queue_clears_and_tracks_status() {
+        let mut state = wired();
+        state.sync_presence();
+        assert_eq!(state.presence.last_published(), None);
+        assert_eq!(state.presence.last_status(), Some(false));
+    }
+
+    #[test]
+    fn sync_presence_with_queued_track_publishes_and_deduplicates_key() {
+        let mut state = wired();
+        let track = Track {
+            id: "vid-1".into(),
+            title: "Paranoid Android".into(),
+            artist: "Radiohead".into(),
+            album: None,
+            duration_secs: Some(383),
+        };
+        state.queue.push(track);
+        state.audio.play("vid-1");
+
+        state.sync_presence();
+        assert_eq!(
+            state.presence.last_published(),
+            Some(("Radiohead".into(), "Paranoid Android".into()))
+        );
+        assert_eq!(state.presence.last_status(), Some(true));
+        assert_eq!(state.last_presence_key, Some(("Radiohead".into(), "Paranoid Android".into())));
+
+        // Pause: set_track skipped because key unchanged, but set_playing updated to false
+        state.audio.pause();
+        state.sync_presence();
+        assert_eq!(state.presence.last_status(), Some(false));
+        assert_eq!(state.last_presence_key, Some(("Radiohead".into(), "Paranoid Android".into())));
+
+        // Clear queue: sync clears presence metadata and resets key
+        state.queue.clear();
+        state.sync_presence();
+        assert_eq!(state.presence.last_published(), None);
+        assert_eq!(state.presence.last_status(), Some(false));
+        assert_eq!(state.last_presence_key, None);
     }
 }

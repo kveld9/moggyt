@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
-    DiskCoverCache, KeyringSessionStore, LiveAudio, LrclibClient, RodioBackend,
+    DesktopPresence, DiskCoverCache, KeyringSessionStore, LiveAudio, LrclibClient, RodioBackend,
     SingleInstanceGuard, TrayHandle, YtmCatalog, ensure_sidecar,
 };
 
@@ -36,6 +36,9 @@ fn main() -> anyhow::Result<()> {
         Some(h) => state.set_tray(h),
         None => tracing::warn!("tray unavailable; running without system tray icon"),
     }
+    let presence = DesktopPresence::new();
+    tracing::debug!("desktop media presence live: {}", presence.is_live());
+    state.set_presence(presence);
 
     let options = eframe::NativeOptions::default();
     eframe::run_native("moggyt", options, Box::new(|_ctx| Ok(Box::new(MoggytApp::new(state)))))
