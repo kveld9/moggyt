@@ -1,0 +1,30 @@
+# Maintainer: kveld9 <https://github.com/kveld9/moggyt>
+#
+# moggyt-bin repackages the official release tarball for Arch Linux.
+# Bump policy: update pkgver, run updpkgsums, regenerate .SRCINFO via:
+#   makepkg --printsrcinfo > .SRCINFO
+# AUR submission deferred until release stabilization.
+
+pkgname=moggyt-bin
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Native YouTube Music client (eframe/egui)"
+arch=('x86_64')
+url="https://github.com/kveld9/moggyt"
+license=('MIT')
+depends=('alsa-lib' 'libayatana-appindicator')
+provides=('moggyt')
+conflicts=('moggyt')
+source=(
+  "https://github.com/kveld9/moggyt/releases/download/v${pkgver}/moggyt-${pkgver}-linux.tar.gz"
+  "moggyt.desktop"
+)
+sha256sums=(
+  '082064a43164c00473c0ae693c6d3e3eb0fd8a9e73d6e864f766d7f909db0948'
+  '3bada013e5a76268ff9f1f60face3240dfa14e57de1509b0230cc71615de28db'
+)
+
+package() {
+  install -Dm755 "${srcdir}/moggyt" "${pkgdir}/usr/bin/moggyt"
+  install -Dm644 "${srcdir}/moggyt.desktop" "${pkgdir}/usr/share/applications/moggyt.desktop"
+}

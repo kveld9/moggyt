@@ -38,6 +38,7 @@
 #   TODO:
 #     - Linux packaging: Integrate cargo-deb for .deb generation and AppImageKit
 #       for standalone .AppImage bundles.
+#     - Arch Linux packaging: Maintain PKGBUILD in packaging/arch/moggyt-bin (AUR publish deferred; no credentials in v1).
 #     - Windows packaging: Integrate cargo-wix (MSI) or NSIS for setup installer creation.
 #     - Code signing & Attestations: Integrate Authenticode signing for Windows
 #       and GitHub Artifact Attestations via actions/attest-build-provenance.
