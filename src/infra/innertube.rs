@@ -4,7 +4,10 @@ use crate::domain::SearchFilter;
 use serde_json::Value;
 use std::time::Duration;
 
-/// InnerTube web API key for the WEB_REMIX client context.
+/// Public InnerTube web API key for the WEB_REMIX client context.
+///
+/// Embedded by every unofficial client; grants no private-data or billable-resource
+/// access and cannot be rotated per installation (see `.gitleaks.toml` allowlist).
 pub const YTM_API_KEY: &str = "AIzaSyC1xlcUPO2SCEmJEWeeIg4X6KyWnhDk-4M";
 
 /// InnerTube client version for the WEB_REMIX client context.
