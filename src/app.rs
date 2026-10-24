@@ -67,6 +67,50 @@ impl<C: Catalog, A: AudioBackend> AppState<C, A> {
             self.page = Page::NowPlaying;
         }
     }
+
+    /// Plays the track currently under the queue cursor without modifying active page.
+    pub fn play_current_quiet(&mut self) {
+        if let Some(track) = self.queue.current() {
+            let id = track.id.clone();
+            self.audio.play(&id);
+        }
+    }
+
+    /// Toggles playback: pauses if currently playing, resumes if previously requested,
+    /// or starts playback of current head quietly.
+    pub fn toggle_play(&mut self) {
+        if self.audio.is_playing() {
+            self.audio.pause();
+        } else if self.audio.last_requested().is_some() {
+            self.audio.resume_play();
+        } else {
+            self.play_current_quiet();
+        }
+    }
+
+    /// Advances the queue cursor and deterministically starts playback of the new head.
+    pub fn next_track(&mut self) {
+        self.queue.advance();
+        self.play_current_quiet();
+    }
+
+    /// Retreats the queue cursor and deterministically starts playback of the new head.
+    pub fn prev_track(&mut self) {
+        self.queue.retreat();
+        self.play_current_quiet();
+    }
+
+    /// Adjusts playback position by `delta_secs` relative to current position, clamped at zero.
+    pub fn seek_by(&mut self, delta_secs: i64) {
+        let current = self.audio.position_secs() as i64;
+        let target = current.saturating_add(delta_secs).max(0) as u64;
+        self.audio.seek(target);
+    }
+
+    /// Sets playback volume level (0..=100, clamped by audio adapter).
+    pub fn set_volume(&mut self, volume: u8) {
+        self.audio.set_volume(volume);
+    }
 }
 
 /// eframe application wrapper (thin view over [`AppState`]).
@@ -84,6 +128,7 @@ impl<C: Catalog, A: AudioBackend> MoggytApp<C, A> {
 impl<C: Catalog, A: AudioBackend> eframe::App for MoggytApp<C, A> {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         render_top_bar(ui, &mut self.state);
+        render_player_bar(ui, &mut self.state);
         render_body(ui, &mut self.state);
     }
 }
@@ -150,6 +195,74 @@ fn render_now_playing<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &Ap
     }
 }
 
+fn render_player_bar<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut AppState<C, A>) {
+    egui::Panel::bottom("player_bar").show(ui, |ui| {
+        ui.horizontal(|ui| {
+            render_track_info(ui, state);
+            ui.separator();
+            render_playback_controls(ui, state);
+            ui.separator();
+            render_seek_controls(ui, state);
+            ui.separator();
+            render_volume_controls(ui, state);
+            ui.separator();
+            render_position_info(ui, state);
+        });
+    });
+}
+
+fn render_track_info<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &AppState<C, A>) {
+    let title = state.queue.current().map_or("Queue empty".to_owned(), |t| t.display());
+    ui.label(title);
+}
+
+fn render_playback_controls<C: Catalog, A: AudioBackend>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A>,
+) {
+    if ui.button("Previous").clicked() {
+        state.prev_track();
+    }
+    let toggle_label = if state.audio.is_playing() { "Pause" } else { "Play" };
+    if ui.button(toggle_label).clicked() {
+        state.toggle_play();
+    }
+    if ui.button("Next").clicked() {
+        state.next_track();
+    }
+}
+
+fn render_seek_controls<C: Catalog, A: AudioBackend>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A>,
+) {
+    if ui.button("-10s").clicked() {
+        state.seek_by(-10);
+    }
+    if ui.button("+10s").clicked() {
+        state.seek_by(10);
+    }
+}
+
+fn render_volume_controls<C: Catalog, A: AudioBackend>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A>,
+) {
+    let mut vol = state.audio.volume();
+    if ui.add(egui::Slider::new(&mut vol, 0..=100).text("Vol")).changed() {
+        state.set_volume(vol);
+    }
+}
+
+fn render_position_info<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &AppState<C, A>) {
+    let pos = state.audio.position_secs();
+    let text = match state.queue.current().and_then(|t| t.duration_secs) {
+        Some(dur) => format!("{pos}s / {dur}s"),
+        None => format!("{pos}s"),
+    };
+    ui.label(text);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,5 +297,68 @@ mod tests {
         state.submit_search();
         state.play_head();
         assert_eq!(state.page, Page::NowPlaying);
+    }
+
+    #[test]
+    fn toggle_on_empty_queue_does_nothing() {
+        let mut state = wired();
+        state.toggle_play();
+        assert!(!state.audio.is_playing());
+        assert_eq!(state.audio.last_requested(), None);
+    }
+
+    #[test]
+    fn search_then_toggle_plays_head() {
+        let mut state = wired();
+        state.search_text = "midnight".to_owned();
+        state.submit_search();
+        state.toggle_play();
+        assert!(state.audio.is_playing());
+        assert_eq!(state.audio.last_requested(), Some("stub-1"));
+        assert_eq!(state.page, Page::Queue);
+    }
+
+    #[test]
+    fn next_and_prev_move_current_and_play() {
+        let mut state = wired();
+        state.search_text = "midnight".to_owned();
+        state.submit_search();
+        state.search_text = "sunrise".to_owned();
+        state.submit_search();
+        assert_eq!(state.queue.len(), 2);
+
+        state.next_track();
+        assert!(state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("sunrise"));
+
+        state.prev_track();
+        assert!(state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("midnight"));
+    }
+
+    #[test]
+    fn seek_by_clamps_at_zero_and_advances() {
+        let mut state = wired();
+        state.seek_by(-10);
+        assert_eq!(state.audio.position_secs(), 0);
+
+        state.seek_by(15);
+        assert_eq!(state.audio.position_secs(), 15);
+
+        state.seek_by(-5);
+        assert_eq!(state.audio.position_secs(), 10);
+
+        state.seek_by(-20);
+        assert_eq!(state.audio.position_secs(), 0);
+    }
+
+    #[test]
+    fn set_volume_clamps_via_stub() {
+        let mut state = wired();
+        state.set_volume(50);
+        assert_eq!(state.audio.volume(), 50);
+
+        state.set_volume(150);
+        assert_eq!(state.audio.volume(), 100);
     }
 }

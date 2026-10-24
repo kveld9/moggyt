@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink};
 
-use super::audio::AudioBackend;
+use super::audio::{AudioBackend, AudioStub};
 use super::ytdlp::YtDlpResolver;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
@@ -157,6 +157,91 @@ impl AudioBackend for RodioBackend {
     }
 }
 
+/// Dual-mode audio backend: hardware playback with graceful fallback to an in-memory stub.
+pub enum LiveAudio {
+    /// Live rodio backend connected to audio hardware.
+    Live(RodioBackend),
+    /// Muted fallback storing state in memory when hardware or dependencies are unavailable.
+    Muted(AudioStub),
+}
+
+impl LiveAudio {
+    /// Creates a muted backend variant.
+    pub fn muted() -> Self {
+        Self::Muted(AudioStub::new())
+    }
+
+    /// Returns whether this backend is actively backed by audio hardware.
+    pub fn is_live(&self) -> bool {
+        matches!(self, Self::Live(_))
+    }
+}
+
+impl AudioBackend for LiveAudio {
+    fn play(&mut self, track_id: &str) {
+        match self {
+            Self::Live(backend) => backend.play(track_id),
+            Self::Muted(stub) => stub.play(track_id),
+        }
+    }
+
+    fn pause(&mut self) {
+        match self {
+            Self::Live(backend) => backend.pause(),
+            Self::Muted(stub) => stub.pause(),
+        }
+    }
+
+    fn resume_play(&mut self) {
+        match self {
+            Self::Live(backend) => backend.resume_play(),
+            Self::Muted(stub) => stub.resume_play(),
+        }
+    }
+
+    fn seek(&mut self, position_secs: u64) {
+        match self {
+            Self::Live(backend) => backend.seek(position_secs),
+            Self::Muted(stub) => stub.seek(position_secs),
+        }
+    }
+
+    fn set_volume(&mut self, volume: u8) {
+        match self {
+            Self::Live(backend) => backend.set_volume(volume),
+            Self::Muted(stub) => stub.set_volume(volume),
+        }
+    }
+
+    fn volume(&self) -> u8 {
+        match self {
+            Self::Live(backend) => backend.volume(),
+            Self::Muted(stub) => stub.volume(),
+        }
+    }
+
+    fn position_secs(&self) -> u64 {
+        match self {
+            Self::Live(backend) => backend.position_secs(),
+            Self::Muted(stub) => stub.position_secs(),
+        }
+    }
+
+    fn is_playing(&self) -> bool {
+        match self {
+            Self::Live(backend) => backend.is_playing(),
+            Self::Muted(stub) => stub.is_playing(),
+        }
+    }
+
+    fn last_requested(&self) -> Option<&str> {
+        match self {
+            Self::Live(backend) => backend.last_requested(),
+            Self::Muted(stub) => stub.last_requested(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,5 +329,34 @@ mod tests {
 
         backend.resume_play();
         assert!(!backend.is_playing());
+    }
+
+    #[test]
+    fn live_audio_muted_delegation_table() {
+        let mut audio = LiveAudio::muted();
+        assert!(!audio.is_live());
+        assert_eq!(audio.last_requested(), None);
+        assert!(!audio.is_playing());
+        assert_eq!(audio.position_secs(), 0);
+        assert_eq!(audio.volume(), 100);
+
+        audio.play("track-stub-1");
+        assert_eq!(audio.last_requested(), Some("track-stub-1"));
+        assert!(audio.is_playing());
+
+        audio.pause();
+        assert!(!audio.is_playing());
+
+        audio.resume_play();
+        assert!(audio.is_playing());
+
+        audio.seek(42);
+        assert_eq!(audio.position_secs(), 42);
+
+        audio.set_volume(80);
+        assert_eq!(audio.volume(), 80);
+
+        audio.set_volume(150);
+        assert_eq!(audio.volume(), 100);
     }
 }
