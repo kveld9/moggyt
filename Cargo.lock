@@ -2286,6 +2286,8 @@ dependencies = [
  "num-traits",
  "png 0.18.1",
  "tiff",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -2706,6 +2708,7 @@ dependencies = [
  "anyhow",
  "discord-rich-presence",
  "eframe",
+ "image",
  "keyring",
  "md-5",
  "reqwest",
