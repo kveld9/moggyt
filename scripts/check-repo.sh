@@ -75,6 +75,7 @@ check_file() {
 
 echo -e "${BOLD}1. Root Metadata & Licensing${RESET}"
 check_file "README.md" true
+check_file "AGENTS.md" true
 check_file "LICENSE" true
 check_file "CONTRIBUTING.md" true
 check_file "CODE_OF_CONDUCT.md" true
