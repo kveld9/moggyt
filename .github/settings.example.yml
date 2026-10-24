@@ -1,0 +1,149 @@
+# GitHub Repository Settings & Rulesets Specification
+#
+# This file serves as an explicit specification and blueprint for repository
+# settings and modern GitHub Repository Rulesets (replacing legacy branch protections).
+# It documents repository-level options and ruleset configurations aligned with
+# the GitHub REST API (POST /repos/{owner}/{repo}/rulesets).
+#
+# Documentation:
+# https://docs.github.com/en/rest/repos/rules
+# https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets
+
+repository:
+  # General repository configuration
+  name: moggyt
+  description: "Native YouTube Music client in Rust (eframe/egui)"
+  homepage: ""
+  topics: "git, github, standards, devops, engineering-best-practices"
+  private: true # secure default: flip to false only as a conscious decision
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  has_downloads: false
+
+  # Merge strategies
+  # Disallow standard merge commits to keep git history linear and clean
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: true
+  # Automatically delete head branches after pull requests are merged
+  delete_branch_on_merge: true
+  # Encourage squash commit messages to default to PR title and commit details
+  squash_merge_commit_title: "PR_TITLE"
+  squash_merge_commit_message: "PR_BODY"
+
+# ==============================================================================
+# GitHub Repository Rulesets (Modern Standard)
+# ==============================================================================
+# Rulesets allow targeting multiple branch/tag patterns in a single place,
+# support evaluation mode ('evaluate') for dry-run testing before enforcement,
+# provide granular bypass actors (roles, teams, integrations), and can be
+# managed either at repository level or organization-wide.
+
+rulesets:
+  # ----------------------------------------------------------------------------
+  # Ruleset 1: Default Branch Protection & Governance
+  # ----------------------------------------------------------------------------
+  - name: "default-branch-protection"
+    target: "branch"
+    # Enforcement options:
+    # - active: rules are enforced immediately
+    # - evaluate: rules are tested in dry-run mode without blocking pushes/merges
+    # - disabled: ruleset is inactive
+    enforcement: "active"
+
+    # Conditions defining target references
+    conditions:
+      ref_name:
+        include:
+          - "~DEFAULT_BRANCH" # Dynamically targets the default branch (e.g., main)
+        exclude: []
+
+    # Bypass actors allowed to bypass ruleset restrictions
+    # bypass_mode: always | pull_request
+    bypass_actors:
+      # Example: Allow organization security team or release managers to bypass
+      # - actor_id: [TEAM_ID]
+      #   actor_type: "Team"
+      #   bypass_mode: "always"
+      # Example: Allow Repository Administrators to bypass in emergency
+      - actor_id: 1 # Role ID for Repository Admin (or specific [ROLE_ID] / [INTEGRATION_ID])
+        actor_type: "RepositoryRole" # OrganizationAdmin | RepositoryRole | Team | Integration
+        bypass_mode: "always"
+
+    rules:
+      # Prevent direct pushes and require Pull Requests
+      - type: "pull_request"
+        parameters:
+          required_approving_review_count: 1
+          dismiss_stale_reviews_on_push: true
+          require_code_owner_review: true
+          require_last_push_approval: true
+          required_review_thread_resolution: true
+
+      # Require required status checks to pass before merging
+      - type: "required_status_checks"
+        parameters:
+          strict_required_status_checks_policy: true # Equivalent to strict branch protection
+          required_status_checks:
+            - context: "Repository Standards & Integrity Check"
+            - context: "Markdown Quality Check"
+
+      # Enforce code scanning tool results (SAST / CodeQL)
+      - type: "required_code_scanning"
+        parameters:
+          required_code_scanning_tools:
+            - tool: "CodeQL"
+              security_alerts_threshold: "errors_and_warnings" # none | errors | errors_and_warnings | all
+              alerts_threshold: "errors_and_warnings"
+
+      # Disallow merge commits; enforce linear history
+      - type: "required_linear_history"
+
+      # Block direct deletion or creation of the target branch outside standard flows
+      - type: "deletion"
+      - type: "non_fast_forward" # Prevents force pushes
+
+  # ----------------------------------------------------------------------------
+  # Ruleset 2: Release Tag Immutability
+  # ----------------------------------------------------------------------------
+  - name: "tag-immutability"
+    target: "tag"
+    enforcement: "active"
+
+    conditions:
+      ref_name:
+        include:
+          - "refs/tags/v*" # Semantic version tags
+        exclude: []
+
+    bypass_actors:
+      # Only automated release pipelines (GitHub Actions app/bot) or Organization Admins
+      # - actor_id: [APP_ID]
+      #   actor_type: "Integration"
+      #   bypass_mode: "always"
+
+    rules:
+      - type: "deletion"          # Prevents deleting existing release tags
+      - type: "non_fast_forward"  # Prevents overwriting or force-updating tags
+      - type: "update"            # Disallows mutating existing tag refs
+
+# ==============================================================================
+# Legacy Branch Protection vs Rulesets Migration Map
+# ==============================================================================
+#
+# | Legacy Branch Protection Setting    | Modern Ruleset Equivalent               | Ruleset Parameter / Type                   |
+# | :---------------------------------- | :-------------------------------------- | :----------------------------------------- |
+# | required_pull_request_reviews       | Rule type: "pull_request"               | parameters: required_approving_review_count|
+# | dismiss_stale_reviews               | Rule type: "pull_request"               | parameters: dismiss_stale_reviews_on_push  |
+# | require_code_owner_reviews          | Rule type: "pull_request"               | parameters: require_code_owner_review      |
+# | require_last_push_approval          | Rule type: "pull_request"               | parameters: require_last_push_approval     |
+# | required_conversation_resolution    | Rule type: "pull_request"               | parameters: required_review_thread_resolution|
+# | required_status_checks.strict       | Rule type: "required_status_checks"     | parameters: strict_required_status_checks_policy |
+# | required_status_checks.contexts     | Rule type: "required_status_checks"     | parameters: required_status_checks[].context|
+# | enforce_admins: true                | Absence of Admin in bypass_actors       | bypass_actors (explicit whitelist only)    |
+# | allow_force_pushes: false           | Rule type: "non_fast_forward"           | Blocks force pushes                        |
+# | allow_deletions: false              | Rule type: "deletion"                   | Blocks ref deletion                        |
+# | required_linear_history: true       | Rule type: "required_linear_history"    | Disallows merge commits                    |
+# | (N/A in classic protection)         | Rule type: "required_code_scanning"     | Enforces CodeQL / security alert gates     |
+# | (N/A in classic protection)         | Target: "tag"                           | Protects tags like refs/tags/v* in ruleset |

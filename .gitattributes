@@ -1,0 +1,66 @@
+# Auto-detect text files and normalize line endings to LF on commit
+* text=auto eol=lf
+
+# Force LF for shell scripts and executable configuration
+*.sh text eol=lf
+*.bash text eol=lf
+Makefile text eol=lf
+
+# Explicit text files
+*.md text
+*.txt text
+*.json text
+*.yaml text
+*.yml text
+*.xml text
+*.toml text
+*.ini text
+*.cfg text
+
+# Source code files with diff driver hints
+*.py text diff=python
+*.go text diff=golang
+*.rs text diff=rust
+*.c text diff=cpp
+*.cpp text diff=cpp
+*.h text diff=cpp
+*.hpp text diff=cpp
+*.java text diff=java
+*.js text
+*.ts text
+*.html text diff=html
+*.css text diff=css
+
+# Binary files - do not attempt to normalize line endings or generate diffs
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.webp binary
+*.pdf binary
+*.tar binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# GitHub Linguist attributes
+docs/* linguist-documentation
+scripts/* linguist-documentation=false
+*.min.js linguist-generated=true
+*.min.css linguist-generated=true
+package-lock.json linguist-generated=true
+yarn.lock linguist-generated=true
+pnpm-lock.yaml linguist-generated=true
+Cargo.lock linguist-generated=true
+
+# Opt-in examples: exclude vendored third-party code and AI-agent tooling from language statistics
+# vendor/** linguist-vendored=true
+# third-party/** linguist-vendored=true
+# .agent/** linguist-vendored=true
+# .skills/** linguist-vendored=true

@@ -1,0 +1,182 @@
+# ==============================================================================
+# Comprehensive Polyglot .gitignore Template
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Operating System Files
+# ------------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ------------------------------------------------------------------------------
+# Editors & IDEs
+# ------------------------------------------------------------------------------
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (IntelliJ, PyCharm, WebStorm, GoLand, etc.)
+.idea/
+*.iml
+*.iws
+
+# Vim / Emacs
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+*~
+\#*\#
+.#*
+
+# ------------------------------------------------------------------------------
+# Environment Variables & Secrets (CRITICAL)
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.test.example
+*.pem
+*.key
+*.pkcs12
+*.pfx
+*.p12
+*.cer
+*.crt
+id_rsa*
+id_ed25519*
+secrets.*
+
+# ------------------------------------------------------------------------------
+# Node.js / JavaScript / TypeScript
+# ------------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+.turbo/
+dist/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
+.nyc_output/
+
+# ------------------------------------------------------------------------------
+# Python
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ------------------------------------------------------------------------------
+# Rust
+# ------------------------------------------------------------------------------
+/target/
+**/*.rs.bk
+*.pdb
+
+# ------------------------------------------------------------------------------
+# Go
+# ------------------------------------------------------------------------------
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# ------------------------------------------------------------------------------
+# C / C++ / CMake
+# ------------------------------------------------------------------------------
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+
+# ------------------------------------------------------------------------------
+# Java / Kotlin / Gradle / Maven
+# ------------------------------------------------------------------------------
+*.class
+*.jar
+*.war
+*.ear
+target/
+.gradle/
+build/
+
+# ------------------------------------------------------------------------------
+# Logs & General Temporary Files
+# ------------------------------------------------------------------------------
+*.log
+*.tmp
+*.bak
+*.swp
+tmp/
+temp/

@@ -1,0 +1,229 @@
+# Example Release Workflow: Artifact-based releases with automated SemVer calculation
+# Rename to .github/workflows/release.yml to enable in your repository.
+#
+# Customization:
+# - Adjust ARTIFACT_GLOB, ASSET_PREFIX, and BUILD_CMD to match your stack.
+# - Gradle / Android: BUILD_CMD="./gradlew assembleRelease"
+# - Node.js:          BUILD_CMD="npm ci && npm run build"
+# - Rust:             BUILD_CMD="cargo build --release --locked"
+# - Go / Make:        BUILD_CMD="make build"
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  ARTIFACT_GLOB: "dist/*"
+  ASSET_PREFIX: "my-app"
+  BUILD_CMD: "mkdir -p dist && echo 'Sample release binary payload' > dist/my-app-binary"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Compute SemVer, Build & Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Check out repository with full tag history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute Next Semantic Version
+        id: semver
+        shell: bash
+        run: |
+          git fetch --tags --force
+
+          LATEST_TAG=$(git describe --tags --abbrev=0 --match "v[0-9]*" 2>/dev/null || echo "")
+
+          if [ -z "$LATEST_TAG" ]; then
+            COMMITS_COUNT=$(git rev-list HEAD --count)
+            if [ "$COMMITS_COUNT" -eq 0 ]; then
+              echo "Repository is empty. Skipping release."
+              echo "skip_release=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            NEW_VERSION="1.0.0"
+            NEW_TAG="v${NEW_VERSION}"
+            echo "No previous v* tags found. Starting baseline at ${NEW_TAG}."
+            echo "skip_release=false" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+            echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          COMMITS_COUNT=$(git rev-list "${LATEST_TAG}..HEAD" --count)
+          if [ "$COMMITS_COUNT" -eq 0 ]; then
+            echo "No new commits since ${LATEST_TAG}. Skipping release."
+            echo "skip_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Found ${COMMITS_COUNT} commits since ${LATEST_TAG}."
+
+          # Determine version bump based on conventional commits in range
+          if git log "${LATEST_TAG}..HEAD" --format="%B" | grep -Eq '(^[a-z]+(\([^\)]+\))?!:|BREAKING CHANGE:)'; then
+            BUMP="major"
+          elif git log "${LATEST_TAG}..HEAD" --format="%s" | grep -Eq '^feat(\([^\)]+\))?:'; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          RAW_VERSION="${LATEST_TAG#v}"
+          MAJOR=$(echo "$RAW_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$RAW_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$RAW_VERSION" | cut -d. -f3 | cut -d- -f1)
+
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+
+          if [ "$BUMP" = "major" ]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [ "$BUMP" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          NEW_TAG="v${NEW_VERSION}"
+
+          echo "Computed bump '${BUMP}': ${LATEST_TAG} -> ${NEW_TAG}"
+          echo "skip_release=false" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Application Artifacts
+        if: steps.semver.outputs.skip_release != 'true'
+        shell: bash
+        run: |
+          echo "Running build command: ${BUILD_CMD}"
+          eval "${BUILD_CMD}"
+
+      # Signing Step Architecture:
+      # Production release signing uses repository secrets (protected branches only).
+      # Secrets inventory:
+      # - KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD
+      # - GPG_PRIVATE_KEY / GPG_PASSPHRASE
+      #
+      # Security note: PR workflows must NEVER use production signing secrets.
+      # PR workflows should generate a throwaway keystore via keytool:
+      #   keytool -genkey -v -keystore ephemeral.keystore -alias ephemeral \
+      #     -keyalg RSA -keysize 2048 -validity 1 -storepass android -keypass android \
+      #     -dname "CN=PR-Build, OU=CI, O=Test, L=Local, S=Local, C=US"
+      #
+      # Example release signing step (uncomment when configured):
+      # - name: Sign Release Artifacts
+      #   if: steps.semver.outputs.skip_release != 'true'
+      #   env:
+      #     KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      #     KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      #     KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      #     KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      #   run: |
+      #     if [ -n "$KEYSTORE_BASE64" ]; then
+      #       echo "$KEYSTORE_BASE64" | base64 --decode > release.keystore
+      #       # Execute your signer here (e.g., apksigner, jarsigner, gpg)
+      #       rm -f release.keystore
+      #     fi
+
+      - name: Package and Rename Versioned Artifacts
+        if: steps.semver.outputs.skip_release != 'true'
+        shell: bash
+        run: |
+          VERSION="${{ steps.semver.outputs.version }}"
+          mkdir -p release_assets
+
+          for file in ${ARTIFACT_GLOB}; do
+            if [ -f "$file" ]; then
+              BASENAME=$(basename "$file")
+              TARGET_NAME="${ASSET_PREFIX}-${VERSION}-${BASENAME}"
+              cp "$file" "release_assets/${TARGET_NAME}"
+              echo "Prepared artifact: release_assets/${TARGET_NAME}"
+            fi
+          done
+
+      - name: Generate Cryptographic Checksums
+        if: steps.semver.outputs.skip_release != 'true'
+        shell: bash
+        working-directory: release_assets
+        run: |
+          # Generate individual SHA-256 and SHA-512 hashes
+          for asset in *; do
+            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]] && [[ "$asset" != *.sha512 ]] && [[ "$asset" != *.md5 ]] && [ "$asset" != "SHA256SUMS.txt" ]; then
+              sha256sum "$asset" | awk '{print $1}' > "${asset}.sha256"
+              sha512sum "$asset" | awk '{print $1}' > "${asset}.sha512"
+              md5sum "$asset" | awk '{print $1}' > "${asset}.md5" # Legacy corruption check only
+            fi
+          done
+
+          # Generate standard SHA256SUMS.txt compatible with 'sha256sum -c'
+          rm -f SHA256SUMS.txt
+          for asset in *; do
+            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]] && [[ "$asset" != *.sha512 ]] && [[ "$asset" != *.md5 ]]; then
+              sha256sum "$asset" >> SHA256SUMS.txt
+            fi
+          done
+          echo "Generated SHA256SUMS.txt:"
+          cat SHA256SUMS.txt
+
+      - name: Generate Release Notes Body
+        if: steps.semver.outputs.skip_release != 'true'
+        shell: bash
+        run: |
+          TAG="${{ steps.semver.outputs.tag_name }}"
+          VERSION="${{ steps.semver.outputs.version }}"
+
+          cat << 'EOF' > release_body.md
+          ## Release Details
+          EOF
+
+          echo "- Version: \`${VERSION}\`" >> release_body.md
+          echo "- Tag: \`${TAG}\`" >> release_body.md
+          echo "" >> release_body.md
+
+          echo "### Download & Verification" >> release_body.md
+          echo "| File | SHA-256 Checksum |" >> release_body.md
+          echo "| :--- | :--- |" >> release_body.md
+
+          cd release_assets
+          while read -r hash filename; do
+            echo "| \`${filename}\` | \`${hash}\` |" >> ../release_body.md
+          done < SHA256SUMS.txt
+          cd ..
+
+          echo "" >> release_body.md
+          echo "To verify downloads:" >> release_body.md
+          echo '```bash' >> release_body.md
+          echo 'sha256sum -c SHA256SUMS.txt' >> release_body.md
+          echo '```' >> release_body.md
+
+      - name: Publish GitHub Release
+        if: steps.semver.outputs.skip_release != 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.semver.outputs.tag_name }}
+          name: ${{ steps.semver.outputs.tag_name }}
+          body_path: release_body.md
+          files: release_assets/*
+          fail_on_unmatched_files: true
+          generate_release_notes: false

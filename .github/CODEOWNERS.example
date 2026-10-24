@@ -1,0 +1,30 @@
+# GitHub CODEOWNERS Example Configuration
+#
+# Lines starting with '#' are comments.
+# Each line defines a file pattern followed by one or more owners (GitHub usernames or @org/teams).
+# Order matters: the last matching pattern takes precedence for the specified file.
+#
+# To activate this configuration, copy or rename this file to:
+#   .github/CODEOWNERS
+#
+# Documentation:
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repository
+* @kveld9
+
+# Security policy and critical credentials audit
+/SECURITY.md @security-team
+/.github/workflows/ @devops-team @kveld9
+
+# Documentation and standards
+/docs/ @docs-team @kveld9
+/README.md @docs-team @kveld9
+/CONTRIBUTING.md @docs-team @kveld9
+
+# Automation and maintenance scripts
+/scripts/ @devops-team
+
+# Core application / stack-specific code (customize for your repository)
+#/src/ @frontend-team
+#/backend/ @backend-team

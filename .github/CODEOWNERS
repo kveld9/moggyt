@@ -1,0 +1,19 @@
+# Default owner for everything in the repository.
+* @kveld9
+
+# Security policy and critical credentials audit.
+/SECURITY.md @kveld9
+/.github/workflows/ @kveld9
+
+# Documentation and standards.
+/docs/ @kveld9
+/README.md @kveld9
+/CONTRIBUTING.md @kveld9
+
+# Automation and maintenance scripts.
+/scripts/ @kveld9
+
+# Rust application code.
+/src/ @kveld9
+/Cargo.toml @kveld9
+/Cargo.lock @kveld9

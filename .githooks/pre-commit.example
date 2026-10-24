@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Git pre-commit hook to audit repository standards before committing.
+# Activate with:
+#   cp .githooks/pre-commit.example .githooks/pre-commit && chmod +x .githooks/pre-commit && git config core.hooksPath .githooks
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+echo "Running repository standards check..."
+if [ -x "./scripts/check-repo.sh" ]; then
+  ./scripts/check-repo.sh
+else
+  bash ./scripts/check-repo.sh
+fi
+
+if [ -f "./scripts/check-complexity.py" ]; then
+  echo "Running cyclomatic complexity ratchet check..."
+  python3 ./scripts/check-complexity.py
+fi
+
+# Reject empty commit messages if message file exists
+MSG_FILE="${1:-.git/COMMIT_EDITMSG}"
+if [ -f "$MSG_FILE" ] && [ -z "$(grep -v '^[[:space:]]*#' "$MSG_FILE" | tr -d '[:space:]')" ]; then
+  echo "Error: Commit message cannot be empty." >&2
+  exit 1
+fi

@@ -1,0 +1,3 @@
+# Clippy configuration: deny complexity creep, keep functions small (CC <= 5 target).
+cognitive-complexity-threshold = 5
+too-many-arguments-threshold = 5
