@@ -38,11 +38,11 @@ Three existing projects were used as requirements sources:
   `notifications`, `playback-speed`, `visualizer`). Its plugin contract shape informs where
   `moggyt` ports end so a minimal plugin host stays possible in v2.
 
-| Source       | Reuse in `moggyt`                             | Reject                                   |
-| ------------ | --------------------------------------------- | ---------------------------------------- |
-| `ytmdesktop` | Feature checklist, release cadence            | Electron shell wrapping the web player   |
-| `YTubic`     | InnerTube client, `yt-dlp` sidecar, cache plan | Webview shell (WebView2 / WebKitGTK)    |
-| `pear`       | Plugin taxonomy, settings-per-feature pattern | CSS themes, full plugin SDK in v1        |
+| Source       | Reuse in `moggyt`                              | Reject                                   |
+| ------------ | ---------------------------------------------- | ---------------------------------------- |
+| `ytmdesktop` | Feature checklist, release cadence             | Electron shell wrapping the web player   |
+| `YTubic`     | InnerTube client, `yt-dlp` sidecar, cache plan | Webview shell (WebView2 / WebKitGTK)     |
+| `pear`       | Plugin taxonomy, settings-per-feature pattern  | CSS themes, full plugin SDK in v1        |
 
 ## 3 Scope
 
