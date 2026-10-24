@@ -39,6 +39,7 @@ fn main() -> anyhow::Result<()> {
     let presence = DesktopPresence::new();
     tracing::debug!("desktop media presence live: {}", presence.is_live());
     state.set_presence(presence);
+    tracing::debug!("discord rich presence live: {}", state.discord.is_live());
 
     let options = eframe::NativeOptions::default();
     eframe::run_native("moggyt", options, Box::new(|_ctx| Ok(Box::new(MoggytApp::new(state)))))

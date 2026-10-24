@@ -21,3 +21,4 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 single-instance = "0.3"
 souvlaki = "0.8"
 tray-icon = { version = "0.20", default-features = false }
+discord-rich-presence = "0.2"
