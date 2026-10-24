@@ -10,8 +10,9 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
-    DesktopPresence, DiskCoverCache, KeyringSessionStore, LastFmClient, LiveAudio, LrclibClient,
-    RodioBackend, SingleInstanceGuard, TrayHandle, YtmCatalog, ensure_sidecar,
+    DesktopPresence, DiskCoverCache, DiskSettingsStore, KeyringSessionStore, LastFmClient,
+    LiveAudio, LrclibClient, RodioBackend, SingleInstanceGuard, TrayHandle, YtmCatalog,
+    default_config_dir, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -46,9 +47,20 @@ fn main() -> anyhow::Result<()> {
     tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
     state.set_scrobbler(Box::new(scrobbler));
 
+    let settings_dir = default_config_dir();
+    let settings_store = DiskSettingsStore::new(settings_dir);
+    state.set_settings_store(Box::new(settings_store));
+
     let options = eframe::NativeOptions::default();
-    eframe::run_native("moggyt", options, Box::new(|_ctx| Ok(Box::new(MoggytApp::new(state)))))
-        .map_err(|err| anyhow::anyhow!("eframe failed: {err}"))?;
+    eframe::run_native(
+        "moggyt",
+        options,
+        Box::new(|cc| {
+            moggyt::app::theme::apply(&cc.egui_ctx, &state.theme.palette());
+            Ok(Box::new(MoggytApp::new(state)))
+        }),
+    )
+    .map_err(|err| anyhow::anyhow!("eframe failed: {err}"))?;
 
     Ok(())
 }
