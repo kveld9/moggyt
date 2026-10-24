@@ -74,6 +74,14 @@ makepkg -si
 
 ## Installing on Linux from Portable Tarball
 
+Unlike the Arch package (`makepkg -si` auto-resolves `alsa-lib` and `libayatana-appindicator`),
+the portable tarball ships only the `moggyt` binary. Install the runtime libraries first:
+
+- Debian/Ubuntu: `sudo apt install libasound2 libayatana-appindicator3-1`
+- Arch Linux: `sudo pacman -S --needed alsa-lib libayatana-appindicator`
+
+Without them, audio initialization falls back to a muted stub and the system tray stays disabled.
+
 1. Download `moggyt-<version>-linux.tar.gz` and `SHA256SUMS.txt` from GitHub Releases.
 1. Verify archive integrity:
 
