@@ -64,6 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       skip_release: ${{ steps.semver.outputs.skip_release }}
+      prev_tag: ${{ steps.semver.outputs.prev_tag }}
       tag_name: ${{ steps.semver.outputs.tag_name }}
       version: ${{ steps.semver.outputs.version }}
     steps:
@@ -91,6 +92,7 @@ jobs:
             NEW_TAG="v${NEW_VERSION}"
             echo "No previous v* tags found. Starting baseline at ${NEW_TAG}."
             echo "skip_release=false" >> "$GITHUB_OUTPUT"
+            echo "prev_tag=" >> "$GITHUB_OUTPUT"
             echo "tag_name=${NEW_TAG}" >> "$GITHUB_OUTPUT"
             echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
             exit 0
@@ -139,6 +141,7 @@ jobs:
 
           echo "Computed bump '${BUMP}': ${LATEST_TAG} -> ${NEW_TAG}"
           echo "skip_release=false" >> "$GITHUB_OUTPUT"
+          echo "prev_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
           echo "tag_name=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -201,6 +204,11 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - name: Check out repository with tag history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Download all release artifacts
         uses: actions/download-artifact@v4
         with:
@@ -234,6 +242,21 @@ jobs:
         run: |
           TAG="${{ needs.semver.outputs.tag_name }}"
           VERSION="${{ needs.semver.outputs.version }}"
+          PREV_TAG="${{ needs.semver.outputs.prev_tag }}"
+          REPO="${GITHUB_REPOSITORY}"
+
+          git fetch --tags --force
+
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+
+          FEATURES=$(git log "$RANGE" --format="- %s (%h)" | grep -E "^- feat(\([^)]+\))?(!)?: " || true)
+          FIXES=$(git log "$RANGE" --format="- %s (%h)" | grep -E "^- fix(\([^)]+\))?(!)?: " || true)
+          BREAKING=$(git log "$RANGE" --format="- %s (%h)" | grep -E "^- [a-z]+(\([^)]+\))?!: " || true)
+          BREAKING_BODY=$(git log "$RANGE" --format="%H %s" --grep="BREAKING CHANGE" | sed -E "s/^([0-9a-f]+) (.*)$/- \2 (\1)/" || true)
 
           cat << 'EOF' > release_body.md
           ## Release Details
@@ -242,6 +265,33 @@ jobs:
           echo "- Version: \`${VERSION}\`" >> release_body.md
           echo "- Tag: \`${TAG}\`" >> release_body.md
           echo "" >> release_body.md
+
+          echo "### What's Changed" >> release_body.md
+          if [ -n "$BREAKING" ] || [ -n "$BREAKING_BODY" ]; then
+            echo "#### Breaking Changes" >> release_body.md
+            [ -n "$BREAKING" ] && echo "$BREAKING" >> release_body.md
+            [ -n "$BREAKING_BODY" ] && echo "$BREAKING_BODY" >> release_body.md
+            echo "" >> release_body.md
+          fi
+          if [ -n "$FEATURES" ]; then
+            echo "#### Features" >> release_body.md
+            echo "$FEATURES" >> release_body.md
+            echo "" >> release_body.md
+          fi
+          if [ -n "$FIXES" ]; then
+            echo "#### Fixes" >> release_body.md
+            echo "$FIXES" >> release_body.md
+            echo "" >> release_body.md
+          fi
+          if [ -z "$FEATURES" ] && [ -z "$FIXES" ] && [ -z "$BREAKING" ] && [ -z "$BREAKING_BODY" ]; then
+            echo "_No application changes in this range._" >> release_body.md
+            echo "" >> release_body.md
+          fi
+
+          if [ -n "$PREV_TAG" ] && [ -n "$REPO" ]; then
+            echo "**Full Changelog:** https://github.com/${REPO}/compare/${PREV_TAG}...${TAG}" >> release_body.md
+            echo "" >> release_body.md
+          fi
 
           echo "### Download & Verification" >> release_body.md
           echo "| File | SHA-256 Checksum |" >> release_body.md
