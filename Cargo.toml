@@ -40,4 +40,12 @@ Native YouTube Music client written in Rust (eframe/egui)."""
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
 
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev.package."*"]
+opt-level = 2
 
