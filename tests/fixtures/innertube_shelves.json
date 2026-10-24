@@ -1,0 +1,19 @@
+{
+  "contents": { "tabbedSearchResultsRenderer": { "tabs": [{ "tabRenderer": { "content": { "sectionListRenderer": { "contents": [
+    { "musicShelfRenderer": { "title": { "runs": [{ "text": "Songs" }] }, "contents": [
+      { "musicResponsiveListItemRenderer": { "flexColumns": [
+        { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Solaris" }] } } },
+        { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Photay" }] } } }
+      ], "navigationEndpoint": { "watchEndpoint": { "videoId": "solar-1" } } } },
+      { "musicResponsiveListItemRenderer": { "flexColumns": [{ "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Incomplete" }] } } }] } }
+    ] } },
+    { "musicShelfRenderer": { "title": { "runs": [{ "text": "Albums" }] }, "contents": [{ "musicTwoRowItemRenderer": {
+      "title": { "runs": [{ "text": "Waking Season", "navigationEndpoint": { "browseEndpoint": { "browseId": "MPREb_album_1" } } }] }, "subtitle": { "runs": [{ "text": "Photay" }] }
+    } }] } },
+    { "musicShelfRenderer": { "title": { "runs": [{ "text": "Artists" }] }, "contents": [{ "musicTwoRowItemRenderer": {
+      "title": { "runs": [{ "text": "Photay" }] }, "subtitle": { "runs": [{ "text": "Artist • 50K subscribers" }] }, "navigationEndpoint": { "browseEndpoint": { "browseId": "UC_photay_1" } }
+    } }] } },
+    { "musicShelfRenderer": { "title": { "runs": [{ "text": "Community Mixes" }] }, "contents": [] } },
+    { "musicCardShelfRenderer": { "header": { "musicCardShelfHeaderBasicRenderer": { "title": { "runs": [{ "text": "Card" }] } } } } }
+  ] } } } }] } }
+}
