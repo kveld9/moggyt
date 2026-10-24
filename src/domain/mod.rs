@@ -6,5 +6,5 @@
 mod queue;
 mod search;
 
-pub use queue::PlaybackQueue;
+pub use queue::{PlaybackQueue, RepeatMode};
 pub use search::{SearchQuery, Track};
