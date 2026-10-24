@@ -10,11 +10,19 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
-    DiskCoverCache, KeyringSessionStore, LiveAudio, LrclibClient, RodioBackend, YtmCatalog,
-    ensure_sidecar,
+    DiskCoverCache, KeyringSessionStore, LiveAudio, LrclibClient, RodioBackend,
+    SingleInstanceGuard, YtmCatalog, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
+    let _instance = match SingleInstanceGuard::try_acquire() {
+        Some(g) => g,
+        None => {
+            eprintln!("moggyt is already running; exiting.");
+            return Ok(());
+        }
+    };
+
     tracing_subscriber_setup();
 
     let data_dir = app_data_dir();
