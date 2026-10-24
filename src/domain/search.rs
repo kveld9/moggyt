@@ -1,9 +1,26 @@
 //! Search models: immutable query and catalog hit types.
 
+/// Category filter for catalog search queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SearchFilter {
+    /// All categories.
+    #[default]
+    All,
+    /// Tracks only.
+    Tracks,
+    /// Albums only.
+    Albums,
+    /// Artists only.
+    Artists,
+    /// Playlists only.
+    Playlists,
+}
+
 /// Validated search query (trimmed, non-empty).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchQuery {
     text: String,
+    filter: SearchFilter,
 }
 
 impl SearchQuery {
@@ -13,12 +30,23 @@ impl SearchQuery {
         if text.is_empty() {
             return None;
         }
-        Some(Self { text })
+        Some(Self { text, filter: SearchFilter::All })
     }
 
     /// Query text (already trimmed).
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Active category filter.
+    pub fn filter(&self) -> SearchFilter {
+        self.filter
+    }
+
+    /// Sets the category filter, consuming self.
+    pub fn with_filter(mut self, filter: SearchFilter) -> Self {
+        self.filter = filter;
+        self
     }
 }
 
@@ -97,6 +125,16 @@ mod tests {
     fn query_is_trimmed() {
         let query = SearchQuery::parse("  midnight  ").expect("valid query");
         assert_eq!(query.text(), "midnight");
+    }
+
+    #[test]
+    fn query_filter_defaults_to_all_and_builder_updates_filter() {
+        let query = SearchQuery::parse("rock").expect("valid query");
+        assert_eq!(query.filter(), SearchFilter::All);
+
+        let filtered = query.with_filter(SearchFilter::Albums);
+        assert_eq!(filtered.filter(), SearchFilter::Albums);
+        assert_eq!(filtered.text(), "rock");
     }
 
     #[test]
