@@ -11,6 +11,7 @@ mod innertube;
 mod lyrics;
 mod presence;
 mod session;
+mod session_keyring;
 mod stream;
 mod updater;
 mod ytdlp;
@@ -23,6 +24,7 @@ pub use innertube::{InnerTube, RawTrack, search_body, search_url};
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
 pub use presence::{NoopPresence, Presence};
 pub use session::{MemorySessionStore, SessionStore};
+pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
 pub use stream::{StreamResolver, StreamStub};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
 pub use ytdlp::{
