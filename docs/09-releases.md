@@ -12,6 +12,20 @@ Release automation runs across standard GitHub Actions runners:
 - **Reproducibility**: `Cargo.lock` is tracked in version control and acts as the single source of truth for all crate
   dependencies across development and release pipelines.
 
+## Release Procedure
+
+Releases are triggered exclusively by pushing an explicit Semantic Versioning Git tag. Merging pull requests into
+`main` never publishes a release.
+
+To cut a new release:
+
+```bash
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+
+The release pipeline validates the tag format (`^v[0-9]+\.[0-9]+\.[0-9]+$`), derives the package version, builds
+distribution artifacts across platforms, generates SHA-256 checksums, and publishes the release to GitHub Releases.
+
 ## Distribution Artifacts
 
 Release assets by shipment status:
