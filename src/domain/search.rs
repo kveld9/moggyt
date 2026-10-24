@@ -1,9 +1,26 @@
 //! Search models: immutable query and catalog hit types.
 
+/// Category filter for catalog search queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SearchFilter {
+    /// All categories.
+    #[default]
+    All,
+    /// Tracks only.
+    Tracks,
+    /// Albums only.
+    Albums,
+    /// Artists only.
+    Artists,
+    /// Playlists only.
+    Playlists,
+}
+
 /// Validated search query (trimmed, non-empty).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchQuery {
     text: String,
+    filter: SearchFilter,
 }
 
 impl SearchQuery {
@@ -13,12 +30,23 @@ impl SearchQuery {
         if text.is_empty() {
             return None;
         }
-        Some(Self { text })
+        Some(Self { text, filter: SearchFilter::All })
     }
 
     /// Query text (already trimmed).
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Active category filter.
+    pub fn filter(&self) -> SearchFilter {
+        self.filter
+    }
+
+    /// Sets the category filter, consuming self.
+    pub fn with_filter(mut self, filter: SearchFilter) -> Self {
+        self.filter = filter;
+        self
     }
 }
 
@@ -35,6 +63,8 @@ pub struct Track {
     pub album: Option<String>,
     /// Optional track duration in seconds.
     pub duration_secs: Option<u32>,
+    /// Highest-resolution InnerTube thumbnail URL when known.
+    pub artwork: Option<String>,
 }
 
 impl Track {
@@ -46,6 +76,7 @@ impl Track {
             artist: artist.to_owned(),
             album: None,
             duration_secs: None,
+            artwork: None,
         }
     }
 
@@ -63,6 +94,7 @@ impl Track {
             artist: artist.to_owned(),
             album,
             duration_secs,
+            artwork: None,
         }
     }
 
@@ -75,6 +107,12 @@ impl Track {
     /// Sets the optional duration in seconds, consuming self.
     pub fn with_duration(mut self, duration_secs: u32) -> Self {
         self.duration_secs = Some(duration_secs);
+        self
+    }
+
+    /// Sets the optional artwork URL, consuming self.
+    pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {
+        self.artwork = Some(artwork.into());
         self
     }
 
@@ -100,6 +138,16 @@ mod tests {
     }
 
     #[test]
+    fn query_filter_defaults_to_all_and_builder_updates_filter() {
+        let query = SearchQuery::parse("rock").expect("valid query");
+        assert_eq!(query.filter(), SearchFilter::All);
+
+        let filtered = query.with_filter(SearchFilter::Albums);
+        assert_eq!(filtered.filter(), SearchFilter::Albums);
+        assert_eq!(filtered.text(), "rock");
+    }
+
+    #[test]
     fn display_joins_title_and_artist() {
         let track = Track::new("id", "Midnight", "Night Drive");
         assert_eq!(track.display(), "Midnight - Night Drive");
@@ -110,12 +158,16 @@ mod tests {
         let base = Track::new("id", "Title", "Artist");
         assert_eq!(base.album, None);
         assert_eq!(base.duration_secs, None);
+        assert_eq!(base.artwork, None);
 
-        let built = base.with_album("Album").with_duration(210);
-        let full = Track::new_full("id", "Title", "Artist", Some("Album".to_owned()), Some(210));
+        let built =
+            base.with_album("Album").with_duration(210).with_artwork("https://artwork.local/art");
+        let full = Track::new_full("id", "Title", "Artist", Some("Album".to_owned()), Some(210))
+            .with_artwork("https://artwork.local/art");
         assert_eq!(built, full);
         assert_eq!(built.album.as_deref(), Some("Album"));
         assert_eq!(built.duration_secs, Some(210));
+        assert_eq!(built.artwork.as_deref(), Some("https://artwork.local/art"));
         assert_eq!(built.display(), "Title - Artist");
     }
 }

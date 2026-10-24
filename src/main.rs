@@ -5,21 +5,119 @@
 //! Domain logic lives in [`moggyt::domain`]; all I/O hides behind
 //! ports implemented in [`moggyt::infra`].
 
+use std::path::{Path, PathBuf};
+
+use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
-use moggyt::infra::{AudioStub, CatalogStub};
+use moggyt::infra::{
+    DesktopPresence, DiskCoverCache, KeyringSessionStore, LastFmClient, LiveAudio, LrclibClient,
+    RodioBackend, SingleInstanceGuard, TrayHandle, YtmCatalog, ensure_sidecar,
+};
 
 fn main() -> anyhow::Result<()> {
+    let _instance = match SingleInstanceGuard::try_acquire() {
+        Some(g) => g,
+        None => {
+            eprintln!("moggyt is already running; exiting.");
+            return Ok(());
+        }
+    };
+
     tracing_subscriber_setup();
 
-    let catalog = CatalogStub::new();
-    let audio = AudioStub::new();
-    let state = AppState::new(catalog, audio);
+    let data_dir = app_data_dir();
+    let audio = init_live_audio(&data_dir);
+    let catalog = YtmCatalog::new();
+    let session = KeyringSessionStore::moggyt();
+    let lyrics = LrclibClient::new();
+    let covers = init_cover_cache(&data_dir);
+    let mut state = AppState::new(catalog, audio, session, lyrics, covers);
+    match TrayHandle::try_new() {
+        Some(h) => state.set_tray(h),
+        None => tracing::warn!("tray unavailable; running without system tray icon"),
+    }
+    let presence = DesktopPresence::new();
+    tracing::debug!("desktop media presence live: {}", presence.is_live());
+    state.set_presence(presence);
+    tracing::debug!("discord rich presence live: {}", state.discord.is_live());
+
+    // Dormant without credentials; live scrobbling awaits user settings UI and Last.fm app registration.
+    let scrobbler = LastFmClient::new("", "");
+    tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
+    state.set_scrobbler(Box::new(scrobbler));
 
     let options = eframe::NativeOptions::default();
     eframe::run_native("moggyt", options, Box::new(|_ctx| Ok(Box::new(MoggytApp::new(state)))))
         .map_err(|err| anyhow::anyhow!("eframe failed: {err}"))?;
 
     Ok(())
+}
+
+/// Resolves the application data directory using standard platform conventions.
+///
+/// On Windows, targets `%APPDATA%/moggyt`.
+/// On Unix and other platforms, checks `$XDG_DATA_HOME/moggyt`, falling back to
+/// `$HOME/.local/share/moggyt` or `.moggyt` relative directory.
+fn app_data_dir() -> PathBuf {
+    #[cfg(windows)]
+    {
+        if let Some(appdata) = std::env::var_os("APPDATA") {
+            return PathBuf::from(appdata).join("moggyt");
+        }
+        PathBuf::from(".").join(".moggyt")
+    }
+    #[cfg(not(windows))]
+    {
+        if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
+            return PathBuf::from(xdg).join("moggyt");
+        }
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home).join(".local/share/moggyt");
+        }
+        PathBuf::from(".").join(".moggyt")
+    }
+}
+
+/// Creates directory tree if missing, ignoring AlreadyExists.
+fn ensure_data_dir(data_dir: &Path) -> anyhow::Result<()> {
+    std::fs::create_dir_all(data_dir).with_context(|| {
+        format!("failed to create application data directory at '{}'", data_dir.display())
+    })
+}
+
+/// Attempts to initialize the live rodio backend and yt-dlp sidecar.
+fn init_rodio_backend(data_dir: &Path) -> anyhow::Result<RodioBackend> {
+    ensure_data_dir(data_dir)?;
+    let binary =
+        ensure_sidecar(data_dir).context("failed to locate or download yt-dlp sidecar binary")?;
+    RodioBackend::new(binary).context("failed to initialize rodio audio output stream")
+}
+
+/// Initializes audio backend with live rodio playback, falling back to muted stub on any failure.
+fn init_live_audio(data_dir: &Path) -> LiveAudio {
+    match init_rodio_backend(data_dir) {
+        Ok(backend) => LiveAudio::Live(backend),
+        Err(err) => {
+            tracing::warn!("audio initialization failed; running with muted stub: {err:#}");
+            LiveAudio::muted()
+        }
+    }
+}
+
+/// Initializes the disk cover cache in `data_dir/covers`, falling back to a temporary directory
+/// if primary creation fails. If both attempts fail, logs error and exits with code 1.
+fn init_cover_cache(data_dir: &Path) -> DiskCoverCache {
+    let primary = data_dir.join("covers");
+    if let Ok(cache) = DiskCoverCache::new(&primary) {
+        return cache;
+    }
+    tracing::warn!("primary cover cache failed at '{}'; using temp fallback", primary.display());
+    let fallback = std::env::temp_dir().join("moggyt-covers-fallback");
+    DiskCoverCache::new(&fallback).unwrap_or_else(|err| {
+        tracing::error!("fallback cover cache failed at '{}': {err:#}", fallback.display());
+        eprintln!("Fatal: failed to initialize cover cache: {err}");
+        std::process::exit(1);
+    })
 }
 
 fn tracing_subscriber_setup() {

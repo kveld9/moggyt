@@ -10,8 +10,17 @@ rust-version = "1.85"
 [dependencies]
 anyhow = "1.0.104"
 eframe = "0.37.0"
+keyring = "3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rodio = "0.21"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+single-instance = "0.3"
+souvlaki = "0.8"
+tray-icon = { version = "0.20", default-features = false }
+discord-rich-presence = "0.2"
+md-5 = "0.10"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
