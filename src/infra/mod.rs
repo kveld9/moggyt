@@ -5,7 +5,9 @@
 //! without touching `domain` or `app`.
 
 mod audio;
+mod innertube;
 mod ytm;
 
 pub use audio::{AudioBackend, AudioStub};
+pub use innertube::{InnerTube, RawTrack, search_body, search_url};
 pub use ytm::{Catalog, CatalogStub};
