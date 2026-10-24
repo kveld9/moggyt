@@ -9,7 +9,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
-use moggyt::infra::{KeyringSessionStore, LiveAudio, RodioBackend, YtmCatalog, ensure_sidecar};
+use moggyt::infra::{
+    DiskCoverCache, KeyringSessionStore, LiveAudio, LrclibClient, RodioBackend, YtmCatalog,
+    ensure_sidecar,
+};
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber_setup();
@@ -18,7 +21,9 @@ fn main() -> anyhow::Result<()> {
     let audio = init_live_audio(&data_dir);
     let catalog = YtmCatalog::new();
     let session = KeyringSessionStore::moggyt();
-    let state = AppState::new(catalog, audio, session);
+    let lyrics = LrclibClient::new();
+    let covers = init_cover_cache(&data_dir);
+    let state = AppState::new(catalog, audio, session, lyrics, covers);
 
     let options = eframe::NativeOptions::default();
     eframe::run_native("moggyt", options, Box::new(|_ctx| Ok(Box::new(MoggytApp::new(state)))))
@@ -76,6 +81,22 @@ fn init_live_audio(data_dir: &Path) -> LiveAudio {
             LiveAudio::muted()
         }
     }
+}
+
+/// Initializes the disk cover cache in `data_dir/covers`, falling back to a temporary directory
+/// if primary creation fails. If both attempts fail, logs error and exits with code 1.
+fn init_cover_cache(data_dir: &Path) -> DiskCoverCache {
+    let primary = data_dir.join("covers");
+    if let Ok(cache) = DiskCoverCache::new(&primary) {
+        return cache;
+    }
+    tracing::warn!("primary cover cache failed at '{}'; using temp fallback", primary.display());
+    let fallback = std::env::temp_dir().join("moggyt-covers-fallback");
+    DiskCoverCache::new(&fallback).unwrap_or_else(|err| {
+        tracing::error!("fallback cover cache failed at '{}': {err:#}", fallback.display());
+        eprintln!("Fatal: failed to initialize cover cache: {err}");
+        std::process::exit(1);
+    })
 }
 
 fn tracing_subscriber_setup() {

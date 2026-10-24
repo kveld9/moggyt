@@ -6,7 +6,9 @@
 use eframe::egui;
 
 use crate::domain::{PlaybackQueue, SearchQuery};
-use crate::infra::{AudioBackend, Catalog, SessionStore, sanitize_cookie_input};
+use crate::infra::{
+    AudioBackend, Catalog, CoverCache, LyricLine, LyricsSource, SessionStore, sanitize_cookie_input,
+};
 
 /// Navigation pages of the application shell.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -23,7 +25,7 @@ pub enum Page {
 }
 
 /// Wiring between the UI shell and its collaborators.
-pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore> {
+pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache> {
     /// Active navigation page.
     pub page: Page,
     /// Pure playback queue (no I/O).
@@ -38,11 +40,18 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore> {
     pub audio: A,
     /// Session store adapter (injected port).
     pub session: S,
+    pub lyrics: L,
+    pub covers: K,
+    pub lyrics_key: Option<(String, String)>,
+    pub lyrics_lines: Vec<LyricLine>,
+    pub lyrics_offset_ms: i64,
 }
 
-impl<C: Catalog, A: AudioBackend, S: SessionStore> AppState<C, A, S> {
+impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
+    AppState<C, A, S, L, K>
+{
     /// Creates the shell with injected collaborators.
-    pub fn new(catalog: C, audio: A, session: S) -> Self {
+    pub fn new(catalog: C, audio: A, session: S, lyrics: L, covers: K) -> Self {
         Self {
             page: Page::default(),
             queue: PlaybackQueue::new(),
@@ -51,6 +60,11 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore> AppState<C, A, S> {
             catalog,
             audio,
             session,
+            lyrics,
+            covers,
+            lyrics_key: None,
+            lyrics_lines: Vec::new(),
+            lyrics_offset_ms: 0,
         }
     }
 
@@ -161,21 +175,70 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore> AppState<C, A, S> {
         let next_liked = !self.is_liked(trimmed);
         self.catalog.set_liked(trimmed, next_liked);
     }
+
+    /// Fetches and caches synced lyrics for the currently playing track.
+    ///
+    /// No-op if lyrics for the current (artist, title) pair have already been resolved.
+    pub fn refresh_lyrics(&mut self) {
+        let Some(track) = self.queue.current() else {
+            if self.lyrics_key.is_some() {
+                self.lyrics_key = None;
+                self.lyrics_lines.clear();
+            }
+            return;
+        };
+        let key = (track.artist.clone(), track.title.clone());
+        if self.lyrics_key.as_ref() == Some(&key) {
+            return;
+        }
+        let lines = self.lyrics.lookup(&key.0, &key.1).map(|s| s.lines).unwrap_or_default();
+        self.lyrics_lines = lines;
+        self.lyrics_key = Some(key);
+    }
+
+    /// Adjusts the user lyrics timing offset by `delta_ms` with saturating arithmetic.
+    pub fn nudge_lyrics_offset(&mut self, delta_ms: i64) {
+        self.lyrics_offset_ms = self.lyrics_offset_ms.saturating_add(delta_ms);
+    }
+
+    /// Computes user-visible lyrics timestamps by applying current offset clamped at zero.
+    pub fn visible_lyric_lines(&self) -> Vec<(u64, String)> {
+        self.lyrics_lines
+            .iter()
+            .map(|line| {
+                let shifted = (line.start_ms as i64).saturating_add(self.lyrics_offset_ms);
+                let visible_ms = shifted.max(0) as u64;
+                (visible_ms, line.text.clone())
+            })
+            .collect()
+    }
+}
+
+/// Formats a millisecond duration as zero-padded "m:ss" (e.g. 65000 -> "1:05").
+pub fn format_lyric_timestamp(ms: u64) -> String {
+    let total_secs = ms / 1000;
+    let mins = total_secs / 60;
+    let secs = total_secs % 60;
+    format!("{mins}:{secs:02}")
 }
 
 /// eframe application wrapper (thin view over [`AppState`]).
-pub struct MoggytApp<C: Catalog, A: AudioBackend, S: SessionStore> {
-    state: AppState<C, A, S>,
+pub struct MoggytApp<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache> {
+    state: AppState<C, A, S, L, K>,
 }
 
-impl<C: Catalog, A: AudioBackend, S: SessionStore> MoggytApp<C, A, S> {
+impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
+    MoggytApp<C, A, S, L, K>
+{
     /// Wraps an already-wired state for eframe.
-    pub fn new(state: AppState<C, A, S>) -> Self {
+    pub fn new(state: AppState<C, A, S, L, K>) -> Self {
         Self { state }
     }
 }
 
-impl<C: Catalog, A: AudioBackend, S: SessionStore> eframe::App for MoggytApp<C, A, S> {
+impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache> eframe::App
+    for MoggytApp<C, A, S, L, K>
+{
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         render_top_bar(ui, &mut self.state);
         render_player_bar(ui, &mut self.state);
@@ -183,9 +246,9 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore> eframe::App for MoggytApp<C, 
     }
 }
 
-fn render_top_bar<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_top_bar<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     egui::Panel::top("top_bar").show(ui, |ui| {
         ui.horizontal(|ui| {
@@ -199,9 +262,9 @@ fn render_top_bar<C: Catalog, A: AudioBackend, S: SessionStore>(
     });
 }
 
-fn render_body<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_body<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     egui::CentralPanel::default().show(ui, |ui| match state.page {
         Page::Search => render_search(ui, state),
@@ -211,9 +274,9 @@ fn render_body<C: Catalog, A: AudioBackend, S: SessionStore>(
     });
 }
 
-fn render_library<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_library<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     render_library_sign_in(ui, state);
     ui.separator();
@@ -224,9 +287,15 @@ fn render_library<C: Catalog, A: AudioBackend, S: SessionStore>(
     render_library_albums(ui, state);
 }
 
-fn render_library_sign_in<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_library_sign_in<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     let status = if state.is_signed_in() {
         "Signed in — library unlocked"
@@ -245,9 +314,15 @@ fn render_library_sign_in<C: Catalog, A: AudioBackend, S: SessionStore>(
     });
 }
 
-fn render_library_playlists<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_library_playlists<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &AppState<C, A, S>,
+    state: &AppState<C, A, S, L, K>,
 ) {
     ui.heading("Playlists");
     let playlists = state.catalog.playlists();
@@ -260,9 +335,15 @@ fn render_library_playlists<C: Catalog, A: AudioBackend, S: SessionStore>(
     }
 }
 
-fn render_library_liked<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_library_liked<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     ui.heading("Liked songs");
     let liked = state.catalog.liked_tracks();
@@ -284,9 +365,15 @@ fn render_library_liked<C: Catalog, A: AudioBackend, S: SessionStore>(
     }
 }
 
-fn render_library_albums<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_library_albums<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &AppState<C, A, S>,
+    state: &AppState<C, A, S, L, K>,
 ) {
     ui.heading("Saved albums");
     let albums = state.catalog.saved_albums();
@@ -299,9 +386,9 @@ fn render_library_albums<C: Catalog, A: AudioBackend, S: SessionStore>(
     }
 }
 
-fn render_search<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_search<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     ui.label("Search the catalog (stub returns fixed hits):");
     let submitted = ui.text_edit_singleline(&mut state.search_text).lost_focus()
@@ -311,9 +398,9 @@ fn render_search<C: Catalog, A: AudioBackend, S: SessionStore>(
     }
 }
 
-fn render_queue<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_queue<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     ui.label(format!("{} track(s) queued", state.queue.len()));
     ui.horizontal(|ui| {
@@ -332,27 +419,75 @@ fn render_queue<C: Catalog, A: AudioBackend, S: SessionStore>(
     }
 }
 
-fn render_now_playing<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_now_playing<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
-    match state.queue.current() {
-        Some(track) => {
-            ui.heading(track.display());
-            ui.label(format!("by {}", track.artist));
-            ui.separator();
-            ui.label(format!("requested: {}", state.audio.last_requested().unwrap_or("none")));
-        }
-        None => {
-            debug_assert!(state.queue.is_empty());
-            ui.label("Queue is empty. Search and enqueue a track first.");
-        }
+    let Some(track) = state.queue.current().cloned() else {
+        debug_assert!(state.queue.is_empty());
+        ui.label("Queue is empty. Search and enqueue a track first.");
+        return;
+    };
+    if state.lyrics_key.as_ref().is_none_or(|k| k.0 != track.artist || k.1 != track.title) {
+        state.refresh_lyrics();
     }
+    ui.heading(track.display());
+    ui.label(format!("by {}", track.artist));
+    ui.separator();
+    ui.label(format!("requested: {}", state.audio.last_requested().unwrap_or("none")));
+    ui.separator();
+    ui.label("Cover art: image decoding lands with hi-res covers (v1.1 polish); cache ready.");
+    ui.separator();
+    render_lyrics_panel(ui, state);
 }
 
-fn render_player_bar<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_lyrics_panel<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.heading("Lyrics");
+    ui.horizontal(|ui| {
+        ui.label(format!("Offset: {}ms", state.lyrics_offset_ms));
+        if ui.button("-250ms").clicked() {
+            state.nudge_lyrics_offset(-250);
+        }
+        if ui.button("+250ms").clicked() {
+            state.nudge_lyrics_offset(250);
+        }
+    });
+    let lines = state.visible_lyric_lines();
+    if lines.is_empty() {
+        ui.label("No synced lyrics for this track.");
+        return;
+    }
+    egui::ScrollArea::vertical().show(ui, |ui| {
+        for (ms, text) in lines {
+            ui.label(format!("{} {text}", format_lyric_timestamp(ms)));
+        }
+    });
+}
+
+fn render_player_bar<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     egui::Panel::bottom("player_bar").show(ui, |ui| {
         ui.horizontal(|ui| {
@@ -369,17 +504,29 @@ fn render_player_bar<C: Catalog, A: AudioBackend, S: SessionStore>(
     });
 }
 
-fn render_track_info<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_track_info<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &AppState<C, A, S>,
+    state: &AppState<C, A, S, L, K>,
 ) {
     let title = state.queue.current().map_or("Queue empty".to_owned(), |t| t.display());
     ui.label(title);
 }
 
-fn render_playback_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_playback_controls<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     if ui.button("Previous").clicked() {
         state.prev_track();
@@ -393,9 +540,15 @@ fn render_playback_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
     }
 }
 
-fn render_seek_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_seek_controls<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     if ui.button("-10s").clicked() {
         state.seek_by(-10);
@@ -405,9 +558,15 @@ fn render_seek_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
     }
 }
 
-fn render_volume_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_volume_controls<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S>,
+    state: &mut AppState<C, A, S, L, K>,
 ) {
     let mut vol = state.audio.volume();
     if ui.add(egui::Slider::new(&mut vol, 0..=100).text("Vol")).changed() {
@@ -415,9 +574,15 @@ fn render_volume_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
     }
 }
 
-fn render_position_info<C: Catalog, A: AudioBackend, S: SessionStore>(
+fn render_position_info<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
     ui: &mut egui::Ui,
-    state: &AppState<C, A, S>,
+    state: &AppState<C, A, S, L, K>,
 ) {
     let pos = state.audio.position_secs();
     let text = match state.queue.current().and_then(|t| t.duration_secs) {
@@ -430,10 +595,20 @@ fn render_position_info<C: Catalog, A: AudioBackend, S: SessionStore>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infra::{AudioStub, CatalogStub, MemorySessionStore};
+    use crate::domain::Track;
+    use crate::infra::{
+        AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
+    };
 
-    fn wired() -> AppState<CatalogStub, AudioStub, MemorySessionStore> {
-        AppState::new(CatalogStub::new(), AudioStub::new(), MemorySessionStore::new())
+    fn wired() -> AppState<CatalogStub, AudioStub, MemorySessionStore, LrclibStub, MemoryCoverCache>
+    {
+        AppState::new(
+            CatalogStub::new(),
+            AudioStub::new(),
+            MemorySessionStore::new(),
+            LrclibStub::new(),
+            MemoryCoverCache::new(),
+        )
     }
 
     #[test]
@@ -592,5 +767,64 @@ mod tests {
 
         state.set_volume(150);
         assert_eq!(state.audio.volume(), 100);
+    }
+
+    #[test]
+    fn format_lyric_timestamp_table() {
+        for (ms, exp) in [(0, "0:00"), (5_000, "0:05"), (65_000, "1:05"), (612_000, "10:12")] {
+            assert_eq!(format_lyric_timestamp(ms), exp);
+        }
+    }
+
+    #[test]
+    fn lyrics_offset_and_visible_lines_clamping_table() {
+        let mut state = wired();
+        state.lyrics_lines = vec![
+            LyricLine { start_ms: 0, text: "intro".into() },
+            LyricLine { start_ms: 5_000, text: "verse".into() },
+        ];
+        for (delta, off, fst, snd) in [
+            (0, 0, 0, 5_000),
+            (250, 250, 250, 5_250),
+            (-500, -250, 0, 4_750),
+            (-5_000, -5_250, 0, 0),
+        ] {
+            state.nudge_lyrics_offset(delta);
+            assert_eq!(state.lyrics_offset_ms, off);
+            assert_eq!(
+                state.visible_lyric_lines(),
+                vec![(fst, "intro".into()), (snd, "verse".into())]
+            );
+        }
+        state.nudge_lyrics_offset(i64::MAX);
+        assert_eq!(state.lyrics_offset_ms, i64::MAX - 5_250);
+        state.nudge_lyrics_offset(10_000);
+        assert_eq!(state.lyrics_offset_ms, i64::MAX);
+    }
+
+    #[test]
+    fn refresh_lyrics_lifecycle_tracks_active_song_and_refills_on_change() {
+        let mut state = wired();
+        state.refresh_lyrics();
+        assert!(state.lyrics_key.is_none() && state.lyrics_lines.is_empty());
+
+        state.search_text = "midnight".into();
+        state.submit_search();
+        state.refresh_lyrics();
+        assert_eq!(state.lyrics_key, Some(("Stub Artist".into(), "midnight".into())));
+        assert_eq!(state.lyrics_lines.len(), 2);
+        assert_eq!(state.lyrics_lines[0].text, "midnight - Stub Artist");
+
+        // Skip on same key
+        state.refresh_lyrics();
+        assert_eq!(state.lyrics_lines.len(), 2);
+
+        // Refill on track change via stub (2 lines)
+        state.queue.push(Track::new("s2", "sunrise", "Sunrise Band"));
+        state.queue.advance();
+        state.refresh_lyrics();
+        assert_eq!(state.lyrics_key, Some(("Sunrise Band".into(), "sunrise".into())));
+        assert_eq!(state.lyrics_lines.len(), 2);
+        assert_eq!(state.lyrics_lines[0].text, "sunrise - Sunrise Band");
     }
 }
