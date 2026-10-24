@@ -42,7 +42,7 @@ cargo test --all-features
 └── clippy.toml             # Lint policy (complexity threshold 5)
 ```
 
-See [`docs/02-arquitectura.md`](docs/02-arquitectura.md) for the module boundaries and dependency direction.
+See [`docs/02-architecture.md`](docs/02-architecture.md) for the module boundaries and dependency direction.
 
 ## Standards
 

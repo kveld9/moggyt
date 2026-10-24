@@ -14,7 +14,7 @@ cargo test --all-features
 
 Run all four before finishing. `cargo run` launches the window.
 
-## Architecture invariants (see `docs/02-arquitectura.md`)
+## Architecture invariants (see `docs/02-architecture.md`)
 
 - Dependency direction: `app`/`infra` → `domain`. `domain` never touches I/O
   (`net`, `fs`, `process`, clocks, randomness); inject those as parameters or ports.
@@ -22,7 +22,7 @@ Run all four before finishing. `cargo run` launches the window.
 - External crates hide behind ports in `src/infra/`; the binary crate exposes
   the library via `src/lib.rs` so `pub` APIs stay reachable (no `allow(dead_code)`).
 
-## Code rules (see `docs/03-desarrollo.md`)
+## Code rules (see `docs/03-development.md`)
 
 - TDD for `domain/` and `app/`: red test on public behavior first, then minimal
   code, refactor on green. Fakes in memory; no network/audio in tests; no `sleep`.
