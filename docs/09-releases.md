@@ -35,7 +35,7 @@ Release assets by shipment status:
 | `moggyt-*-linux.tar.gz` | Linux (Generic tarball) | GitHub Releases (consumed by Arch PKGBUILD) | Shipped |
 | `moggyt-*-windows.zip` | Windows 64-bit | GitHub Releases | Shipped |
 | `moggyt_*_amd64.deb` | Linux (Debian, Ubuntu) | GitHub Releases | Shipped |
-| `moggyt-*-x86_64.AppImage` | Linux | GitHub Releases | Planned |
+| `moggyt-*-x86_64.AppImage` | Linux | GitHub Releases | Shipped |
 | `moggyt-*.x86_64.rpm` | Linux (Fedora, openSUSE) | GitHub Releases | Planned |
 | `moggyt-*-setup.exe` | Windows 64-bit | GitHub Releases (NSIS installer) | Planned |
 

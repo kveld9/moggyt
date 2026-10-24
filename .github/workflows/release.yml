@@ -15,7 +15,7 @@
 #   - moggyt-<version>-linux.tar.gz: Portable tarball containing the Linux binary (x86_64).
 #   - moggyt-<version>-windows.zip: Portable zip containing the Windows binary (x86_64).
 #   - moggyt_<version>_amd64.deb: Debian/Ubuntu package with automated dependency resolution.
-#   - <asset>.sha256: Individual SHA-256 digests for each archive.
+#   - moggyt-<version>-x86_64.AppImage: Standalone portable AppImage bundle for Linux (x86_64).
 #   - SHA256SUMS.txt: Unified SHA-256 checksum manifest compatible with 'sha256sum -c'.
 #     (Legacy MD5 and SHA-512 hashes have been dropped to keep release assets clean and lean).
 #
@@ -29,10 +29,11 @@
 #
 # Packaging Roadmap & Installer TODO (SDD Section 10):
 #   SDD Section 10 specifies Linux packages (.AppImage, .deb, .rpm) and Windows
-#   installers (NSIS .exe). This workflow ships standalone portable archives (.tar.gz and .zip)
-#   and native Debian packages (.deb) via cargo-deb.
+#   installers (NSIS .exe). This workflow ships standalone portable archives (.tar.gz and .zip),
+#   native Debian packages (.deb) via cargo-deb, and standalone Linux AppImage bundles (.AppImage)
+#   via linuxdeploy and appimagetool.
 #   TODO:
-#     - Linux packaging: Integrate AppImageKit for standalone .AppImage bundles and rpmbuild for .rpm.
+#     - Linux packaging: Integrate rpmbuild for .rpm.
 #     - Arch Linux packaging: Maintain PKGBUILD in packaging/arch/moggyt-bin (AUR publish deferred; no credentials in v1).
 #     - Windows packaging: Integrate cargo-wix (MSI) or NSIS for setup installer creation.
 #     - Code signing & Attestations: Integrate Authenticode signing for Windows
@@ -150,6 +151,37 @@ jobs:
           cargo deb --no-build --deb-version "${VERSION}"
           cp target/debian/*.deb dist/
 
+      - name: Build AppImage (.AppImage)
+        if: runner.os == 'Linux'
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        shell: bash
+        run: |
+          VERSION="${{ needs.semver.outputs.version }}"
+          LINUXDEPLOY_URL="https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20240109-1/linuxdeploy-x86_64.AppImage"
+          APPIMAGETOOL_URL="https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
+
+          curl -sSfLo linuxdeploy.AppImage "${LINUXDEPLOY_URL}"
+          curl -sSfLo appimagetool.AppImage "${APPIMAGETOOL_URL}"
+          chmod +x linuxdeploy.AppImage appimagetool.AppImage
+
+          mkdir -p AppDir
+          ALSA_LIB=$(find /usr/lib -name "libasound.so.2" 2>/dev/null | head -n 1)
+          INDICATOR_LIB=$(find /usr/lib -name "libayatana-appindicator3.so.1" 2>/dev/null | head -n 1)
+
+          EXTRA_LIBS=()
+          [ -n "${ALSA_LIB}" ] && EXTRA_LIBS+=("-l" "${ALSA_LIB}")
+          [ -n "${INDICATOR_LIB}" ] && EXTRA_LIBS+=("-l" "${INDICATOR_LIB}")
+
+          ./linuxdeploy.AppImage \
+            --appdir AppDir \
+            -e target/release/moggyt \
+            -d packaging/appimage/moggyt.desktop \
+            -i packaging/appimage/moggyt.png \
+            "${EXTRA_LIBS[@]}"
+
+          ARCH=x86_64 ./appimagetool.AppImage AppDir "dist/moggyt-${VERSION}-x86_64.AppImage"
+
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
@@ -183,17 +215,10 @@ jobs:
         shell: bash
         working-directory: release_assets
         run: |
-          # Generate individual SHA-256 hashes (dropping legacy MD5/SHA-512 to keep assets clean)
-          for asset in *; do
-            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]] && [ "$asset" != "SHA256SUMS.txt" ]; then
-              sha256sum "$asset" | awk '{print $1}' > "${asset}.sha256"
-            fi
-          done
-
-          # Generate standard SHA256SUMS.txt compatible with 'sha256sum -c'
+          # Single SHA256SUMS.txt manifest compatible with 'sha256sum -c'
           rm -f SHA256SUMS.txt
           for asset in *; do
-            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]] && [ "$asset" != "SHA256SUMS.txt" ]; then
+            if [ -f "$asset" ] && [ "$asset" != "SHA256SUMS.txt" ]; then
               sha256sum "$asset" >> SHA256SUMS.txt
             fi
           done
