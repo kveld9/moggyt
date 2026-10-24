@@ -5,28 +5,56 @@ use super::innertube::{
 };
 use crate::domain::{Album, Artist, Playlist, SearchFilter, SearchQuery, SearchResult, Track};
 
-/// Read-only catalog port: search by free text.
+/// Catalog port: search by free text and user library read/mutation access.
 pub trait Catalog {
     /// Returns catalog hits for `query` (empty when nothing matches).
     fn search(&self, query: &str) -> Vec<Track>;
 
     /// Returns catalog hits matching the query text and filter.
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult>;
+
+    /// Returns saved or owned playlists.
+    fn playlists(&self) -> Vec<Playlist>;
+
+    /// Returns tracks saved to the user's liked collection.
+    fn liked_tracks(&self) -> Vec<Track>;
+
+    /// Returns albums saved to the user's library.
+    fn saved_albums(&self) -> Vec<Album>;
+
+    /// Adds (`liked = true`) or removes (`liked = false`) a track from the liked collection.
+    /// Blank identifiers are ignored.
+    fn set_liked(&mut self, track_id: &str, liked: bool);
 }
 
 /// Fixed-data stub: keeps UI and tests deterministic until the real API lands.
-#[derive(Debug, Default)]
-pub struct CatalogStub;
+#[derive(Debug, Clone)]
+pub struct CatalogStub {
+    liked_ids: Vec<String>,
+}
+
+impl Default for CatalogStub {
+    fn default() -> Self {
+        Self { liked_ids: vec!["stub-1".to_owned()] }
+    }
+}
 
 impl CatalogStub {
     /// Creates the stub catalog.
     pub fn new() -> Self {
-        Self
+        Self::default()
     }
 
     fn fixed_hits(query: &str) -> Vec<Track> {
         vec![
             Track::new("stub-1", query, "Stub Artist"),
+            Track::new("stub-2", "B-side", "Stub Artist"),
+        ]
+    }
+
+    fn stub_liked_hits() -> Vec<Track> {
+        vec![
+            Track::new("stub-1", "Liked Song", "Stub Artist"),
             Track::new("stub-2", "B-side", "Stub Artist"),
         ]
     }
@@ -41,6 +69,10 @@ impl CatalogStub {
 
     fn stub_playlist() -> Playlist {
         Playlist::new("stub-playlist-1", "Stub Playlist", 12)
+    }
+
+    fn stub_playlists() -> Vec<Playlist> {
+        vec![Self::stub_playlist(), Playlist::new("stub-playlist-2", "Favorites", 24)]
     }
 }
 
@@ -63,6 +95,35 @@ impl Catalog for CatalogStub {
             SearchFilter::Albums => vec![SearchResult::Album(Self::stub_album())],
             SearchFilter::Artists => vec![SearchResult::Artist(Self::stub_artist())],
             SearchFilter::Playlists => vec![SearchResult::Playlist(Self::stub_playlist())],
+        }
+    }
+
+    fn playlists(&self) -> Vec<Playlist> {
+        Self::stub_playlists()
+    }
+
+    fn liked_tracks(&self) -> Vec<Track> {
+        Self::stub_liked_hits()
+            .into_iter()
+            .filter(|track| self.liked_ids.iter().any(|id| id == &track.id))
+            .collect()
+    }
+
+    fn saved_albums(&self) -> Vec<Album> {
+        vec![Self::stub_album()]
+    }
+
+    fn set_liked(&mut self, track_id: &str, liked: bool) {
+        let trimmed = track_id.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        if liked {
+            if !self.liked_ids.iter().any(|id| id == trimmed) {
+                self.liked_ids.push(trimmed.to_owned());
+            }
+        } else {
+            self.liked_ids.retain(|id| id != trimmed);
         }
     }
 }
@@ -137,6 +198,28 @@ impl Catalog for YtmCatalog {
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
         Self::map_hits(self.fetch_hits(query.text()), query.filter())
     }
+
+    /// Returns saved or owned playlists. Anonymous interim returns an empty list
+    /// because authenticated library endpoints require a signed-in InnerTube client.
+    fn playlists(&self) -> Vec<Playlist> {
+        Vec::new()
+    }
+
+    /// Returns liked tracks. Anonymous interim returns an empty list
+    /// because authenticated library endpoints require a signed-in InnerTube client.
+    fn liked_tracks(&self) -> Vec<Track> {
+        Vec::new()
+    }
+
+    /// Returns saved albums. Anonymous interim returns an empty list
+    /// because authenticated library endpoints require a signed-in InnerTube client.
+    fn saved_albums(&self) -> Vec<Album> {
+        Vec::new()
+    }
+
+    /// Sets liked status. Anonymous interim is a no-op because an unauthenticated
+    /// client cannot mutate remote user library state.
+    fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
 }
 
 #[cfg(test)]
@@ -228,5 +311,83 @@ mod tests {
         assert!(format!("{:?}", YtmCatalog::default()).contains("YtmCatalog"));
         assert!(format!("{:?}", InnerTube::new().into_catalog()).contains("YtmCatalog"));
         assert!(format!("{:?}", YtmCatalog::with_tube(InnerTube::new())).contains("YtmCatalog"));
+    }
+
+    #[test]
+    fn stub_library_lifecycle_defaults_and_readers() {
+        let catalog = CatalogStub::new();
+
+        let playlists = catalog.playlists();
+        assert_eq!(playlists.len(), 2);
+        assert!(!playlists[0].title.is_empty());
+        assert!(!playlists[1].title.is_empty());
+
+        let albums = catalog.saved_albums();
+        assert_eq!(albums.len(), 1);
+        assert_eq!(albums[0].id, "stub-album-1");
+
+        let liked = catalog.liked_tracks();
+        assert_eq!(liked.len(), 1);
+        assert_eq!(liked[0].id, "stub-1");
+        assert_eq!(liked[0].title, "Liked Song");
+    }
+
+    #[test]
+    fn stub_library_mutation_and_filtering() {
+        let mut catalog = CatalogStub::new();
+
+        // Initial default state: stub-1 liked.
+        assert_eq!(catalog.liked_tracks().len(), 1);
+
+        // Add stub-2 -> 2 liked tracks ("stub-1", "stub-2").
+        catalog.set_liked("stub-2", true);
+        let liked_both = catalog.liked_tracks();
+        assert_eq!(liked_both.len(), 2);
+        let ids: Vec<_> = liked_both.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["stub-1", "stub-2"]);
+
+        // Duplicate insert keeps exactly 1 entry for that id.
+        catalog.set_liked("stub-2", true);
+        assert_eq!(catalog.liked_tracks().len(), 2);
+        assert_eq!(catalog.liked_tracks().iter().filter(|t| t.id == "stub-2").count(), 1);
+
+        // Remove stub-1 -> only stub-2 remains.
+        catalog.set_liked("stub-1", false);
+        let liked_one = catalog.liked_tracks();
+        assert_eq!(liked_one.len(), 1);
+        assert_eq!(liked_one[0].id, "stub-2");
+
+        // Remove stub-2 -> empty.
+        catalog.set_liked("stub-2", false);
+        assert!(catalog.liked_tracks().is_empty());
+
+        // Blank and whitespace-only ids are ignored.
+        catalog.set_liked("", true);
+        catalog.set_liked("   ", true);
+        catalog.set_liked("", false);
+        catalog.set_liked("   ", false);
+        assert!(catalog.liked_tracks().is_empty());
+
+        // Unknown id is ignored by stub_liked_hits membership filter.
+        catalog.set_liked("unknown-id", true);
+        assert!(catalog.liked_tracks().is_empty());
+    }
+
+    #[test]
+    fn ytm_catalog_interim_library_semantics() {
+        let mut catalog = YtmCatalog::new();
+
+        assert!(catalog.playlists().is_empty());
+        assert!(catalog.saved_albums().is_empty());
+        assert!(catalog.liked_tracks().is_empty());
+
+        // Anonymous interim mutation is a documented no-op and does not panic.
+        catalog.set_liked("stub-1", true);
+        catalog.set_liked("stub-1", false);
+        catalog.set_liked("", true);
+
+        assert!(catalog.playlists().is_empty());
+        assert!(catalog.saved_albums().is_empty());
+        assert!(catalog.liked_tracks().is_empty());
     }
 }
