@@ -24,6 +24,68 @@ cargo test --all-features
 ./scripts/check-repo.sh
 ```
 
+## Install
+
+Pre-built binaries and packages are published on the GitHub [Releases](https://github.com/kveld9/moggyt/releases) page.
+
+### Linux (portable tarball)
+
+1. Download `moggyt-<version>-linux.tar.gz` and `SHA256SUMS.txt` from [Releases](https://github.com/kveld9/moggyt/releases).
+1. Verify archive integrity:
+
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+1. Extract the standalone `moggyt` binary and place it in your `PATH`:
+
+```bash
+tar -xzf moggyt-*-linux.tar.gz
+chmod +x moggyt
+mv moggyt ~/.local/bin/
+```
+
+### Arch Linux (PKGBUILD)
+
+Arch Linux packaging is available via `packaging/arch/moggyt-bin`. Note that `moggyt-bin` is not yet
+published on the AUR; installing via `yay -S moggyt-bin` or `paru -S moggyt-bin` is not supported
+until AUR submission is completed.
+
+1. Install build tools:
+
+```bash
+sudo pacman -S --needed base-devel git
+```
+
+1. Clone the repository and navigate to the package directory:
+
+```bash
+git clone https://github.com/kveld9/moggyt.git
+cd moggyt/packaging/arch/moggyt-bin
+```
+
+1. Build and install the package:
+
+```bash
+makepkg -si
+```
+
+`makepkg -si` downloads the official release tarball, verifies SHA-256 sums, builds the native `.pkg.tar.zst`
+package locally, auto-resolves runtime dependencies (`alsa-lib`, `libayatana-appindicator`), and installs
+`/usr/bin/moggyt` along with the desktop launcher entry (`/usr/share/applications/moggyt.desktop`).
+
+To update to future releases, pull the latest changes and rebuild:
+
+```bash
+git pull
+makepkg -si
+```
+
+### Windows (portable zip)
+
+Download `moggyt-<version>-windows.zip` from [Releases](https://github.com/kveld9/moggyt/releases),
+extract the archive, and run `moggyt.exe`.
+
 ## Repository layout
 
 ```text
