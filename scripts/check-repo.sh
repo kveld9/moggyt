@@ -103,8 +103,8 @@ check_file ".github/settings.example.yml" false
 
 echo -e "\n${BOLD}4. Product Documentation (docs/)${RESET}"
 check_file "docs/01-vision.md" true
-check_file "docs/02-arquitectura.md" true
-check_file "docs/03-desarrollo.md" true
+check_file "docs/02-architecture.md" true
+check_file "docs/03-development.md" true
 
 echo -e "\n${BOLD}5. Rust Sources & Toolchain${RESET}"
 check_file "Cargo.toml" true

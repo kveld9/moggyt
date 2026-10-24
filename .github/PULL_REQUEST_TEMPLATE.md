@@ -48,8 +48,8 @@ Describe the testing performed to ensure correctness, reproducibility, and preve
 Before submitting this pull request for review, confirm the following:
 
 - [ ] My code adheres to the project's formatting and styling standards ([`.editorconfig`](../.editorconfig)).
-- [ ] No emojis in code, scripts, configs, or commits (allowed only in docs/releases; docs/03-desarrollo.md).
-- [ ] Commit history is atomic, clean, and follows Conventional Commits (see docs/03-desarrollo.md).
+- [ ] No emojis in code, scripts, configs, or commits (allowed only in docs/releases; docs/03-development.md).
+- [ ] Commit history is atomic, clean, and follows Conventional Commits (see docs/03-development.md).
 - [ ] I have updated corresponding documentation in `docs/` or `README.md` if public APIs, commands, flags, or configuration changed.
 - [ ] No temporary files, debug logging, or foreign changes are included.
 - [ ] No secrets, keys, or credentials are introduced.

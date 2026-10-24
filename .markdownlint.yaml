@@ -1,24 +1,24 @@
-# Configuración de markdownlint para estándares del repositorio.
-# Cada ajuste respecto a las reglas por defecto está justificado individualmente.
+# Markdownlint configuration for repository standards.
+# Each deviation from the default rules is individually justified.
 
-# Reglas por defecto activadas
+# Default rules enabled
 default: true
 
-# MD013 / line-length: Límite ampliado a 120 caracteres para prosa técnica legible.
-# Se excluyen bloques de código (code_blocks: false) y tablas (tables: false)
-# para preservar fragmentos de código, comandos continuos y tablas comparativas.
+# MD013 / line-length: Limit raised to 120 characters for readable technical prose.
+# Code blocks (code_blocks: false) and tables (tables: false) are excluded
+# to preserve code snippets, continued commands, and comparison tables.
 MD013:
   line_length: 120
   code_blocks: false
   tables: false
 
-# MD033 / no-inline-html: Permitir únicamente elementos HTML estructuralmente indispensables.
-# 'br' se utiliza dentro de celdas de tablas Markdown (ej. docs/07-ci.md) para listar múltiples permisos.
+# MD033 / no-inline-html: Allow only structurally indispensable HTML elements.
+# 'br' is used inside Markdown table cells (e.g. docs/07-ci.md) to list multiple permissions.
 MD033:
   allowed_elements:
     - br
 
-# MD024 / no-duplicate-heading: Keep a Changelog repite encabezados de sección (Added, Fixed...) bajo cada
-# versión; solo se prohíben duplicados entre encabezados hermanos del mismo nivel y padre.
+# MD024 / no-duplicate-heading: Keep a Changelog repeats section headings (Added, Fixed...) under each
+# version; only duplicates between sibling headings of the same level and parent are forbidden.
 MD024:
   siblings_only: true
