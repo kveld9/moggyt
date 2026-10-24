@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2026-10-24): Option A (public releases at v1 launch).
 
 ## Context
 
@@ -45,16 +45,15 @@ Remove FR-12, the `Updater` port, `GithubUpdater` adapter, and related UI elemen
 - Pros: Eliminates external GitHub API dependency and pre-launch failure state.
 - Cons: Loses update discoverability for desktop users; requires code removal.
 
-## Recommendation
+## Decision
 
-Recommend Option A (public releases at v1 launch). The current unauthenticated implementation is correct for public
+Accept Option A (public releases at v1 launch). The current unauthenticated implementation is correct for public
 distribution, and soft-failing to `CheckFailed` during private pre-launch is safe and non-blocking. Option B is
 deferred unless private distribution channels become a concrete requirement.
 
-Status remains Proposed; repository owner decides before v1 public release.
-
 ## Consequences
 
-- If Option A is accepted: no client changes needed; checks succeed once releases are public.
-- If Option B is accepted: requires new settings UI, keyring storage for tokens, and updater header injection.
-- If Option C is accepted: requires deprecating and removing `Updater` port and UI elements.
+- No client changes needed; checks succeed once releases are public.
+- Pre-launch private testing stays in `CheckFailed` until launch; this is expected and non-blocking.
+- Option B (token support) stays deferred unless private distribution becomes a requirement.
+- Option C (removing FR-12) is rejected.
