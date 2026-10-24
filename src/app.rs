@@ -6,7 +6,7 @@
 use eframe::egui;
 
 use crate::domain::{PlaybackQueue, SearchQuery};
-use crate::infra::{AudioBackend, Catalog};
+use crate::infra::{AudioBackend, Catalog, SessionStore, sanitize_cookie_input};
 
 /// Navigation pages of the application shell.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -18,31 +18,39 @@ pub enum Page {
     Queue,
     /// Currently playing view.
     NowPlaying,
+    /// Library view (playlists, liked tracks, saved albums).
+    Library,
 }
 
 /// Wiring between the UI shell and its collaborators.
-pub struct AppState<C: Catalog, A: AudioBackend> {
+pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore> {
     /// Active navigation page.
     pub page: Page,
     /// Pure playback queue (no I/O).
     pub queue: PlaybackQueue,
     /// Text typed into the search box (UI state only).
     pub search_text: String,
+    /// Text typed into the sign-in cookie box (UI state only).
+    pub cookie_text: String,
     /// Catalog adapter (injected port).
     pub catalog: C,
     /// Audio adapter (injected port).
     pub audio: A,
+    /// Session store adapter (injected port).
+    pub session: S,
 }
 
-impl<C: Catalog, A: AudioBackend> AppState<C, A> {
+impl<C: Catalog, A: AudioBackend, S: SessionStore> AppState<C, A, S> {
     /// Creates the shell with injected collaborators.
-    pub fn new(catalog: C, audio: A) -> Self {
+    pub fn new(catalog: C, audio: A, session: S) -> Self {
         Self {
             page: Page::default(),
             queue: PlaybackQueue::new(),
             search_text: String::new(),
+            cookie_text: String::new(),
             catalog,
             audio,
+            session,
         }
     }
 
@@ -111,21 +119,63 @@ impl<C: Catalog, A: AudioBackend> AppState<C, A> {
     pub fn set_volume(&mut self, volume: u8) {
         self.audio.set_volume(volume);
     }
+
+    /// Returns true if an active session is currently stored.
+    pub fn is_signed_in(&self) -> bool {
+        self.session.load().is_some()
+    }
+
+    /// Attempts to parse and save the current cookie input.
+    ///
+    /// Returns true and clears the buffer if valid, otherwise returns false.
+    pub fn sign_in_from_input(&mut self) -> bool {
+        let Some(cleaned) = sanitize_cookie_input(&self.cookie_text) else {
+            return false;
+        };
+        self.session.save(&cleaned);
+        self.cookie_text.clear();
+        true
+    }
+
+    /// Clears the stored session and resets the cookie input buffer.
+    pub fn sign_out(&mut self) {
+        self.session.clear();
+        self.cookie_text.clear();
+    }
+
+    /// Returns true if the track id is present in the user's liked collection.
+    pub fn is_liked(&self, track_id: &str) -> bool {
+        let trimmed = track_id.trim();
+        if trimmed.is_empty() {
+            return false;
+        }
+        self.catalog.liked_tracks().iter().any(|track| track.id == trimmed)
+    }
+
+    /// Toggles the liked status of a track in the catalog. Blank identifiers are ignored.
+    pub fn toggle_like(&mut self, track_id: &str) {
+        let trimmed = track_id.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        let next_liked = !self.is_liked(trimmed);
+        self.catalog.set_liked(trimmed, next_liked);
+    }
 }
 
 /// eframe application wrapper (thin view over [`AppState`]).
-pub struct MoggytApp<C: Catalog, A: AudioBackend> {
-    state: AppState<C, A>,
+pub struct MoggytApp<C: Catalog, A: AudioBackend, S: SessionStore> {
+    state: AppState<C, A, S>,
 }
 
-impl<C: Catalog, A: AudioBackend> MoggytApp<C, A> {
+impl<C: Catalog, A: AudioBackend, S: SessionStore> MoggytApp<C, A, S> {
     /// Wraps an already-wired state for eframe.
-    pub fn new(state: AppState<C, A>) -> Self {
+    pub fn new(state: AppState<C, A, S>) -> Self {
         Self { state }
     }
 }
 
-impl<C: Catalog, A: AudioBackend> eframe::App for MoggytApp<C, A> {
+impl<C: Catalog, A: AudioBackend, S: SessionStore> eframe::App for MoggytApp<C, A, S> {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         render_top_bar(ui, &mut self.state);
         render_player_bar(ui, &mut self.state);
@@ -133,7 +183,10 @@ impl<C: Catalog, A: AudioBackend> eframe::App for MoggytApp<C, A> {
     }
 }
 
-fn render_top_bar<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut AppState<C, A>) {
+fn render_top_bar<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S>,
+) {
     egui::Panel::top("top_bar").show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.heading("moggyt");
@@ -141,19 +194,115 @@ fn render_top_bar<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut Ap
             ui.selectable_value(&mut state.page, Page::Search, "Search");
             ui.selectable_value(&mut state.page, Page::Queue, "Queue");
             ui.selectable_value(&mut state.page, Page::NowPlaying, "Now playing");
+            ui.selectable_value(&mut state.page, Page::Library, "Library");
         });
     });
 }
 
-fn render_body<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut AppState<C, A>) {
+fn render_body<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S>,
+) {
     egui::CentralPanel::default().show(ui, |ui| match state.page {
         Page::Search => render_search(ui, state),
         Page::Queue => render_queue(ui, state),
         Page::NowPlaying => render_now_playing(ui, state),
+        Page::Library => render_library(ui, state),
     });
 }
 
-fn render_search<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut AppState<C, A>) {
+fn render_library<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S>,
+) {
+    render_library_sign_in(ui, state);
+    ui.separator();
+    render_library_playlists(ui, state);
+    ui.separator();
+    render_library_liked(ui, state);
+    ui.separator();
+    render_library_albums(ui, state);
+}
+
+fn render_library_sign_in<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S>,
+) {
+    let status = if state.is_signed_in() {
+        "Signed in — library unlocked"
+    } else {
+        "Anonymous — paste cookies to unlock library"
+    };
+    ui.label(status);
+    ui.horizontal(|ui| {
+        ui.text_edit_singleline(&mut state.cookie_text);
+        if ui.button("Save").clicked() {
+            state.sign_in_from_input();
+        }
+        if ui.button("Clear").clicked() {
+            state.sign_out();
+        }
+    });
+}
+
+fn render_library_playlists<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &AppState<C, A, S>,
+) {
+    ui.heading("Playlists");
+    let playlists = state.catalog.playlists();
+    if playlists.is_empty() {
+        ui.label("No playlists");
+        return;
+    }
+    for playlist in playlists {
+        ui.label(format!("{} ({} tracks)", playlist.title, playlist.track_count));
+    }
+}
+
+fn render_library_liked<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S>,
+) {
+    ui.heading("Liked songs");
+    let liked = state.catalog.liked_tracks();
+    if liked.is_empty() {
+        ui.label("No liked tracks");
+        return;
+    }
+    let mut to_toggle = None;
+    for track in &liked {
+        ui.horizontal(|ui| {
+            ui.label(track.display());
+            if ui.button("Unlike").clicked() {
+                to_toggle = Some(track.id.clone());
+            }
+        });
+    }
+    if let Some(id) = to_toggle {
+        state.toggle_like(&id);
+    }
+}
+
+fn render_library_albums<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &AppState<C, A, S>,
+) {
+    ui.heading("Saved albums");
+    let albums = state.catalog.saved_albums();
+    if albums.is_empty() {
+        ui.label("No saved albums");
+        return;
+    }
+    for album in albums {
+        ui.label(format!("{} - {}", album.title, album.artist));
+    }
+}
+
+fn render_search<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S>,
+) {
     ui.label("Search the catalog (stub returns fixed hits):");
     let submitted = ui.text_edit_singleline(&mut state.search_text).lost_focus()
         && ui.input(|input| input.key_pressed(egui::Key::Enter));
@@ -162,7 +311,10 @@ fn render_search<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut App
     }
 }
 
-fn render_queue<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut AppState<C, A>) {
+fn render_queue<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S>,
+) {
     ui.label(format!("{} track(s) queued", state.queue.len()));
     ui.horizontal(|ui| {
         if ui.button("Previous").clicked() {
@@ -180,7 +332,10 @@ fn render_queue<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut AppS
     }
 }
 
-fn render_now_playing<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &AppState<C, A>) {
+fn render_now_playing<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &AppState<C, A, S>,
+) {
     match state.queue.current() {
         Some(track) => {
             ui.heading(track.display());
@@ -195,7 +350,10 @@ fn render_now_playing<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &Ap
     }
 }
 
-fn render_player_bar<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut AppState<C, A>) {
+fn render_player_bar<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S>,
+) {
     egui::Panel::bottom("player_bar").show(ui, |ui| {
         ui.horizontal(|ui| {
             render_track_info(ui, state);
@@ -211,14 +369,17 @@ fn render_player_bar<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &mut
     });
 }
 
-fn render_track_info<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &AppState<C, A>) {
+fn render_track_info<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &AppState<C, A, S>,
+) {
     let title = state.queue.current().map_or("Queue empty".to_owned(), |t| t.display());
     ui.label(title);
 }
 
-fn render_playback_controls<C: Catalog, A: AudioBackend>(
+fn render_playback_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A>,
+    state: &mut AppState<C, A, S>,
 ) {
     if ui.button("Previous").clicked() {
         state.prev_track();
@@ -232,9 +393,9 @@ fn render_playback_controls<C: Catalog, A: AudioBackend>(
     }
 }
 
-fn render_seek_controls<C: Catalog, A: AudioBackend>(
+fn render_seek_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A>,
+    state: &mut AppState<C, A, S>,
 ) {
     if ui.button("-10s").clicked() {
         state.seek_by(-10);
@@ -244,9 +405,9 @@ fn render_seek_controls<C: Catalog, A: AudioBackend>(
     }
 }
 
-fn render_volume_controls<C: Catalog, A: AudioBackend>(
+fn render_volume_controls<C: Catalog, A: AudioBackend, S: SessionStore>(
     ui: &mut egui::Ui,
-    state: &mut AppState<C, A>,
+    state: &mut AppState<C, A, S>,
 ) {
     let mut vol = state.audio.volume();
     if ui.add(egui::Slider::new(&mut vol, 0..=100).text("Vol")).changed() {
@@ -254,7 +415,10 @@ fn render_volume_controls<C: Catalog, A: AudioBackend>(
     }
 }
 
-fn render_position_info<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &AppState<C, A>) {
+fn render_position_info<C: Catalog, A: AudioBackend, S: SessionStore>(
+    ui: &mut egui::Ui,
+    state: &AppState<C, A, S>,
+) {
     let pos = state.audio.position_secs();
     let text = match state.queue.current().and_then(|t| t.duration_secs) {
         Some(dur) => format!("{pos}s / {dur}s"),
@@ -266,10 +430,78 @@ fn render_position_info<C: Catalog, A: AudioBackend>(ui: &mut egui::Ui, state: &
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infra::{AudioStub, CatalogStub};
+    use crate::infra::{AudioStub, CatalogStub, MemorySessionStore};
 
-    fn wired() -> AppState<CatalogStub, AudioStub> {
-        AppState::new(CatalogStub::new(), AudioStub::new())
+    fn wired() -> AppState<CatalogStub, AudioStub, MemorySessionStore> {
+        AppState::new(CatalogStub::new(), AudioStub::new(), MemorySessionStore::new())
+    }
+
+    #[test]
+    fn sign_in_and_out_lifecycle_with_sanitized_input() {
+        let mut state = wired();
+        assert!(!state.is_signed_in());
+
+        state.cookie_text = "  cookie: SID=secret123; HSID=secret456  ".to_owned();
+        let ok = state.sign_in_from_input();
+        assert!(ok);
+        assert!(state.is_signed_in());
+        assert_eq!(state.cookie_text, "");
+        assert_eq!(state.session.load().as_deref(), Some("SID=secret123; HSID=secret456"));
+
+        state.sign_out();
+        assert!(!state.is_signed_in());
+        assert_eq!(state.session.load(), None);
+    }
+
+    #[test]
+    fn sign_in_from_input_rejects_empty_or_whitespace() {
+        let mut state = wired();
+        for invalid in ["", "   ", "cookie:", "COOKIE:   "] {
+            state.cookie_text = invalid.to_owned();
+            let ok = state.sign_in_from_input();
+            assert!(!ok, "expected '{invalid}' to be rejected");
+            assert!(!state.is_signed_in());
+        }
+    }
+
+    #[test]
+    fn toggle_like_flips_state_and_ignores_blank() {
+        let mut state = wired();
+
+        // Stub catalog defaults to "stub-1" liked.
+        assert!(state.is_liked("stub-1"));
+        assert!(!state.is_liked("stub-2"));
+
+        // Toggle existing liked track off.
+        state.toggle_like("stub-1");
+        assert!(!state.is_liked("stub-1"));
+
+        // Toggle back on.
+        state.toggle_like("stub-1");
+        assert!(state.is_liked("stub-1"));
+
+        // Toggle unliked track on.
+        state.toggle_like("stub-2");
+        assert!(state.is_liked("stub-2"));
+
+        // Blank and whitespace ids are ignored.
+        state.toggle_like("");
+        state.toggle_like("   ");
+        assert!(state.is_liked("stub-1"));
+        assert!(state.is_liked("stub-2"));
+        assert!(!state.is_liked(""));
+        assert!(!state.is_liked("   "));
+    }
+
+    #[test]
+    fn library_page_selection_and_state() {
+        let mut state = wired();
+        assert_eq!(state.page, Page::Search);
+        state.page = Page::Library;
+        assert_eq!(state.page, Page::Library);
+        assert!(!state.catalog.playlists().is_empty());
+        assert!(!state.catalog.liked_tracks().is_empty());
+        assert!(!state.catalog.saved_albums().is_empty());
     }
 
     #[test]
