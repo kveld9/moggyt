@@ -17,7 +17,7 @@ mod ytdlp;
 mod ytm;
 
 pub use audio::{AudioBackend, AudioStub};
-pub use audio_rodio::{RodioBackend, volume_to_amplitude};
+pub use audio_rodio::{LiveAudio, RodioBackend, volume_to_amplitude};
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use innertube::{InnerTube, RawTrack, search_body, search_url};
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
@@ -29,4 +29,4 @@ pub use ytdlp::{
     YTDLP_AUDIO_FORMAT, YTDLP_UPDATE_INTERVAL_SECS, YtDlpResolver, ensure_sidecar, format_args,
     parse_version, release_asset_name, sidecar_needs_update, watch_url,
 };
-pub use ytm::{Catalog, CatalogStub};
+pub use ytm::{Catalog, CatalogStub, YtmCatalog};
