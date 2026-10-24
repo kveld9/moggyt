@@ -14,6 +14,13 @@ else
   bash ./scripts/check-repo.sh
 fi
 
+echo "Running markdown quality gate..."
+if [ -x "./scripts/check-markdown.sh" ]; then
+  ./scripts/check-markdown.sh
+else
+  bash ./scripts/check-markdown.sh
+fi
+
 if [ -f "./scripts/check-complexity.py" ]; then
   echo "Running cyclomatic complexity ratchet check..."
   python3 ./scripts/check-complexity.py

@@ -10,9 +10,10 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
 ./scripts/check-repo.sh
+./scripts/check-markdown.sh
 ```
 
-Run all four before finishing. `cargo run` launches the window.
+Run all five before finishing. `cargo run` launches the window.
 
 ## Architecture invariants (see `docs/02-architecture.md`)
 
