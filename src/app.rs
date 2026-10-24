@@ -7,8 +7,8 @@ use eframe::egui;
 
 use crate::domain::{PlaybackQueue, SearchQuery};
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, DesktopPresence, LyricLine, LyricsSource, Presence,
-    SessionStore, TrayAction, TrayHandle, sanitize_cookie_input,
+    AudioBackend, Catalog, CoverCache, DesktopPresence, GithubUpdater, LyricLine, LyricsSource,
+    Presence, SessionStore, TrayAction, TrayHandle, Updater, is_newer, sanitize_cookie_input,
 };
 
 /// Navigation pages of the application shell.
@@ -23,6 +23,24 @@ pub enum Page {
     NowPlaying,
     /// Library view (playlists, liked tracks, saved albums).
     Library,
+}
+
+/// Update check status for the desktop application.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UpdateStatus {
+    /// Never checked in this session.
+    Unknown,
+    /// Installed version is up to date with upstream release.
+    Current,
+    /// A newer upstream release is available for download.
+    Available {
+        /// Upstream release version tag.
+        version: String,
+        /// Upstream release webpage URL.
+        url: String,
+    },
+    /// Last check failed (e.g. offline, rate limited, timeout).
+    CheckFailed,
 }
 
 /// Wiring between the UI shell and its collaborators.
@@ -49,6 +67,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub lyrics_key: Option<(String, String)>,
     pub lyrics_lines: Vec<LyricLine>,
     pub lyrics_offset_ms: i64,
+    pub update_status: UpdateStatus,
+    pub updater: GithubUpdater,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -72,7 +92,39 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             lyrics_key: None,
             lyrics_lines: Vec::new(),
             lyrics_offset_ms: 0,
+            update_status: UpdateStatus::Unknown,
+            updater: GithubUpdater::new(),
         }
+    }
+
+    /// Returns the current update check status.
+    pub fn update_status(&self) -> &UpdateStatus {
+        &self.update_status
+    }
+
+    /// Checks for updates against an injected updater implementation.
+    pub fn check_with(&mut self, updater: &impl Updater) {
+        let Some(info) = updater.latest() else {
+            self.update_status = UpdateStatus::CheckFailed;
+            return;
+        };
+        let current = GithubUpdater::current_version();
+        if is_newer(current, &info.version) {
+            self.update_status = UpdateStatus::Available { version: info.version, url: info.url };
+        } else {
+            self.update_status = UpdateStatus::Current;
+        }
+    }
+
+    /// Initiates a manual update check using the configured updater.
+    pub fn refresh_update(&mut self) {
+        let updater = self.updater.clone();
+        self.check_with(&updater);
+    }
+
+    /// Dismisses the update banner, treating the app as up-to-date for this session.
+    pub fn dismiss_update(&mut self) {
+        self.update_status = UpdateStatus::Current;
     }
 
     /// Attaches an initialized system tray handle.
@@ -341,7 +393,23 @@ fn render_top_bar<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource,
             ui.selectable_value(&mut state.page, Page::Queue, "Queue");
             ui.selectable_value(&mut state.page, Page::NowPlaying, "Now playing");
             ui.selectable_value(&mut state.page, Page::Library, "Library");
+            render_top_bar_update_badge(ui, &state.update_status);
         });
+    });
+}
+
+fn render_top_bar_update_badge(ui: &mut egui::Ui, status: &UpdateStatus) {
+    let UpdateStatus::Available { version, .. } = status else {
+        return;
+    };
+    // Keep top bar lean with just a colored notice; interactive download link lives in Library.
+    let display_tag = if version.starts_with(['v', 'V']) {
+        format!("Update {version}")
+    } else {
+        format!("Update v{version}")
+    };
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.colored_label(egui::Color32::from_rgb(255, 180, 50), display_tag);
     });
 }
 
@@ -363,11 +431,62 @@ fn render_library<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource,
 ) {
     render_library_sign_in(ui, state);
     ui.separator();
+    render_library_updates(ui, state);
+    ui.separator();
     render_library_playlists(ui, state);
     ui.separator();
     render_library_liked(ui, state);
     ui.separator();
     render_library_albums(ui, state);
+}
+
+fn render_library_updates<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.heading("Updates");
+    if render_update_status_body(ui, &state.update_status) {
+        state.dismiss_update();
+    }
+    if ui.button("Check for updates").clicked() {
+        state.refresh_update();
+    }
+}
+
+fn render_update_status_body(ui: &mut egui::Ui, status: &UpdateStatus) -> bool {
+    match status {
+        UpdateStatus::Unknown => {
+            ui.label("Never checked");
+        }
+        UpdateStatus::Current => {
+            ui.label(format!("moggyt is up to date (v{})", GithubUpdater::current_version()));
+        }
+        UpdateStatus::Available { version, url } => {
+            return render_update_available(ui, version, url);
+        }
+        UpdateStatus::CheckFailed => {
+            ui.label("Update check failed (offline?)");
+        }
+    }
+    false
+}
+
+fn render_update_available(ui: &mut egui::Ui, version: &str, url: &str) -> bool {
+    ui.label(format!("Update available: {version}"));
+    let mut dismissed = false;
+    ui.horizontal(|ui| {
+        ui.hyperlink_to("Download page", url);
+        if ui.button("Dismiss").clicked() {
+            dismissed = true;
+        }
+    });
+    dismissed
 }
 
 fn render_library_sign_in<
@@ -681,7 +800,24 @@ mod tests {
     use crate::domain::Track;
     use crate::infra::{
         AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
+        ReleaseInfo, StaticUpdater, Updater,
     };
+
+    struct NoUpdates;
+
+    impl Updater for NoUpdates {
+        fn latest(&self) -> Option<ReleaseInfo> {
+            None
+        }
+    }
+
+    struct CustomReleaseUpdater(String);
+
+    impl Updater for CustomReleaseUpdater {
+        fn latest(&self) -> Option<ReleaseInfo> {
+            Some(ReleaseInfo { version: self.0.clone(), url: "https://example.com/release".into() })
+        }
+    }
 
     fn wired() -> AppState<CatalogStub, AudioStub, MemorySessionStore, LrclibStub, MemoryCoverCache>
     {
@@ -1005,5 +1141,37 @@ mod tests {
         assert_eq!(state.presence.last_published(), None);
         assert_eq!(state.presence.last_status(), Some(false));
         assert_eq!(state.last_presence_key, None);
+    }
+
+    #[test]
+    fn update_status_lifecycle_and_dismiss() {
+        let mut state = wired();
+        assert_eq!(*state.update_status(), UpdateStatus::Unknown);
+
+        state.check_with(&StaticUpdater::new());
+        assert_eq!(
+            *state.update_status(),
+            UpdateStatus::Available {
+                version: "v9.9.9-test".into(),
+                url: "https://github.com/example/moggyt/releases/tag/v9.9.9-test".into(),
+            }
+        );
+
+        state.dismiss_update();
+        assert_eq!(*state.update_status(), UpdateStatus::Current);
+    }
+
+    #[test]
+    fn update_check_failure_and_up_to_date_cases() {
+        let mut state = wired();
+
+        state.check_with(&NoUpdates);
+        assert_eq!(*state.update_status(), UpdateStatus::CheckFailed);
+
+        state.check_with(&CustomReleaseUpdater("0.1.0".into()));
+        assert_eq!(*state.update_status(), UpdateStatus::Current);
+
+        state.check_with(&CustomReleaseUpdater("0.0.1".into()));
+        assert_eq!(*state.update_status(), UpdateStatus::Current);
     }
 }
