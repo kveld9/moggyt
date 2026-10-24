@@ -69,11 +69,13 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-5: transport controls with seek and volume, including keyboard shortcuts.
 - FR-6: start radio from any track and keep an autoplay continuation queue.
 - FR-7: read the signed-in library (playlists, likes, saved albums); like or dislike tracks.
+  Note: authenticated library endpoints are pending; interim implementation operates as anonymous empty readers.
 - FR-8: display synced lyrics with a user-adjustable offset when LRCLIB has a match.
 - FR-9: load cover art progressively with placeholder, memory LRU, and disk cache.
 - FR-10: persist settings (volume, theme, quality preference, shortcuts) across restarts.
 - FR-11: single instance; tray icon with play/pause/next and show/hide actions.
 - FR-12: check GitHub Releases for updates and offer the download page (no silent install).
+  Note: unauthenticated checks return 404 on private repo and soft-fail to CheckFailed (see ADR-001).
 
 Anonymous use covers FR-1 through FR-6 plus FR-8 through FR-12. FR-7 requires sign-in.
 
@@ -116,6 +118,10 @@ downloaded on first launch into the app data directory and self-updated roughly 
 the fix then arrives via `yt-dlp` without an emergency `moggyt` release. The `StreamResolver`
 port keeps a pure-Rust decipher implementation replaceable later without touching `domain`.
 
+Runtime caveat (live verification 2026-10-24): upstream `yt-dlp` (2026.10.21) extracts stream URLs successfully but
+warns that YouTube extraction without a supported JavaScript runtime is deprecated. Full long-term extraction
+robustness may require bundling or documenting a JS runtime dependency (e.g. `deno`) alongside the sidecar.
+
 Locked decision D-2 (auth): anonymous by default; library features unlock by importing
 `music.youtube.com` cookies from the user's browser into the OS keyring (Secret Service or
 a compatible provider on Linux, Credential Manager on Windows). Streaming stays anonymous and
@@ -151,6 +157,7 @@ The v1.1 floating widget is a second lightweight `eframe` window sharing the pla
 - Windows: SMTC integration, tray icon with thumbnail controls, single instance via named mutex.
 - Shared: media keys, desktop notifications, configurable global shortcuts (off by default
   where the compositor restricts them, with an explanatory note).
+  Note: inbound MPRIS/SMTC media-key routing is attach-no-op (outbound metadata only; inbound dispatch deferred).
 
 ## 10 Packaging and releases
 
@@ -188,7 +195,7 @@ Each milestone ships as small PRs under 400 lines:
 3. `yt-dlp` resolver plus `rodio` playback plus player bar.
 4. Cookie-import auth with OS keyring plus library views.
 5. LRCLIB lyrics plus cover cache.
-6. MPRIS/SMTC plus tray plus single instance.
+6. MPRIS/SMTC plus tray plus single instance (inbound media-key routing deferred; outbound metadata only).
 7. Release pipeline (AppImage, deb, rpm, exe) plus update check.
 8. Polish: Discord presence, Last.fm, hi-res covers.
 
