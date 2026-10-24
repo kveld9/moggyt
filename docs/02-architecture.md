@@ -40,6 +40,7 @@ src/
     ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence
     ├── scrobble.rs    # Scrobbler port and Last.fm client adapter
     ├── session*.rs    # SessionStore port and Keyring cookie persistence
+    ├── settings.rs    # SettingsStore port and atomic JSON persistence
     ├── stream.rs      # StreamResolver trait definition
     ├── tray.rs        # System tray handle and action event loop
     ├── updater*.rs    # Updater port and GitHub Releases release checker

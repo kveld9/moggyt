@@ -61,8 +61,23 @@ Log messages record sidecar downloads, audio backend status, cover cache resolut
 
 ## User Preferences and Settings
 
-Per SDD requirement FR-10, persistent user preferences (playback volume, UI theme, streaming quality preferences, and
-keyboard shortcuts) are defined for local persistence.
+Persistent user preferences are saved in `settings.json` inside the standard configuration directory:
+
+| Platform | Configuration Directory | Fallback |
+| --- | --- | --- |
+| Linux / Unix | `$XDG_CONFIG_HOME/moggyt` | `~/.config/moggyt` (or `.moggyt` relative directory) |
+| Windows | `%APPDATA%\moggyt` | `.moggyt` relative directory |
+
+### Settings File Format
+
+The configuration file uses JSON serialization with atomic replacement:
+
+```json
+{
+  "theme": "white",
+  "locale": "en"
+}
+```
 
 ### Supported Options
 
@@ -73,6 +88,12 @@ keyboard shortcuts) are defined for local persistence.
 - **Locales (`locale`)**:
   - `"en"`: English (tranche 1 default).
   - `"es"`: Spanish (`Español`).
+
+### Fault Tolerance & Atomic Persistence
+
+Settings are saved by writing to a temporary file in the configuration directory followed by an atomic rename, ensuring
+that unexpected termination never leaves a corrupt or truncated configuration file. If `settings.json` is missing,
+empty, or corrupted, `moggyt` automatically falls back to default settings without crashing.
 
 ## External Integrations
 
