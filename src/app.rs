@@ -61,6 +61,12 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub audio: A,
     /// Session store adapter (injected port).
     pub session: S,
+    /// Cached sign-in status to avoid per-frame keyring I/O.
+    ///
+    /// Cache coherence contract: initialized once from `session.load()` at startup
+    /// and kept in sync on `sign_in_from_input()` and `sign_out()`. Out-of-band external
+    /// mutations to the underlying keyring session store are not observed.
+    pub signed_in: bool,
     pub lyrics: L,
     pub covers: K,
     pub tray: Option<TrayHandle>,
@@ -87,6 +93,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 {
     /// Creates the shell with injected collaborators.
     pub fn new(catalog: C, audio: A, session: S, lyrics: L, covers: K) -> Self {
+        let signed_in = session.load().is_some();
         Self {
             page: Page::default(),
             queue: PlaybackQueue::new(),
@@ -94,6 +101,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             cookie_text: String::new(),
             catalog,
             audio,
+            signed_in,
             session,
             lyrics,
             covers,
@@ -322,7 +330,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 
     /// Returns true if an active session is currently stored.
     pub fn is_signed_in(&self) -> bool {
-        self.session.load().is_some()
+        self.signed_in
     }
 
     /// Attempts to parse and save the current cookie input.
@@ -333,6 +341,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             return false;
         };
         self.session.save(&cleaned);
+        self.signed_in = true;
         self.cookie_text.clear();
         true
     }
@@ -340,6 +349,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Clears the stored session and resets the cookie input buffer.
     pub fn sign_out(&mut self) {
         self.session.clear();
+        self.signed_in = false;
         self.cookie_text.clear();
     }
 
