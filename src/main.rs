@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
-use moggyt::infra::{LiveAudio, RodioBackend, YtmCatalog, ensure_sidecar};
+use moggyt::infra::{KeyringSessionStore, LiveAudio, RodioBackend, YtmCatalog, ensure_sidecar};
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber_setup();
@@ -17,7 +17,8 @@ fn main() -> anyhow::Result<()> {
     let data_dir = app_data_dir();
     let audio = init_live_audio(&data_dir);
     let catalog = YtmCatalog::new();
-    let state = AppState::new(catalog, audio);
+    let session = KeyringSessionStore::moggyt();
+    let state = AppState::new(catalog, audio, session);
 
     let options = eframe::NativeOptions::default();
     eframe::run_native("moggyt", options, Box::new(|_ctx| Ok(Box::new(MoggytApp::new(state)))))
