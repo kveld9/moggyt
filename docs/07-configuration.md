@@ -64,6 +64,16 @@ Log messages record sidecar downloads, audio backend status, cover cache resolut
 Per SDD requirement FR-10, persistent user preferences (playback volume, UI theme, streaming quality preferences, and
 keyboard shortcuts) are defined for local persistence.
 
+### Supported Options
+
+- **Themes (`theme`)**:
+  - `"white"`: Clean light palette (tranche 1 default).
+  - `"black-oled"`: Pure black background (`#000000`) designed for OLED panels.
+  - `"mono"`: High-contrast monochromatic palette with zero color saturation across all slots.
+- **Locales (`locale`)**:
+  - `"en"`: English (tranche 1 default).
+  - `"es"`: Spanish (`Español`).
+
 ## External Integrations
 
 - **Discord Rich Presence**: stays dormant in this build because `DISCORD_APP_ID` is 0 (unregistered); no IPC
