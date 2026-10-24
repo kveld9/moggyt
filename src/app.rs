@@ -8,8 +8,8 @@ use eframe::egui;
 use crate::domain::{PlaybackQueue, SearchQuery};
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, GithubUpdater, LyricLine,
-    LyricsSource, Presence, SessionStore, TrayAction, TrayHandle, Updater, is_newer,
-    sanitize_cookie_input,
+    LyricsSource, Presence, Scrobbler, SessionStore, StubScrobbler, TrayAction, TrayHandle,
+    Updater, is_newer, sanitize_cookie_input, should_scrobble,
 };
 
 /// Navigation pages of the application shell.
@@ -71,6 +71,10 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub lyrics_offset_ms: i64,
     pub update_status: UpdateStatus,
     pub updater: GithubUpdater,
+    /// Last.fm scrobbler port for now-playing notifications and scrobbles.
+    pub scrobbler: Box<dyn Scrobbler>,
+    /// Playback start monotonic instant and unix timestamp pair.
+    pub started_at: Option<(std::time::Instant, u64)>,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -97,7 +101,14 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             lyrics_offset_ms: 0,
             update_status: UpdateStatus::Unknown,
             updater: GithubUpdater::new(),
+            scrobbler: Box::new(StubScrobbler::new()),
+            started_at: None,
         }
+    }
+
+    /// Injects an alternative scrobbler implementation.
+    pub fn set_scrobbler(&mut self, scrobbler: Box<dyn Scrobbler>) {
+        self.scrobbler = scrobbler;
     }
 
     /// Returns the current update check status.
@@ -226,19 +237,23 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 
     /// Starts playback of the track at the head of the queue.
     pub fn play_head(&mut self) {
-        if let Some(track) = self.queue.current() {
-            let id = track.id.clone();
-            self.audio.play(&id);
+        if self.queue.current().is_some() {
+            self.play_current_quiet();
             self.page = Page::NowPlaying;
         }
     }
 
     /// Plays the track currently under the queue cursor without modifying active page.
     pub fn play_current_quiet(&mut self) {
-        if let Some(track) = self.queue.current() {
-            let id = track.id.clone();
-            self.audio.play(&id);
-        }
+        let Some(track) = self.queue.current() else {
+            return;
+        };
+        let id = track.id.clone();
+        let artist = track.artist.clone();
+        let title = track.title.clone();
+        self.audio.play(&id);
+        self.started_at = Some((std::time::Instant::now(), current_unix_secs()));
+        self.scrobbler.now_playing(&artist, &title);
     }
 
     /// Toggles playback: pauses if currently playing, resumes if previously requested,
@@ -253,14 +268,35 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         }
     }
 
+    fn maybe_scrobble_current(&mut self) {
+        let elapsed = self.started_at.map_or(0, |(inst, _)| inst.elapsed().as_secs());
+        self.maybe_scrobble_with_elapsed(elapsed);
+    }
+
+    pub(crate) fn maybe_scrobble_with_elapsed(&mut self, elapsed_secs: u64) {
+        let Some(track) = self.queue.current() else {
+            return;
+        };
+        let duration = track.duration_secs.map(|d| d as u64);
+        if !should_scrobble(elapsed_secs, duration) {
+            return;
+        }
+        let timestamp = self.started_at.map_or(0, |(_, ts)| ts);
+        let artist = track.artist.clone();
+        let title = track.title.clone();
+        self.scrobbler.scrobble(&artist, &title, timestamp);
+    }
+
     /// Advances the queue cursor and deterministically starts playback of the new head.
     pub fn next_track(&mut self) {
+        self.maybe_scrobble_current();
         self.queue.advance();
         self.play_current_quiet();
     }
 
     /// Retreats the queue cursor and deterministically starts playback of the new head.
     pub fn prev_track(&mut self) {
+        self.maybe_scrobble_current();
         self.queue.retreat();
         self.play_current_quiet();
     }
@@ -363,6 +399,14 @@ pub fn format_lyric_timestamp(ms: u64) -> String {
     let mins = total_secs / 60;
     let secs = total_secs % 60;
     format!("{mins}:{secs:02}")
+}
+
+/// Returns current UTC timestamp in seconds since UNIX epoch, or 0 on clock failure.
+fn current_unix_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// eframe application wrapper (thin view over [`AppState`]).
@@ -1198,6 +1242,40 @@ mod tests {
 
         state.dismiss_update();
         assert_eq!(*state.update_status(), UpdateStatus::Current);
+    }
+
+    #[test]
+    fn scrobbler_now_playing_recorded_on_playback_funnel() {
+        let mut state = wired();
+        state.search_text = "midnight".to_owned();
+        state.submit_search();
+        state.toggle_play();
+
+        let stub = state.scrobbler.as_any().downcast_ref::<StubScrobbler>().expect("stub");
+        assert_eq!(
+            stub.now_playing_calls,
+            vec![("Stub Artist".to_string(), "midnight".to_string())]
+        );
+    }
+
+    #[test]
+    fn scrobbler_advance_threshold_and_recording_lifecycle() {
+        let mut state = wired();
+        let track = Track::new_full("vid-1", "Karma Police", "Radiohead", None, Some(240));
+        state.queue.push(track);
+        state.play_current_quiet();
+
+        // Advance immediately with ~0s elapsed -> no scrobble
+        state.next_track();
+        let stub = state.scrobbler.as_any().downcast_ref::<StubScrobbler>().expect("stub");
+        assert!(stub.scrobble_calls.is_empty());
+
+        // With sufficient elapsed playtime, scrobble is recorded
+        state.maybe_scrobble_with_elapsed(120);
+        let stub = state.scrobbler.as_any().downcast_ref::<StubScrobbler>().expect("stub");
+        assert_eq!(stub.scrobble_calls.len(), 1);
+        assert_eq!(stub.scrobble_calls[0].0, "Radiohead");
+        assert_eq!(stub.scrobble_calls[0].1, "Karma Police");
     }
 
     #[test]
