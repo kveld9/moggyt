@@ -23,3 +23,4 @@ souvlaki = "0.8"
 tray-icon = { version = "0.20", default-features = false }
 discord-rich-presence = "0.2"
 md-5 = "0.10"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
