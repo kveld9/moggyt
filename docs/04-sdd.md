@@ -161,11 +161,12 @@ The v1.1 floating widget is a second lightweight `eframe` window sharing the pla
 
 ## 10 Packaging and releases
 
-CI builds on `ubuntu-latest` and `windows-latest` only. Artifacts: `.AppImage`, `.deb`,
-`.rpm` for Linux; NSIS `.exe` (x64) for Windows. No signing in v1, so the docs explain the
-expected SmartScreen and quarantine prompts. `Cargo.lock` stays committed. V1 auto-update is
-check-plus-link to the Releases page; silent self-update is deferred to v2.
-Arch Linux is served via `packaging/arch/moggyt-bin` PKGBUILD (`-bin`, repackages release tarball); AUR submission is TODO.
+CI builds on `ubuntu-latest` and `windows-latest` only. Artifacts: `.AppImage` and `.deb` for Linux;
+NSIS `.exe` (x64) for Windows. No signing in v1, so the docs explain the expected SmartScreen and quarantine prompts.
+`Cargo.lock` stays committed. V1 auto-update is check-plus-link to the Releases page; silent self-update is
+deferred to v2.
+Arch Linux is served via `packaging/arch/moggyt-bin` PKGBUILD (`-bin`, repackages release tarball);
+AUR submission is TODO.
 
 ## 11 Security and privacy
 
@@ -198,7 +199,7 @@ Each milestone ships as small PRs under 400 lines:
 4. Cookie-import auth with OS keyring plus library views.
 5. LRCLIB lyrics plus cover cache.
 6. MPRIS/SMTC plus tray plus single instance (inbound media-key routing deferred; outbound metadata only).
-7. Release pipeline (AppImage, deb, rpm, exe) plus update check.
+7. Release pipeline (AppImage, deb, exe) plus update check.
 8. Polish: Discord presence, Last.fm, hi-res covers.
 
 ## 14 Risks and mitigations

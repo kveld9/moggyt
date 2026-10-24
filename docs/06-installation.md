@@ -24,7 +24,6 @@ Official builds are distributed as GitHub Releases for Linux and Windows x86_64:
 | --- | --- | --- |
 | Linux | `.AppImage` | Standalone portable executable bundle |
 | Linux | `.deb` | Debian and Ubuntu binary package |
-| Linux | `.rpm` | Fedora, RHEL, and openSUSE binary package |
 | Linux | `moggyt-*-linux.tar.gz` | Standalone portable tarball |
 | Linux (Arch) | `moggyt-bin` | Arch Linux PKGBUILD repackaging release tarball (AUR pending) |
 | Windows | `.exe` (NSIS) | Windows 64-bit installer |

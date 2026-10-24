@@ -28,12 +28,11 @@
 #      to GitHub Releases.
 #
 # Packaging Roadmap & Installer TODO (SDD Section 10):
-#   SDD Section 10 specifies Linux packages (.AppImage, .deb, .rpm) and Windows
+#   SDD Section 10 specifies Linux packages (.AppImage, .deb) and Windows
 #   installers (NSIS .exe). This workflow ships standalone portable archives (.tar.gz and .zip),
 #   native Debian packages (.deb) via cargo-deb, and standalone Linux AppImage bundles (.AppImage)
 #   via linuxdeploy and appimagetool.
 #   TODO:
-#     - Linux packaging: Integrate rpmbuild for .rpm.
 #     - Arch Linux packaging: Maintain PKGBUILD in packaging/arch/moggyt-bin (AUR publish deferred; no credentials in v1).
 #     - Windows packaging: Integrate cargo-wix (MSI) or NSIS for setup installer creation.
 #     - Code signing & Attestations: Integrate Authenticode signing for Windows

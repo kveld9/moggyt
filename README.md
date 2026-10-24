@@ -42,7 +42,7 @@ cargo run
 `moggyt` can be compiled from source or installed using pre-built binary packages from GitHub Releases:
 
 - **From Source**: build release binaries with `cargo build --release`.
-- **Release Packages**: standalone `.AppImage`, `.deb`, and `.rpm` packages, plus portable tarballs for Linux x86_64;
+- **Release Packages**: standalone `.AppImage` and `.deb` packages, plus portable tarballs for Linux x86_64;
   NSIS installer (`.exe`) and portable zip for 64-bit Windows.
 - **Arch Linux**: packaging definition available under `packaging/arch/moggyt-bin/PKGBUILD` which repackages the
   official Linux release tarball via `makepkg -si` (AUR publishing pending).
