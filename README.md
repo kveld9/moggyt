@@ -2,6 +2,8 @@
 
 Native YouTube Music client written in Rust, with an `eframe`/`egui` graphical interface.
 
+> Unofficial client with no affiliation with Google or YouTube.
+>
 > Early scaffold (v0.1.0): the repository standards, CI, and hexagonal module skeleton are in place.
 > Playback and the YouTube Music API integration land incrementally behind small, atomic PRs.
 
