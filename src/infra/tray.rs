@@ -48,6 +48,9 @@ impl TrayHandle {
     }
 
     fn build_inner() -> Option<Self> {
+        #[cfg(target_os = "linux")]
+        gtk::init().ok()?;
+
         let (rgba, width, height) = default_icon_rgba();
         let icon = tray_icon::Icon::from_rgba(rgba, width, height).ok()?;
         let menu = tray_icon::menu::Menu::new();

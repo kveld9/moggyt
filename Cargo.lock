@@ -2708,6 +2708,7 @@ dependencies = [
  "anyhow",
  "discord-rich-presence",
  "eframe",
+ "gtk",
  "image",
  "keyring",
  "md-5",

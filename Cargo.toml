@@ -37,3 +37,7 @@ assets = [
 extended-description = """\
 Native YouTube Music client written in Rust (eframe/egui)."""
 
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+
