@@ -34,7 +34,8 @@ Release binaries are not digitally signed in v1. Operating systems may present s
 
 - On Windows, Microsoft Defender SmartScreen may display an unrecognized app warning. Select "More info" and "Run
   anyway" to proceed.
-- On Linux desktop environments, verify executable permissions on portable AppImage files (`chmod +x moggyt.AppImage`).
+- On Linux desktop environments, verify executable permissions on portable AppImage files
+  (`chmod +x moggyt-*-x86_64.AppImage`).
 
 ## Installing on Arch Linux
 
@@ -71,6 +72,39 @@ To update to future releases, pull the latest changes and rebuild:
 git pull
 makepkg -si
 ```
+
+## Installing on Linux from AppImage
+
+The standalone `moggyt-*-x86_64.AppImage` bundles user-space dependencies, including ALSA and Ayatana AppIndicator
+libraries, allowing it to run across modern Linux distributions without manual package installation.
+
+1. Download `moggyt-<version>-x86_64.AppImage` and `SHA256SUMS.txt` from GitHub Releases.
+1. Verify bundle integrity:
+
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+1. Grant executable permissions:
+
+```bash
+chmod +x moggyt-*-x86_64.AppImage
+```
+
+1. Launch the application:
+
+```bash
+./moggyt-*-x86_64.AppImage
+```
+
+### Runtime Requirements
+
+- **FUSE**: AppImages require host FUSE support (`libfuse2` on older distributions, `fuse3` on modern systems) to
+  mount the filesystem image. On environments where FUSE is unavailable (e.g. unprivileged containers or minimal
+  WSL2 instances), launch the AppImage with `./moggyt-*-x86_64.AppImage --appimage-extract-and-run`.
+- **System Tray**: System tray integration communicates over the host D-Bus daemon (`org.kde.StatusNotifierWatcher` /
+  `org.ayatana.indicator`). The tray remains dependent on a running host desktop environment and notification watcher.
+- **Graphics & Hardware Acceleration**: Hardware-accelerated OpenGL/Vulkan rendering uses host GPU and Mesa drivers.
 
 ## Installing on Linux from Portable Tarball
 
