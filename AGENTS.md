@@ -29,6 +29,9 @@ Run all four before finishing. `cargo run` launches the window.
 - CC <= 5 per function (hard limit 10); guard clauses first; DRY from 3rd repetition.
 - English identifiers (verbs for functions, nouns for types); boolean predicates
   (`is_`, `has_`, `can_`); fail-loud errors (`anyhow`), no silent swallowing.
+- English only: every tracked text in this repo is written in English — docs, comments,
+  configs, scripts, templates, commit messages, and PR/issue text. Never introduce
+  non-English text; translate instead.
 - No emojis in code, scripts, configs, CI, or commits — docs/releases only.
 - `Cargo.lock` is committed; never add dependencies without justification.
 
