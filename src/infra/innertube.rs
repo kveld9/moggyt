@@ -35,6 +35,8 @@ pub struct RawTrack {
     pub title: String,
     /// Artist name.
     pub artist: String,
+    /// Highest-resolution thumbnail URL when known.
+    pub thumb_url: Option<String>,
 }
 
 /// Parsed album hit from InnerTube search.
@@ -112,7 +114,8 @@ fn parse_item(renderer: &Value) -> Option<RawTrack> {
     let video_id = watch_video_id(renderer)?;
     let title = flex_text(renderer, 0)?;
     let artist = flex_text(renderer, 1).unwrap_or_default();
-    Some(RawTrack { video_id, title, artist })
+    let thumb_url = best_thumbnail(renderer);
+    Some(RawTrack { video_id, title, artist, thumb_url })
 }
 
 fn collect_shelf_items(shelf: &Value, out: &mut Vec<RawTrack>) {
@@ -166,6 +169,29 @@ const CATEGORY_KEYWORDS: &[(&[&str], SearchFilter)] = &[
 pub fn shelf_category(title: &str) -> Option<SearchFilter> {
     let lower = title.to_ascii_lowercase();
     CATEGORY_KEYWORDS.iter().find(|(kw, _)| kw.iter().any(|k| lower.contains(k))).map(|(_, f)| *f)
+}
+
+/// Extracts the highest-resolution thumbnail URL from a renderer node.
+///
+/// Reads `.thumbnail.musicThumbnailRenderer.thumbnail.thumbs[]`.
+/// When multiple thumbnails exist, picks the one with the greatest width.
+/// In case of ties, the first candidate wins (strictly-greater replacement).
+/// Blank URLs and non-array payloads return `None`.
+pub fn best_thumbnail(value: &Value) -> Option<String> {
+    let thumbs = value.pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbs")?.as_array()?;
+
+    let mut best: Option<(&str, u64)> = None;
+    for item in thumbs {
+        let url = item.get("url").and_then(Value::as_str).map(str::trim).unwrap_or("");
+        if url.is_empty() {
+            continue;
+        }
+        let width = item.get("width").and_then(Value::as_u64).unwrap_or(0);
+        if best.is_none_or(|(_, max_w)| width > max_w) {
+            best = Some((url, width));
+        }
+    }
+    best.map(|(url, _)| url.to_owned())
 }
 
 fn two_row_title(renderer: &Value) -> Option<String> {
@@ -326,6 +352,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn best_thumbnail_resolution_and_fallback_table() {
+        let renderer_with = |thumbs: Value| {
+            serde_json::json!({
+                "thumbnail": {
+                    "musicThumbnailRenderer": {
+                        "thumbnail": {
+                            "thumbs": thumbs
+                        }
+                    }
+                }
+            })
+        };
+
+        // Missing / null / non-array thumbs
+        assert_eq!(best_thumbnail(&serde_json::json!({})), None);
+        assert_eq!(best_thumbnail(&renderer_with(Value::Null)), None);
+        assert_eq!(best_thumbnail(&renderer_with(serde_json::json!("not-an-array"))), None);
+        assert_eq!(best_thumbnail(&renderer_with(serde_json::json!([]))), None);
+
+        // Blank and whitespace URLs are skipped
+        assert_eq!(
+            best_thumbnail(&renderer_with(serde_json::json!([
+                { "url": "", "width": 100, "height": 100 },
+                { "url": "   ", "width": 200, "height": 200 }
+            ]))),
+            None
+        );
+
+        // Multiple sizes: widest wins
+        let multi = renderer_with(serde_json::json!([
+            { "url": "https://img.test/small.jpg", "width": 60, "height": 60 },
+            { "url": "https://img.test/large.jpg", "width": 540, "height": 540 },
+            { "url": "https://img.test/med.jpg", "width": 120, "height": 120 }
+        ]));
+        assert_eq!(best_thumbnail(&multi), Some("https://img.test/large.jpg".to_owned()));
+
+        // Ties: strictly-greater replacement means first-wins ties
+        let ties = renderer_with(serde_json::json!([
+            { "url": "https://img.test/first.jpg", "width": 300, "height": 300 },
+            { "url": "https://img.test/second.jpg", "width": 300, "height": 300 }
+        ]));
+        assert_eq!(best_thumbnail(&ties), Some("https://img.test/first.jpg".to_owned()));
+    }
+
+    #[test]
     fn search_url_format_and_key() {
         let url = search_url();
         assert_eq!(
@@ -375,6 +446,7 @@ mod tests {
                 video_id: "vid-1".to_owned(),
                 title: "Midnight City".to_owned(),
                 artist: "M83".to_owned(),
+                thumb_url: Some("https://lh3.googleusercontent.com/test-thumb-large".to_owned()),
             }
         );
         assert_eq!(
@@ -383,6 +455,7 @@ mod tests {
                 video_id: "vid-2".to_owned(),
                 title: "Starboy".to_owned(),
                 artist: "The Weeknd".to_owned(),
+                thumb_url: None,
             }
         );
     }
@@ -471,6 +544,7 @@ mod tests {
         assert_eq!(first.tracks[0].video_id, "solar-1");
         assert_eq!(first.tracks[0].title, "Solaris");
         assert_eq!(first.tracks[0].artist, "Photay");
+        assert_eq!(first.tracks[0].thumb_url, None);
         assert_eq!(first.albums[0].browse_id, "MPREb_album_1");
         assert_eq!(first.albums[0].title, "Waking Season");
         assert_eq!(first.albums[0].artist, "Photay");

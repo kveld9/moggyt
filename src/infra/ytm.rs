@@ -39,6 +39,8 @@ impl Default for CatalogStub {
     }
 }
 
+const STUB_ARTWORK_URL: &str = "https://artwork.local/stub-1";
+
 impl CatalogStub {
     /// Creates the stub catalog.
     pub fn new() -> Self {
@@ -47,14 +49,14 @@ impl CatalogStub {
 
     fn fixed_hits(query: &str) -> Vec<Track> {
         vec![
-            Track::new("stub-1", query, "Stub Artist"),
+            Track::new("stub-1", query, "Stub Artist").with_artwork(STUB_ARTWORK_URL),
             Track::new("stub-2", "B-side", "Stub Artist"),
         ]
     }
 
     fn stub_liked_hits() -> Vec<Track> {
         vec![
-            Track::new("stub-1", "Liked Song", "Stub Artist"),
+            Track::new("stub-1", "Liked Song", "Stub Artist").with_artwork(STUB_ARTWORK_URL),
             Track::new("stub-2", "B-side", "Stub Artist"),
         ]
     }
@@ -84,7 +86,10 @@ impl Catalog for CatalogStub {
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
         match query.filter() {
             SearchFilter::All => vec![
-                SearchResult::Track(Track::new("stub-1", query.text(), "Stub Artist")),
+                SearchResult::Track(
+                    Track::new("stub-1", query.text(), "Stub Artist")
+                        .with_artwork(STUB_ARTWORK_URL),
+                ),
                 SearchResult::Album(Self::stub_album()),
                 SearchResult::Artist(Self::stub_artist()),
                 SearchResult::Playlist(Self::stub_playlist()),
@@ -167,8 +172,16 @@ impl YtmCatalog {
     }
 }
 
+fn raw_to_track(raw: RawTrack) -> Track {
+    let track = Track::new(&raw.video_id, &raw.title, &raw.artist);
+    match raw.thumb_url {
+        Some(url) => track.with_artwork(url),
+        None => track,
+    }
+}
+
 fn map_tracks(tracks: Vec<RawTrack>) -> impl Iterator<Item = SearchResult> {
-    tracks.into_iter().map(|t| SearchResult::Track(Track::new(&t.video_id, &t.title, &t.artist)))
+    tracks.into_iter().map(|t| SearchResult::Track(raw_to_track(t)))
 }
 
 fn map_albums(albums: Vec<RawAlbum>) -> impl Iterator<Item = SearchResult> {
@@ -186,12 +199,7 @@ fn map_playlists(playlists: Vec<RawPlaylist>) -> impl Iterator<Item = SearchResu
 impl Catalog for YtmCatalog {
     /// Returns catalog hits for `query`. Network failures map to an empty vector.
     fn search(&self, query: &str) -> Vec<Track> {
-        self.tube
-            .search_tracks(query)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|t| Track::new(&t.video_id, &t.title, &t.artist))
-            .collect()
+        self.tube.search_tracks(query).unwrap_or_default().into_iter().map(raw_to_track).collect()
     }
 
     /// Returns catalog hits matching the query text and filter. Network failures map to an empty vector.
@@ -233,6 +241,8 @@ mod tests {
         let hits = catalog.search("midnight");
         assert_eq!(hits.len(), 2);
         assert_eq!(hits[0].title, "midnight");
+        assert_eq!(hits[0].artwork.as_deref(), Some(STUB_ARTWORK_URL));
+        assert_eq!(hits[1].artwork, None);
     }
 
     #[test]
@@ -245,7 +255,9 @@ mod tests {
         assert_eq!(first_all.len(), 4);
         assert_eq!(
             first_all[0],
-            SearchResult::Track(Track::new("stub-1", "echoed", "Stub Artist"))
+            SearchResult::Track(
+                Track::new("stub-1", "echoed", "Stub Artist").with_artwork(STUB_ARTWORK_URL)
+            )
         );
 
         let cases = [
@@ -272,11 +284,20 @@ mod tests {
         use super::super::innertube::{RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits};
 
         let hits = SearchHits {
-            tracks: vec![RawTrack {
-                video_id: "v1".into(),
-                title: "T1".into(),
-                artist: "A1".into(),
-            }],
+            tracks: vec![
+                RawTrack {
+                    video_id: "v1".into(),
+                    title: "T1".into(),
+                    artist: "A1".into(),
+                    thumb_url: Some("https://artwork.test/v1".into()),
+                },
+                RawTrack {
+                    video_id: "v2".into(),
+                    title: "T2".into(),
+                    artist: "A2".into(),
+                    thumb_url: None,
+                },
+            ],
             albums: vec![RawAlbum {
                 browse_id: "b1".into(),
                 title: "Alb".into(),
@@ -287,14 +308,20 @@ mod tests {
         };
 
         let all = YtmCatalog::map_hits(hits.clone(), SearchFilter::All);
-        assert_eq!(all.len(), 4);
-        assert_eq!(all[0], SearchResult::Track(Track::new("v1", "T1", "A1")));
-        assert_eq!(all[1], SearchResult::Album(Album::new("b1", "Alb", "Art")));
-        assert_eq!(all[2], SearchResult::Artist(Artist::new("ar1", "ArtName")));
-        assert_eq!(all[3], SearchResult::Playlist(Playlist::new("p1", "PlayTitle", 0)));
+        assert_eq!(all.len(), 5);
+        assert_eq!(
+            all[0],
+            SearchResult::Track(
+                Track::new("v1", "T1", "A1").with_artwork("https://artwork.test/v1")
+            )
+        );
+        assert_eq!(all[1], SearchResult::Track(Track::new("v2", "T2", "A2")));
+        assert_eq!(all[2], SearchResult::Album(Album::new("b1", "Alb", "Art")));
+        assert_eq!(all[3], SearchResult::Artist(Artist::new("ar1", "ArtName")));
+        assert_eq!(all[4], SearchResult::Playlist(Playlist::new("p1", "PlayTitle", 0)));
 
         for (filter, expected) in [
-            (SearchFilter::Tracks, 1),
+            (SearchFilter::Tracks, 2),
             (SearchFilter::Albums, 1),
             (SearchFilter::Artists, 1),
             (SearchFilter::Playlists, 1),
