@@ -19,6 +19,7 @@ mod presence_discord;
 mod scrobble;
 mod session;
 mod session_keyring;
+mod settings;
 mod stream;
 mod tray;
 mod updater;
@@ -41,6 +42,9 @@ pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts};
 pub use scrobble::{LastFmClient, Scrobbler, StubScrobbler, api_signature, should_scrobble};
 pub use session::{MemorySessionStore, SessionStore};
 pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
+pub use settings::{
+    DiskSettingsStore, MemorySettingsStore, Settings, SettingsStore, default_config_dir,
+};
 pub use stream::{StreamResolver, StreamStub};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
