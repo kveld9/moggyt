@@ -7,8 +7,9 @@ use eframe::egui;
 
 use crate::domain::{PlaybackQueue, SearchQuery};
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, DesktopPresence, GithubUpdater, LyricLine, LyricsSource,
-    Presence, SessionStore, TrayAction, TrayHandle, Updater, is_newer, sanitize_cookie_input,
+    AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, GithubUpdater, LyricLine,
+    LyricsSource, Presence, SessionStore, TrayAction, TrayHandle, Updater, is_newer,
+    sanitize_cookie_input,
 };
 
 /// Navigation pages of the application shell.
@@ -63,6 +64,7 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub covers: K,
     pub tray: Option<TrayHandle>,
     pub presence: DesktopPresence,
+    pub discord: DiscordPresence,
     pub last_presence_key: Option<(String, String)>,
     pub lyrics_key: Option<(String, String)>,
     pub lyrics_lines: Vec<LyricLine>,
@@ -88,6 +90,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             covers,
             tray: None,
             presence: DesktopPresence::new(),
+            discord: DiscordPresence::new(),
             last_presence_key: None,
             lyrics_key: None,
             lyrics_lines: Vec::new(),
@@ -137,6 +140,11 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.presence = presence;
     }
 
+    /// Attaches an initialized Discord Rich Presence handle.
+    pub fn set_discord(&mut self, discord: DiscordPresence) {
+        self.discord = discord;
+    }
+
     /// Dispatches a single tray action, returning true if quit was requested.
     fn handle_action(&mut self, action: TrayAction) -> bool {
         match action {
@@ -171,7 +179,10 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.apply_actions(&actions)
     }
 
-    /// Synchronizes current playback state and track metadata with desktop media presence.
+    /// Synchronizes current playback state and track metadata with presence adapters.
+    ///
+    /// Fans out active track metadata or queue clearance to both desktop media presence
+    /// (MPRIS on Linux, SMTC on Windows) and Discord Rich Presence.
     fn sync_presence(&mut self) {
         let is_playing = self.audio.is_playing();
         let track_info = self.queue.current().map(|t| (t.artist.clone(), t.title.clone()));
@@ -185,6 +196,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         let key = (artist.to_string(), title.to_string());
         if self.last_presence_key.as_ref() != Some(&key) {
             self.presence.set_track(artist, title);
+            self.discord.set_track(artist, title);
             self.last_presence_key = Some(key);
         }
         self.presence.set_playing(is_playing);
@@ -193,6 +205,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     fn sync_empty_track(&mut self) {
         if self.last_presence_key.is_some() || self.presence.last_published().is_some() {
             self.presence.clear();
+            self.discord.clear();
             self.last_presence_key = None;
         }
         self.presence.set_playing(false);
@@ -1141,6 +1154,32 @@ mod tests {
         assert_eq!(state.presence.last_published(), None);
         assert_eq!(state.presence.last_status(), Some(false));
         assert_eq!(state.last_presence_key, None);
+    }
+
+    #[test]
+    fn sync_presence_fans_out_to_discord_presence_and_clears_on_empty() {
+        let mut state = wired();
+        assert_eq!(state.discord.last_published(), None);
+
+        let track = Track {
+            id: "vid-1".into(),
+            title: "Paranoid Android".into(),
+            artist: "Radiohead".into(),
+            album: None,
+            duration_secs: Some(383),
+        };
+        state.queue.push(track);
+        state.audio.play("vid-1");
+
+        state.sync_presence();
+        assert_eq!(
+            state.discord.last_published(),
+            Some(("Paranoid Android".into(), "Radiohead".into()))
+        );
+
+        state.queue.clear();
+        state.sync_presence();
+        assert_eq!(state.discord.last_published(), None);
     }
 
     #[test]
