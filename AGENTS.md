@@ -41,8 +41,10 @@ Run all four before finishing. `cargo run` launches the window.
 - Commits in English, Conventional Commits, imperative mood, no emojis.
 - Update `docs/` or `README.md` in the same PR when behavior, flags, config,
   or public APIs change.
-- Merge only with green CI (`fmt`, `clippy`, `test`, standards audit, markdownlint);
-  squash-merge to keep `main` linear. Agents open PRs and never merge them —
-  the owner reviews (self-review checklist in `CONTRIBUTING.md`) and merges.
+- Merge only with green CI (`fmt`, `clippy`, `test`, standards audit, markdownlint).
+  Merge method is Squash (default) or Rebase — never Merge commits
+  (`gh pr merge --squash`, never `--merge`; repo setting `allow_merge_commit: false`).
+  Agents open PRs and never merge them — the owner reviews (self-review checklist
+  in `CONTRIBUTING.md`) and merges.
 - Never publish releases unless explicitly asked.
 - Never commit secrets, `.env`, debug output, or foreign files; keep the diff minimal.
