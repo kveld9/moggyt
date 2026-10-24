@@ -27,6 +27,13 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    /// Default fallback settings resolving the locale from system environment.
+    pub fn fallback() -> Self {
+        Self { theme: ThemeId::White, locale: Locale::detect() }
+    }
+}
+
 /// Port for loading and persisting user settings.
 pub trait SettingsStore: Send + Sync {
     /// Loads settings, returning default if absent or unreadable.
@@ -92,9 +99,9 @@ impl SettingsStore for DiskSettingsStore {
     fn load(&self) -> Settings {
         let path = self.file_path();
         let Ok(bytes) = std::fs::read(&path) else {
-            return Settings::default();
+            return Settings::fallback();
         };
-        serde_json::from_slice(&bytes).unwrap_or_default()
+        serde_json::from_slice(&bytes).unwrap_or_else(|_| Settings::fallback())
     }
 
     fn save(&self, settings: &Settings) -> anyhow::Result<()> {
@@ -181,5 +188,12 @@ mod tests {
         assert!(store.file_path().exists());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_8_given_fallback_settings_when_constructed_then_locale_is_detected() {
+        let fallback = Settings::fallback();
+        assert_eq!(fallback.theme, ThemeId::White);
+        assert_eq!(fallback.locale, Locale::detect());
     }
 }
