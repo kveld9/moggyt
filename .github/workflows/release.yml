@@ -1,0 +1,267 @@
+# ==============================================================================
+# Production Release Pipeline for moggyt
+#
+# Purpose:
+#   Automated multi-platform release workflow for the native YouTube Music client.
+#   Builds release binaries on Linux and Windows, packages them into portable
+#   distribution archives, generates SHA-256 cryptographic checksums, and publishes
+#   a new GitHub Release with release notes.
+#
+# Triggers:
+#   - push to main: Automated release trigger when changes land on the default branch.
+#   - workflow_dispatch: Manual release execution from the Actions tab.
+#   Note on tag triggers: Tag-based triggers (e.g. on: push tags 'v*') are intentionally
+#   deferred. SemVer calculation is computed automatically from conventional commit
+#   messages (fix, feat, feat!, BREAKING CHANGE) since the latest tag on main.
+#   This aligns with the trunk-based automated release process of the repository.
+#
+# Release Artifacts:
+#   - moggyt-<version>-linux.tar.gz: Portable tarball containing the Linux binary (x86_64).
+#   - moggyt-<version>-windows.zip: Portable zip containing the Windows binary (x86_64).
+#   - <asset>.sha256: Individual SHA-256 digests for each archive.
+#   - SHA256SUMS.txt: Unified SHA-256 checksum manifest compatible with 'sha256sum -c'.
+#     (Legacy MD5 and SHA-512 hashes have been dropped to keep release assets clean and lean).
+#
+# How to cut a release:
+#   1. Merge PRs with Conventional Commit formatting into main.
+#   2. The workflow checks for commits since the last v* tag. If no new commits exist
+#      or the repository has not changed, the release steps are skipped.
+#   3. If new commits exist, SemVer bump level (patch, minor, major) is computed,
+#      matrix builds run, archives are created, checksums computed, and the release
+#      is published to GitHub Releases.
+#
+# Packaging Roadmap & Installer TODO (SDD Section 10):
+#   SDD Section 10 specifies Linux packages (.AppImage, .deb, .rpm) and Windows
+#   installers (NSIS .exe). This v1 workflow intentionally ships standalone portable
+#   archives (.tar.gz and .zip) to provide immediate binary availability without
+#   premature or unverified packaging scripts.
+#   TODO:
+#     - Linux packaging: Integrate cargo-deb for .deb generation and AppImageKit
+#       for standalone .AppImage bundles.
+#     - Windows packaging: Integrate cargo-wix (MSI) or NSIS for setup installer creation.
+#     - Code signing & Attestations: Integrate Authenticode signing for Windows
+#       and GitHub Artifact Attestations via actions/attest-build-provenance.
+# ==============================================================================
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  semver:
+    name: Compute SemVer
+    runs-on: ubuntu-latest
+    outputs:
+      skip_release: ${{ steps.semver.outputs.skip_release }}
+      tag_name: ${{ steps.semver.outputs.tag_name }}
+      version: ${{ steps.semver.outputs.version }}
+    steps:
+      - name: Check out repository with full tag history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Compute Next Semantic Version
+        id: semver
+        shell: bash
+        run: |
+          git fetch --tags --force
+
+          LATEST_TAG=$(git describe --tags --abbrev=0 --match "v[0-9]*" 2>/dev/null || echo "")
+
+          if [ -z "$LATEST_TAG" ]; then
+            COMMITS_COUNT=$(git rev-list HEAD --count)
+            if [ "$COMMITS_COUNT" -eq 0 ]; then
+              echo "Repository is empty. Skipping release."
+              echo "skip_release=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            NEW_VERSION="1.0.0"
+            NEW_TAG="v${NEW_VERSION}"
+            echo "No previous v* tags found. Starting baseline at ${NEW_TAG}."
+            echo "skip_release=false" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+            echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          COMMITS_COUNT=$(git rev-list "${LATEST_TAG}..HEAD" --count)
+          if [ "$COMMITS_COUNT" -eq 0 ]; then
+            echo "No new commits since ${LATEST_TAG}. Skipping release."
+            echo "skip_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Found ${COMMITS_COUNT} commits since ${LATEST_TAG}."
+
+          # Determine version bump based on conventional commits in range
+          if git log "${LATEST_TAG}..HEAD" --format="%B" | grep -Eq '(^[a-z]+(\([^\)]+\))?!:|BREAKING CHANGE:)'; then
+            BUMP="major"
+          elif git log "${LATEST_TAG}..HEAD" --format="%s" | grep -Eq '^feat(\([^\)]+\))?:'; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          RAW_VERSION="${LATEST_TAG#v}"
+          MAJOR=$(echo "$RAW_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$RAW_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$RAW_VERSION" | cut -d. -f3 | cut -d- -f1)
+
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+
+          if [ "$BUMP" = "major" ]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [ "$BUMP" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          NEW_TAG="v${NEW_VERSION}"
+
+          echo "Computed bump '${BUMP}': ${LATEST_TAG} -> ${NEW_TAG}"
+          echo "skip_release=false" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.target-os }})
+    needs: semver
+    if: needs.semver.outputs.skip_release != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target-os: linux
+            binary-path: target/release/moggyt
+          - os: windows-latest
+            target-os: windows
+            binary-path: target/release/moggyt.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install ALSA dev headers for rodio/cpal
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Package portable release archive
+        shell: bash
+        run: |
+          VERSION="${{ needs.semver.outputs.version }}"
+          mkdir -p dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            (cd target/release && 7z a "../../dist/moggyt-${VERSION}-windows.zip" moggyt.exe)
+          else
+            tar -czf "dist/moggyt-${VERSION}-linux.tar.gz" -C target/release moggyt
+          fi
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-asset-${{ matrix.target-os }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish Release
+    needs: [semver, build]
+    if: needs.semver.outputs.skip_release != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          pattern: release-asset-*
+          merge-multiple: true
+
+      - name: Generate Cryptographic Checksums
+        shell: bash
+        working-directory: release_assets
+        run: |
+          # Generate individual SHA-256 hashes (dropping legacy MD5/SHA-512 to keep assets clean)
+          for asset in *; do
+            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]] && [ "$asset" != "SHA256SUMS.txt" ]; then
+              sha256sum "$asset" | awk '{print $1}' > "${asset}.sha256"
+            fi
+          done
+
+          # Generate standard SHA256SUMS.txt compatible with 'sha256sum -c'
+          rm -f SHA256SUMS.txt
+          for asset in *; do
+            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]] && [ "$asset" != "SHA256SUMS.txt" ]; then
+              sha256sum "$asset" >> SHA256SUMS.txt
+            fi
+          done
+          echo "Generated SHA256SUMS.txt:"
+          cat SHA256SUMS.txt
+
+      - name: Generate Release Notes Body
+        shell: bash
+        run: |
+          TAG="${{ needs.semver.outputs.tag_name }}"
+          VERSION="${{ needs.semver.outputs.version }}"
+
+          cat << 'EOF' > release_body.md
+          ## Release Details
+          EOF
+
+          echo "- Version: \`${VERSION}\`" >> release_body.md
+          echo "- Tag: \`${TAG}\`" >> release_body.md
+          echo "" >> release_body.md
+
+          echo "### Download & Verification" >> release_body.md
+          echo "| File | SHA-256 Checksum |" >> release_body.md
+          echo "| :--- | :--- |" >> release_body.md
+
+          cd release_assets
+          while read -r hash filename; do
+            echo "| \`${filename}\` | \`${hash}\` |" >> ../release_body.md
+          done < SHA256SUMS.txt
+          cd ..
+
+          echo "" >> release_body.md
+          echo "To verify downloads:" >> release_body.md
+          echo '```bash' >> release_body.md
+          echo 'sha256sum -c SHA256SUMS.txt' >> release_body.md
+          echo '```' >> release_body.md
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.semver.outputs.tag_name }}
+          name: ${{ needs.semver.outputs.tag_name }}
+          body_path: release_body.md
+          files: release_assets/*
+          fail_on_unmatched_files: true
+          generate_release_notes: false
