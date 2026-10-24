@@ -20,13 +20,15 @@ UI (app.rs, eframe) --> domain (domain/) <-- ports <-- adapters (infra/)
 ```text
 src/
 ├── main.rs            # Composition root (bin): tracing, tokio runtime, eframe bootstrap
-├── lib.rs             # Public contracts: app + domain + infra
+├── lib.rs             # Public contracts: app + domain + i18n + infra
+├── i18n.rs            # Interface localization skeleton and translation lookup
 ├── app.rs             # UI shell: navigation state, delegates events to domain and ports
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
 │   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)
 │   ├── queue.rs       # Pure playback queue (add, next, previous, shuffle, repeat)
-│   └── search.rs      # Search models (immutable query, track model)
+│   ├── search.rs      # Search models (immutable query, track model)
+│   └── theme.rs       # Color palette data and ThemeId domain models
 └── infra/
     ├── mod.rs         # Re-exports adapters and port traits
     ├── audio.rs       # AudioBackend trait definition
