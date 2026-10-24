@@ -27,18 +27,21 @@ state to `UpdateStatus::CheckFailed` and displays "Update check failed (offline?
 ### Option A: Public releases at launch
 
 Make repository releases or the repository itself public upon v1 launch.
+
 - Pros: Requires zero code or configuration changes; existing `GithubUpdater` functions immediately on launch.
 - Cons: Update check remains in `CheckFailed` state throughout private pre-launch testing.
 
 ### Option B: Add token support in the app
 
 Extend the application to accept a GitHub PAT via settings or keyring to authenticate release API requests.
+
 - Pros: Allows update verification against private releases during pre-launch development.
 - Cons: Adds UI complexity, credential management overhead, and poor UX for regular users.
 
 ### Option C: Drop the update check
 
 Remove FR-12, the `Updater` port, `GithubUpdater` adapter, and related UI elements entirely.
+
 - Pros: Eliminates external GitHub API dependency and pre-launch failure state.
 - Cons: Loses update discoverability for desktop users; requires code removal.
 
