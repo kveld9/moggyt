@@ -7,7 +7,8 @@ use eframe::egui;
 
 use crate::domain::{PlaybackQueue, SearchQuery};
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, LyricLine, LyricsSource, SessionStore, sanitize_cookie_input,
+    AudioBackend, Catalog, CoverCache, LyricLine, LyricsSource, SessionStore, TrayAction,
+    TrayHandle, sanitize_cookie_input,
 };
 
 /// Navigation pages of the application shell.
@@ -42,6 +43,7 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub session: S,
     pub lyrics: L,
     pub covers: K,
+    pub tray: Option<TrayHandle>,
     pub lyrics_key: Option<(String, String)>,
     pub lyrics_lines: Vec<LyricLine>,
     pub lyrics_offset_ms: i64,
@@ -62,10 +64,50 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             session,
             lyrics,
             covers,
+            tray: None,
             lyrics_key: None,
             lyrics_lines: Vec::new(),
             lyrics_offset_ms: 0,
         }
+    }
+
+    /// Attaches an initialized system tray handle.
+    pub fn set_tray(&mut self, handle: TrayHandle) {
+        self.tray = Some(handle);
+    }
+
+    /// Dispatches a single tray action, returning true if quit was requested.
+    fn handle_action(&mut self, action: TrayAction) -> bool {
+        match action {
+            TrayAction::TogglePlay => self.toggle_play(),
+            TrayAction::Next => self.next_track(),
+            TrayAction::Previous => self.prev_track(),
+            TrayAction::Show => {}
+            TrayAction::Quit => return true,
+        }
+        false
+    }
+
+    /// Applies a batch of tray actions to application state.
+    pub fn apply_actions(&mut self, actions: &[TrayAction]) -> bool {
+        let mut quit_requested = false;
+        for action in actions {
+            if self.handle_action(*action) {
+                quit_requested = true;
+            }
+        }
+        quit_requested
+    }
+
+    /// Drains pending system tray events and applies them to state.
+    ///
+    /// Returns true when a Quit action was received.
+    pub fn drain_tray(&mut self) -> bool {
+        let Some(tray) = &self.tray else {
+            return false;
+        };
+        let actions = tray.drain();
+        self.apply_actions(&actions)
     }
 
     /// Handles a search submission: parses the raw input at the boundary,
@@ -240,6 +282,10 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     for MoggytApp<C, A, S, L, K>
 {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if self.state.drain_tray() {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            return;
+        }
         render_top_bar(ui, &mut self.state);
         render_player_bar(ui, &mut self.state);
         render_body(ui, &mut self.state);
@@ -826,5 +872,58 @@ mod tests {
         assert_eq!(state.lyrics_key, Some(("Sunrise Band".into(), "sunrise".into())));
         assert_eq!(state.lyrics_lines.len(), 2);
         assert_eq!(state.lyrics_lines[0].text, "sunrise - Sunrise Band");
+    }
+
+    #[test]
+    fn drain_tray_with_none_returns_false_and_preserves_state() {
+        let mut state = wired();
+        assert!(state.tray.is_none());
+        let quit = state.drain_tray();
+        assert!(!quit);
+        assert!(!state.audio.is_playing());
+    }
+
+    #[test]
+    fn apply_actions_empty_and_show_return_false() {
+        let mut state = wired();
+        assert!(!state.apply_actions(&[]));
+        assert!(!state.apply_actions(&[TrayAction::Show]));
+        assert!(!state.audio.is_playing());
+    }
+
+    #[test]
+    fn apply_actions_toggle_next_prev_and_quit() {
+        let mut state = wired();
+        state.search_text = "midnight".into();
+        state.submit_search();
+        state.search_text = "sunrise".into();
+        state.submit_search();
+        assert_eq!(state.queue.len(), 2);
+
+        // Toggle starts playback of head track
+        let quit = state.apply_actions(&[TrayAction::TogglePlay]);
+        assert!(!quit);
+        assert!(state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("midnight"));
+
+        // Next advances to sunrise and plays
+        let quit = state.apply_actions(&[TrayAction::Next]);
+        assert!(!quit);
+        assert!(state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("sunrise"));
+
+        // Previous retreats to midnight and plays
+        let quit = state.apply_actions(&[TrayAction::Previous]);
+        assert!(!quit);
+        assert!(state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("midnight"));
+
+        // Quit returns true
+        assert!(state.apply_actions(&[TrayAction::Quit]));
+
+        // Compound batch: TogglePlay then Quit toggles (pauses) and returns true
+        let quit = state.apply_actions(&[TrayAction::TogglePlay, TrayAction::Quit]);
+        assert!(quit);
+        assert!(!state.audio.is_playing());
     }
 }

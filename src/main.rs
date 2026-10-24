@@ -11,7 +11,7 @@ use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
     DiskCoverCache, KeyringSessionStore, LiveAudio, LrclibClient, RodioBackend,
-    SingleInstanceGuard, YtmCatalog, ensure_sidecar,
+    SingleInstanceGuard, TrayHandle, YtmCatalog, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -31,7 +31,11 @@ fn main() -> anyhow::Result<()> {
     let session = KeyringSessionStore::moggyt();
     let lyrics = LrclibClient::new();
     let covers = init_cover_cache(&data_dir);
-    let state = AppState::new(catalog, audio, session, lyrics, covers);
+    let mut state = AppState::new(catalog, audio, session, lyrics, covers);
+    match TrayHandle::try_new() {
+        Some(h) => state.set_tray(h),
+        None => tracing::warn!("tray unavailable; running without system tray icon"),
+    }
 
     let options = eframe::NativeOptions::default();
     eframe::run_native("moggyt", options, Box::new(|_ctx| Ok(Box::new(MoggytApp::new(state)))))
