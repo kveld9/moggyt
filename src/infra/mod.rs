@@ -16,6 +16,7 @@ mod presence;
 mod session;
 mod session_keyring;
 mod stream;
+mod tray;
 mod updater;
 mod ytdlp;
 mod ytm;
@@ -32,6 +33,7 @@ pub use presence::{NoopPresence, Presence};
 pub use session::{MemorySessionStore, SessionStore};
 pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
 pub use stream::{StreamResolver, StreamStub};
+pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
 pub use ytdlp::{
     YTDLP_AUDIO_FORMAT, YTDLP_UPDATE_INTERVAL_SECS, YtDlpResolver, ensure_sidecar, format_args,
