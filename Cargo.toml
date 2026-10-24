@@ -19,3 +19,4 @@ tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 single-instance = "0.3"
+tray-icon = { version = "0.20", default-features = false }
