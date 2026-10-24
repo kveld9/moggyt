@@ -28,6 +28,24 @@
                                 }
                               }
                             ],
+                            "thumbnail": {
+                              "musicThumbnailRenderer": {
+                                "thumbnail": {
+                                  "thumbs": [
+                                    {
+                                      "url": "https://lh3.googleusercontent.com/test-thumb-small",
+                                      "width": 60,
+                                      "height": 60
+                                    },
+                                    {
+                                      "url": "https://lh3.googleusercontent.com/test-thumb-large",
+                                      "width": 540,
+                                      "height": 540
+                                    }
+                                  ]
+                                }
+                              }
+                            },
                             "overlay": {
                               "musicItemThumbnailOverlayRenderer": {
                                 "content": {

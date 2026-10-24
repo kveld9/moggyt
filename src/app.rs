@@ -1174,6 +1174,7 @@ mod tests {
             artist: "Radiohead".into(),
             album: None,
             duration_secs: Some(383),
+            artwork: None,
         };
         state.queue.push(track);
         state.audio.play("vid-1");
@@ -1211,6 +1212,7 @@ mod tests {
             artist: "Radiohead".into(),
             album: None,
             duration_secs: Some(383),
+            artwork: None,
         };
         state.queue.push(track);
         state.audio.play("vid-1");
