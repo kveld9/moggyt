@@ -23,6 +23,8 @@ src/
 ├── lib.rs             # Public contracts: app + domain + i18n + infra
 ├── i18n.rs            # Interface localization skeleton and translation lookup
 ├── app.rs             # UI shell: navigation state, delegates events to domain and ports
+├── app/
+│   └── theme.rs       # egui Visuals mapping adapter for domain Palette
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
 │   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)
