@@ -160,9 +160,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Install ALSA dev headers for rodio/cpal
+      # Install system dev headers: ALSA for rodio/cpal, Ayatana AppIndicator
+      # (plus GTK/glib transitively) for tray-icon/libappindicator build scripts.
+      - name: Install Linux system dev headers
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
