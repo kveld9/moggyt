@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
-    DesktopPresence, DiskCoverCache, KeyringSessionStore, LiveAudio, LrclibClient, RodioBackend,
-    SingleInstanceGuard, TrayHandle, YtmCatalog, ensure_sidecar,
+    DesktopPresence, DiskCoverCache, KeyringSessionStore, LastFmClient, LiveAudio, LrclibClient,
+    RodioBackend, SingleInstanceGuard, TrayHandle, YtmCatalog, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -40,6 +40,11 @@ fn main() -> anyhow::Result<()> {
     tracing::debug!("desktop media presence live: {}", presence.is_live());
     state.set_presence(presence);
     tracing::debug!("discord rich presence live: {}", state.discord.is_live());
+
+    // Dormant without credentials; live scrobbling awaits user settings UI and Last.fm app registration.
+    let scrobbler = LastFmClient::new("", "");
+    tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
+    state.set_scrobbler(Box::new(scrobbler));
 
     let options = eframe::NativeOptions::default();
     eframe::run_native("moggyt", options, Box::new(|_ctx| Ok(Box::new(MoggytApp::new(state)))))
