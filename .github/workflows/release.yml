@@ -19,6 +19,7 @@
 # Release Artifacts:
 #   - moggyt-<version>-linux.tar.gz: Portable tarball containing the Linux binary (x86_64).
 #   - moggyt-<version>-windows.zip: Portable zip containing the Windows binary (x86_64).
+#   - moggyt_<version>_amd64.deb: Debian/Ubuntu package with automated dependency resolution.
 #   - <asset>.sha256: Individual SHA-256 digests for each archive.
 #   - SHA256SUMS.txt: Unified SHA-256 checksum manifest compatible with 'sha256sum -c'.
 #     (Legacy MD5 and SHA-512 hashes have been dropped to keep release assets clean and lean).
@@ -34,12 +35,10 @@
 #
 # Packaging Roadmap & Installer TODO (SDD Section 10):
 #   SDD Section 10 specifies Linux packages (.AppImage, .deb, .rpm) and Windows
-#   installers (NSIS .exe). This v1 workflow intentionally ships standalone portable
-#   archives (.tar.gz and .zip) to provide immediate binary availability without
-#   premature or unverified packaging scripts.
+#   installers (NSIS .exe). This workflow ships standalone portable archives (.tar.gz and .zip)
+#   and native Debian packages (.deb) via cargo-deb.
 #   TODO:
-#     - Linux packaging: Integrate cargo-deb for .deb generation and AppImageKit
-#       for standalone .AppImage bundles.
+#     - Linux packaging: Integrate AppImageKit for standalone .AppImage bundles and rpmbuild for .rpm.
 #     - Arch Linux packaging: Maintain PKGBUILD in packaging/arch/moggyt-bin (AUR publish deferred; no credentials in v1).
 #     - Windows packaging: Integrate cargo-wix (MSI) or NSIS for setup installer creation.
 #     - Code signing & Attestations: Integrate Authenticode signing for Windows
@@ -197,6 +196,18 @@ jobs:
           else
             tar -czf "dist/moggyt-${VERSION}-linux.tar.gz" -C target/release moggyt
           fi
+
+      - name: Install cargo-deb
+        if: runner.os == 'Linux'
+        run: cargo install cargo-deb --locked
+
+      - name: Build Debian package (.deb)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          VERSION="${{ needs.semver.outputs.version }}"
+          cargo deb --no-build --deb-version "${VERSION}"
+          cp target/debian/*.deb dist/
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4

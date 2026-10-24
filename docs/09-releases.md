@@ -14,15 +14,16 @@ Release automation runs across standard GitHub Actions runners:
 
 ## Distribution Artifacts
 
-Each tagged release publishes the following standalone assets:
+Release assets by shipment status:
 
-| Artifact | Target OS | Distribution Channel |
-| --- | --- | --- |
-| `moggyt-*-x86_64.AppImage` | Linux | GitHub Releases |
-| `moggyt_*_amd64.deb` | Linux (Debian, Ubuntu) | GitHub Releases |
-| `moggyt-*.x86_64.rpm` | Linux (Fedora, openSUSE) | GitHub Releases |
-| `moggyt-*-linux.tar.gz` | Linux (Generic tarball) | GitHub Releases (consumed by Arch PKGBUILD) |
-| `moggyt-*-setup.exe` | Windows 64-bit | GitHub Releases (NSIS installer) |
+| Artifact | Target OS | Distribution Channel | Status |
+| --- | --- | --- | --- |
+| `moggyt-*-linux.tar.gz` | Linux (Generic tarball) | GitHub Releases (consumed by Arch PKGBUILD) | Shipped |
+| `moggyt-*-windows.zip` | Windows 64-bit | GitHub Releases | Shipped |
+| `moggyt_*_amd64.deb` | Linux (Debian, Ubuntu) | GitHub Releases | Shipped |
+| `moggyt-*-x86_64.AppImage` | Linux | GitHub Releases | Planned |
+| `moggyt-*.x86_64.rpm` | Linux (Fedora, openSUSE) | GitHub Releases | Planned |
+| `moggyt-*-setup.exe` | Windows 64-bit | GitHub Releases (NSIS installer) | Planned |
 
 ### Arch Linux Packaging
 
