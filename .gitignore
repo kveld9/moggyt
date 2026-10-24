@@ -180,3 +180,6 @@ build/
 *.swp
 tmp/
 temp/
+
+# Local Git Hooks (active copy; versioned template is .githooks/pre-commit.example)
+.githooks/pre-commit
