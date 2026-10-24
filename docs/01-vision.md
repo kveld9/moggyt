@@ -5,11 +5,12 @@
 Web-based YouTube Music clients consume too much memory and depend on the browser.
 `moggyt` is a fast, lightweight native desktop client written in Rust.
 
-## Scope v0.1 (current scaffold)
+## Scope v0.1 (current scaffold evolving to v1)
 
-- Native `eframe`/`egui` window with minimal navigation (search, queue, now playing).
-- Pure domain core: playback queue and search models, no I/O.
-- Ports (`trait`) for the YouTube Music catalog and the audio backend; real adapters land in later phases.
+- Native `eframe`/`egui` window with navigation (search, queue, now playing, library).
+- Pure domain core: playback queue, search models, and library entities without I/O.
+- Ports (`trait`) for the YouTube Music catalog, audio backend, stream resolver, lyrics, cover cache, presence, and updater.
+- Initial working adapters for playback via `rodio` and a `yt-dlp` sidecar, LRCLIB lyrics, cover cache, and keyring auth.
 
 ## Out of scope (for now)
 

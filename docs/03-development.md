@@ -16,6 +16,8 @@ cargo clippy --all-targets --all-features -- -D warnings
 ./scripts/check-markdown.sh                # markdown lint (CI fails on drift)
 ```
 
+CI additionally runs markdown quality checks using `markdownlint-cli2`.
+
 ## Branches and commits
 
 - Default branch `main`. Every change enters via Pull Request from `<type>/<short-desc>`

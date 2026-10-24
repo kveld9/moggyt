@@ -19,17 +19,30 @@ UI (app.rs, eframe) --> domain (domain/) <-- ports <-- adapters (infra/)
 
 ```text
 src/
-├── main.rs            # Composition root (bin): tracing, tokio runtime, eframe::run_native
+├── main.rs            # Composition root (bin): tracing, tokio runtime, eframe bootstrap
 ├── lib.rs             # Public contracts: app + domain + infra
-├── app.rs             # UI shell: navigation state, delegates events to the domain
+├── app.rs             # UI shell: navigation state, delegates events to domain and ports
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
-│   ├── queue.rs       # Pure playback queue (add, next, previous, shuffle)
-│   └── search.rs      # Search models (immutable query, paginated results)
+│   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)
+│   ├── queue.rs       # Pure playback queue (add, next, previous, shuffle, repeat)
+│   └── search.rs      # Search models (immutable query, track model)
 └── infra/
-    ├── mod.rs         # Re-exports adapters
-    ├── ytm.rs         # Catalog adapter (stub: returns fixed data until the API lands)
-    └── audio.rs       # Audio adapter (stub: records intent without playing yet)
+    ├── mod.rs         # Re-exports adapters and port traits
+    ├── audio.rs       # AudioBackend trait definition
+    ├── audio_rodio.rs # rodio playback adapter with LiveAudio fallback
+    ├── cover*.rs      # CoverCache port and memory/disk caching adapters
+    ├── innertube.rs   # InnerTube search request builder and parser
+    ├── instance.rs    # SingleInstanceGuard lock
+    ├── lyrics*.rs     # LyricsSource port and LRCLIB synced lyrics client
+    ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence
+    ├── scrobble.rs    # Scrobbler port and Last.fm client adapter
+    ├── session*.rs    # SessionStore port and Keyring cookie persistence
+    ├── stream.rs      # StreamResolver trait definition
+    ├── tray.rs        # System tray handle and action event loop
+    ├── updater*.rs    # Updater port and GitHub Releases release checker
+    ├── ytdlp.rs       # yt-dlp sidecar download and stream resolution adapter
+    └── ytm.rs         # Catalog adapter implementing search and library views
 ```
 
 ## Evolution rules
