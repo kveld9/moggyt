@@ -1,0 +1,40 @@
+{
+  "musicQueueRenderer": {
+    "content": {
+      "playlistPanelRenderer": {
+        "contents": [
+          {
+            "playlistPanelVideoRenderer": {
+              "videoId": "radio-1",
+              "title": { "runs": [{ "text": "Radio Song 1" }] },
+              "shortBylineText": { "runs": [{ "text": "Radio Artist 1" }] },
+              "lengthText": { "runs": [{ "text": "3:30" }] },
+              "thumbnail": {
+                "musicThumbnailRenderer": {
+                  "thumbnail": {
+                    "thumbs": [{ "url": "https://lh3.googleusercontent.com/radio-thumb-1", "width": 300, "height": 300 }]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "playlistPanelVideoRenderer": {
+              "videoId": "radio-2",
+              "title": { "runs": [{ "text": "Radio Song 2" }] },
+              "shortBylineText": { "runs": [{ "text": "Radio Artist 2" }] }
+            }
+          },
+          {
+            "playlistPanelVideoRenderer": {
+              "videoId": "   ",
+              "title": { "runs": [{ "text": "Radio Song 3 Blank ID" }] },
+              "shortBylineText": { "runs": [{ "text": "Radio Artist 3" }] },
+              "lengthText": { "runs": [{ "text": "4:15" }] }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

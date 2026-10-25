@@ -13,6 +13,9 @@ pub trait Catalog {
     /// Returns catalog hits matching the query text and filter.
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult>;
 
+    /// Returns radio continuation tracks seeded by `seed_track_id` (empty when seed is blank).
+    fn radio(&self, seed_track_id: &str) -> Vec<Track>;
+
     /// Returns saved or owned playlists.
     fn playlists(&self) -> Vec<Playlist>;
 
@@ -103,6 +106,19 @@ impl Catalog for CatalogStub {
         }
     }
 
+    fn radio(&self, seed_track_id: &str) -> Vec<Track> {
+        let trimmed = seed_track_id.trim();
+        if trimmed.is_empty() {
+            return Vec::new();
+        }
+        vec![
+            Track::new(&format!("{trimmed}-radio-1"), &format!("{trimmed} Radio 1"), "Stub Artist")
+                .with_duration(180),
+            Track::new(&format!("{trimmed}-radio-2"), &format!("{trimmed} Radio 2"), "Stub Artist")
+                .with_duration(210),
+        ]
+    }
+
     fn playlists(&self) -> Vec<Playlist> {
         Self::stub_playlists()
     }
@@ -173,7 +189,10 @@ impl YtmCatalog {
 }
 
 fn raw_to_track(raw: RawTrack) -> Track {
-    let track = Track::new(&raw.video_id, &raw.title, &raw.artist);
+    let mut track = Track::new(&raw.video_id, &raw.title, &raw.artist);
+    if let Some(dur) = raw.duration_secs {
+        track = track.with_duration(dur);
+    }
     match raw.thumb_url {
         Some(url) => track.with_artwork(url),
         None => track,
@@ -205,6 +224,15 @@ impl Catalog for YtmCatalog {
     /// Returns catalog hits matching the query text and filter. Network failures map to an empty vector.
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
         Self::map_hits(self.fetch_hits(query.text()), query.filter())
+    }
+
+    /// Returns radio continuation tracks seeded by `seed_track_id`. Network failures map to an empty vector.
+    fn radio(&self, seed_track_id: &str) -> Vec<Track> {
+        let trimmed = seed_track_id.trim();
+        if trimmed.is_empty() {
+            return Vec::new();
+        }
+        self.tube.radio_tracks(trimmed).into_iter().map(raw_to_track).collect()
     }
 
     /// Returns saved or owned playlists. Anonymous interim returns an empty list
@@ -289,12 +317,14 @@ mod tests {
                     video_id: "v1".into(),
                     title: "T1".into(),
                     artist: "A1".into(),
+                    duration_secs: None,
                     thumb_url: Some("https://artwork.test/v1".into()),
                 },
                 RawTrack {
                     video_id: "v2".into(),
                     title: "T2".into(),
                     artist: "A2".into(),
+                    duration_secs: None,
                     thumb_url: None,
                 },
             ],
@@ -416,5 +446,44 @@ mod tests {
         assert!(catalog.playlists().is_empty());
         assert!(catalog.saved_albums().is_empty());
         assert!(catalog.liked_tracks().is_empty());
+    }
+
+    #[test]
+    fn stub_radio_determinism_and_blank_seed() {
+        let catalog = CatalogStub::new();
+        let first = catalog.radio("vid-seed");
+        let second = catalog.radio("vid-seed");
+        assert_eq!(first, second, "stub radio must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0].id, "vid-seed-radio-1");
+        assert_eq!(first[0].artist, "Stub Artist");
+        assert_eq!(first[0].duration_secs, Some(180));
+        assert_eq!(first[1].id, "vid-seed-radio-2");
+        assert_eq!(first[1].artist, "Stub Artist");
+        assert_eq!(first[1].duration_secs, Some(210));
+
+        assert!(catalog.radio("").is_empty());
+        assert!(catalog.radio("   ").is_empty());
+    }
+
+    #[test]
+    fn ytm_catalog_maps_radio_tracks() {
+        let raw = RawTrack {
+            video_id: "radio-vid-1".into(),
+            title: "Radio Title".into(),
+            artist: "Radio Artist".into(),
+            duration_secs: Some(225),
+            thumb_url: Some("https://img.local/radio.jpg".into()),
+        };
+        let track = raw_to_track(raw);
+        assert_eq!(track.id, "radio-vid-1");
+        assert_eq!(track.title, "Radio Title");
+        assert_eq!(track.artist, "Radio Artist");
+        assert_eq!(track.duration_secs, Some(225));
+        assert_eq!(track.artwork.as_deref(), Some("https://img.local/radio.jpg"));
+
+        let catalog = YtmCatalog::new();
+        assert!(catalog.radio("").is_empty());
+        assert!(catalog.radio("   ").is_empty());
     }
 }

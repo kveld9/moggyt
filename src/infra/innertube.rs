@@ -22,6 +22,11 @@ pub fn search_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/search?key={YTM_API_KEY}&prettyPrint=false")
 }
 
+/// Returns the InnerTube next endpoint URL.
+pub fn next_url() -> String {
+    format!("https://music.youtube.com/youtubei/v1/next?key={YTM_API_KEY}&prettyPrint=false")
+}
+
 /// Builds the minimal WEB_REMIX search payload for `query`.
 pub fn search_body(query: &str) -> Value {
     serde_json::json!({
@@ -37,6 +42,22 @@ pub fn search_body(query: &str) -> Value {
     })
 }
 
+/// Builds the minimal WEB_REMIX next payload for `video_id`.
+pub fn next_body(video_id: &str) -> Value {
+    serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": YTM_CLIENT_VERSION,
+                "hl": "en",
+                "gl": "US",
+            }
+        },
+        "videoId": video_id,
+        "playlistId": format!("RD{video_id}"),
+    })
+}
+
 /// Parsed track hit from InnerTube search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawTrack {
@@ -46,6 +67,8 @@ pub struct RawTrack {
     pub title: String,
     /// Artist name.
     pub artist: String,
+    /// Optional track duration in seconds.
+    pub duration_secs: Option<u32>,
     /// Highest-resolution thumbnail URL when known.
     pub thumb_url: Option<String>,
 }
@@ -126,7 +149,7 @@ fn parse_item(renderer: &Value) -> Option<RawTrack> {
     let title = flex_text(renderer, 0)?;
     let artist = flex_text(renderer, 1).unwrap_or_default();
     let thumb_url = best_thumbnail(renderer);
-    Some(RawTrack { video_id, title, artist, thumb_url })
+    Some(RawTrack { video_id, title, artist, duration_secs: None, thumb_url })
 }
 
 fn collect_shelf_items(shelf: &Value, out: &mut Vec<RawTrack>) {
@@ -208,7 +231,10 @@ pub fn shelf_category(title: &str) -> Option<SearchFilter> {
 /// In case of ties, the first candidate wins (strictly-greater replacement).
 /// Blank URLs and non-array payloads return `None`.
 pub fn best_thumbnail(value: &Value) -> Option<String> {
-    let thumbs = value.pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbs")?.as_array()?;
+    let thumbs = value
+        .pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbs")
+        .or_else(|| value.pointer("/thumbnail/thumbnails"))?
+        .as_array()?;
 
     let mut best: Option<(&str, u64)> = None;
     for item in thumbs {
@@ -350,6 +376,88 @@ pub fn parse_search_all(value: &Value) -> SearchHits {
     hits
 }
 
+/// Parses duration string formatted as "mm:ss" or "hh:mm:ss" into total seconds.
+pub fn parse_duration_secs(raw: &str) -> Option<u32> {
+    let parts: Vec<&str> = raw.trim().split(':').collect();
+    match parts.as_slice() {
+        [mins, secs] => mins.parse::<u32>().ok()?.checked_mul(60)?.checked_add(secs.parse().ok()?),
+        [hours, mins, secs] => {
+            let total_m =
+                hours.parse::<u32>().ok()?.checked_mul(60)?.checked_add(mins.parse().ok()?)?;
+            total_m.checked_mul(60)?.checked_add(secs.parse().ok()?)
+        }
+        _ => None,
+    }
+}
+
+fn panel_video_id(renderer: &Value) -> Option<String> {
+    if let Some(id) = renderer.get("videoId").and_then(Value::as_str) {
+        let trimmed = id.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_owned());
+        }
+    }
+    watch_video_id(renderer)
+}
+
+fn panel_title(renderer: &Value) -> Option<String> {
+    let text = renderer.pointer("/title/runs/0/text")?.as_str()?.trim();
+    if text.is_empty() { None } else { Some(text.to_owned()) }
+}
+
+fn panel_artist(renderer: &Value) -> String {
+    const PATHS: &[&str] =
+        &["/shortBylineText/runs/0/text", "/longBylineText/runs/0/text", "/bylineText/runs/0/text"];
+    for path in PATHS {
+        if let Some(text) = renderer.pointer(path).and_then(Value::as_str) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_owned();
+            }
+        }
+    }
+    String::new()
+}
+
+fn panel_duration(renderer: &Value) -> Option<u32> {
+    let raw = renderer
+        .pointer("/lengthText/runs/0/text")
+        .or_else(|| renderer.pointer("/lengthText/simpleText"))?
+        .as_str()?;
+    parse_duration_secs(raw)
+}
+
+fn parse_radio_item(item: &Value) -> Option<RawTrack> {
+    let renderer = item.get("playlistPanelVideoRenderer").unwrap_or(item);
+    let video_id = panel_video_id(renderer)?;
+    let title = panel_title(renderer)?;
+    let artist = panel_artist(renderer);
+    let duration_secs = panel_duration(renderer);
+    let thumb_url = best_thumbnail(renderer);
+    Some(RawTrack { video_id, title, artist, duration_secs, thumb_url })
+}
+
+fn playlist_panel_contents(value: &Value) -> Option<&[Value]> {
+    const CANDIDATES: &[&str] = &[
+        "/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents",
+        "/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/playlistPanelRenderer/contents",
+        "/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents",
+        "/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/playlistPanelRenderer/contents",
+        "/musicQueueRenderer/content/playlistPanelRenderer/contents",
+        "/musicQueueRenderer/playlistPanelRenderer/contents",
+        "/playlistPanelRenderer/contents",
+    ];
+    CANDIDATES
+        .iter()
+        .find_map(|path| value.pointer(path).and_then(Value::as_array).map(Vec::as_slice))
+}
+
+/// Parses radio track hits from InnerTube next response payload.
+pub fn parse_radio_all(value: &Value) -> Vec<RawTrack> {
+    playlist_panel_contents(value)
+        .map_or_else(Vec::new, |items| items.iter().filter_map(parse_radio_item).collect())
+}
+
 /// Blocking HTTP client for the InnerTube API.
 #[derive(Debug)]
 pub struct InnerTube {
@@ -392,6 +500,29 @@ impl InnerTube {
     /// Performs search for `query` and returns grouped search hits across all shelves.
     pub fn search_all(&self, query: &str) -> anyhow::Result<SearchHits> {
         self.search_payload(query).map(|p| parse_search_all(&p))
+    }
+
+    /// Executes next endpoint request for radio and returns the unparsed JSON response payload.
+    pub fn next_payload(&self, video_id: &str) -> anyhow::Result<Value> {
+        let url = next_url();
+        let body = next_body(video_id);
+        let response = self.client.post(&url).json(&body).send()?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("InnerTube next request failed with status: {status}");
+        }
+        let payload: Value = response.json()?;
+        Ok(payload)
+    }
+
+    /// Queries the next endpoint for `video_id` and returns parsed radio tracks.
+    /// Returns an empty vector on any network or parse failure.
+    pub fn radio_tracks(&self, video_id: &str) -> Vec<RawTrack> {
+        let trimmed = video_id.trim();
+        if trimmed.is_empty() {
+            return Vec::new();
+        }
+        self.next_payload(trimmed).map_or_else(|_| Vec::new(), |p| parse_radio_all(&p))
     }
 
     /// Converts this InnerTube client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
@@ -506,6 +637,7 @@ mod tests {
                 video_id: "vid-1".to_owned(),
                 title: "Midnight City".to_owned(),
                 artist: "M83".to_owned(),
+                duration_secs: None,
                 thumb_url: Some("https://lh3.googleusercontent.com/test-thumb-large".to_owned()),
             }
         );
@@ -515,6 +647,7 @@ mod tests {
                 video_id: "vid-2".to_owned(),
                 title: "Starboy".to_owned(),
                 artist: "The Weeknd".to_owned(),
+                duration_secs: None,
                 thumb_url: None,
             }
         );
@@ -669,5 +802,79 @@ mod tests {
         assert!(first.albums.is_empty());
         assert!(first.artists.is_empty());
         assert!(first.playlists.is_empty());
+    }
+
+    #[test]
+    fn next_url_format_and_key() {
+        assert_eq!(
+            next_url(),
+            format!(
+                "https://music.youtube.com/youtubei/v1/next?key={YTM_API_KEY}&prettyPrint=false"
+            )
+        );
+    }
+
+    #[test]
+    fn next_body_structure() {
+        let body = next_body("abc-123");
+        assert_eq!(body["videoId"], "abc-123");
+        assert_eq!(body["playlistId"], "RDabc-123");
+        assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+        assert_eq!(body["context"]["client"]["clientVersion"], YTM_CLIENT_VERSION);
+    }
+
+    #[test]
+    fn parse_duration_secs_table() {
+        for (input, expected) in [
+            ("3:30", Some(210)),
+            ("0:45", Some(45)),
+            ("1:02:15", Some(3735)),
+            ("0:00", Some(0)),
+            ("", None),
+            ("invalid", None),
+            ("1:2:3:4", None),
+        ] {
+            assert_eq!(parse_duration_secs(input), expected, "failed for: {input}");
+        }
+    }
+
+    #[test]
+    fn parse_radio_all_tolerates_empty_and_malformed() {
+        assert!(parse_radio_all(&serde_json::json!({})).is_empty());
+        assert!(parse_radio_all(&serde_json::json!({"musicQueueRenderer": null})).is_empty());
+        assert!(
+            parse_radio_all(&serde_json::json!({
+                "musicQueueRenderer": { "content": { "playlistPanelRenderer": { "contents": [] } } }
+            }))
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn parse_radio_all_golden_fixture() {
+        let raw = include_str!("../../tests/fixtures/innertube_radio.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let tracks = parse_radio_all(&payload);
+        assert_eq!(tracks.len(), 2);
+        assert_eq!(
+            tracks[0],
+            RawTrack {
+                video_id: "radio-1".to_owned(),
+                title: "Radio Song 1".to_owned(),
+                artist: "Radio Artist 1".to_owned(),
+                duration_secs: Some(210),
+                thumb_url: Some("https://lh3.googleusercontent.com/radio-thumb-1".to_owned()),
+            }
+        );
+        assert_eq!(
+            tracks[1],
+            RawTrack {
+                video_id: "radio-2".to_owned(),
+                title: "Radio Song 2".to_owned(),
+                artist: "Radio Artist 2".to_owned(),
+                duration_secs: None,
+                thumb_url: None,
+            }
+        );
     }
 }
