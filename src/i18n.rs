@@ -156,4 +156,23 @@ mod tests {
         assert_eq!(Locale::from_tag(""), None);
         assert_eq!(Locale::from_tag("unknown"), None);
     }
+
+    #[test]
+    fn test_8_given_env_lang_strings_when_parse_env_lang_called_then_maps_expected_locales() {
+        let cases = [
+            ("es", Some(Locale::Spanish)),
+            ("es_AR.UTF-8", Some(Locale::Spanish)),
+            ("es-ES", Some(Locale::Spanish)),
+            ("en", Some(Locale::English)),
+            ("en_US.UTF-8", Some(Locale::English)),
+            ("fr_FR", None),
+            ("C", None),
+            ("POSIX", None),
+            ("", None),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(parse_env_lang(input), expected, "failed for input: {input}");
+        }
+    }
 }

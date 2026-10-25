@@ -86,8 +86,10 @@ The configuration file uses JSON serialization with atomic replacement:
   - `"black-oled"`: Pure black background (`#000000`) designed for OLED panels.
   - `"mono"`: High-contrast monochromatic palette with zero color saturation across all slots.
 - **Locales (`locale`)**:
-  - `"en"`: English (tranche 1 default).
+  - `"en"`: English (fallback when system language is not Spanish or unparseable).
   - `"es"`: Spanish (`Español`).
+  - First-run resolution detects the system locale via environment variables (`LC_ALL`, `LC_MESSAGES`, `LANG`),
+    falling back to English; explicitly saved choices in `settings.json` take precedence.
 
 ### Fault Tolerance & Atomic Persistence
 
