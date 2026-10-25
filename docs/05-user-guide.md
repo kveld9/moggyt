@@ -37,6 +37,8 @@ The queue view manages the ordered list of upcoming tracks:
 The now playing view presents rich playback details for the track under the active cursor:
 
 - Displays track title, artist name, and the stream identifier requested from the audio backend.
+- **Start Radio**: click `Start radio` to seed an autoplay continuation queue with the active track
+  and automatically fetch recommendations when reaching the end of the queue.
 - **Cover Art**: displays artwork fetched from the track thumbnail URL and cached locally. If offline or pending,
   shows `Cover art unavailable (offline or pending fetch)`.
 - **Synced Lyrics**: displays timestamped lyrics fetched from LRCLIB for the active artist and title pair.
