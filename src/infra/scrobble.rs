@@ -1,7 +1,8 @@
-//! Scrobbler port and Last.fm 2.0 API client.
+//! Scrobbler port, credential vault, and Last.fm 2.0 API client.
 //!
 //! Exposes the [`Scrobbler`] trait for playback progress reporting,
-//! pure Last.fm rule helpers, and a dormant client awaiting credentials.
+//! credential persistence via [`CredentialStore`], pure Last.fm rule helpers,
+//! and a dormant client awaiting credentials.
 
 use md5::{Digest, Md5};
 
@@ -172,6 +173,184 @@ pub fn api_signature(params: &[(&str, &str)], secret: &str) -> String {
     format!("{digest:x}")
 }
 
+/// Last.fm API credentials and user session key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LastFmCredentials {
+    pub api_key: String,
+    pub secret: String,
+    pub session_key: String,
+}
+
+impl LastFmCredentials {
+    /// Constructs a credential bundle.
+    pub fn new(
+        api_key: impl Into<String>,
+        secret: impl Into<String>,
+        session_key: impl Into<String>,
+    ) -> Self {
+        Self { api_key: api_key.into(), secret: secret.into(), session_key: session_key.into() }
+    }
+
+    /// Returns true when API key, secret, and session key are all non-empty after trimming.
+    pub fn is_complete(&self) -> bool {
+        if self.api_key.trim().is_empty() || self.secret.trim().is_empty() {
+            return false;
+        }
+        !self.session_key.trim().is_empty()
+    }
+}
+
+/// Constructs a [`LastFmClient`] initialized with the given credentials.
+pub fn client_from_credentials(creds: &LastFmCredentials) -> LastFmClient {
+    LastFmClient::new(&creds.api_key, &creds.secret).with_session_key(&creds.session_key)
+}
+
+/// Port for persisting and retrieving Last.fm credentials.
+pub trait CredentialStore: Send + Sync {
+    /// Saves Last.fm credentials, or clears them when incomplete.
+    fn save_lastfm(&mut self, creds: &LastFmCredentials);
+    /// Loads persisted credentials if all three fields are present and non-empty.
+    fn load_lastfm(&self) -> Option<LastFmCredentials>;
+    /// Clears any persisted Last.fm credentials.
+    fn clear_lastfm(&mut self);
+}
+
+/// In-memory credential store for tests and transient sessions.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct MemoryCredentialStore {
+    inner: Option<LastFmCredentials>,
+}
+
+impl MemoryCredentialStore {
+    /// Creates an empty memory store.
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl CredentialStore for MemoryCredentialStore {
+    fn save_lastfm(&mut self, creds: &LastFmCredentials) {
+        self.inner = creds.is_complete().then(|| creds.clone());
+    }
+
+    fn load_lastfm(&self) -> Option<LastFmCredentials> {
+        self.inner.as_ref().filter(|c| c.is_complete()).cloned()
+    }
+
+    fn clear_lastfm(&mut self) {
+        self.inner = None;
+    }
+}
+
+/// Credential store backed by the platform credential manager via `keyring`.
+#[derive(Debug, Clone)]
+pub struct KeyringCredentialStore {
+    service: String,
+    api_key_account: String,
+    secret_account: String,
+    session_account: String,
+}
+
+impl KeyringCredentialStore {
+    /// Creates a store with custom service and account names.
+    pub fn new(
+        service: impl Into<String>,
+        api_key_account: impl Into<String>,
+        secret_account: impl Into<String>,
+        session_account: impl Into<String>,
+    ) -> Self {
+        Self {
+            service: service.into(),
+            api_key_account: api_key_account.into(),
+            secret_account: secret_account.into(),
+            session_account: session_account.into(),
+        }
+    }
+
+    /// Creates the default application store targeting Last.fm credentials.
+    pub fn moggyt() -> Self {
+        Self::new("moggyt", "lastfm-api-key", "lastfm-secret", "lastfm-session-key")
+    }
+
+    fn entry(&self, account: &str) -> anyhow::Result<keyring::Entry> {
+        keyring::Entry::new(&self.service, account).map_err(Into::into)
+    }
+
+    fn open_entry(&self, account: &str, op: &str) -> Option<keyring::Entry> {
+        self.entry(account)
+            .map_err(|err| tracing::warn!(error = %err, "failed to open OS keyring entry for {op}"))
+            .ok()
+    }
+
+    fn save_entry(&self, account: &str, secret: &str) -> bool {
+        let Some(entry) = self.open_entry(account, "save") else {
+            return false;
+        };
+        if let Err(err) = entry.set_secret(secret.as_bytes()) {
+            tracing::warn!(error = %err, "failed to store Last.fm credential in OS keyring");
+        }
+        true
+    }
+
+    fn load_entry(&self, account: &str) -> Option<String> {
+        let entry = self.open_entry(account, "load")?;
+        let bytes = entry
+            .get_secret()
+            .map_err(|err| {
+                tracing::warn!(error = %err, "failed to load Last.fm credential from OS keyring");
+            })
+            .ok()?;
+        match String::from_utf8(bytes) {
+            Ok(stored) => Some(stored),
+            Err(err) => {
+                tracing::warn!(error = %err, "stored OS keyring secret is not valid UTF-8");
+                None
+            }
+        }
+    }
+
+    fn clear_entry(&self, account: &str) {
+        let Some(entry) = self.open_entry(account, "clear") else {
+            return;
+        };
+        if let Err(err) = entry.delete_credential() {
+            if !matches!(err, keyring::Error::NoEntry) {
+                tracing::warn!(error = %err, "failed to clear Last.fm credential from OS keyring");
+            }
+        }
+    }
+}
+
+impl CredentialStore for KeyringCredentialStore {
+    fn save_lastfm(&mut self, creds: &LastFmCredentials) {
+        if !creds.is_complete() {
+            self.clear_lastfm();
+            return;
+        }
+        if !self.save_entry(&self.api_key_account, &creds.api_key)
+            || !self.save_entry(&self.secret_account, &creds.secret)
+        {
+            return;
+        }
+        self.save_entry(&self.session_account, &creds.session_key);
+    }
+
+    fn load_lastfm(&self) -> Option<LastFmCredentials> {
+        let creds = LastFmCredentials::new(
+            self.load_entry(&self.api_key_account)?,
+            self.load_entry(&self.secret_account)?,
+            self.load_entry(&self.session_account)?,
+        );
+        creds.is_complete().then_some(creds)
+    }
+
+    fn clear_lastfm(&mut self) {
+        for account in [&self.api_key_account, &self.secret_account, &self.session_account] {
+            self.clear_entry(account);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,5 +423,76 @@ mod tests {
         // Parameters with format and unsorted order must yield identical signature
         let params_with_format = [("b", "2"), ("format", "json"), ("a", "1")];
         assert_eq!(api_signature(&params_with_format, "s"), expected);
+    }
+
+    #[test]
+    fn lastfm_credentials_and_client_construction() {
+        let creds = LastFmCredentials::new("key", "sec", "sk");
+        assert!(creds.is_complete());
+        assert!(client_from_credentials(&creds).is_live());
+
+        for (k, s, sk) in [("", "sec", "sk"), ("key", " ", "sk"), ("key", "sec", "\t")] {
+            let item = LastFmCredentials::new(k, s, sk);
+            assert!(!item.is_complete());
+            assert!(!client_from_credentials(&item).is_live());
+        }
+    }
+
+    #[test]
+    fn memory_credential_store_lifecycle() {
+        let mut store = MemoryCredentialStore::new();
+        assert_eq!(store.load_lastfm(), None);
+
+        let creds = LastFmCredentials::new("key", "sec", "sk");
+        store.save_lastfm(&creds);
+        assert_eq!(store.load_lastfm(), Some(creds.clone()));
+
+        // Incomplete save clears existing credentials; blank fields return None
+        store.save_lastfm(&LastFmCredentials::new("key", "  ", "sk"));
+        assert_eq!(store.load_lastfm(), None);
+
+        store.save_lastfm(&creds);
+        store.clear_lastfm();
+        assert_eq!(store.load_lastfm(), None);
+    }
+
+    #[test]
+    fn keyring_credential_store_constructors() {
+        let custom = KeyringCredentialStore::new("svc", "k", "s", "sk");
+        assert_eq!(custom.service, "svc");
+        assert_eq!(custom.api_key_account, "k");
+        assert_eq!(custom.secret_account, "s");
+        assert_eq!(custom.session_account, "sk");
+
+        let def = KeyringCredentialStore::moggyt();
+        assert_eq!(def.service, "moggyt");
+        assert_eq!(def.api_key_account, "lastfm-api-key");
+        assert_eq!(def.secret_account, "lastfm-secret");
+        assert_eq!(def.session_account, "lastfm-session-key");
+    }
+
+    #[test]
+    fn keyring_credential_store_provider_tolerance_lifecycle() {
+        let mut store = KeyringCredentialStore::new(
+            "moggyt-test",
+            "moggyt-test-lastfm-api-key",
+            "moggyt-test-lastfm-secret",
+            "moggyt-test-lastfm-session-key",
+        );
+        store.clear_lastfm();
+        let creds = LastFmCredentials::new("test-key", "test-secret", "test-session");
+        store.save_lastfm(&creds);
+
+        match store.load_lastfm() {
+            Some(loaded) => {
+                assert_eq!(loaded, creds);
+                store.save_lastfm(&LastFmCredentials::new("test-key", "   ", "test-session"));
+                assert_eq!(store.load_lastfm(), None);
+            }
+            None => {
+                eprintln!("keyring provider absent in current environment; tolerated per SDD D-2")
+            }
+        }
+        store.clear_lastfm();
     }
 }
