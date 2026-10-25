@@ -15,8 +15,10 @@ The interface consists of three primary regions:
 
 ### Search Page
 
-The search view accepts queries for tracks, artists, and albums:
+The search view presents curated home shelves and accepts queries for tracks, artists, and albums:
 
+- **Home Shelves**: displays categorized carousels (albums, artists, playlists) loaded lazily on open. Click `Refresh`
+  to clear the cache and refetch home shelves from the catalog.
 - Type your search terms into the single-line input field.
 - Press `Enter` or click the `Search` button.
 - Catalog hits are queried through the catalog adapter and the top hit is enqueued automatically, transitioning the

@@ -3,7 +3,9 @@
 use super::innertube::{
     InnerTube, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
 };
-use crate::domain::{Album, Artist, Playlist, SearchFilter, SearchQuery, SearchResult, Track};
+use crate::domain::{
+    Album, Artist, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf, Track,
+};
 
 /// Catalog port: search by free text and user library read/mutation access.
 pub trait Catalog {
@@ -15,6 +17,9 @@ pub trait Catalog {
 
     /// Returns radio continuation tracks seeded by `seed_track_id` (empty when seed is blank).
     fn radio(&self, seed_track_id: &str) -> Vec<Track>;
+
+    /// Returns home shelves (empty on failure).
+    fn home_shelves(&self) -> Vec<Shelf>;
 
     /// Returns saved or owned playlists.
     fn playlists(&self) -> Vec<Playlist>;
@@ -79,6 +84,22 @@ impl CatalogStub {
     fn stub_playlists() -> Vec<Playlist> {
         vec![Self::stub_playlist(), Playlist::new("stub-playlist-2", "Favorites", 24)]
     }
+
+    fn stub_home_shelves() -> Vec<Shelf> {
+        vec![
+            Shelf {
+                title: "Trending".to_owned(),
+                items: vec![
+                    SearchResult::Album(Self::stub_album()),
+                    SearchResult::Artist(Self::stub_artist()),
+                ],
+            },
+            Shelf {
+                title: "Featured Playlists".to_owned(),
+                items: vec![SearchResult::Playlist(Self::stub_playlist())],
+            },
+        ]
+    }
 }
 
 impl Catalog for CatalogStub {
@@ -117,6 +138,10 @@ impl Catalog for CatalogStub {
             Track::new(&format!("{trimmed}-radio-2"), &format!("{trimmed} Radio 2"), "Stub Artist")
                 .with_duration(210),
         ]
+    }
+
+    fn home_shelves(&self) -> Vec<Shelf> {
+        Self::stub_home_shelves()
     }
 
     fn playlists(&self) -> Vec<Playlist> {
@@ -233,6 +258,11 @@ impl Catalog for YtmCatalog {
             return Vec::new();
         }
         self.tube.radio_tracks(trimmed).into_iter().map(raw_to_track).collect()
+    }
+
+    /// Returns home shelves. Network failures map to an empty vector.
+    fn home_shelves(&self) -> Vec<Shelf> {
+        self.tube.home_shelves()
     }
 
     /// Returns saved or owned playlists. Anonymous interim returns an empty list
@@ -485,5 +515,23 @@ mod tests {
         let catalog = YtmCatalog::new();
         assert!(catalog.radio("").is_empty());
         assert!(catalog.radio("   ").is_empty());
+    }
+
+    #[test]
+    fn stub_home_shelves_determinism_and_content() {
+        let catalog = CatalogStub::new();
+        let first = catalog.home_shelves();
+        let second = catalog.home_shelves();
+        assert_eq!(first, second, "stub home shelves must be deterministic");
+        assert_eq!(first.len(), 2);
+
+        assert_eq!(first[0].title, "Trending");
+        assert_eq!(first[0].items.len(), 2);
+        assert_eq!(first[0].items[0], SearchResult::Album(CatalogStub::stub_album()));
+        assert_eq!(first[0].items[1], SearchResult::Artist(CatalogStub::stub_artist()));
+
+        assert_eq!(first[1].title, "Featured Playlists");
+        assert_eq!(first[1].items.len(), 1);
+        assert_eq!(first[1].items[0], SearchResult::Playlist(CatalogStub::stub_playlist()));
     }
 }
