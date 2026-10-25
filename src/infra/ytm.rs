@@ -4,7 +4,8 @@ use super::innertube::{
     InnerTube, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
 };
 use crate::domain::{
-    Album, Artist, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf, Track,
+    Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf,
+    Track,
 };
 
 /// Catalog port: search by free text and user library read/mutation access.
@@ -33,6 +34,9 @@ pub trait Catalog {
     /// Adds (`liked = true`) or removes (`liked = false`) a track from the liked collection.
     /// Blank identifiers are ignored.
     fn set_liked(&mut self, track_id: &str, liked: bool);
+
+    /// Returns detail view for `browse_id` and `kind` (None on blank id or failure).
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail>;
 }
 
 /// Fixed-data stub: keeps UI and tests deterministic until the real API lands.
@@ -172,6 +176,21 @@ impl Catalog for CatalogStub {
             self.liked_ids.retain(|id| id != trimmed);
         }
     }
+
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+        let trimmed = browse_id.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let tracks = vec![
+            Track::new(&format!("{trimmed}-1"), &format!("{trimmed} Track 1"), "Stub Artist")
+                .with_duration(180)
+                .with_artwork(STUB_ARTWORK_URL),
+            Track::new(&format!("{trimmed}-2"), &format!("{trimmed} Track 2"), "Stub Artist")
+                .with_duration(210),
+        ];
+        Some(Detail::new(kind, &format!("{trimmed} Title"), "Stub Subtitle", tracks))
+    }
 }
 
 /// InnerTube-backed YouTube Music catalog implementing the [`Catalog`] port.
@@ -286,6 +305,15 @@ impl Catalog for YtmCatalog {
     /// Sets liked status. Anonymous interim is a no-op because an unauthenticated
     /// client cannot mutate remote user library state.
     fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+
+    /// Returns detail view for `browse_id` and `kind`. Network failures map to None.
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+        let trimmed = browse_id.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        self.tube.detail(trimmed, kind)
+    }
 }
 
 #[cfg(test)]
@@ -533,5 +561,36 @@ mod tests {
         assert_eq!(first[1].title, "Featured Playlists");
         assert_eq!(first[1].items.len(), 1);
         assert_eq!(first[1].items[0], SearchResult::Playlist(CatalogStub::stub_playlist()));
+    }
+
+    #[test]
+    fn stub_detail_determinism_per_kind_and_blank_none() {
+        let catalog = CatalogStub::new();
+        for kind in [DetailKind::Album, DetailKind::Artist, DetailKind::Playlist] {
+            let first = catalog.detail("browse-123", kind);
+            let second = catalog.detail("browse-123", kind);
+            assert_eq!(first, second, "stub detail must be deterministic");
+            let detail = first.expect("expected detail");
+            assert_eq!(detail.kind, kind);
+            assert_eq!(detail.title, "browse-123 Title");
+            assert_eq!(detail.subtitle, "Stub Subtitle");
+            assert_eq!(detail.tracks.len(), 2);
+            assert_eq!(detail.tracks[0].id, "browse-123-1");
+            assert_eq!(detail.tracks[0].duration_secs, Some(180));
+            assert_eq!(detail.tracks[0].artwork.as_deref(), Some(STUB_ARTWORK_URL));
+            assert_eq!(detail.tracks[1].id, "browse-123-2");
+            assert_eq!(detail.tracks[1].duration_secs, Some(210));
+        }
+
+        assert_eq!(catalog.detail("", DetailKind::Album), None);
+        assert_eq!(catalog.detail("   ", DetailKind::Album), None);
+    }
+
+    #[test]
+    fn ytm_catalog_detail_blank_returns_none() {
+        let catalog = YtmCatalog::new();
+        assert_eq!(catalog.detail("", DetailKind::Album), None);
+        assert_eq!(catalog.detail("   ", DetailKind::Artist), None);
+        assert_eq!(catalog.detail("   ", DetailKind::Playlist), None);
     }
 }

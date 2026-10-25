@@ -138,9 +138,42 @@ pub fn apply_filter(items: &[SearchResult], filter: SearchFilter) -> Vec<SearchR
     items.iter().filter(|item| item.kind() == filter).cloned().collect()
 }
 
+/// Category of detail container view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetailKind {
+    Album,
+    Artist,
+    Playlist,
+}
+
+/// Detailed view for an album, artist, or playlist.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Detail {
+    pub kind: DetailKind,
+    pub title: String,
+    pub subtitle: String,
+    pub tracks: Vec<Track>,
+}
+
+impl Detail {
+    pub fn new(kind: DetailKind, title: &str, subtitle: &str, tracks: Vec<Track>) -> Self {
+        Self { kind, title: title.to_owned(), subtitle: subtitle.to_owned(), tracks }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detail_construction_and_fields() {
+        let tracks = vec![Track::new("t1", "Track 1", "Artist 1")];
+        let detail = Detail::new(DetailKind::Album, "Title", "Subtitle", tracks.clone());
+        assert_eq!(detail.kind, DetailKind::Album);
+        assert_eq!(detail.title, "Title");
+        assert_eq!(detail.subtitle, "Subtitle");
+        assert_eq!(detail.tracks, tracks);
+    }
 
     #[test]
     fn item_kinds_and_displays() {
