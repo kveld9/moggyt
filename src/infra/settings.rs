@@ -8,29 +8,51 @@ use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 
+use super::stream::AudioQuality;
 use crate::domain::ThemeId;
 use crate::i18n::Locale;
 
+const fn default_volume() -> u8 {
+    100
+}
+
 /// Persistent user settings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Settings {
     /// Active UI theme.
     pub theme: ThemeId,
     /// Active interface locale.
     pub locale: Locale,
+    /// Playback volume level (0..=100).
+    #[serde(default = "default_volume")]
+    pub volume: u8,
+    /// Preferred audio streaming quality.
+    #[serde(default)]
+    pub quality: AudioQuality,
 }
 
 impl Default for Settings {
-    /// Tranche 1 default settings: White theme + English locale.
+    /// Tranche 1 default settings: White theme + English locale + volume 100 + Standard quality.
     fn default() -> Self {
-        Self { theme: ThemeId::White, locale: Locale::English }
+        Self {
+            theme: ThemeId::White,
+            locale: Locale::English,
+            volume: 100,
+            quality: AudioQuality::Standard,
+        }
     }
 }
 
 impl Settings {
     /// Default fallback settings resolving the locale from system environment.
     pub fn fallback() -> Self {
-        Self { theme: ThemeId::White, locale: Locale::detect() }
+        Self {
+            theme: ThemeId::White,
+            locale: Locale::detect(),
+            volume: 100,
+            quality: AudioQuality::Standard,
+        }
     }
 }
 
@@ -56,7 +78,9 @@ impl Default for MemorySettingsStore {
 
 impl SettingsStore for MemorySettingsStore {
     fn load(&self) -> Settings {
-        self.inner.lock().map(|g| g.clone()).unwrap_or_default()
+        let mut settings = self.inner.lock().map(|g| g.clone()).unwrap_or_default();
+        settings.volume = settings.volume.min(100);
+        settings
     }
 
     fn save(&self, settings: &Settings) -> anyhow::Result<()> {
@@ -101,7 +125,10 @@ impl SettingsStore for DiskSettingsStore {
         let Ok(bytes) = std::fs::read(&path) else {
             return Settings::fallback();
         };
-        serde_json::from_slice(&bytes).unwrap_or_else(|_| Settings::fallback())
+        let mut settings: Settings =
+            serde_json::from_slice(&bytes).unwrap_or_else(|_| Settings::fallback());
+        settings.volume = settings.volume.min(100);
+        settings
     }
 
     fn save(&self, settings: &Settings) -> anyhow::Result<()> {
@@ -144,6 +171,8 @@ mod tests {
         let loaded = store.load();
         assert_eq!(loaded.theme, ThemeId::White);
         assert_eq!(loaded.locale, Locale::English);
+        assert_eq!(loaded.volume, 100);
+        assert_eq!(loaded.quality, AudioQuality::Standard);
         assert_eq!(loaded, Settings::default());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -177,7 +206,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
         let store = DiskSettingsStore::new(temp_dir.clone());
 
-        let modified = Settings { theme: ThemeId::BlackOled, locale: Locale::Spanish };
+        let modified = Settings {
+            theme: ThemeId::BlackOled,
+            locale: Locale::Spanish,
+            volume: 75,
+            quality: AudioQuality::High,
+        };
 
         store.save(&modified).expect("save should succeed");
 
@@ -195,5 +229,38 @@ mod tests {
         let fallback = Settings::fallback();
         assert_eq!(fallback.theme, ThemeId::White);
         assert_eq!(fallback.locale, Locale::detect());
+        assert_eq!(fallback.volume, 100);
+        assert_eq!(fallback.quality, AudioQuality::Standard);
+    }
+
+    #[test]
+    fn test_old_schema_settings_json_backward_compatibility() {
+        let json = r#"{"theme": "white", "locale": "en"}"#;
+        let loaded: Settings = serde_json::from_str(json).expect("deserialization succeeds");
+        assert_eq!(loaded.theme, ThemeId::White);
+        assert_eq!(loaded.locale, Locale::English);
+        assert_eq!(loaded.volume, 100);
+        assert_eq!(loaded.quality, AudioQuality::Standard);
+        assert_eq!(loaded, Settings::default());
+    }
+
+    #[test]
+    fn test_volume_clamped_on_load_from_disk() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-test-clamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let store = DiskSettingsStore::new(temp_dir.clone());
+
+        let json = r#"{"theme": "mono", "locale": "es", "volume": 150, "quality": "compact"}"#;
+        std::fs::write(store.file_path(), json).unwrap();
+
+        let loaded = store.load();
+        assert_eq!(loaded.theme, ThemeId::Mono);
+        assert_eq!(loaded.locale, Locale::Spanish);
+        assert_eq!(loaded.volume, 100);
+        assert_eq!(loaded.quality, AudioQuality::Compact);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

@@ -10,10 +10,10 @@ use eframe::egui;
 use crate::domain::{PlaybackQueue, SearchQuery, ThemeId};
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence, DiscordPresence,
-    GithubUpdater, LyricLine, LyricsSource, MemorySettingsStore, Presence, Scrobbler, SessionStore,
-    Settings, SettingsStore, StubScrobbler, TrayAction, TrayHandle, Updater, decode_cover,
-    fetch_artwork, is_newer, sanitize_cookie_input, should_scrobble,
+    AudioBackend, AudioQuality, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence,
+    DiscordPresence, GithubUpdater, LyricLine, LyricsSource, MemorySettingsStore, Presence,
+    Scrobbler, SessionStore, Settings, SettingsStore, StubScrobbler, TrayAction, TrayHandle,
+    Updater, decode_cover, fetch_artwork, is_newer, sanitize_cookie_input, should_scrobble,
 };
 
 /// Navigation pages of the application shell.
@@ -93,6 +93,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub theme: ThemeId,
     /// Active interface locale.
     pub locale: Locale,
+    /// Preferred audio streaming quality.
+    pub quality: AudioQuality,
     /// Injected settings storage adapter.
     pub settings_store: Box<dyn SettingsStore>,
 }
@@ -129,6 +131,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             started_at: None,
             theme: ThemeId::White,
             locale: Locale::English,
+            quality: AudioQuality::Standard,
             settings_store: Box::new(MemorySettingsStore::default()),
         }
     }
@@ -143,6 +146,9 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         let loaded = store.load();
         self.theme = loaded.theme;
         self.locale = loaded.locale;
+        self.quality = loaded.quality;
+        self.audio.set_volume(loaded.volume);
+        self.audio.set_quality(loaded.quality);
         self.settings_store = store;
     }
 
@@ -158,8 +164,20 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.persist_settings();
     }
 
+    /// Sets the preferred audio streaming quality, forwards to audio backend, and persists the change.
+    pub fn set_quality(&mut self, quality: AudioQuality) {
+        self.quality = quality;
+        self.audio.set_quality(quality);
+        self.persist_settings();
+    }
+
     fn persist_settings(&self) {
-        let settings = Settings { theme: self.theme, locale: self.locale };
+        let settings = Settings {
+            theme: self.theme,
+            locale: self.locale,
+            volume: self.audio.volume(),
+            quality: self.quality,
+        };
         if let Err(err) = self.settings_store.save(&settings) {
             tracing::warn!("failed to persist settings: {err:#}");
         }
@@ -362,9 +380,10 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.audio.seek(target);
     }
 
-    /// Sets playback volume level (0..=100, clamped by audio adapter).
+    /// Sets playback volume level (0..=100, clamped by audio adapter) and persists the change.
     pub fn set_volume(&mut self, volume: u8) {
         self.audio.set_volume(volume);
+        self.persist_settings();
     }
 
     /// Returns true if an active session is currently stored.
@@ -1554,6 +1573,8 @@ mod tests {
 
         assert_eq!(state.theme, ThemeId::White);
         assert_eq!(state.locale, Locale::English);
+        assert_eq!(state.quality, AudioQuality::Standard);
+        assert_eq!(state.audio.volume(), 100);
 
         state.set_theme(ThemeId::BlackOled);
         assert_eq!(state.theme, ThemeId::BlackOled);
@@ -1562,5 +1583,102 @@ mod tests {
         state.set_locale(Locale::Spanish);
         assert_eq!(state.locale, Locale::Spanish);
         assert_eq!(store.load().locale, Locale::Spanish);
+    }
+
+    #[test]
+    fn set_volume_persists_to_settings_store_with_clamping() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        state.set_settings_store(Box::new(store.clone()));
+
+        state.set_volume(42);
+        assert_eq!(state.audio.volume(), 42);
+        assert_eq!(store.load().volume, 42);
+
+        state.set_volume(150);
+        assert_eq!(state.audio.volume(), 100);
+        assert_eq!(store.load().volume, 100);
+    }
+
+    #[test]
+    fn set_quality_persists_and_forwards_to_audio_backend() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        state.set_settings_store(Box::new(store.clone()));
+
+        state.set_quality(AudioQuality::High);
+        assert_eq!(state.quality, AudioQuality::High);
+        assert_eq!(store.load().quality, AudioQuality::High);
+
+        state.set_quality(AudioQuality::Compact);
+        assert_eq!(state.quality, AudioQuality::Compact);
+        assert_eq!(store.load().quality, AudioQuality::Compact);
+    }
+
+    #[derive(Debug, Default)]
+    struct QualityTrackingAudio {
+        stub: AudioStub,
+        applied_quality: AudioQuality,
+    }
+
+    impl AudioBackend for QualityTrackingAudio {
+        fn play(&mut self, track_id: &str) {
+            self.stub.play(track_id);
+        }
+        fn pause(&mut self) {
+            self.stub.pause();
+        }
+        fn resume_play(&mut self) {
+            self.stub.resume_play();
+        }
+        fn seek(&mut self, position_secs: u64) {
+            self.stub.seek(position_secs);
+        }
+        fn set_volume(&mut self, volume: u8) {
+            self.stub.set_volume(volume);
+        }
+        fn volume(&self) -> u8 {
+            self.stub.volume()
+        }
+        fn position_secs(&self) -> u64 {
+            self.stub.position_secs()
+        }
+        fn is_playing(&self) -> bool {
+            self.stub.is_playing()
+        }
+        fn last_requested(&self) -> Option<&str> {
+            self.stub.last_requested()
+        }
+        fn set_quality(&mut self, q: AudioQuality) {
+            self.applied_quality = q;
+        }
+    }
+
+    #[test]
+    fn set_settings_store_applies_volume_and_quality_to_stub_backend() {
+        let mut state = AppState::new(
+            CatalogStub::new(),
+            QualityTrackingAudio::default(),
+            MemorySessionStore::new(),
+            LrclibStub::new(),
+            MemoryCoverCache::new(),
+        );
+
+        let custom_settings = Settings {
+            theme: ThemeId::Mono,
+            locale: Locale::Spanish,
+            volume: 64,
+            quality: AudioQuality::Compact,
+        };
+        let store = MemorySettingsStore::default();
+        store.save(&custom_settings).unwrap();
+
+        state.set_settings_store(Box::new(store));
+
+        assert_eq!(state.theme, ThemeId::Mono);
+        assert_eq!(state.locale, Locale::Spanish);
+        assert_eq!(state.quality, AudioQuality::Compact);
+        assert_eq!(state.audio.volume(), 64);
+        assert_eq!(state.audio.applied_quality, AudioQuality::Compact);
     }
 }

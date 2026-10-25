@@ -1,5 +1,7 @@
 //! Audio port and no-op stub (no sound yet).
 
+use super::stream::AudioQuality;
+
 /// Playback port: stream control and observable playback state.
 pub trait AudioBackend {
     fn play(&mut self, track_id: &str);
@@ -11,6 +13,7 @@ pub trait AudioBackend {
     fn position_secs(&self) -> u64;
     fn is_playing(&self) -> bool;
     fn last_requested(&self) -> Option<&str>;
+    fn set_quality(&mut self, _q: AudioQuality) {}
 }
 
 /// Recording stub: captures intent without touching audio hardware.
@@ -99,5 +102,6 @@ mod tests {
         assert!(audio.is_playing() && audio.last_requested() == Some("s-1"));
         audio.play("s-2");
         assert!(audio.is_playing() && audio.position_secs() == 0);
+        audio.set_quality(AudioQuality::High);
     }
 }

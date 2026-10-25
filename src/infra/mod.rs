@@ -45,7 +45,7 @@ pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
 pub use settings::{
     DiskSettingsStore, MemorySettingsStore, Settings, SettingsStore, default_config_dir,
 };
-pub use stream::{StreamResolver, StreamStub};
+pub use stream::{AudioQuality, StreamResolver, StreamStub};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
 pub use updater_github::{
