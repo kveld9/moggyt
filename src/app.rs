@@ -7,7 +7,9 @@ pub mod theme;
 
 use eframe::egui;
 
-use crate::domain::{PlaybackQueue, SearchQuery, SearchResult, Shelf, ThemeId, Track};
+use crate::domain::{
+    Detail, DetailKind, PlaybackQueue, SearchQuery, SearchResult, Shelf, ThemeId, Track,
+};
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, AudioQuality, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence,
@@ -17,7 +19,7 @@ use crate::infra::{
 };
 
 /// Navigation pages of the application shell.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
     /// Search the catalog.
     #[default]
@@ -28,6 +30,8 @@ pub enum Page {
     NowPlaying,
     /// Library view (playlists, liked tracks, saved albums).
     Library,
+    /// Detailed view for an album, artist, or playlist.
+    Detail,
 }
 
 /// Update check status for the desktop application.
@@ -101,6 +105,10 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub autoplay: bool,
     /// Cached home shelves for the Search view.
     pub home_shelves: Vec<Shelf>,
+    /// Active detail container view.
+    pub detail: Option<Detail>,
+    /// Page to restore when closing detail view.
+    pub detail_return: Page,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -139,6 +147,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             settings_store: Box::new(MemorySettingsStore::default()),
             autoplay: false,
             home_shelves: Vec::new(),
+            detail: None,
+            detail_return: Page::Search,
         }
     }
 
@@ -311,6 +321,25 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     pub fn reload_home(&mut self) {
         self.home_shelves.clear();
         self.ensure_home();
+    }
+
+    /// Opens the detail view for `browse_id` and `kind`. Blank identifiers are ignored.
+    pub fn open_detail(&mut self, browse_id: &str, kind: DetailKind) {
+        let trimmed = browse_id.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        if self.page != Page::Detail {
+            self.detail_return = self.page;
+        }
+        self.detail = self.catalog.detail(trimmed, kind);
+        self.page = Page::Detail;
+    }
+
+    /// Closes the detail view and returns to the previous page.
+    pub fn close_detail(&mut self) {
+        self.page = self.detail_return;
+        self.detail = None;
     }
 
     /// Handles a search submission: parses the raw input at the boundary,
@@ -671,6 +700,7 @@ fn render_top_bar<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource,
             ui.selectable_value(&mut state.page, Page::Queue, "Queue");
             ui.selectable_value(&mut state.page, Page::NowPlaying, "Now playing");
             ui.selectable_value(&mut state.page, Page::Library, "Library");
+            ui.selectable_value(&mut state.page, Page::Detail, "Detail");
             render_top_bar_update_badge(ui, &state.update_status);
         });
     });
@@ -700,6 +730,7 @@ fn render_body<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K:
         Page::Queue => render_queue(ui, state),
         Page::NowPlaying => render_now_playing(ui, state),
         Page::Library => render_library(ui, state),
+        Page::Detail => render_detail(ui, state),
     });
 }
 
@@ -943,6 +974,15 @@ fn shelf_item_display(item: &SearchResult) -> String {
     }
 }
 
+fn item_detail_target(item: &SearchResult) -> Option<(String, DetailKind)> {
+    match item {
+        SearchResult::Album(album) => Some((album.id.clone(), DetailKind::Album)),
+        SearchResult::Artist(artist) => Some((artist.id.clone(), DetailKind::Artist)),
+        SearchResult::Playlist(playlist) => Some((playlist.id.clone(), DetailKind::Playlist)),
+        SearchResult::Track(_) => None,
+    }
+}
+
 fn render_home_shelves<
     C: Catalog,
     A: AudioBackend,
@@ -959,11 +999,73 @@ fn render_home_shelves<
             state.reload_home();
         }
     });
+    let mut to_open = None;
     for shelf in &state.home_shelves {
         ui.heading(&shelf.title);
         for item in &shelf.items {
-            ui.label(shelf_item_display(item));
+            ui.horizontal(|ui| {
+                ui.label(shelf_item_display(item));
+                if let Some((id, kind)) = item_detail_target(item) {
+                    if ui.button("Open").clicked() {
+                        to_open = Some((id, kind));
+                    }
+                }
+            });
         }
+    }
+    if let Some((id, kind)) = to_open {
+        state.open_detail(&id, kind);
+    }
+}
+
+fn render_detail<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    if ui.button("Back").clicked() {
+        state.close_detail();
+        return;
+    }
+    let Some(detail) = state.detail.clone() else {
+        ui.label("No detail available.");
+        return;
+    };
+    ui.heading(&detail.title);
+    if !detail.subtitle.is_empty() {
+        ui.label(&detail.subtitle);
+    }
+    ui.separator();
+    render_detail_tracks(ui, state, &detail.tracks);
+}
+
+fn render_detail_tracks<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+    tracks: &[Track],
+) {
+    if tracks.is_empty() {
+        ui.label("No tracks available.");
+        return;
+    }
+    let mut to_play = None;
+    for track in tracks {
+        ui.horizontal(|ui| {
+            let dur_text = track.duration_secs.map_or_else(String::new, |d| format!(" ({d}s)"));
+            ui.label(format!("{} - {}{dur_text}", track.title, track.artist));
+            if ui.button("Play").clicked() {
+                to_play = Some(track.clone());
+            }
+        });
+    }
+    if let Some(track) = to_play {
+        state.queue.push(track);
+        state.play_head();
     }
 }
 
@@ -1191,7 +1293,9 @@ fn render_position_info<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Album, Artist, Playlist, SearchQuery, SearchResult, Shelf, Track};
+    use crate::domain::{
+        Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
+    };
     use crate::infra::{
         AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
         ReleaseInfo, StaticUpdater, Updater,
@@ -1228,6 +1332,9 @@ mod tests {
         }
         fn set_liked(&mut self, track_id: &str, liked: bool) {
             self.inner.set_liked(track_id, liked);
+        }
+        fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+            self.inner.detail(browse_id, kind)
         }
     }
 
@@ -2001,6 +2108,77 @@ mod tests {
         assert_eq!(
             shelf_item_display(&SearchResult::Playlist(Playlist::new("p1", "PlaylistTitle", 10))),
             "PlaylistTitle - Playlist"
+        );
+    }
+
+    #[test]
+    fn open_detail_sets_page_detail_and_return_page() {
+        let mut state = wired();
+        assert_eq!(state.page, Page::Search);
+        state.open_detail("stub-album-1", DetailKind::Album);
+        assert_eq!(state.page, Page::Detail);
+        assert_eq!(state.detail_return, Page::Search);
+        let detail = state.detail.as_ref().expect("detail should be loaded");
+        assert_eq!(detail.kind, DetailKind::Album);
+        assert_eq!(detail.title, "stub-album-1 Title");
+        assert_eq!(detail.tracks.len(), 2);
+    }
+
+    #[test]
+    fn open_detail_blank_id_is_noop() {
+        let mut state = wired();
+        state.open_detail("", DetailKind::Album);
+        assert_eq!(state.page, Page::Search);
+        assert!(state.detail.is_none());
+
+        state.open_detail("   ", DetailKind::Artist);
+        assert_eq!(state.page, Page::Search);
+        assert!(state.detail.is_none());
+    }
+
+    #[test]
+    fn open_detail_preserves_initial_return_page_when_already_detail() {
+        let mut state = wired();
+        state.page = Page::Queue;
+        state.open_detail("alb-1", DetailKind::Album);
+        assert_eq!(state.page, Page::Detail);
+        assert_eq!(state.detail_return, Page::Queue);
+
+        state.open_detail("art-1", DetailKind::Artist);
+        assert_eq!(state.page, Page::Detail);
+        assert_eq!(state.detail_return, Page::Queue);
+    }
+
+    #[test]
+    fn close_detail_restores_return_page_and_clears_detail() {
+        let mut state = wired();
+        state.page = Page::Library;
+        state.open_detail("alb-1", DetailKind::Album);
+        assert_eq!(state.page, Page::Detail);
+        assert!(state.detail.is_some());
+
+        state.close_detail();
+        assert_eq!(state.page, Page::Library);
+        assert!(state.detail.is_none());
+    }
+
+    #[test]
+    fn item_detail_target_mapping() {
+        assert_eq!(
+            item_detail_target(&SearchResult::Album(Album::new("a1", "Alb", "Art"))),
+            Some(("a1".into(), DetailKind::Album))
+        );
+        assert_eq!(
+            item_detail_target(&SearchResult::Artist(Artist::new("ar1", "Art"))),
+            Some(("ar1".into(), DetailKind::Artist))
+        );
+        assert_eq!(
+            item_detail_target(&SearchResult::Playlist(Playlist::new("p1", "Play", 5))),
+            Some(("p1".into(), DetailKind::Playlist))
+        );
+        assert_eq!(
+            item_detail_target(&SearchResult::Track(Track::new("t1", "Track", "Art"))),
+            None
         );
     }
 }

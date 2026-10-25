@@ -6,8 +6,8 @@ This guide covers the interface layout, playback controls, queue management, and
 
 The interface consists of three primary regions:
 
-1. **Top Bar**: displays application title, page navigation tabs (`Search`, `Queue`, `Now playing`, `Library`), and an
-   update badge when a newer release is detected.
+1. **Top Bar**: displays application title, page navigation tabs (`Search`, `Queue`, `Now playing`, `Library`, `Detail`),
+   and an update badge when a newer release is detected.
 2. **Body Panel**: renders the active page selected in the top bar.
 3. **Player Bar**: persistent bottom panel providing transport controls, volume slider, and track position.
 
@@ -18,11 +18,21 @@ The interface consists of three primary regions:
 The search view presents curated home shelves and accepts queries for tracks, artists, and albums:
 
 - **Home Shelves**: displays categorized carousels (albums, artists, playlists) loaded lazily on open. Click `Refresh`
-  to clear the cache and refetch home shelves from the catalog.
+  to clear the cache and refetch home shelves from the catalog. Click `Open` to view full container tracklistings.
 - Type your search terms into the single-line input field.
 - Press `Enter` or click the `Search` button.
 - Catalog hits are queried through the catalog adapter and the top hit is enqueued automatically, transitioning the
   view to the `Queue` page.
+
+### Detail Page
+
+The detail view displays full tracklistings for an album, artist, or playlist:
+
+- **Header**: displays container title and subtitle (such as artist, release year, or item count).
+- **Track List**: lists all tracks in the collection with title, artist, and duration.
+- **Playback**: click `Play` next to any track to push it to the playback queue and start playback immediately.
+- **Navigation**: click `Back` to close the detail view and return to the previous page.
+- Home shelf items in the `Search` page provide an `Open` button to navigate directly to their detail view.
 
 ### Queue Page
 
