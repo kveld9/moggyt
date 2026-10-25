@@ -8,6 +8,7 @@ use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink};
 
 use super::audio::{AudioBackend, AudioStub};
+use super::stream::AudioQuality;
 use super::ytdlp::YtDlpResolver;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
@@ -103,6 +104,11 @@ impl RodioBackend {
         let active = self.anchor.map_or(Duration::ZERO, |anchor| anchor.elapsed());
         self.paused_accum.saturating_add(active)
     }
+
+    /// Returns the currently configured audio quality preference.
+    pub fn quality(&self) -> AudioQuality {
+        self.resolver.quality()
+    }
 }
 
 impl AudioBackend for RodioBackend {
@@ -154,6 +160,10 @@ impl AudioBackend for RodioBackend {
 
     fn last_requested(&self) -> Option<&str> {
         self.last_requested.as_deref()
+    }
+
+    fn set_quality(&mut self, quality: AudioQuality) {
+        self.resolver.set_quality(quality);
     }
 }
 
@@ -240,6 +250,13 @@ impl AudioBackend for LiveAudio {
             Self::Muted(stub) => stub.last_requested(),
         }
     }
+
+    fn set_quality(&mut self, quality: AudioQuality) {
+        match self {
+            Self::Live(backend) => backend.set_quality(quality),
+            Self::Muted(stub) => stub.set_quality(quality),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -262,6 +279,7 @@ mod tests {
         match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
             Ok(backend) => {
                 assert_eq!(backend.volume(), 100);
+                assert_eq!(backend.quality(), AudioQuality::Standard);
                 assert_eq!(backend.last_requested(), None);
                 assert!(!backend.is_playing());
                 assert_eq!(backend.position_secs(), 0);
@@ -358,5 +376,8 @@ mod tests {
 
         audio.set_volume(150);
         assert_eq!(audio.volume(), 100);
+
+        audio.set_quality(AudioQuality::High);
+        audio.set_quality(AudioQuality::Compact);
     }
 }

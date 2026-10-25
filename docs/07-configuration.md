@@ -75,7 +75,9 @@ The configuration file uses JSON serialization with atomic replacement:
 ```json
 {
   "theme": "white",
-  "locale": "en"
+  "locale": "en",
+  "volume": 100,
+  "quality": "standard"
 }
 ```
 
@@ -90,6 +92,12 @@ The configuration file uses JSON serialization with atomic replacement:
   - `"es"`: Spanish (`Español`).
   - First-run resolution detects the system locale via environment variables (`LC_ALL`, `LC_MESSAGES`, `LANG`),
     falling back to English; explicitly saved choices in `settings.json` take precedence.
+- **Volume (`volume`)**:
+  - Integer audio level between `0` and `100` (default `100`). Clamped to `0..=100` on load.
+- **Audio Quality (`quality`)**:
+  - `"compact"`: Low-bandwidth audio stream using yt-dlp selector `"bestaudio[abr<=64]/bestaudio/best"`.
+  - `"standard"`: Balanced audio stream using yt-dlp selector `"bestaudio/best"` (default).
+  - `"high"`: High-fidelity audio stream using yt-dlp selector `"bestaudio[abr>=192]/bestaudio/best"`.
 
 ### Fault Tolerance & Atomic Persistence
 

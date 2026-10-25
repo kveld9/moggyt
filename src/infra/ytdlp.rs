@@ -8,16 +8,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 
-use super::stream::StreamResolver;
+use super::stream::{AudioQuality, StreamResolver, audio_quality_format};
 
 /// Update interval for checking yt-dlp release freshness (3 days in seconds).
 pub const YTDLP_UPDATE_INTERVAL_SECS: u64 = 3 * 24 * 60 * 60;
 
-/// Default format selector for audio streams.
-///
-/// SDD Q-3: quality-preference mapping is deferred to a future tranche.
-/// Using `"bestaudio/best"` keeps any subsequent quality preference mapping a one-line change.
-pub const YTDLP_AUDIO_FORMAT: &str = "bestaudio/best";
+/// Default format selector for audio streams (alias for standard quality preference).
+pub const YTDLP_AUDIO_FORMAT: &str = audio_quality_format(AudioQuality::Standard);
 
 /// Constructs a canonical YouTube watch URL for a video ID.
 pub fn watch_url(video_id: &str) -> String {
@@ -34,9 +31,19 @@ pub fn sidecar_needs_update(age_secs: u64) -> bool {
     age_secs >= YTDLP_UPDATE_INTERVAL_SECS
 }
 
-/// Formats the CLI arguments passed to yt-dlp for extracting the audio URL.
+/// Formats the CLI arguments passed to yt-dlp for extracting the audio URL using the default quality.
 pub fn format_args(video_id: &str) -> Vec<String> {
-    vec!["-f".to_string(), YTDLP_AUDIO_FORMAT.to_string(), "-g".to_string(), watch_url(video_id)]
+    format_args_with_quality(video_id, AudioQuality::default())
+}
+
+/// Formats the CLI arguments passed to yt-dlp for extracting the audio URL with a quality preference.
+pub fn format_args_with_quality(video_id: &str, quality: AudioQuality) -> Vec<String> {
+    vec![
+        "-f".to_string(),
+        audio_quality_format(quality).to_string(),
+        "-g".to_string(),
+        watch_url(video_id),
+    ]
 }
 
 /// Returns the platform-specific release binary asset name for yt-dlp standalone releases.
@@ -79,12 +86,23 @@ pub fn sidecar_binary_name() -> &'static str {
 pub struct YtDlpResolver {
     binary: PathBuf,
     timeout_secs: u64,
+    quality: AudioQuality,
 }
 
 impl YtDlpResolver {
-    /// Creates a resolver with default timeout (30 seconds).
+    /// Creates a resolver with default timeout (30 seconds) and standard quality.
     pub fn new(binary: impl Into<PathBuf>) -> Self {
-        Self { binary: binary.into(), timeout_secs: 30 }
+        Self { binary: binary.into(), timeout_secs: 30, quality: AudioQuality::default() }
+    }
+
+    /// Mutates the preferred audio quality in place.
+    pub fn set_quality(&mut self, quality: AudioQuality) {
+        self.quality = quality;
+    }
+
+    /// Returns the currently configured audio quality preference.
+    pub fn quality(&self) -> AudioQuality {
+        self.quality
     }
 
     /// Path to the configured yt-dlp binary.
@@ -107,7 +125,7 @@ impl YtDlpResolver {
     /// Resolves `video_id` to a stream URL with explicit error details.
     pub fn fetch_audio_url(&self, video_id: &str) -> anyhow::Result<String> {
         let id = validate_video_id(video_id)?;
-        let output = spawn_ytdlp(&self.binary, id)?;
+        let output = spawn_ytdlp(&self.binary, id, self.quality)?;
         extract_stream_url(&output.stdout)
     }
 }
@@ -120,10 +138,14 @@ fn validate_video_id(video_id: &str) -> anyhow::Result<&str> {
     Ok(trimmed)
 }
 
-fn spawn_ytdlp(binary: &Path, video_id: &str) -> anyhow::Result<std::process::Output> {
+fn spawn_ytdlp(
+    binary: &Path,
+    video_id: &str,
+    quality: AudioQuality,
+) -> anyhow::Result<std::process::Output> {
     let output = std::process::Command::new(binary)
         .arg("--no-playlist")
-        .args(format_args(video_id))
+        .args(format_args_with_quality(video_id, quality))
         .output()
         .with_context(|| format!("failed to spawn yt-dlp at {binary:?}"))?;
 
@@ -287,5 +309,37 @@ mod tests {
         let resolver = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
         assert_eq!(resolver.resolve("dQw4w9WgXcQ"), None);
         assert!(resolver.fetch_audio_url("dQw4w9WgXcQ").is_err());
+    }
+
+    #[test]
+    fn format_args_with_quality_table() {
+        for (q, expected_fmt) in [
+            (AudioQuality::Compact, "bestaudio[abr<=64]/bestaudio/best"),
+            (AudioQuality::Standard, "bestaudio/best"),
+            (AudioQuality::High, "bestaudio[abr>=192]/bestaudio/best"),
+        ] {
+            let args = format_args_with_quality("v123", q);
+            assert_eq!(
+                args,
+                vec![
+                    "-f".to_string(),
+                    expected_fmt.to_string(),
+                    "-g".to_string(),
+                    "https://www.youtube.com/watch?v=v123".to_string(),
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn resolver_default_quality_is_standard_and_mutators_work() {
+        let mut resolver = YtDlpResolver::new("/bin/dummy");
+        assert_eq!(resolver.quality(), AudioQuality::Standard);
+
+        resolver.set_quality(AudioQuality::High);
+        assert_eq!(resolver.quality(), AudioQuality::High);
+
+        resolver.set_quality(AudioQuality::Compact);
+        assert_eq!(resolver.quality(), AudioQuality::Compact);
     }
 }
