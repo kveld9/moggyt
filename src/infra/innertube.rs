@@ -1,6 +1,8 @@
 //! InnerTube API client and response parser for YouTube Music search.
 
-use crate::domain::{Album, Artist, Playlist, SearchFilter, SearchResult, Shelf};
+use crate::domain::{
+    Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchResult, Shelf, Track,
+};
 use serde_json::Value;
 use std::time::Duration;
 
@@ -554,6 +556,173 @@ pub fn parse_home_all(value: &Value) -> Vec<Shelf> {
     sections.iter().filter_map(parse_home_section).collect()
 }
 
+fn detail_header_node(value: &Value) -> Option<&Value> {
+    const PATHS: &[&str] = &[
+        "/header/musicDetailHeaderRenderer",
+        "/header/musicVisualHeaderRenderer",
+        "/header/musicEditablePlaylistDetailHeaderRenderer/header/musicDetailHeaderRenderer",
+        "/header/musicResponsiveHeaderRenderer",
+        "/header/musicHeaderRenderer",
+        "/header",
+    ];
+    PATHS.iter().find_map(|path| value.pointer(path))
+}
+
+fn detail_header_title(value: &Value) -> String {
+    const PATHS: &[&str] = &["/title/runs/0/text", "/title/simpleText"];
+    let Some(header) = detail_header_node(value) else {
+        return String::new();
+    };
+    for path in PATHS {
+        if let Some(text) = header.pointer(path).and_then(Value::as_str) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_owned();
+            }
+        }
+    }
+    String::new()
+}
+
+fn detail_header_subtitle(value: &Value) -> String {
+    const PATHS: &[&str] = &[
+        "/subtitle/runs/1/text",
+        "/subtitle/runs/0/text",
+        "/subtitle/simpleText",
+        "/description/runs/0/text",
+        "/descriptionSnippet/runs/0/text",
+        "/description/simpleText",
+    ];
+    let Some(header) = detail_header_node(value) else {
+        return String::new();
+    };
+    for path in PATHS {
+        if let Some(text) = header.pointer(path).and_then(Value::as_str) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() && trimmed != "•" {
+                return trimmed.to_owned();
+            }
+        }
+    }
+    String::new()
+}
+
+fn detail_video_id(renderer: &Value) -> Option<String> {
+    if let Some(id) = renderer.get("videoId").and_then(Value::as_str) {
+        let trimmed = id.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_owned());
+        }
+    }
+    watch_video_id(renderer)
+}
+
+fn detail_title(renderer: &Value) -> Option<String> {
+    flex_text(renderer, 0).or_else(|| {
+        let text = renderer.pointer("/title/runs/0/text")?.as_str()?.trim();
+        if text.is_empty() { None } else { Some(text.to_owned()) }
+    })
+}
+
+fn detail_artist(renderer: &Value) -> String {
+    if let Some(artist) = flex_text(renderer, 1) {
+        return artist;
+    }
+    panel_artist(renderer)
+}
+
+fn detail_duration(renderer: &Value) -> Option<u32> {
+    const PATHS: &[&str] = &[
+        "/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text",
+        "/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/simpleText",
+        "/lengthText/runs/0/text",
+        "/lengthText/simpleText",
+    ];
+    for path in PATHS {
+        if let Some(raw) = renderer.pointer(path).and_then(Value::as_str) {
+            if let Some(secs) = parse_duration_secs(raw) {
+                return Some(secs);
+            }
+        }
+    }
+    None
+}
+
+fn build_detail_track(renderer: &Value) -> Option<Track> {
+    let video_id = detail_video_id(renderer)?;
+    let title = detail_title(renderer)?;
+    let artist = detail_artist(renderer);
+    let mut track = Track::new(&video_id, &title, &artist);
+    if let Some(dur) = detail_duration(renderer) {
+        track = track.with_duration(dur);
+    }
+    if let Some(thumb) = best_thumbnail(renderer) {
+        track = track.with_artwork(thumb);
+    }
+    Some(track)
+}
+
+fn detail_sections(value: &Value) -> Option<&[Value]> {
+    const CANDIDATES: &[&str] = &[
+        "/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents",
+        "/contents/twoColumnBrowseResultsRenderer/secondaryContents/sectionListRenderer/contents",
+        "/sectionListRenderer/contents",
+    ];
+    CANDIDATES
+        .iter()
+        .find_map(|path| value.pointer(path).and_then(Value::as_array).map(Vec::as_slice))
+}
+
+fn collect_shelf_tracks(shelf: &Value, out: &mut Vec<Track>) {
+    let Some(contents) = shelf.get("contents").and_then(Value::as_array) else {
+        return;
+    };
+    for item in contents {
+        let renderer = item.get("musicResponsiveListItemRenderer").unwrap_or(item);
+        if let Some(track) = build_detail_track(renderer) {
+            out.push(track);
+        }
+    }
+}
+
+fn collect_detail_tracks(value: &Value) -> Vec<Track> {
+    let mut tracks = Vec::new();
+    if let Some(sections) = detail_sections(value) {
+        for section in sections {
+            let shelf = section
+                .get("musicShelfRenderer")
+                .or_else(|| section.get("musicPlaylistShelfRenderer"));
+            if let Some(s) = shelf {
+                collect_shelf_tracks(s, &mut tracks);
+            }
+        }
+        if !tracks.is_empty() {
+            return tracks;
+        }
+    }
+    let direct_shelf =
+        value.get("musicShelfRenderer").or_else(|| value.get("musicPlaylistShelfRenderer"));
+    if let Some(s) = direct_shelf {
+        collect_shelf_tracks(s, &mut tracks);
+        return tracks;
+    }
+    collect_shelf_tracks(value, &mut tracks);
+    tracks
+}
+
+/// Parses a detail view (album, artist, or playlist) from InnerTube browse response payload.
+///
+/// Returns `None` when neither a header title nor any valid track items are found.
+pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
+    let title = detail_header_title(value);
+    let subtitle = detail_header_subtitle(value);
+    let tracks = collect_detail_tracks(value);
+    if title.is_empty() && tracks.is_empty() {
+        return None;
+    }
+    Some(Detail::new(kind, &title, &subtitle, tracks))
+}
+
 /// Blocking HTTP client for the InnerTube API.
 #[derive(Debug)]
 pub struct InnerTube {
@@ -638,6 +807,17 @@ impl InnerTube {
     /// Returns an empty vector on any network or parse failure.
     pub fn home_shelves(&self) -> Vec<Shelf> {
         self.browse_payload(HOME_BROWSE_ID).map_or_else(|_| Vec::new(), |p| parse_home_all(&p))
+    }
+
+    /// Queries the browse endpoint for `browse_id` and returns parsed detail view of `kind`.
+    /// Returns `None` on blank id, network error, or parse failure.
+    pub fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+        let trimmed = browse_id.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let payload = self.browse_payload(trimmed).ok()?;
+        parse_detail_all(&payload, kind)
     }
 
     /// Converts this InnerTube client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
@@ -1058,5 +1238,39 @@ mod tests {
             shelves[1].items[1],
             SearchResult::Playlist(Playlist::new("RD_radio_2", "Energy Radio", 0))
         );
+    }
+
+    #[test]
+    fn parse_detail_all_golden_fixture_and_empty() {
+        let raw = include_str!("../../tests/fixtures/innertube_detail.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let detail = parse_detail_all(&payload, DetailKind::Album).expect("parsed detail");
+        assert_eq!(detail.kind, DetailKind::Album);
+        assert_eq!(detail.title, "Test Album Title");
+        assert_eq!(detail.subtitle, "Test Artist");
+        assert_eq!(detail.tracks.len(), 2);
+        assert_eq!(
+            detail.tracks[0],
+            Track::new("track-vid-1", "Full Track", "Full Artist")
+                .with_duration(225)
+                .with_artwork("https://img.local/t1.jpg")
+        );
+        assert_eq!(detail.tracks[1], Track::new("track-vid-2", "No Length Track", "Second Artist"));
+
+        assert_eq!(parse_detail_all(&serde_json::json!({}), DetailKind::Album), None);
+        assert_eq!(
+            parse_detail_all(
+                &serde_json::json!({"header": null, "contents": null}),
+                DetailKind::Artist
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn innertube_detail_blank_id_returns_none() {
+        let tube = InnerTube::new();
+        assert_eq!(tube.detail("", DetailKind::Album), None);
+        assert_eq!(tube.detail("   ", DetailKind::Artist), None);
     }
 }
