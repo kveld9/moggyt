@@ -109,6 +109,10 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub detail: Option<Detail>,
     /// Page to restore when closing detail view.
     pub detail_return: Page,
+    /// Whether any single-line text input field currently has focus.
+    pub text_focused: bool,
+    /// Whether global keyboard shortcuts are enabled.
+    pub shortcuts_enabled: bool,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -149,6 +153,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             home_shelves: Vec::new(),
             detail: None,
             detail_return: Page::Search,
+            text_focused: false,
+            shortcuts_enabled: true,
         }
     }
 
@@ -163,6 +169,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.theme = loaded.theme;
         self.locale = loaded.locale;
         self.quality = loaded.quality;
+        self.shortcuts_enabled = loaded.keyboard_shortcuts;
         self.audio.set_volume(loaded.volume);
         self.audio.set_quality(loaded.quality);
         self.settings_store = store;
@@ -187,12 +194,24 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.persist_settings();
     }
 
+    /// Sets whether keyboard shortcuts are enabled and persists the preference.
+    pub fn set_shortcuts_enabled(&mut self, enabled: bool) {
+        self.shortcuts_enabled = enabled;
+        self.persist_settings();
+    }
+
+    /// Returns whether keyboard shortcuts are enabled.
+    pub fn keyboard_shortcuts_enabled(&self) -> bool {
+        self.shortcuts_enabled
+    }
+
     fn persist_settings(&self) {
         let settings = Settings {
             theme: self.theme,
             locale: self.locale,
             volume: self.audio.volume(),
             quality: self.quality,
+            keyboard_shortcuts: self.shortcuts_enabled,
         };
         if let Err(err) = self.settings_store.save(&settings) {
             tracing::warn!("failed to persist settings: {err:#}");
@@ -547,6 +566,86 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.catalog.set_liked(trimmed, next_liked);
     }
 
+    /// Handles a global keyboard shortcut event.
+    ///
+    /// Returns true if the key triggered an action, false otherwise.
+    pub fn apply_key(&mut self, key: egui::Key) -> bool {
+        if !self.keyboard_shortcuts_enabled() {
+            return false;
+        }
+        self.apply_playback_shortcut(key)
+            || self.apply_volume_shortcut(key)
+            || self.apply_queue_shortcut(key)
+    }
+
+    fn apply_playback_shortcut(&mut self, key: egui::Key) -> bool {
+        match key {
+            egui::Key::Space => {
+                self.toggle_play();
+                true
+            }
+            egui::Key::ArrowLeft => {
+                self.seek_by(-10);
+                true
+            }
+            egui::Key::ArrowRight => {
+                self.seek_by(10);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn apply_volume_shortcut(&mut self, key: egui::Key) -> bool {
+        match key {
+            egui::Key::ArrowUp => {
+                let vol = self.audio.volume().saturating_add(5).min(100);
+                self.set_volume(vol);
+                true
+            }
+            egui::Key::ArrowDown => {
+                let vol = self.audio.volume().saturating_sub(5);
+                self.set_volume(vol);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn apply_queue_shortcut(&mut self, key: egui::Key) -> bool {
+        match key {
+            egui::Key::N => self.step_next_shortcut(),
+            egui::Key::P => self.step_prev_shortcut(),
+            egui::Key::L => self.toggle_like_shortcut(),
+            _ => false,
+        }
+    }
+
+    fn step_next_shortcut(&mut self) -> bool {
+        if self.queue.is_empty() || self.queue.current().is_none() {
+            return false;
+        }
+        self.next_track();
+        true
+    }
+
+    fn step_prev_shortcut(&mut self) -> bool {
+        if self.queue.is_empty() || self.queue.current().is_none() {
+            return false;
+        }
+        self.prev_track();
+        true
+    }
+
+    fn toggle_like_shortcut(&mut self) -> bool {
+        let Some(track) = self.queue.current() else {
+            return false;
+        };
+        let id = track.id.clone();
+        self.toggle_like(&id);
+        true
+    }
+
     /// Fetches and caches synced lyrics for the currently playing track.
     ///
     /// No-op if lyrics for the current (artist, title) pair have already been resolved.
@@ -682,6 +781,23 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         }
         self.state.sync_presence();
         self.state.continue_autoplay_if_ended();
+        if !self.state.text_focused {
+            for key in [
+                egui::Key::Space,
+                egui::Key::ArrowLeft,
+                egui::Key::ArrowRight,
+                egui::Key::ArrowUp,
+                egui::Key::ArrowDown,
+                egui::Key::N,
+                egui::Key::P,
+                egui::Key::L,
+            ] {
+                if ui.input(|i| i.key_pressed(key)) {
+                    self.state.apply_key(key);
+                    break;
+                }
+            }
+        }
         render_top_bar(ui, &mut self.state);
         render_player_bar(ui, &mut self.state);
         render_body(ui, &mut self.state);
@@ -773,6 +889,11 @@ fn render_library_preferences<
         render_locale_button(ui, state, Locale::English, "English");
         render_locale_button(ui, state, Locale::Spanish, "Spanish");
     });
+    ui.add_space(4.0);
+    let mut shortcuts = state.shortcuts_enabled;
+    if ui.checkbox(&mut shortcuts, "Keyboard shortcuts").changed() {
+        state.set_shortcuts_enabled(shortcuts);
+    }
 }
 
 fn render_theme_button<
@@ -880,7 +1001,8 @@ fn render_library_sign_in<
     };
     ui.label(status);
     ui.horizontal(|ui| {
-        ui.text_edit_singleline(&mut state.cookie_text);
+        let response = ui.text_edit_singleline(&mut state.cookie_text);
+        state.text_focused = response.has_focus();
         if ui.button("Save").clicked() {
             state.sign_in_from_input();
         }
@@ -1077,8 +1199,9 @@ fn render_search<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, 
     render_home_shelves(ui, state);
     ui.separator();
     ui.label("Search the catalog (stub returns fixed hits):");
-    let submitted = ui.text_edit_singleline(&mut state.search_text).lost_focus()
-        && ui.input(|input| input.key_pressed(egui::Key::Enter));
+    let response = ui.text_edit_singleline(&mut state.search_text);
+    state.text_focused = response.has_focus();
+    let submitted = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
     if ui.button("Search").clicked() || submitted {
         state.submit_search();
     }
@@ -1941,6 +2064,7 @@ mod tests {
             locale: Locale::Spanish,
             volume: 64,
             quality: AudioQuality::Compact,
+            keyboard_shortcuts: false,
         };
         let store = MemorySettingsStore::default();
         store.save(&custom_settings).unwrap();
@@ -1950,6 +2074,7 @@ mod tests {
         assert_eq!(state.theme, ThemeId::Mono);
         assert_eq!(state.locale, Locale::Spanish);
         assert_eq!(state.quality, AudioQuality::Compact);
+        assert!(!state.shortcuts_enabled);
         assert_eq!(state.audio.volume(), 64);
         assert_eq!(state.audio.applied_quality, AudioQuality::Compact);
     }
@@ -2180,5 +2305,151 @@ mod tests {
             item_detail_target(&SearchResult::Track(Track::new("t1", "Track", "Art"))),
             None
         );
+    }
+
+    #[test]
+    fn test_apply_key_handling_matrix() {
+        let mut state = wired();
+        state.search_text = "midnight".into();
+        state.submit_search();
+        state.search_text = "sunrise".into();
+        state.submit_search();
+        assert_eq!(state.queue.len(), 2);
+
+        // Space toggles playback
+        assert!(state.apply_key(egui::Key::Space));
+        assert!(state.audio.is_playing());
+        assert!(state.apply_key(egui::Key::Space));
+        assert!(!state.audio.is_playing());
+
+        // Seek forward and backward
+        assert!(state.apply_key(egui::Key::ArrowRight));
+        assert_eq!(state.audio.position_secs(), 10);
+        assert!(state.apply_key(egui::Key::ArrowLeft));
+        assert_eq!(state.audio.position_secs(), 0);
+
+        // Volume adjustments
+        state.set_volume(50);
+        assert!(state.apply_key(egui::Key::ArrowUp));
+        assert_eq!(state.audio.volume(), 55);
+        assert!(state.apply_key(egui::Key::ArrowDown));
+        assert_eq!(state.audio.volume(), 50);
+
+        // Track progression and regression
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("midnight"));
+        assert!(state.apply_key(egui::Key::N));
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("sunrise"));
+        assert!(state.apply_key(egui::Key::P));
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("midnight"));
+
+        // Toggle like status for current track
+        let curr_id = state.queue.current().unwrap().id.clone();
+        let initial_liked = state.is_liked(&curr_id);
+        assert!(state.apply_key(egui::Key::L));
+        assert_eq!(state.is_liked(&curr_id), !initial_liked);
+        assert!(state.apply_key(egui::Key::L));
+        assert_eq!(state.is_liked(&curr_id), initial_liked);
+
+        // Unhandled keys return false
+        assert!(!state.apply_key(egui::Key::A));
+        assert!(!state.apply_key(egui::Key::Enter));
+        assert!(!state.apply_key(egui::Key::Escape));
+    }
+
+    #[test]
+    fn test_apply_key_when_shortcuts_disabled_returns_false_and_does_not_mutate() {
+        let mut state = wired();
+        state.search_text = "midnight".into();
+        state.submit_search();
+        state.set_shortcuts_enabled(false);
+
+        let initial_pos = state.audio.position_secs();
+        let initial_vol = state.audio.volume();
+        let initial_playing = state.audio.is_playing();
+        let initial_title = state.queue.current().map(|t| t.title.clone());
+
+        for key in [
+            egui::Key::Space,
+            egui::Key::ArrowLeft,
+            egui::Key::ArrowRight,
+            egui::Key::ArrowUp,
+            egui::Key::ArrowDown,
+            egui::Key::N,
+            egui::Key::P,
+            egui::Key::L,
+            egui::Key::A,
+        ] {
+            assert!(!state.apply_key(key));
+        }
+
+        assert_eq!(state.audio.position_secs(), initial_pos);
+        assert_eq!(state.audio.volume(), initial_vol);
+        assert_eq!(state.audio.is_playing(), initial_playing);
+        assert_eq!(state.queue.current().map(|t| t.title.clone()), initial_title);
+    }
+
+    #[test]
+    fn test_apply_key_queue_dependent_keys_noop_on_empty_queue() {
+        let mut state = wired();
+        assert!(state.queue.is_empty());
+
+        assert!(!state.apply_key(egui::Key::N));
+        assert!(!state.apply_key(egui::Key::P));
+        assert!(!state.apply_key(egui::Key::L));
+        assert_eq!(state.audio.last_requested(), None);
+    }
+
+    #[test]
+    fn test_apply_key_volume_clamping_at_edges() {
+        let mut state = wired();
+
+        // Upper boundary
+        state.set_volume(98);
+        assert!(state.apply_key(egui::Key::ArrowUp));
+        assert_eq!(state.audio.volume(), 100);
+        assert!(state.apply_key(egui::Key::ArrowUp));
+        assert_eq!(state.audio.volume(), 100);
+
+        // Lower boundary
+        state.set_volume(2);
+        assert!(state.apply_key(egui::Key::ArrowDown));
+        assert_eq!(state.audio.volume(), 0);
+        assert!(state.apply_key(egui::Key::ArrowDown));
+        assert_eq!(state.audio.volume(), 0);
+    }
+
+    #[test]
+    fn test_set_shortcuts_enabled_persists_flag() {
+        let mut state = wired();
+        assert!(state.shortcuts_enabled);
+        assert!(state.keyboard_shortcuts_enabled());
+
+        state.set_shortcuts_enabled(false);
+        assert!(!state.shortcuts_enabled);
+        assert!(!state.keyboard_shortcuts_enabled());
+        assert!(!state.settings_store.load().keyboard_shortcuts);
+
+        state.set_shortcuts_enabled(true);
+        assert!(state.shortcuts_enabled);
+        assert!(state.keyboard_shortcuts_enabled());
+        assert!(state.settings_store.load().keyboard_shortcuts);
+    }
+
+    #[test]
+    fn test_set_settings_store_syncs_shortcuts_flag() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        store
+            .save(&Settings {
+                theme: ThemeId::White,
+                locale: Locale::English,
+                volume: 80,
+                quality: AudioQuality::Standard,
+                keyboard_shortcuts: false,
+            })
+            .unwrap();
+
+        state.set_settings_store(Box::new(store));
+        assert!(!state.shortcuts_enabled);
     }
 }

@@ -93,6 +93,23 @@ The bottom player bar remains visible across all pages and provides continuous t
 - **Volume Slider**: interactive slider setting audio volume from 0 to 100.
 - **Position Display**: shows elapsed seconds against total duration (`<elapsed>s / <duration>s` or `<elapsed>s`).
 
+## Keyboard Shortcuts
+
+Global keyboard shortcuts provide transport and playback control when single-line text inputs are not focused:
+
+| Key | Action | Context / Notes |
+| --- | --- | --- |
+| `Space` | Play / Pause | Toggles playback state of current track. |
+| `Left Arrow` | Seek backward | Rewinds position by 10 seconds (clamped at 0). |
+| `Right Arrow` | Seek forward | Advances position by 10 seconds. |
+| `Up Arrow` | Volume up | Increases playback volume by 5% (up to 100%). |
+| `Down Arrow` | Volume down | Decreases playback volume by 5% (down to 0%). |
+| `N` | Next track | Skips to next track in queue (requires queued tracks). |
+| `P` | Previous track | Skips to previous track in queue (requires queued tracks). |
+| `L` | Toggle like | Adds or removes current track from liked songs. |
+
+Keyboard shortcuts can be toggled in the `Library` preferences section and are enabled by default.
+
 ## Desktop Integration
 
 ### System Tray
