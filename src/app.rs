@@ -7,7 +7,7 @@ pub mod theme;
 
 use eframe::egui;
 
-use crate::domain::{PlaybackQueue, SearchQuery, ThemeId};
+use crate::domain::{PlaybackQueue, SearchQuery, ThemeId, Track};
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, AudioQuality, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence,
@@ -97,6 +97,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub quality: AudioQuality,
     /// Injected settings storage adapter.
     pub settings_store: Box<dyn SettingsStore>,
+    /// Whether radio autoplay queue continuation is active.
+    pub autoplay: bool,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -133,6 +135,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             locale: Locale::English,
             quality: AudioQuality::Standard,
             settings_store: Box::new(MemorySettingsStore::default()),
+            autoplay: false,
         }
     }
 
@@ -312,6 +315,75 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         if self.queue.current().is_some() {
             self.play_current_quiet();
             self.page = Page::NowPlaying;
+        }
+    }
+
+    /// Seeds an autoplay radio session with `seed`, clears queue, and starts playback.
+    /// Blank seed identifiers are ignored.
+    pub fn start_radio(&mut self, seed: Track) {
+        let seed_id = seed.id.trim();
+        if seed_id.is_empty() {
+            return;
+        }
+        let radio_tracks = self.catalog.radio(seed_id);
+        self.queue.clear();
+        let seed_key = seed.id.clone();
+        self.queue.push(seed);
+        for track in radio_tracks {
+            let trimmed = track.id.trim();
+            if !trimmed.is_empty() && trimmed != seed_key {
+                self.queue.push(track);
+            }
+        }
+        self.autoplay = true;
+        self.play_current_quiet();
+        self.page = Page::NowPlaying;
+    }
+
+    /// Evaluates autoplay queue continuation when the active track ends.
+    pub fn continue_autoplay_if_ended(&mut self) {
+        if !self.autoplay {
+            return;
+        }
+        if self.queue.is_empty() {
+            return;
+        }
+        let (Some(current), Some(last)) = (self.queue.current(), self.queue.tracks().last()) else {
+            return;
+        };
+        if !std::ptr::eq(current, last) {
+            return;
+        }
+        if self.audio.is_playing() {
+            return;
+        }
+        if self.audio.last_requested().is_none() {
+            return;
+        }
+        let Some(duration) = current.duration_secs else {
+            return;
+        };
+        if self.audio.position_secs() < duration as u64 {
+            return;
+        }
+        let current_id = current.id.clone();
+        self.append_autoplay_and_advance(&current_id);
+    }
+
+    fn append_autoplay_and_advance(&mut self, current_id: &str) {
+        let recommendations = self.catalog.radio(current_id);
+        let mut appended = false;
+        for track in recommendations {
+            let trimmed = track.id.trim();
+            if trimmed.is_empty() || self.queue.tracks().iter().any(|t| t.id == trimmed) {
+                continue;
+            }
+            self.queue.push(track);
+            appended = true;
+        }
+        if appended {
+            self.queue.advance();
+            self.play_current_quiet();
         }
     }
 
@@ -564,6 +636,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             return;
         }
         self.state.sync_presence();
+        self.state.continue_autoplay_if_ended();
         render_top_bar(ui, &mut self.state);
         render_player_bar(ui, &mut self.state);
         render_body(ui, &mut self.state);
@@ -898,6 +971,9 @@ fn render_now_playing<
     ui.label(format!("by {}", track.artist));
     ui.separator();
     ui.label(format!("requested: {}", state.audio.last_requested().unwrap_or("none")));
+    if ui.button("Start radio").clicked() {
+        state.start_radio(track.clone());
+    }
     ui.separator();
     render_cover_art_section(ui, state.cover_texture.as_ref());
     ui.separator();
@@ -1680,5 +1756,108 @@ mod tests {
         assert_eq!(state.quality, AudioQuality::Compact);
         assert_eq!(state.audio.volume(), 64);
         assert_eq!(state.audio.applied_quality, AudioQuality::Compact);
+    }
+
+    #[test]
+    fn start_radio_seeds_plays_and_navigates() {
+        let mut state = wired();
+        let seed = Track::new("seed-1", "Seed Song", "Seed Artist").with_duration(180);
+        state.start_radio(seed);
+        assert_eq!(state.queue.len(), 3);
+        assert_eq!(state.queue.tracks()[0].id, "seed-1");
+        assert_eq!(state.queue.tracks()[1].id, "seed-1-radio-1");
+        assert_eq!(state.queue.tracks()[2].id, "seed-1-radio-2");
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("seed-1"));
+        assert!(state.autoplay && state.page == Page::NowPlaying && state.audio.is_playing());
+        assert_eq!(state.audio.last_requested(), Some("seed-1"));
+    }
+
+    #[test]
+    fn start_radio_blank_id_is_noop() {
+        let mut state = wired();
+        state.queue.push(Track::new("kept", "Kept Song", "Artist"));
+        state.start_radio(Track::new("", "Empty", "Artist"));
+        assert_eq!(state.queue.len(), 1);
+        assert!(!state.autoplay && state.page == Page::Search);
+        state.start_radio(Track::new("   ", "Spaces", "Artist"));
+        assert_eq!(state.queue.len(), 1);
+        assert!(!state.autoplay && state.page == Page::Search);
+    }
+
+    #[test]
+    fn continue_autoplay_if_ended_appends_and_advances_at_end() {
+        let mut state = wired();
+        state.start_radio(Track::new("seed-1", "Seed", "Artist").with_duration(180));
+        state.next_track();
+        state.next_track();
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("seed-1-radio-2"));
+
+        state.audio.seek(210);
+        state.audio.pause();
+        state.continue_autoplay_if_ended();
+
+        assert_eq!(state.queue.len(), 5);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("seed-1-radio-2-radio-1"));
+        assert!(state.audio.is_playing());
+        assert_eq!(state.audio.last_requested(), Some("seed-1-radio-2-radio-1"));
+    }
+
+    #[test]
+    fn continue_autoplay_if_ended_noops() {
+        let mut state = wired();
+        state.start_radio(Track::new("seed-1", "Seed", "Artist").with_duration(180));
+
+        // Mid-queue: not final track
+        state.audio.seek(180);
+        state.audio.pause();
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.len(), 3);
+
+        // Move to last track
+        state.next_track();
+        state.next_track();
+
+        // While playing
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.len(), 3);
+
+        // Paused mid-track
+        state.audio.seek(100);
+        state.audio.pause();
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.len(), 3);
+
+        // Autoplay off
+        state.audio.seek(210);
+        state.autoplay = false;
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.len(), 3);
+
+        // Unknown duration
+        state.autoplay = true;
+        state.queue.push(Track::new("unknown-dur", "Unknown", "Artist"));
+        state.next_track();
+        state.audio.seek(500);
+        state.audio.pause();
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.len(), 4);
+    }
+
+    #[test]
+    fn continue_autoplay_deduplicates_and_skips_existing_tracks() {
+        let mut state = wired();
+        state.start_radio(Track::new("seed-1", "Seed", "Artist").with_duration(180));
+        state.next_track();
+        state.next_track();
+        state.queue.push(Track::new("seed-1-radio-2-radio-1", "R1", "Stub Artist"));
+        state.queue.push(Track::new("seed-1-radio-2-radio-2", "R2", "Stub Artist"));
+        state.next_track();
+        state.next_track();
+        let len_before = state.queue.len();
+
+        state.audio.seek(210);
+        state.audio.pause();
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.len(), len_before);
     }
 }
