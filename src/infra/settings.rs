@@ -12,6 +12,10 @@ use super::stream::AudioQuality;
 use crate::domain::ThemeId;
 use crate::i18n::Locale;
 
+const fn default_true() -> bool {
+    true
+}
+
 const fn default_volume() -> u8 {
     100
 }
@@ -30,6 +34,9 @@ pub struct Settings {
     /// Preferred audio streaming quality.
     #[serde(default)]
     pub quality: AudioQuality,
+    /// Whether global keyboard shortcuts are enabled.
+    #[serde(default = "default_true")]
+    pub keyboard_shortcuts: bool,
 }
 
 impl Default for Settings {
@@ -40,6 +47,7 @@ impl Default for Settings {
             locale: Locale::English,
             volume: 100,
             quality: AudioQuality::Standard,
+            keyboard_shortcuts: true,
         }
     }
 }
@@ -52,6 +60,7 @@ impl Settings {
             locale: Locale::detect(),
             volume: 100,
             quality: AudioQuality::Standard,
+            keyboard_shortcuts: true,
         }
     }
 }
@@ -173,6 +182,7 @@ mod tests {
         assert_eq!(loaded.locale, Locale::English);
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.quality, AudioQuality::Standard);
+        assert!(loaded.keyboard_shortcuts);
         assert_eq!(loaded, Settings::default());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -211,6 +221,7 @@ mod tests {
             locale: Locale::Spanish,
             volume: 75,
             quality: AudioQuality::High,
+            keyboard_shortcuts: false,
         };
 
         store.save(&modified).expect("save should succeed");
@@ -231,6 +242,7 @@ mod tests {
         assert_eq!(fallback.locale, Locale::detect());
         assert_eq!(fallback.volume, 100);
         assert_eq!(fallback.quality, AudioQuality::Standard);
+        assert!(fallback.keyboard_shortcuts);
     }
 
     #[test]
@@ -241,6 +253,7 @@ mod tests {
         assert_eq!(loaded.locale, Locale::English);
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.quality, AudioQuality::Standard);
+        assert!(loaded.keyboard_shortcuts);
         assert_eq!(loaded, Settings::default());
     }
 
@@ -260,7 +273,22 @@ mod tests {
         assert_eq!(loaded.locale, Locale::Spanish);
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.quality, AudioQuality::Compact);
+        assert!(loaded.keyboard_shortcuts);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_keyboard_shortcuts_serde_defaults_and_explicit_deserialization() {
+        let with_false: Settings =
+            serde_json::from_str(r#"{"keyboard_shortcuts": false}"#).expect("deserialize false");
+        assert!(!with_false.keyboard_shortcuts);
+
+        let with_true: Settings =
+            serde_json::from_str(r#"{"keyboard_shortcuts": true}"#).expect("deserialize true");
+        assert!(with_true.keyboard_shortcuts);
+
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert!(omitted.keyboard_shortcuts);
     }
 }
