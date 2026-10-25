@@ -7,7 +7,7 @@ pub mod theme;
 
 use eframe::egui;
 
-use crate::domain::{PlaybackQueue, SearchQuery, ThemeId, Track};
+use crate::domain::{PlaybackQueue, SearchQuery, SearchResult, Shelf, ThemeId, Track};
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, AudioQuality, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence,
@@ -99,6 +99,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub settings_store: Box<dyn SettingsStore>,
     /// Whether radio autoplay queue continuation is active.
     pub autoplay: bool,
+    /// Cached home shelves for the Search view.
+    pub home_shelves: Vec<Shelf>,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -136,6 +138,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             quality: AudioQuality::Standard,
             settings_store: Box::new(MemorySettingsStore::default()),
             autoplay: false,
+            home_shelves: Vec::new(),
         }
     }
 
@@ -295,6 +298,19 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             self.last_presence_key = None;
         }
         self.presence.set_playing(false);
+    }
+
+    /// Fetches home shelves from the catalog if not already populated.
+    pub fn ensure_home(&mut self) {
+        if self.home_shelves.is_empty() {
+            self.home_shelves = self.catalog.home_shelves();
+        }
+    }
+
+    /// Clears and reloads home shelves from the catalog.
+    pub fn reload_home(&mut self) {
+        self.home_shelves.clear();
+        self.ensure_home();
     }
 
     /// Handles a search submission: parses the raw input at the boundary,
@@ -915,10 +931,49 @@ fn render_library_albums<
     }
 }
 
+fn shelf_item_display(item: &SearchResult) -> String {
+    match item {
+        SearchResult::Track(track) => format!("{} - {}", track.title, track.artist),
+        SearchResult::Album(album) => {
+            let subtitle = if album.artist.is_empty() { "Album" } else { &album.artist };
+            format!("{} - {subtitle}", album.title)
+        }
+        SearchResult::Artist(artist) => format!("{} - Artist", artist.name),
+        SearchResult::Playlist(playlist) => format!("{} - Playlist", playlist.title),
+    }
+}
+
+fn render_home_shelves<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.horizontal(|ui| {
+        ui.heading("Home");
+        if ui.button("Refresh").clicked() {
+            state.reload_home();
+        }
+    });
+    for shelf in &state.home_shelves {
+        ui.heading(&shelf.title);
+        for item in &shelf.items {
+            ui.label(shelf_item_display(item));
+        }
+    }
+}
+
 fn render_search<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
+    state.ensure_home();
+    render_home_shelves(ui, state);
+    ui.separator();
     ui.label("Search the catalog (stub returns fixed hits):");
     let submitted = ui.text_edit_singleline(&mut state.search_text).lost_focus()
         && ui.input(|input| input.key_pressed(egui::Key::Enter));
@@ -1136,11 +1191,45 @@ fn render_position_info<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Track;
+    use crate::domain::{Album, Artist, Playlist, SearchQuery, SearchResult, Shelf, Track};
     use crate::infra::{
         AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
         ReleaseInfo, StaticUpdater, Updater,
     };
+
+    #[derive(Default)]
+    struct CountingCatalog {
+        inner: CatalogStub,
+        home_calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl Catalog for CountingCatalog {
+        fn search(&self, query: &str) -> Vec<Track> {
+            self.inner.search(query)
+        }
+        fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
+            self.inner.search_filtered(query)
+        }
+        fn radio(&self, seed_track_id: &str) -> Vec<Track> {
+            self.inner.radio(seed_track_id)
+        }
+        fn home_shelves(&self) -> Vec<Shelf> {
+            self.home_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.home_shelves()
+        }
+        fn playlists(&self) -> Vec<Playlist> {
+            self.inner.playlists()
+        }
+        fn liked_tracks(&self) -> Vec<Track> {
+            self.inner.liked_tracks()
+        }
+        fn saved_albums(&self) -> Vec<Album> {
+            self.inner.saved_albums()
+        }
+        fn set_liked(&mut self, track_id: &str, liked: bool) {
+            self.inner.set_liked(track_id, liked);
+        }
+    }
 
     struct NoUpdates;
 
@@ -1859,5 +1948,59 @@ mod tests {
         state.audio.pause();
         state.continue_autoplay_if_ended();
         assert_eq!(state.queue.len(), len_before);
+    }
+
+    #[test]
+    fn ensure_home_fetches_once_and_deduplicates() {
+        let catalog = CountingCatalog::default();
+        let mut state = AppState::new(
+            catalog,
+            AudioStub::new(),
+            MemorySessionStore::new(),
+            LrclibStub::new(),
+            MemoryCoverCache::new(),
+        );
+
+        assert!(state.home_shelves.is_empty());
+        assert_eq!(state.catalog.home_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+        // First call fetches
+        state.ensure_home();
+        assert_eq!(state.home_shelves.len(), 2);
+        assert_eq!(state.catalog.home_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        // Second call deduplicates (does not re-query)
+        state.ensure_home();
+        assert_eq!(state.home_shelves.len(), 2);
+        assert_eq!(state.catalog.home_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        // Reload refetches
+        state.reload_home();
+        assert_eq!(state.home_shelves.len(), 2);
+        assert_eq!(state.catalog.home_calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn shelf_item_display_formatting() {
+        assert_eq!(
+            shelf_item_display(&SearchResult::Track(Track::new("t1", "TrackTitle", "TrackArtist"))),
+            "TrackTitle - TrackArtist"
+        );
+        assert_eq!(
+            shelf_item_display(&SearchResult::Album(Album::new("a1", "AlbumTitle", "AlbumArtist"))),
+            "AlbumTitle - AlbumArtist"
+        );
+        assert_eq!(
+            shelf_item_display(&SearchResult::Album(Album::new("a2", "AlbumTitle", ""))),
+            "AlbumTitle - Album"
+        );
+        assert_eq!(
+            shelf_item_display(&SearchResult::Artist(Artist::new("ar1", "ArtistName"))),
+            "ArtistName - Artist"
+        );
+        assert_eq!(
+            shelf_item_display(&SearchResult::Playlist(Playlist::new("p1", "PlaylistTitle", 10))),
+            "PlaylistTitle - Playlist"
+        );
     }
 }
