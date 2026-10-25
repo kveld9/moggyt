@@ -1,8 +1,11 @@
 //! InnerTube API client and response parser for YouTube Music search.
 
-use crate::domain::SearchFilter;
+use crate::domain::{Album, Artist, Playlist, SearchFilter, SearchResult, Shelf};
 use serde_json::Value;
 use std::time::Duration;
+
+/// Home feed browse identifier for YouTube Music.
+pub const HOME_BROWSE_ID: &str = "FEmusic_home";
 
 /// Public InnerTube web API key for the WEB_REMIX client context.
 ///
@@ -55,6 +58,26 @@ pub fn next_body(video_id: &str) -> Value {
         },
         "videoId": video_id,
         "playlistId": format!("RD{video_id}"),
+    })
+}
+
+/// Returns the InnerTube browse endpoint URL.
+pub fn browse_url() -> String {
+    format!("https://music.youtube.com/youtubei/v1/browse?key={YTM_API_KEY}&prettyPrint=false")
+}
+
+/// Builds the minimal WEB_REMIX browse payload for `browse_id`.
+pub fn browse_body(browse_id: &str) -> Value {
+    serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": YTM_CLIENT_VERSION,
+                "hl": "en",
+                "gl": "US",
+            }
+        },
+        "browseId": browse_id,
     })
 }
 
@@ -458,6 +481,79 @@ pub fn parse_radio_all(value: &Value) -> Vec<RawTrack> {
         .map_or_else(Vec::new, |items| items.iter().filter_map(parse_radio_item).collect())
 }
 
+fn home_sections(value: &Value) -> Option<&Vec<Value>> {
+    const PATH: &str = "/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents";
+    const ALT_PATH: &str = "/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents";
+    value.pointer(PATH).or_else(|| value.pointer(ALT_PATH)).and_then(Value::as_array)
+}
+
+fn carousel_shelf_title(shelf: &Value) -> Option<String> {
+    const PATHS: &[&str] = &[
+        "/header/musicCarouselShelfBasicHeaderRenderer/title/runs/0/text",
+        "/title/runs/0/text",
+        "/header/musicCarouselShelfBasicHeaderRenderer/title/simpleText",
+        "/title/simpleText",
+    ];
+    for path in PATHS {
+        if let Some(text) = shelf.pointer(path).and_then(Value::as_str) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_owned());
+            }
+        }
+    }
+    None
+}
+
+fn classify_home_item(id: &str, title: &str, subtitle: &str) -> SearchResult {
+    if id.starts_with("UC") {
+        return SearchResult::Artist(Artist::new(id, title));
+    }
+    if id.starts_with("VL") || id.starts_with("RD") {
+        return SearchResult::Playlist(Playlist::new(id, title, 0));
+    }
+    SearchResult::Album(Album::new(id, title, subtitle))
+}
+
+fn parse_carousel_item(item: &Value) -> Option<SearchResult> {
+    let renderer = item.get("musicTwoRowItemRenderer")?;
+    let (title, subtitle, browse_id) = parse_two_row(renderer)?;
+    let id = browse_id?;
+    let _thumb = best_thumbnail(renderer);
+    Some(classify_home_item(&id, &title, &subtitle))
+}
+
+fn parse_carousel_shelf(shelf: &Value) -> Option<Shelf> {
+    let title = carousel_shelf_title(shelf)?;
+    let items_array = shelf.get("contents")?.as_array()?;
+    let items: Vec<SearchResult> = items_array.iter().filter_map(parse_carousel_item).collect();
+    if items.is_empty() {
+        return None;
+    }
+    Some(Shelf { title, items })
+}
+
+fn parse_home_section(section: &Value) -> Option<Shelf> {
+    let shelf = section.get("musicCarouselShelfRenderer")?;
+    parse_carousel_shelf(shelf)
+}
+
+/// Parses home carousel shelves from InnerTube browse response payload.
+///
+/// Browse items are classified using the following heuristic on `browseId`:
+/// - Starts with `"UC"`: [`SearchResult::Artist`]
+/// - Starts with `"VL"` or `"RD"`: [`SearchResult::Playlist`] (with track_count 0)
+/// - Otherwise: [`SearchResult::Album`]
+///
+/// Featured immersive carousels (`musicImmersiveCarouselShelfRenderer`), shelves
+/// with empty titles, and shelves with zero kept items are skipped.
+pub fn parse_home_all(value: &Value) -> Vec<Shelf> {
+    let Some(sections) = home_sections(value) else {
+        return Vec::new();
+    };
+    sections.iter().filter_map(parse_home_section).collect()
+}
+
 /// Blocking HTTP client for the InnerTube API.
 #[derive(Debug)]
 pub struct InnerTube {
@@ -523,6 +619,25 @@ impl InnerTube {
             return Vec::new();
         }
         self.next_payload(trimmed).map_or_else(|_| Vec::new(), |p| parse_radio_all(&p))
+    }
+
+    /// Executes browse endpoint request for `browse_id` and returns the unparsed JSON response payload.
+    pub fn browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
+        let url = browse_url();
+        let body = browse_body(browse_id);
+        let response = self.client.post(&url).json(&body).send()?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("InnerTube browse request failed with status: {status}");
+        }
+        let payload: Value = response.json()?;
+        Ok(payload)
+    }
+
+    /// Queries the browse endpoint for home shelves and returns parsed shelves.
+    /// Returns an empty vector on any network or parse failure.
+    pub fn home_shelves(&self) -> Vec<Shelf> {
+        self.browse_payload(HOME_BROWSE_ID).map_or_else(|_| Vec::new(), |p| parse_home_all(&p))
     }
 
     /// Converts this InnerTube client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
@@ -875,6 +990,73 @@ mod tests {
                 duration_secs: None,
                 thumb_url: None,
             }
+        );
+    }
+
+    #[test]
+    fn browse_url_format_and_key() {
+        assert_eq!(
+            browse_url(),
+            format!(
+                "https://music.youtube.com/youtubei/v1/browse?key={YTM_API_KEY}&prettyPrint=false"
+            )
+        );
+    }
+
+    #[test]
+    fn browse_body_structure() {
+        let body = browse_body(HOME_BROWSE_ID);
+        assert_eq!(body["browseId"], HOME_BROWSE_ID);
+        assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+        assert_eq!(body["context"]["client"]["clientVersion"], YTM_CLIENT_VERSION);
+    }
+
+    #[test]
+    fn parse_home_all_tolerates_empty_and_malformed() {
+        assert!(parse_home_all(&serde_json::json!({})).is_empty());
+        assert!(parse_home_all(&serde_json::json!({"contents": null})).is_empty());
+        assert!(
+            parse_home_all(&serde_json::json!({
+                "contents": {
+                    "singleColumnBrowseResultsRenderer": {
+                        "tabs": [{
+                            "tabRenderer": {
+                                "content": {
+                                    "sectionListRenderer": { "contents": [] }
+                                }
+                            }
+                        }]
+                    }
+                }
+            }))
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn parse_home_all_golden_fixture() {
+        let raw = include_str!("../../tests/fixtures/innertube_home.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let shelves = parse_home_all(&payload);
+        assert_eq!(shelves.len(), 2);
+
+        assert_eq!(shelves[0].title, "Quick picks");
+        assert_eq!(shelves[0].items.len(), 2);
+        assert_eq!(
+            shelves[0].items[0],
+            SearchResult::Album(Album::new("MPREb_album_1", "Midnight City", "M83"))
+        );
+        assert_eq!(shelves[0].items[1], SearchResult::Artist(Artist::new("UC_artist_1", "M83")));
+
+        assert_eq!(shelves[1].title, "Recommended mixes");
+        assert_eq!(shelves[1].items.len(), 2);
+        assert_eq!(
+            shelves[1].items[0],
+            SearchResult::Playlist(Playlist::new("VL_mix_1", "Chill Mix", 0))
+        );
+        assert_eq!(
+            shelves[1].items[1],
+            SearchResult::Playlist(Playlist::new("RD_radio_2", "Energy Radio", 0))
         );
     }
 }
