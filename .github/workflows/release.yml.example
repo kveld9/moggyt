@@ -36,7 +36,6 @@
 #   via linuxdeploy and appimagetool.
 #   TODO:
 #     - Arch Linux packaging: Maintain PKGBUILD in packaging/arch/moggyt-bin (AUR publish deferred; no credentials in v1).
-#     - Windows packaging: Integrate cargo-wix (MSI) or NSIS for setup installer creation.
 #     - Code signing & Attestations: Integrate Authenticode signing for Windows
 #       and GitHub Artifact Attestations via actions/attest-build-provenance.
 # ==============================================================================
@@ -139,6 +138,27 @@ jobs:
           else
             tar -czf "dist/moggyt-${VERSION}-linux.tar.gz" -C target/release moggyt
           fi
+
+      - name: Build Windows NSIS installer (.exe)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          MSYS_NO_PATHCONV: 1
+        run: |
+          VERSION="${{ needs.semver.outputs.version }}"
+          mkdir -p dist
+          MAKENSIS="makensis"
+          if ! command -v "$MAKENSIS" >/dev/null 2>&1; then
+            if [ -f "/c/Program Files (x86)/NSIS/makensis.exe" ]; then
+              MAKENSIS="/c/Program Files (x86)/NSIS/makensis.exe"
+            elif [ -f "C:/Program Files (x86)/NSIS/makensis.exe" ]; then
+              MAKENSIS="C:/Program Files (x86)/NSIS/makensis.exe"
+            else
+              echo "Error: makensis not found in PATH or standard installation directory" >&2
+              exit 1
+            fi
+          fi
+          "$MAKENSIS" /DVERSION="${VERSION}" packaging/windows/moggyt.nsi
 
       - name: Install cargo-deb
         if: runner.os == 'Linux'
