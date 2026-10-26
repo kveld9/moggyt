@@ -1,5 +1,7 @@
 //! Search models: immutable query and catalog hit types.
 
+use serde::{Deserialize, Serialize};
+
 /// Category filter for catalog search queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SearchFilter {
@@ -51,7 +53,7 @@ impl SearchQuery {
 }
 
 /// A catalog track hit: plain data, no behavior, no I/O.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Track {
     /// Stable catalog identifier.
     pub id: String,
