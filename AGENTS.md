@@ -46,6 +46,13 @@ Run all five before finishing. `cargo run` launches the window.
   CI and secret scanning run on every PR, so stacked PRs show checks immediately.
   Land bottom-up: merge the lowest PR into `main` first, retarget the next PR to
   `main`, wait for its green CI, and repeat. Never merge a PR whose checks never ran.
+- Fresh base before any work: `git fetch origin` first; never branch, implement,
+  or open a PR from a stale base. If local `main` trails `origin/main`, sync and
+  re-assess scope before starting.
+- Overlap check before delegating: scan `git log origin/main` and open PRs for
+  landed or in-flight work covering the same scope; never duplicate it.
+- If `origin/main` advances mid-task, stop, re-sync onto the new base, re-run the
+  gate, and re-confirm scope before continuing.
 - Commits in English, Conventional Commits, imperative mood, no emojis.
 - Update `docs/` or `README.md` in the same PR when behavior, flags, config,
   or public APIs change.
