@@ -25,6 +25,9 @@ pub trait Catalog {
     /// Adds (`liked = true`) or removes (`liked = false`) a track from the liked collection.
     /// Blank identifiers are ignored.
     fn set_liked(&mut self, track_id: &str, liked: bool);
+
+    /// Sets or clears session cookies for authenticated requests. Default is a no-op.
+    fn set_cookies(&mut self, _cookies: Option<String>) {}
 }
 
 /// Fixed-data stub: keeps UI and tests deterministic until the real API lands.
@@ -150,6 +153,21 @@ impl YtmCatalog {
         Self { tube }
     }
 
+    /// Creates a catalog with optional session cookies.
+    pub fn with_cookies(cookies: Option<String>) -> Self {
+        Self { tube: InnerTube::with_cookies(cookies) }
+    }
+
+    /// Updates session cookies on the underlying InnerTube client.
+    pub fn set_cookies(&mut self, cookies: Option<String>) {
+        self.tube.set_cookies(cookies);
+    }
+
+    /// Returns `true` if this catalog has configured session cookies.
+    pub fn is_authenticated(&self) -> bool {
+        self.tube.is_authenticated()
+    }
+
     fn fetch_hits(&self, query_text: &str) -> SearchHits {
         self.tube
             .search_payload(query_text)
@@ -207,27 +225,54 @@ impl Catalog for YtmCatalog {
         Self::map_hits(self.fetch_hits(query.text()), query.filter())
     }
 
-    /// Returns saved or owned playlists. Anonymous interim returns an empty list
-    /// because authenticated library endpoints require a signed-in InnerTube client.
+    /// Returns saved or owned playlists. Returns empty if unauthenticated or on fetch error.
     fn playlists(&self) -> Vec<Playlist> {
-        Vec::new()
+        if !self.tube.is_authenticated() {
+            return Vec::new();
+        }
+        self.tube
+            .library_playlists()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| Playlist::new(&p.browse_id, &p.title, 0))
+            .collect()
     }
 
-    /// Returns liked tracks. Anonymous interim returns an empty list
-    /// because authenticated library endpoints require a signed-in InnerTube client.
+    /// Returns liked tracks. Returns empty if unauthenticated or on fetch error.
     fn liked_tracks(&self) -> Vec<Track> {
-        Vec::new()
+        if !self.tube.is_authenticated() {
+            return Vec::new();
+        }
+        self.tube.library_liked_tracks().unwrap_or_default().into_iter().map(raw_to_track).collect()
     }
 
-    /// Returns saved albums. Anonymous interim returns an empty list
-    /// because authenticated library endpoints require a signed-in InnerTube client.
+    /// Returns saved albums. Returns empty if unauthenticated or on fetch error.
     fn saved_albums(&self) -> Vec<Album> {
-        Vec::new()
+        if !self.tube.is_authenticated() {
+            return Vec::new();
+        }
+        self.tube
+            .library_saved_albums()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|a| Album::new(&a.browse_id, &a.title, &a.artist))
+            .collect()
     }
 
-    /// Sets liked status. Anonymous interim is a no-op because an unauthenticated
-    /// client cannot mutate remote user library state.
-    fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+    /// Sets liked status. Unauthenticated client or blank identifier is a no-op.
+    fn set_liked(&mut self, track_id: &str, liked: bool) {
+        let trimmed = track_id.trim();
+        if trimmed.is_empty() || !self.tube.is_authenticated() {
+            return;
+        }
+        if let Err(err) = self.tube.set_liked(trimmed, liked) {
+            tracing::warn!(track_id = trimmed, liked, error = %err, "failed to update like status");
+        }
+    }
+
+    fn set_cookies(&mut self, cookies: Option<String>) {
+        self.tube.set_cookies(cookies);
+    }
 }
 
 #[cfg(test)]
@@ -416,5 +461,25 @@ mod tests {
         assert!(catalog.playlists().is_empty());
         assert!(catalog.saved_albums().is_empty());
         assert!(catalog.liked_tracks().is_empty());
+    }
+
+    #[test]
+    fn ytm_catalog_auth_lifecycle_and_seam() {
+        let mut catalog = YtmCatalog::new();
+        assert!(!catalog.is_authenticated());
+
+        catalog.set_cookies(Some("SID=foo123".into()));
+        assert!(catalog.is_authenticated());
+
+        catalog.set_cookies(None);
+        assert!(!catalog.is_authenticated());
+
+        let with_auth = YtmCatalog::with_cookies(Some("SID=bar456".into()));
+        assert!(with_auth.is_authenticated());
+
+        // Default Catalog trait method works on stub without error
+        let mut stub = CatalogStub::new();
+        stub.set_cookies(Some("SID=stub".into()));
+        stub.set_cookies(None);
     }
 }

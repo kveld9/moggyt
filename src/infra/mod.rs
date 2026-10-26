@@ -32,7 +32,12 @@ pub use audio_rodio::{LiveAudio, RodioBackend, volume_to_amplitude};
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use cover_art::{COVER_MAX_PX, decode_cover, fetch_artwork};
 pub use cover_disk::{DiskCoverCache, cache_file_name, fnv1a_hex};
-pub use innertube::{InnerTube, RawTrack, search_body, search_url};
+pub use innertube::{
+    BROWSE_ALBUMS, BROWSE_LIKED_TRACKS, BROWSE_PLAYLISTS, InnerTube, RawAlbum, RawPlaylist,
+    RawTrack, browse_body, browse_url, like_body, like_url, parse_library_liked_tracks,
+    parse_library_playlists, parse_library_saved_albums, parse_like_response, removelike_url,
+    search_body, search_url,
+};
 pub use instance::{SingleInstanceGuard, instance_lock_name};
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
 pub use lyrics_lrclib::{LrclibClient, lrclib_get_url, parse_lrc};

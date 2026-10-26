@@ -399,6 +399,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             return false;
         };
         self.session.save(&cleaned);
+        self.catalog.set_cookies(self.session.load());
         self.signed_in = true;
         self.cookie_text.clear();
         true
@@ -407,6 +408,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Clears the stored session and resets the cookie input buffer.
     pub fn sign_out(&mut self) {
         self.session.clear();
+        self.catalog.set_cookies(None);
         self.signed_in = false;
         self.cookie_text.clear();
     }
@@ -1060,7 +1062,7 @@ fn render_position_info<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Track;
+    use crate::domain::{Album, Playlist, SearchResult, Track};
     use crate::infra::{
         AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
         ReleaseInfo, StaticUpdater, Updater,
@@ -1108,6 +1110,53 @@ mod tests {
         state.sign_out();
         assert!(!state.is_signed_in());
         assert_eq!(state.session.load(), None);
+    }
+
+    #[derive(Debug, Default)]
+    struct CookieTrackingCatalog {
+        cookies: Option<String>,
+    }
+
+    impl Catalog for CookieTrackingCatalog {
+        fn search(&self, _query: &str) -> Vec<Track> {
+            Vec::new()
+        }
+        fn search_filtered(&self, _query: &SearchQuery) -> Vec<SearchResult> {
+            Vec::new()
+        }
+        fn playlists(&self) -> Vec<Playlist> {
+            Vec::new()
+        }
+        fn liked_tracks(&self) -> Vec<Track> {
+            Vec::new()
+        }
+        fn saved_albums(&self) -> Vec<Album> {
+            Vec::new()
+        }
+        fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+        fn set_cookies(&mut self, cookies: Option<String>) {
+            self.cookies = cookies;
+        }
+    }
+
+    #[test]
+    fn sign_in_and_out_refreshes_catalog_auth() {
+        let mut state = AppState::new(
+            CookieTrackingCatalog::default(),
+            AudioStub::new(),
+            MemorySessionStore::new(),
+            LrclibStub::new(),
+            MemoryCoverCache::new(),
+        );
+
+        assert_eq!(state.catalog.cookies, None);
+
+        state.cookie_text = "SID=foo123; HSID=bar456".to_owned();
+        assert!(state.sign_in_from_input());
+        assert_eq!(state.catalog.cookies.as_deref(), Some("SID=foo123; HSID=bar456"));
+
+        state.sign_out();
+        assert_eq!(state.catalog.cookies, None);
     }
 
     #[test]

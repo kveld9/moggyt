@@ -11,8 +11,8 @@ use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
     DesktopPresence, DiskCoverCache, DiskSettingsStore, KeyringSessionStore, LastFmClient,
-    LiveAudio, LrclibClient, RodioBackend, SingleInstanceGuard, TrayHandle, YtmCatalog,
-    default_config_dir, ensure_sidecar,
+    LiveAudio, LrclibClient, RodioBackend, SessionStore, SingleInstanceGuard, TrayHandle,
+    YtmCatalog, default_config_dir, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -28,8 +28,8 @@ fn main() -> anyhow::Result<()> {
 
     let data_dir = app_data_dir();
     let audio = init_live_audio(&data_dir);
-    let catalog = YtmCatalog::new();
     let session = KeyringSessionStore::moggyt();
+    let catalog = YtmCatalog::with_cookies(session.load());
     let lyrics = LrclibClient::new();
     let covers = init_cover_cache(&data_dir);
     let mut state = AppState::new(catalog, audio, session, lyrics, covers);

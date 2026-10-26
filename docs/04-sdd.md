@@ -69,7 +69,7 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-5: transport controls with seek and volume, including keyboard shortcuts.
 - FR-6: start radio from any track and keep an autoplay continuation queue.
 - FR-7: read the signed-in library (playlists, likes, saved albums); like or dislike tracks.
-  Note: authenticated library endpoints are pending; interim implementation operates as anonymous empty readers.
+  Note: authenticated library reads and likes use InnerTube; anonymous use falls back to empty readers.
 - FR-8: display synced lyrics with a user-adjustable offset when LRCLIB has a match.
 - FR-9: load cover art progressively with placeholder, memory LRU, and disk cache.
 - FR-10: persist settings (volume, theme, quality preference, shortcuts) across restarts.

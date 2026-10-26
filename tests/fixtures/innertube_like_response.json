@@ -1,0 +1,15 @@
+{
+  "actions": [
+    {
+      "addToToastAction": {
+        "item": {
+          "notificationTextRenderer": {
+            "successResponseText": {
+              "runs": [{ "text": "Added to liked music" }]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

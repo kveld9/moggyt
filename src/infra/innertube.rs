@@ -22,6 +22,32 @@ pub fn search_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/search?key={YTM_API_KEY}&prettyPrint=false")
 }
 
+/// Returns the InnerTube browse endpoint URL.
+pub fn browse_url() -> String {
+    format!("https://music.youtube.com/youtubei/v1/browse?key={YTM_API_KEY}&prettyPrint=false")
+}
+
+/// Returns the InnerTube like mutation endpoint URL.
+pub fn like_url() -> String {
+    format!("https://music.youtube.com/youtubei/v1/like/like?key={YTM_API_KEY}&prettyPrint=false")
+}
+
+/// Returns the InnerTube remove-like mutation endpoint URL.
+pub fn removelike_url() -> String {
+    format!(
+        "https://music.youtube.com/youtubei/v1/like/removelike?key={YTM_API_KEY}&prettyPrint=false"
+    )
+}
+
+/// InnerTube browse identifier for saved and owned playlists.
+pub const BROWSE_PLAYLISTS: &str = "FEmusic_liked_playlists";
+
+/// InnerTube browse identifier for liked tracks playlist.
+pub const BROWSE_LIKED_TRACKS: &str = "LM";
+
+/// InnerTube browse identifier for saved library albums.
+pub const BROWSE_ALBUMS: &str = "FEmusic_liked_albums";
+
 /// Builds the minimal WEB_REMIX search payload for `query`.
 pub fn search_body(query: &str) -> Value {
     serde_json::json!({
@@ -34,6 +60,38 @@ pub fn search_body(query: &str) -> Value {
             }
         },
         "query": query,
+    })
+}
+
+/// Builds the minimal WEB_REMIX browse payload for `browse_id`.
+pub fn browse_body(browse_id: &str) -> Value {
+    serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": YTM_CLIENT_VERSION,
+                "hl": "en",
+                "gl": "US",
+            }
+        },
+        "browseId": browse_id,
+    })
+}
+
+/// Builds the WEB_REMIX like mutation payload for `video_id`.
+pub fn like_body(video_id: &str) -> Value {
+    serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": YTM_CLIENT_VERSION,
+                "hl": "en",
+                "gl": "US",
+            }
+        },
+        "target": {
+            "videoId": video_id,
+        }
     })
 }
 
@@ -143,6 +201,8 @@ fn collect_shelf_items(shelf: &Value, out: &mut Vec<RawTrack>) {
 fn collect_item_or_shelf_track(item: &Value, out: &mut Vec<RawTrack>) {
     if let Some(shelf) = item.get("musicShelfRenderer") {
         collect_shelf_items(shelf, out);
+    } else if let Some(shelf) = item.get("musicPlaylistShelfRenderer") {
+        collect_shelf_items(shelf, out);
     } else if let Some(track) = item.get("musicResponsiveListItemRenderer").and_then(parse_item) {
         out.push(track);
     }
@@ -159,6 +219,8 @@ fn collect_item_section_tracks(item_section: &Value, out: &mut Vec<RawTrack>) {
 
 fn collect_section_tracks(section: &Value, out: &mut Vec<RawTrack>) {
     if let Some(shelf) = section.get("musicShelfRenderer") {
+        collect_shelf_items(shelf, out);
+    } else if let Some(shelf) = section.get("musicPlaylistShelfRenderer") {
         collect_shelf_items(shelf, out);
     } else if let Some(item_section) = section.get("itemSectionRenderer") {
         collect_item_section_tracks(item_section, out);
@@ -350,21 +412,174 @@ pub fn parse_search_all(value: &Value) -> SearchHits {
     hits
 }
 
+fn find_sections(value: &Value) -> Vec<&Value> {
+    let mut sections = Vec::new();
+    let tabs = value
+        .pointer("/contents/singleColumnBrowseResultsRenderer/tabs")
+        .or_else(|| value.pointer("/contents/tabbedSearchResultsRenderer/tabs"))
+        .and_then(Value::as_array);
+
+    if let Some(tabs) = tabs {
+        for tab in tabs {
+            let path = "/tabRenderer/content/sectionListRenderer/contents";
+            if let Some(s) = tab.pointer(path).and_then(Value::as_array) {
+                sections.extend(s);
+            }
+        }
+    } else if let Some(s) =
+        value.pointer("/contents/sectionListRenderer/contents").and_then(Value::as_array)
+    {
+        sections.extend(s);
+    }
+    sections
+}
+
+fn section_items(section: &Value) -> &[Value] {
+    if let Some(items) = section.pointer("/gridRenderer/items").and_then(Value::as_array) {
+        return items;
+    }
+    if let Some(items) = section.pointer("/musicShelfRenderer/contents").and_then(Value::as_array) {
+        return items;
+    }
+    if let Some(items) = section.pointer("/itemSectionRenderer/contents").and_then(Value::as_array)
+    {
+        return items;
+    }
+    &[]
+}
+
+fn parse_item_metadata(renderer: &Value) -> Option<(String, String, String)> {
+    if let Some(two_row) = renderer.get("musicTwoRowItemRenderer") {
+        let (title, subtitle, id) = parse_two_row(two_row)?;
+        return Some((id?, title, subtitle));
+    }
+    if let Some(list_item) = renderer.get("musicResponsiveListItemRenderer") {
+        let title = flex_text(list_item, 0)?;
+        let subtitle = flex_text(list_item, 1).unwrap_or_default();
+        let id = browse_id(list_item)?;
+        return Some((id, title, subtitle));
+    }
+    None
+}
+
+fn collect_from_items<T>(
+    items: &[Value],
+    transform: &mut impl FnMut(String, String, String) -> T,
+    out: &mut Vec<T>,
+) {
+    for item in items {
+        if let Some((id, title, subtitle)) = parse_item_metadata(item) {
+            out.push(transform(id, title, subtitle));
+        }
+    }
+}
+
+fn collect_section_two_rows<T>(
+    section: &Value,
+    transform: &mut impl FnMut(String, String, String) -> T,
+    out: &mut Vec<T>,
+) {
+    let direct = section_items(section);
+    collect_from_items(direct, transform, out);
+    let sub_items = section
+        .get("itemSectionRenderer")
+        .and_then(|is| is.get("contents"))
+        .and_then(Value::as_array);
+    if let Some(subs) = sub_items {
+        for sub in subs {
+            collect_from_items(section_items(sub), transform, out);
+        }
+    }
+}
+
+fn collect_two_rows<T>(
+    value: &Value,
+    mut transform: impl FnMut(String, String, String) -> T,
+) -> Vec<T> {
+    let mut results = Vec::new();
+    for section in find_sections(value) {
+        collect_section_two_rows(section, &mut transform, &mut results);
+    }
+    results
+}
+
+/// Parses saved or owned playlists from an InnerTube browse response.
+pub fn parse_library_playlists(value: &Value) -> Vec<RawPlaylist> {
+    collect_two_rows(value, |browse_id, title, _sub| RawPlaylist { browse_id, title })
+}
+
+/// Parses saved albums from an InnerTube browse response.
+pub fn parse_library_saved_albums(value: &Value) -> Vec<RawAlbum> {
+    collect_two_rows(value, |browse_id, title, subtitle| RawAlbum {
+        browse_id,
+        title,
+        artist: subtitle,
+    })
+}
+
+/// Parses liked tracks from an InnerTube browse response.
+pub fn parse_library_liked_tracks(value: &Value) -> Vec<RawTrack> {
+    let mut tracks = Vec::new();
+    for section in find_sections(value) {
+        collect_section_tracks(section, &mut tracks);
+    }
+    tracks
+}
+
+/// Parses the response of a like or remove-like mutation endpoint.
+pub fn parse_like_response(value: &Value) -> bool {
+    if !value.is_object() {
+        return false;
+    }
+    value.get("error").is_none()
+}
+
 /// Blocking HTTP client for the InnerTube API.
 #[derive(Debug)]
 pub struct InnerTube {
     client: reqwest::blocking::Client,
     api_key: String,
+    cookies: Option<String>,
 }
 
 impl InnerTube {
-    /// Creates a new InnerTube client with a 10-second request timeout.
+    /// Creates a new InnerTube client with a 10-second request timeout and anonymous credentials.
     pub fn new() -> Self {
+        Self::with_cookies(None)
+    }
+
+    /// Creates an InnerTube client with optional session-cookie authentication.
+    pub fn with_cookies(cookies: Option<String>) -> Self {
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
-        Self { client, api_key: YTM_API_KEY.to_owned() }
+        let clean_cookies = cookies.filter(|c| !c.trim().is_empty());
+        Self { client, api_key: YTM_API_KEY.to_owned(), cookies: clean_cookies }
+    }
+
+    /// Updates session cookies for authenticated requests.
+    pub fn set_cookies(&mut self, cookies: Option<String>) {
+        self.cookies = cookies.filter(|c| !c.trim().is_empty());
+    }
+
+    /// Returns `true` if this client has configured session cookies.
+    pub fn is_authenticated(&self) -> bool {
+        self.cookies.is_some()
+    }
+
+    fn post_json(&self, url: &str, body: &Value) -> anyhow::Result<Value> {
+        let mut request = self.client.post(url).json(body);
+        if let Some(cookie) = &self.cookies {
+            request = request.header("Cookie", cookie);
+        }
+        let response = request.send()?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("InnerTube request failed with status: {status}");
+        }
+        let payload: Value = response.json()?;
+        Ok(payload)
     }
 
     /// Executes search request and returns the unparsed JSON response payload.
@@ -374,13 +589,7 @@ impl InnerTube {
             self.api_key
         );
         let body = search_body(query);
-        let response = self.client.post(&url).json(&body).send()?;
-        let status = response.status();
-        if !status.is_success() {
-            anyhow::bail!("InnerTube search request failed with status: {status}");
-        }
-        let payload: Value = response.json()?;
-        Ok(payload)
+        self.post_json(&url, &body)
     }
 
     /// Performs search for `query` and returns parsed tracks.
@@ -392,6 +601,52 @@ impl InnerTube {
     /// Performs search for `query` and returns grouped search hits across all shelves.
     pub fn search_all(&self, query: &str) -> anyhow::Result<SearchHits> {
         self.search_payload(query).map(|p| parse_search_all(&p))
+    }
+
+    /// Executes browse request and returns the unparsed JSON response payload.
+    pub fn browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
+        if !self.is_authenticated() {
+            anyhow::bail!("InnerTube browse requires authenticated session cookies");
+        }
+        let body = browse_body(browse_id);
+        self.post_json(&browse_url(), &body)
+    }
+
+    /// Fetches saved or owned playlists from the user library.
+    pub fn library_playlists(&self) -> anyhow::Result<Vec<RawPlaylist>> {
+        let payload = self.browse_payload(BROWSE_PLAYLISTS)?;
+        Ok(parse_library_playlists(&payload))
+    }
+
+    /// Fetches liked tracks from the user library.
+    pub fn library_liked_tracks(&self) -> anyhow::Result<Vec<RawTrack>> {
+        let payload = self.browse_payload(BROWSE_LIKED_TRACKS)?;
+        Ok(parse_library_liked_tracks(&payload))
+    }
+
+    /// Fetches saved albums from the user library.
+    pub fn library_saved_albums(&self) -> anyhow::Result<Vec<RawAlbum>> {
+        let payload = self.browse_payload(BROWSE_ALBUMS)?;
+        Ok(parse_library_saved_albums(&payload))
+    }
+
+    /// Executes like or unlike mutation request and returns unparsed payload.
+    pub fn set_liked_payload(&self, video_id: &str, liked: bool) -> anyhow::Result<Value> {
+        if !self.is_authenticated() {
+            anyhow::bail!("InnerTube like mutation requires authenticated session cookies");
+        }
+        let url = if liked { like_url() } else { removelike_url() };
+        let body = like_body(video_id);
+        self.post_json(&url, &body)
+    }
+
+    /// Mutates the liked status for `video_id`.
+    pub fn set_liked(&self, video_id: &str, liked: bool) -> anyhow::Result<()> {
+        let payload = self.set_liked_payload(video_id, liked)?;
+        if !parse_like_response(&payload) {
+            anyhow::bail!("InnerTube like mutation response rejected");
+        }
+        Ok(())
     }
 
     /// Converts this InnerTube client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
@@ -669,5 +924,181 @@ mod tests {
         assert!(first.albums.is_empty());
         assert!(first.artists.is_empty());
         assert!(first.playlists.is_empty());
+    }
+
+    #[test]
+    fn library_urls_and_body_builders() {
+        assert_eq!(
+            browse_url(),
+            format!(
+                "https://music.youtube.com/youtubei/v1/browse?key={YTM_API_KEY}&prettyPrint=false"
+            )
+        );
+        assert_eq!(
+            like_url(),
+            format!(
+                "https://music.youtube.com/youtubei/v1/like/like?key={YTM_API_KEY}&prettyPrint=false"
+            )
+        );
+        assert_eq!(
+            removelike_url(),
+            format!(
+                "https://music.youtube.com/youtubei/v1/like/removelike?key={YTM_API_KEY}&prettyPrint=false"
+            )
+        );
+
+        let browse = browse_body("LM");
+        assert_eq!(browse["browseId"], "LM");
+        assert_eq!(browse["context"]["client"]["clientName"], "WEB_REMIX");
+
+        let like = like_body("vid-xyz");
+        assert_eq!(like["target"]["videoId"], "vid-xyz");
+        assert_eq!(like["context"]["client"]["clientName"], "WEB_REMIX");
+    }
+
+    #[test]
+    fn innertube_auth_lifecycle() {
+        let mut tube = InnerTube::new();
+        assert!(!tube.is_authenticated());
+
+        tube.set_cookies(Some("   ".into()));
+        assert!(!tube.is_authenticated());
+
+        tube.set_cookies(Some("SID=123; HSID=456".into()));
+        assert!(tube.is_authenticated());
+
+        tube.set_cookies(None);
+        assert!(!tube.is_authenticated());
+
+        let authed = InnerTube::with_cookies(Some("SID=abc".into()));
+        assert!(authed.is_authenticated());
+    }
+
+    #[test]
+    fn unauthenticated_library_methods_bail() {
+        let tube = InnerTube::new();
+        assert!(tube.browse_payload("LM").is_err());
+        assert!(tube.library_playlists().is_err());
+        assert!(tube.library_liked_tracks().is_err());
+        assert!(tube.library_saved_albums().is_err());
+        assert!(tube.set_liked("v1", true).is_err());
+    }
+
+    #[test]
+    fn parse_library_playlists_fixture_and_determinism() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let fixture_path = std::path::Path::new(manifest_dir)
+            .join("tests/fixtures/innertube_library_playlists.json");
+        let raw = std::fs::read_to_string(fixture_path).expect("fixture file readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
+
+        let first = parse_library_playlists(&payload);
+        let second = parse_library_playlists(&payload);
+        assert_eq!(first, second, "parsing must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(
+            first[0],
+            RawPlaylist {
+                browse_id: "VLPL_synthwave_favs".into(),
+                title: "Synthwave Favorites".into(),
+            }
+        );
+        assert_eq!(
+            first[1],
+            RawPlaylist { browse_id: "VLPL_chill_beats".into(), title: "Chill Beats".into() }
+        );
+    }
+
+    #[test]
+    fn parse_library_liked_tracks_fixture_and_determinism() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let fixture_path = std::path::Path::new(manifest_dir)
+            .join("tests/fixtures/innertube_library_liked_tracks.json");
+        let raw = std::fs::read_to_string(fixture_path).expect("fixture file readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
+
+        let first = parse_library_liked_tracks(&payload);
+        let second = parse_library_liked_tracks(&payload);
+        assert_eq!(first, second, "parsing must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(
+            first[0],
+            RawTrack {
+                video_id: "home-res-1".into(),
+                title: "Resonance".into(),
+                artist: "HOME".into(),
+                thumb_url: Some("https://lh3.googleusercontent.com/home-thumb".into()),
+            }
+        );
+        assert_eq!(
+            first[1],
+            RawTrack {
+                video_id: "mem-reboot-2".into(),
+                title: "Memory Reboot".into(),
+                artist: "VOJ, Narvent".into(),
+                thumb_url: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_library_saved_albums_fixture_and_determinism() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let fixture_path = std::path::Path::new(manifest_dir)
+            .join("tests/fixtures/innertube_library_saved_albums.json");
+        let raw = std::fs::read_to_string(fixture_path).expect("fixture file readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
+
+        let first = parse_library_saved_albums(&payload);
+        let second = parse_library_saved_albums(&payload);
+        assert_eq!(first, second, "parsing must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(
+            first[0],
+            RawAlbum {
+                browse_id: "MPREb_odyssey".into(),
+                title: "Odyssey".into(),
+                artist: "HOME".into(),
+            }
+        );
+        assert_eq!(
+            first[1],
+            RawAlbum {
+                browse_id: "MPREb_discovery".into(),
+                title: "Discovery".into(),
+                artist: "Daft Punk".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_like_response_fixture_and_error_cases() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let fixture_path =
+            std::path::Path::new(manifest_dir).join("tests/fixtures/innertube_like_response.json");
+        let raw = std::fs::read_to_string(fixture_path).expect("fixture file readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
+
+        assert!(parse_like_response(&payload));
+        assert!(parse_like_response(&serde_json::json!({})));
+        assert!(!parse_like_response(&serde_json::json!({
+            "error": { "code": 401, "message": "unauthorized" }
+        })));
+        assert!(!parse_like_response(&serde_json::json!("not-an-object")));
+    }
+
+    #[test]
+    fn parse_library_tolerates_empty_and_malformed() {
+        let empty = serde_json::json!({});
+        assert!(parse_library_playlists(&empty).is_empty());
+        assert!(parse_library_liked_tracks(&empty).is_empty());
+        assert!(parse_library_saved_albums(&empty).is_empty());
+
+        let malformed = serde_json::json!({
+            "contents": { "singleColumnBrowseResultsRenderer": null }
+        });
+        assert!(parse_library_playlists(&malformed).is_empty());
+        assert!(parse_library_liked_tracks(&malformed).is_empty());
+        assert!(parse_library_saved_albums(&malformed).is_empty());
     }
 }
