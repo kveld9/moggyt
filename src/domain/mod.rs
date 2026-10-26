@@ -13,4 +13,4 @@ pub use library::{
 };
 pub use queue::{PlaybackQueue, RepeatMode};
 pub use search::{SearchFilter, SearchQuery, Track};
-pub use theme::{Palette, ThemeId};
+pub use theme::{DesignTokens, Palette, ThemeId};
