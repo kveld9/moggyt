@@ -1,0 +1,10 @@
+{
+  "contents": { "singleColumnBrowseResultsRenderer": { "tabs": [{ "tabRenderer": { "content": { "sectionListRenderer": { "contents": [{
+    "gridRenderer": {
+      "items": [
+        { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Saved Album 1" }] }, "subtitle": { "runs": [{ "text": "Album Artist 1" }] }, "navigationEndpoint": { "browseEndpoint": { "browseId": "MPREb_saved_1" } } } },
+        { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Saved Album 2" }] }, "subtitle": { "runs": [{ "text": "Album Artist 2" }] }, "navigationEndpoint": { "browseEndpoint": { "browseId": "MPREb_saved_2" } } } }
+      ]
+    }
+  }] } } }] } }
+}

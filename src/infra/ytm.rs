@@ -205,6 +205,11 @@ impl YtmCatalog {
         Self::default()
     }
 
+    /// Creates an authenticated catalog injecting session cookies.
+    pub fn with_cookies(cookies: &str) -> Self {
+        Self::with_tube(InnerTube::with_cookies(cookies))
+    }
+
     /// Creates a catalog injecting an InnerTube client for testing or custom configuration.
     pub fn with_tube(tube: InnerTube) -> Self {
         Self { tube }
@@ -284,27 +289,25 @@ impl Catalog for YtmCatalog {
         self.tube.home_shelves()
     }
 
-    /// Returns saved or owned playlists. Anonymous interim returns an empty list
-    /// because authenticated library endpoints require a signed-in InnerTube client.
+    /// Returns saved or owned playlists. Returns empty when unauthenticated or on failure.
     fn playlists(&self) -> Vec<Playlist> {
-        Vec::new()
+        self.tube.library_playlists()
     }
 
-    /// Returns liked tracks. Anonymous interim returns an empty list
-    /// because authenticated library endpoints require a signed-in InnerTube client.
+    /// Returns liked tracks. Returns empty when unauthenticated or on failure.
     fn liked_tracks(&self) -> Vec<Track> {
-        Vec::new()
+        self.tube.library_liked_tracks()
     }
 
-    /// Returns saved albums. Anonymous interim returns an empty list
-    /// because authenticated library endpoints require a signed-in InnerTube client.
+    /// Returns saved albums. Returns empty when unauthenticated or on failure.
     fn saved_albums(&self) -> Vec<Album> {
-        Vec::new()
+        self.tube.library_saved_albums()
     }
 
-    /// Sets liked status. Anonymous interim is a no-op because an unauthenticated
-    /// client cannot mutate remote user library state.
-    fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+    /// Sets liked status. No-op when unauthenticated, on blank id, or on failure.
+    fn set_liked(&mut self, track_id: &str, liked: bool) {
+        self.tube.set_liked(track_id, liked);
+    }
 
     /// Returns detail view for `browse_id` and `kind`. Network failures map to None.
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
@@ -489,14 +492,14 @@ mod tests {
     }
 
     #[test]
-    fn ytm_catalog_interim_library_semantics() {
+    fn ytm_catalog_unauthenticated_returns_empty_without_network() {
         let mut catalog = YtmCatalog::new();
 
         assert!(catalog.playlists().is_empty());
         assert!(catalog.saved_albums().is_empty());
         assert!(catalog.liked_tracks().is_empty());
 
-        // Anonymous interim mutation is a documented no-op and does not panic.
+        // Anonymous mutation is a documented no-op and does not issue network calls.
         catalog.set_liked("stub-1", true);
         catalog.set_liked("stub-1", false);
         catalog.set_liked("", true);
@@ -504,6 +507,12 @@ mod tests {
         assert!(catalog.playlists().is_empty());
         assert!(catalog.saved_albums().is_empty());
         assert!(catalog.liked_tracks().is_empty());
+    }
+
+    #[test]
+    fn ytm_catalog_with_cookies_constructor() {
+        let catalog = YtmCatalog::with_cookies("fake_cookie_secret");
+        assert!(format!("{catalog:?}").contains("YtmCatalog"));
     }
 
     #[test]

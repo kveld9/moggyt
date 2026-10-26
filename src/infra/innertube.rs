@@ -9,6 +9,15 @@ use std::time::Duration;
 /// Home feed browse identifier for YouTube Music.
 pub const HOME_BROWSE_ID: &str = "FEmusic_home";
 
+/// Library playlists browse identifier for YouTube Music.
+pub const LIBRARY_PLAYLISTS_BROWSE_ID: &str = "FEmusic_liked_playlists";
+
+/// Library liked songs browse identifier for YouTube Music.
+pub const LIBRARY_LIKED_BROWSE_ID: &str = "FEmusic_liked_videos";
+
+/// Library saved albums browse identifier for YouTube Music.
+pub const LIBRARY_ALBUMS_BROWSE_ID: &str = "FEmusic_liked_albums";
+
 /// Public InnerTube web API key for the WEB_REMIX client context.
 ///
 /// Embedded by every unofficial client; grants no private-data or billable-resource
@@ -81,6 +90,34 @@ pub fn browse_body(browse_id: &str) -> Value {
         },
         "browseId": browse_id,
     })
+}
+
+/// Returns the InnerTube like endpoint URL.
+pub fn like_url(liked: bool) -> String {
+    let action = if liked { "like" } else { "removelike" };
+    format!("https://music.youtube.com/youtubei/v1/like/{action}?key={YTM_API_KEY}&prettyPrint=false")
+}
+
+/// Builds the minimal WEB_REMIX like/removelike payload for `video_id`.
+pub fn like_body(video_id: &str) -> Value {
+    serde_json::json!({
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": YTM_CLIENT_VERSION,
+                "hl": "en",
+                "gl": "US",
+            }
+        },
+        "target": {
+            "videoId": video_id,
+        }
+    })
+}
+
+/// Validates if an InnerTube mutation response succeeded (no error object).
+pub fn parse_mutation_response(value: &Value) -> bool {
+    value.get("error").is_none()
 }
 
 /// Parsed track hit from InnerTube search.
@@ -723,21 +760,108 @@ pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
     Some(Detail::new(kind, &title, &subtitle, tracks))
 }
 
+fn parse_track_count(text: &str) -> usize {
+    text.split_whitespace().find_map(|w| w.parse::<usize>().ok()).unwrap_or(0)
+}
+
+fn find_grid_items<'a>(section: &'a Value) -> Option<&'a [Value]> {
+    const CANDIDATES: &[&str] = &[
+        "/gridRenderer/items",
+        "/musicGridRenderer/items",
+        "/musicShelfRenderer/contents",
+        "/itemSectionRenderer/contents",
+    ];
+    CANDIDATES
+        .iter()
+        .find_map(|path| section.pointer(path).and_then(Value::as_array).map(Vec::as_slice))
+}
+
+fn collect_library_items(value: &Value) -> Vec<&Value> {
+    if let Some(sections) = detail_sections(value) {
+        let items: Vec<&Value> = sections
+            .iter()
+            .filter_map(find_grid_items)
+            .flat_map(|slice| slice.iter())
+            .collect();
+        if !items.is_empty() {
+            return items;
+        }
+    }
+    find_grid_items(value).map_or_else(Vec::new, |slice| slice.iter().collect())
+}
+
+fn parse_library_playlist_item(item: &Value) -> Option<Playlist> {
+    let renderer = item.get("musicTwoRowItemRenderer").unwrap_or(item);
+    let (title, subtitle, browse_id) = parse_two_row(renderer)?;
+    let id = browse_id?;
+    let count = parse_track_count(&subtitle);
+    Some(Playlist::new(&id, &title, count))
+}
+
+/// Parses saved or owned playlists from InnerTube browse response payload.
+pub fn parse_library_playlists(value: &Value) -> Vec<Playlist> {
+    collect_library_items(value).into_iter().filter_map(parse_library_playlist_item).collect()
+}
+
+fn parse_library_album_item(item: &Value) -> Option<Album> {
+    let renderer = item.get("musicTwoRowItemRenderer").unwrap_or(item);
+    let (title, subtitle, browse_id) = parse_two_row(renderer)?;
+    let id = browse_id?;
+    Some(Album::new(&id, &title, &subtitle))
+}
+
+/// Parses saved albums from InnerTube browse response payload.
+pub fn parse_library_albums(value: &Value) -> Vec<Album> {
+    collect_library_items(value).into_iter().filter_map(parse_library_album_item).collect()
+}
+
+/// Parses liked tracks from InnerTube browse response payload.
+pub fn parse_library_liked_tracks(value: &Value) -> Vec<Track> {
+    collect_detail_tracks(value)
+}
+
 /// Blocking HTTP client for the InnerTube API.
-#[derive(Debug)]
 pub struct InnerTube {
     client: reqwest::blocking::Client,
     api_key: String,
+    cookies: Option<String>,
+}
+
+impl std::fmt::Debug for InnerTube {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InnerTube")
+            .field("api_key", &self.api_key)
+            .field("has_cookies", &self.cookies.is_some())
+            .finish()
+    }
 }
 
 impl InnerTube {
-    /// Creates a new InnerTube client with a 10-second request timeout.
+    /// Creates a new InnerTube client with a 10-second request timeout (anonymous).
     pub fn new() -> Self {
+        Self::with_optional_cookies(None)
+    }
+
+    /// Creates an authenticated InnerTube client with stored session cookies.
+    ///
+    /// Empty or whitespace-only cookie strings are treated as unauthenticated (`None`).
+    pub fn with_cookies(cookies: &str) -> Self {
+        let trimmed = cookies.trim();
+        let opt = if trimmed.is_empty() { None } else { Some(trimmed.to_owned()) };
+        Self::with_optional_cookies(opt)
+    }
+
+    fn with_optional_cookies(cookies: Option<String>) -> Self {
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
-        Self { client, api_key: YTM_API_KEY.to_owned() }
+        Self { client, api_key: YTM_API_KEY.to_owned(), cookies }
+    }
+
+    /// Returns true if this client has credentials configured for authenticated requests.
+    pub fn is_authenticated(&self) -> bool {
+        self.cookies.is_some()
     }
 
     /// Executes search request and returns the unparsed JSON response payload.
@@ -818,6 +942,80 @@ impl InnerTube {
         }
         let payload = self.browse_payload(trimmed).ok()?;
         parse_detail_all(&payload, kind)
+    }
+
+    /// Executes authenticated browse request for `browse_id`.
+    pub fn library_browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
+        let Some(cookie) = &self.cookies else {
+            anyhow::bail!("Unauthenticated InnerTube client cannot request library endpoint");
+        };
+        let url = browse_url();
+        let body = browse_body(browse_id);
+        let response = self.client.post(&url).header("Cookie", cookie).json(&body).send()?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("InnerTube library browse request failed with status: {status}");
+        }
+        let payload: Value = response.json()?;
+        Ok(payload)
+    }
+
+    /// Queries the browse endpoint for user's library playlists.
+    /// Returns an empty vector when unauthenticated or on network/parse failure.
+    pub fn library_playlists(&self) -> Vec<Playlist> {
+        if !self.is_authenticated() {
+            return Vec::new();
+        }
+        self.library_browse_payload(LIBRARY_PLAYLISTS_BROWSE_ID)
+            .map_or_else(|_| Vec::new(), |p| parse_library_playlists(&p))
+    }
+
+    /// Queries the browse endpoint for user's liked tracks.
+    /// Returns an empty vector when unauthenticated or on network/parse failure.
+    pub fn library_liked_tracks(&self) -> Vec<Track> {
+        if !self.is_authenticated() {
+            return Vec::new();
+        }
+        self.library_browse_payload(LIBRARY_LIKED_BROWSE_ID)
+            .map_or_else(|_| Vec::new(), |p| parse_library_liked_tracks(&p))
+    }
+
+    /// Queries the browse endpoint for user's saved albums.
+    /// Returns an empty vector when unauthenticated or on network/parse failure.
+    pub fn library_saved_albums(&self) -> Vec<Album> {
+        if !self.is_authenticated() {
+            return Vec::new();
+        }
+        self.library_browse_payload(LIBRARY_ALBUMS_BROWSE_ID)
+            .map_or_else(|_| Vec::new(), |p| parse_library_albums(&p))
+    }
+
+    /// Executes authenticated like/removelike mutation for `video_id`.
+    pub fn set_liked_payload(&self, video_id: &str, liked: bool) -> anyhow::Result<Value> {
+        let Some(cookie) = &self.cookies else {
+            anyhow::bail!("Unauthenticated InnerTube client cannot execute library mutations");
+        };
+        let url = like_url(liked);
+        let body = like_body(video_id);
+        let response = self.client.post(&url).header("Cookie", cookie).json(&body).send()?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("InnerTube like mutation failed with status: {status}");
+        }
+        let payload: Value = response.json()?;
+        if !parse_mutation_response(&payload) {
+            anyhow::bail!("InnerTube like mutation response reported an error");
+        }
+        Ok(payload)
+    }
+
+    /// Sets liked status on `video_id`. No-op when unauthenticated, blank id, or on network failure.
+    pub fn set_liked(&self, video_id: &str, liked: bool) {
+        let trimmed = video_id.trim();
+        if trimmed.is_empty() || !self.is_authenticated() {
+            return;
+        }
+        let _ = self.set_liked_payload(trimmed, liked);
     }
 
     /// Converts this InnerTube client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
@@ -1272,5 +1470,92 @@ mod tests {
         let tube = InnerTube::new();
         assert_eq!(tube.detail("", DetailKind::Album), None);
         assert_eq!(tube.detail("   ", DetailKind::Artist), None);
+    }
+
+    #[test]
+    fn parse_library_playlists_golden_fixture_and_determinism() {
+        let raw = include_str!("../../tests/fixtures/innertube_library_playlists.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let first = parse_library_playlists(&payload);
+        let second = parse_library_playlists(&payload);
+        assert_eq!(first, second, "parsing must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0], Playlist::new("VL_fav_mix", "Favorites Mix", 25));
+        assert_eq!(first[1], Playlist::new("VL_workout", "Workout Beats", 10));
+    }
+
+    #[test]
+    fn parse_library_playlists_tolerates_empty_and_malformed() {
+        assert!(parse_library_playlists(&serde_json::json!({})).is_empty());
+        assert!(parse_library_playlists(&serde_json::json!({"contents": null})).is_empty());
+    }
+
+    #[test]
+    fn parse_library_liked_tracks_golden_fixture_and_determinism() {
+        let raw = include_str!("../../tests/fixtures/innertube_library_liked.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let first = parse_library_liked_tracks(&payload);
+        let second = parse_library_liked_tracks(&payload);
+        assert_eq!(first, second, "parsing must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(
+            first[0],
+            Track::new("lib-t1", "Liked Song 1", "Artist One")
+                .with_duration(200)
+                .with_artwork("https://img.local/t1.jpg")
+        );
+        assert_eq!(first[1], Track::new("lib-t2", "Liked Song 2", "Artist Two"));
+    }
+
+    #[test]
+    fn parse_library_liked_tracks_tolerates_empty_and_malformed() {
+        assert!(parse_library_liked_tracks(&serde_json::json!({})).is_empty());
+        assert!(parse_library_liked_tracks(&serde_json::json!({"contents": null})).is_empty());
+    }
+
+    #[test]
+    fn parse_library_albums_golden_fixture_and_determinism() {
+        let raw = include_str!("../../tests/fixtures/innertube_library_albums.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let first = parse_library_albums(&payload);
+        let second = parse_library_albums(&payload);
+        assert_eq!(first, second, "parsing must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0], Album::new("MPREb_saved_1", "Saved Album 1", "Album Artist 1"));
+        assert_eq!(first[1], Album::new("MPREb_saved_2", "Saved Album 2", "Album Artist 2"));
+    }
+
+    #[test]
+    fn parse_library_albums_tolerates_empty_and_malformed() {
+        assert!(parse_library_albums(&serde_json::json!({})).is_empty());
+        assert!(parse_library_albums(&serde_json::json!({"contents": null})).is_empty());
+    }
+
+    #[test]
+    fn like_endpoints_and_mutation_parsing() {
+        assert!(like_url(true).contains("/like/like?key="));
+        assert!(like_url(false).contains("/like/removelike?key="));
+        let body = like_body("lib-t1");
+        assert_eq!(body["target"]["videoId"], "lib-t1");
+        assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+        assert!(parse_mutation_response(&serde_json::json!({})));
+        assert!(!parse_mutation_response(&serde_json::json!({"error": {"code": 401}})));
+    }
+
+    #[test]
+    fn innertube_cookies_masking_and_unauthenticated_guard() {
+        assert!(!InnerTube::new().is_authenticated());
+        assert!(!InnerTube::with_cookies("   ").is_authenticated());
+        let tube = InnerTube::with_cookies("secret-cookie-val");
+        assert!(tube.is_authenticated());
+        let debug_str = format!("{tube:?}");
+        assert!(!debug_str.contains("secret-cookie-val"));
+        assert!(debug_str.contains("has_cookies: true"));
+
+        let anon = InnerTube::new();
+        assert!(anon.library_playlists().is_empty());
+        assert!(anon.library_liked_tracks().is_empty());
+        assert!(anon.library_saved_albums().is_empty());
+        anon.set_liked("lib-t1", true);
     }
 }
