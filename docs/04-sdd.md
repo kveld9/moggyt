@@ -182,7 +182,7 @@ Crate layout stays `src/{main.rs, lib.rs, app.rs, domain/, infra/}`. `main.rs` b
 New adapters are added behind existing ports; `domain` never depends on `infra` or `app`.
 
 The modular api/stream/lyrics/playback/cache/stats subsystem split maps directly to moggyt ports and
-domain structures: `innertube` maps to `Catalog`, `stream` maps to `StreamResolver`, `lyrics` maps to
+domain structures: `catalog_client` maps to `Catalog`, `stream` maps to `StreamResolver`, `lyrics` maps to
 `LyricsSource`, playback DSP filters map to `AudioBackend`, `download/cache` maps to `CoverCache` and
 a future `DownloadCache` port (V2), and `stats` maps to an on-device `PlayLog` domain table (v1.1).
 The `DownloadCache` and plugin-source extension ports remain strictly deferred to V2 to preserve v1

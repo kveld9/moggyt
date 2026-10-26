@@ -1,7 +1,7 @@
 //! Catalog port and deterministic stub (no network).
 
-use super::innertube::{
-    InnerTube, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
+use super::catalog_client::{
+    CatalogClient, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
 };
 use crate::domain::{
     Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf,
@@ -210,11 +210,11 @@ impl Catalog for CatalogStub {
 
 /// Catalog API-backed YouTube Music catalog implementing the [`Catalog`] port.
 #[derive(Debug, Default)]
-pub struct YtmCatalog {
-    tube: InnerTube,
+pub struct LiveCatalog {
+    client: CatalogClient,
 }
 
-impl YtmCatalog {
+impl LiveCatalog {
     /// Creates a new catalog backed by default catalog API client.
     pub fn new() -> Self {
         Self::default()
@@ -222,30 +222,30 @@ impl YtmCatalog {
 
     /// Creates an authenticated catalog injecting session cookies.
     pub fn with_cookies(cookies: &str) -> Self {
-        Self::with_tube(InnerTube::with_cookies(cookies))
+        Self::with_client(CatalogClient::with_cookies(cookies))
     }
 
     /// Creates a catalog injecting a catalog API client for testing or custom configuration.
-    pub fn with_tube(tube: InnerTube) -> Self {
-        Self { tube }
+    pub fn with_client(client: CatalogClient) -> Self {
+        Self { client }
     }
 
     /// Updates session cookies by swapping the inner catalog API client.
     pub fn set_session_cookies(&mut self, cookies: Option<&str>) {
         let clean = cookies.filter(|c| !c.trim().is_empty());
-        self.tube = match clean {
-            Some(c) => InnerTube::with_cookies(c),
-            None => InnerTube::new(),
+        self.client = match clean {
+            Some(c) => CatalogClient::with_cookies(c),
+            None => CatalogClient::new(),
         };
     }
 
     /// Returns true if the catalog client has authenticated session credentials configured.
     pub fn is_authenticated(&self) -> bool {
-        self.tube.is_authenticated()
+        self.client.is_authenticated()
     }
 
     fn fetch_hits(&self, query_text: &str) -> SearchHits {
-        self.tube
+        self.client
             .search_payload(query_text)
             .map_or_else(|_| SearchHits::empty(), |p| parse_search_all(&p))
     }
@@ -293,10 +293,10 @@ fn map_playlists(playlists: Vec<RawPlaylist>) -> impl Iterator<Item = SearchResu
     playlists.into_iter().map(|p| SearchResult::Playlist(Playlist::new(&p.browse_id, &p.title, 0)))
 }
 
-impl Catalog for YtmCatalog {
+impl Catalog for LiveCatalog {
     /// Returns catalog hits for `query`. Network failures map to an empty vector.
     fn search(&self, query: &str) -> Vec<Track> {
-        self.tube.search_tracks(query).unwrap_or_default().into_iter().map(raw_to_track).collect()
+        self.client.search_tracks(query).unwrap_or_default().into_iter().map(raw_to_track).collect()
     }
 
     /// Returns catalog hits matching the query text and filter. Network failures map to an empty vector.
@@ -310,32 +310,32 @@ impl Catalog for YtmCatalog {
         if trimmed.is_empty() {
             return Vec::new();
         }
-        self.tube.radio_tracks(trimmed).into_iter().map(raw_to_track).collect()
+        self.client.radio_tracks(trimmed).into_iter().map(raw_to_track).collect()
     }
 
     /// Returns home shelves. Network failures map to an empty vector.
     fn home_shelves(&self) -> Vec<Shelf> {
-        self.tube.home_shelves()
+        self.client.home_shelves()
     }
 
     /// Returns saved or owned playlists. Returns empty when unauthenticated or on failure.
     fn playlists(&self) -> Vec<Playlist> {
-        self.tube.library_playlists()
+        self.client.library_playlists()
     }
 
     /// Returns liked tracks. Returns empty when unauthenticated or on failure.
     fn liked_tracks(&self) -> Vec<Track> {
-        self.tube.library_liked_tracks()
+        self.client.library_liked_tracks()
     }
 
     /// Returns saved albums. Returns empty when unauthenticated or on failure.
     fn saved_albums(&self) -> Vec<Album> {
-        self.tube.library_saved_albums()
+        self.client.library_saved_albums()
     }
 
     /// Sets liked status. No-op when unauthenticated, on blank id, or on failure.
     fn set_liked(&mut self, track_id: &str, liked: bool) {
-        self.tube.set_liked(track_id, liked);
+        self.client.set_liked(track_id, liked);
     }
 
     /// Returns detail view for `browse_id` and `kind`. Network failures map to None.
@@ -344,7 +344,7 @@ impl Catalog for YtmCatalog {
         if trimmed.is_empty() {
             return None;
         }
-        self.tube.detail(trimmed, kind)
+        self.client.detail(trimmed, kind)
     }
 
     fn set_session_cookies(&mut self, cookies: Option<&str>) {
@@ -402,8 +402,10 @@ mod tests {
     }
 
     #[test]
-    fn ytm_catalog_maps_hits_and_honors_filters() {
-        use super::super::innertube::{RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits};
+    fn live_catalog_maps_hits_and_honors_filters() {
+        use super::super::catalog_client::{
+            RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits,
+        };
 
         let hits = SearchHits {
             tracks: vec![
@@ -431,7 +433,7 @@ mod tests {
             playlists: vec![RawPlaylist { browse_id: "p1".into(), title: "PlayTitle".into() }],
         };
 
-        let all = YtmCatalog::map_hits(hits.clone(), SearchFilter::All);
+        let all = LiveCatalog::map_hits(hits.clone(), SearchFilter::All);
         assert_eq!(all.len(), 5);
         assert_eq!(
             all[0],
@@ -450,18 +452,20 @@ mod tests {
             (SearchFilter::Artists, 1),
             (SearchFilter::Playlists, 1),
         ] {
-            let mapped = YtmCatalog::map_hits(hits.clone(), filter);
+            let mapped = LiveCatalog::map_hits(hits.clone(), filter);
             assert_eq!(mapped.len(), expected);
             assert!(mapped.iter().all(|item| item.kind() == filter));
         }
     }
 
     #[test]
-    fn ytm_catalog_constructors_and_tube_injection() {
-        assert!(format!("{:?}", YtmCatalog::new()).contains("YtmCatalog"));
-        assert!(format!("{:?}", YtmCatalog::default()).contains("YtmCatalog"));
-        assert!(format!("{:?}", InnerTube::new().into_catalog()).contains("YtmCatalog"));
-        assert!(format!("{:?}", YtmCatalog::with_tube(InnerTube::new())).contains("YtmCatalog"));
+    fn live_catalog_constructors_and_client_injection() {
+        assert!(format!("{:?}", LiveCatalog::new()).contains("LiveCatalog"));
+        assert!(format!("{:?}", LiveCatalog::default()).contains("LiveCatalog"));
+        assert!(format!("{:?}", CatalogClient::new().into_catalog()).contains("LiveCatalog"));
+        assert!(
+            format!("{:?}", LiveCatalog::with_client(CatalogClient::new())).contains("LiveCatalog")
+        );
     }
 
     #[test]
@@ -525,8 +529,8 @@ mod tests {
     }
 
     #[test]
-    fn ytm_catalog_unauthenticated_returns_empty_without_network() {
-        let mut catalog = YtmCatalog::new();
+    fn live_catalog_unauthenticated_returns_empty_without_network() {
+        let mut catalog = LiveCatalog::new();
 
         assert!(catalog.playlists().is_empty());
         assert!(catalog.saved_albums().is_empty());
@@ -543,9 +547,9 @@ mod tests {
     }
 
     #[test]
-    fn ytm_catalog_with_cookies_constructor() {
-        let catalog = YtmCatalog::with_cookies("fake_cookie_secret");
-        assert!(format!("{catalog:?}").contains("YtmCatalog"));
+    fn live_catalog_with_cookies_constructor() {
+        let catalog = LiveCatalog::with_cookies("fake_cookie_secret");
+        assert!(format!("{catalog:?}").contains("LiveCatalog"));
     }
 
     #[test]
@@ -567,7 +571,7 @@ mod tests {
     }
 
     #[test]
-    fn ytm_catalog_maps_radio_tracks() {
+    fn live_catalog_maps_radio_tracks() {
         let raw = RawTrack {
             video_id: "radio-vid-1".into(),
             title: "Radio Title".into(),
@@ -582,7 +586,7 @@ mod tests {
         assert_eq!(track.duration_secs, Some(225));
         assert_eq!(track.artwork.as_deref(), Some("https://img.local/radio.jpg"));
 
-        let catalog = YtmCatalog::new();
+        let catalog = LiveCatalog::new();
         assert!(catalog.radio("").is_empty());
         assert!(catalog.radio("   ").is_empty());
     }
@@ -629,8 +633,8 @@ mod tests {
     }
 
     #[test]
-    fn ytm_catalog_detail_blank_returns_none() {
-        let catalog = YtmCatalog::new();
+    fn live_catalog_detail_blank_returns_none() {
+        let catalog = LiveCatalog::new();
         assert_eq!(catalog.detail("", DetailKind::Album), None);
         assert_eq!(catalog.detail("   ", DetailKind::Artist), None);
         assert_eq!(catalog.detail("   ", DetailKind::Playlist), None);
@@ -649,8 +653,8 @@ mod tests {
     }
 
     #[test]
-    fn ytm_catalog_set_session_cookies_swaps_authentication_state() {
-        let mut catalog = YtmCatalog::new();
+    fn live_catalog_set_session_cookies_swaps_authentication_state() {
+        let mut catalog = LiveCatalog::new();
         assert!(!catalog.is_authenticated());
 
         catalog.set_session_cookies(Some("SID=auth_cookie"));

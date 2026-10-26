@@ -36,7 +36,7 @@ src/
     ├── audio.rs       # AudioBackend trait definition
     ├── audio_rodio.rs # rodio playback adapter with LiveAudio fallback
     ├── cover*.rs      # CoverCache port and memory/disk caching adapters
-    ├── innertube.rs   # Catalog API search request builder and parser
+    ├── catalog_client.rs # Catalog API search request builder and parser
     ├── instance.rs    # SingleInstanceGuard lock
     ├── lyrics*.rs     # LyricsSource port and LRCLIB synced lyrics client
     ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence
