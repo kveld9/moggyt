@@ -11,8 +11,8 @@ use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
     DesktopPresence, DiskCoverCache, DiskSettingsStore, KeyringSessionStore, LastFmClient,
-    LiveAudio, LrclibClient, RodioBackend, SingleInstanceGuard, TrayHandle, YtmCatalog,
-    default_config_dir, ensure_sidecar,
+    LiveAudio, LrclibClient, RodioBackend, SessionStore, SingleInstanceGuard, TrayHandle,
+    YtmCatalog, default_config_dir, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -33,6 +33,9 @@ fn main() -> anyhow::Result<()> {
     let lyrics = LrclibClient::new();
     let covers = init_cover_cache(&data_dir);
     let mut state = AppState::new(catalog, audio, session, lyrics, covers);
+    if let Some(cookies) = state.session.load() {
+        state.catalog.set_session_cookies(Some(&cookies));
+    }
     match TrayHandle::try_new() {
         Some(h) => state.set_tray(h),
         None => tracing::warn!("tray unavailable; running without system tray icon"),
