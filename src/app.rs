@@ -3,7 +3,10 @@
 //! The shell holds no business rules; every user intent is forwarded to
 //! [`crate::domain`] and every side effect goes through injected adapters.
 
+pub mod components;
 pub mod theme;
+
+use components::{render_player_bar, render_top_bar};
 
 use eframe::egui;
 
@@ -810,39 +813,6 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     }
 }
 
-fn render_top_bar<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
-    ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S, L, K>,
-) {
-    egui::Panel::top("top_bar").show(ui, |ui| {
-        ui.horizontal(|ui| {
-            ui.heading("moggyt");
-            ui.separator();
-            ui.selectable_value(&mut state.page, Page::Search, "Search");
-            ui.selectable_value(&mut state.page, Page::Queue, "Queue");
-            ui.selectable_value(&mut state.page, Page::NowPlaying, "Now playing");
-            ui.selectable_value(&mut state.page, Page::Library, "Library");
-            ui.selectable_value(&mut state.page, Page::Detail, "Detail");
-            render_top_bar_update_badge(ui, &state.update_status);
-        });
-    });
-}
-
-fn render_top_bar_update_badge(ui: &mut egui::Ui, status: &UpdateStatus) {
-    let UpdateStatus::Available { version, .. } = status else {
-        return;
-    };
-    // Keep top bar lean with just a colored notice; interactive download link lives in Library.
-    let display_tag = if version.starts_with(['v', 'V']) {
-        format!("Update {version}")
-    } else {
-        format!("Update v{version}")
-    };
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        ui.colored_label(egui::Color32::from_rgb(255, 180, 50), display_tag);
-    });
-}
-
 fn render_body<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
@@ -1304,119 +1274,6 @@ fn render_lyrics_panel<
             ui.label(format!("{} {text}", format_lyric_timestamp(ms)));
         }
     });
-}
-
-fn render_player_bar<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S, L, K>,
-) {
-    egui::Panel::bottom("player_bar").show(ui, |ui| {
-        ui.horizontal(|ui| {
-            render_track_info(ui, state);
-            ui.separator();
-            render_playback_controls(ui, state);
-            ui.separator();
-            render_seek_controls(ui, state);
-            ui.separator();
-            render_volume_controls(ui, state);
-            ui.separator();
-            render_position_info(ui, state);
-        });
-    });
-}
-
-fn render_track_info<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    ui: &mut egui::Ui,
-    state: &AppState<C, A, S, L, K>,
-) {
-    let title = state.queue.current().map_or("Queue empty".to_owned(), |t| t.display());
-    ui.label(title);
-}
-
-fn render_playback_controls<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S, L, K>,
-) {
-    if ui.button("Previous").clicked() {
-        state.prev_track();
-    }
-    let toggle_label = if state.audio.is_playing() { "Pause" } else { "Play" };
-    if ui.button(toggle_label).clicked() {
-        state.toggle_play();
-    }
-    if ui.button("Next").clicked() {
-        state.next_track();
-    }
-}
-
-fn render_seek_controls<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S, L, K>,
-) {
-    if ui.button("-10s").clicked() {
-        state.seek_by(-10);
-    }
-    if ui.button("+10s").clicked() {
-        state.seek_by(10);
-    }
-}
-
-fn render_volume_controls<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S, L, K>,
-) {
-    let mut vol = state.audio.volume();
-    if ui.add(egui::Slider::new(&mut vol, 0..=100).text("Vol")).changed() {
-        state.set_volume(vol);
-    }
-}
-
-fn render_position_info<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    ui: &mut egui::Ui,
-    state: &AppState<C, A, S, L, K>,
-) {
-    let pos = state.audio.position_secs();
-    let text = match state.queue.current().and_then(|t| t.duration_secs) {
-        Some(dur) => format!("{pos}s / {dur}s"),
-        None => format!("{pos}s"),
-    };
-    ui.label(text);
 }
 
 #[cfg(test)]
