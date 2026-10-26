@@ -6,6 +6,7 @@
 mod library;
 mod queue;
 mod search;
+mod sleep_timer;
 mod theme;
 
 pub use library::{
@@ -13,4 +14,5 @@ pub use library::{
 };
 pub use queue::{PlaybackQueue, RepeatMode};
 pub use search::{SearchFilter, SearchQuery, Track};
+pub use sleep_timer::{SleepTimer, TimerPreset};
 pub use theme::{DesignTokens, Palette, ThemeId};
