@@ -15,11 +15,12 @@ use crate::domain::{
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, AudioQuality, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence,
-    DiscordPresence, GithubUpdater, LyricLine, LyricsSource, MediaKeyAction, MemorySettingsStore,
-    Presence, Scrobbler, SessionStore, Settings, SettingsStore, StubScrobbler, TrayAction,
-    TrayHandle, Updater, decode_cover, fetch_artwork, is_newer, sanitize_cookie_input,
-    should_scrobble,
+    AudioBackend, AudioQuality, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache,
+    CredentialStore, DesktopPresence, DiscordPresence, GithubUpdater, LastFmClient,
+    LastFmCredentials, LyricLine, LyricsSource, MediaKeyAction, MemoryCredentialStore,
+    MemorySettingsStore, Presence, Scrobbler, SessionStore, Settings, SettingsStore, StubScrobbler,
+    TrayAction, TrayHandle, Updater, client_from_credentials, decode_cover, fetch_artwork,
+    is_newer, sanitize_cookie_input, should_scrobble,
 };
 
 /// Navigation pages of the application shell.
@@ -117,6 +118,18 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub text_focused: bool,
     /// Whether global keyboard shortcuts are enabled.
     pub shortcuts_enabled: bool,
+    /// Port for persisting and retrieving Last.fm credentials.
+    pub credentials: Box<dyn CredentialStore>,
+    /// Whether Last.fm live scrobbling is enabled.
+    pub lastfm_enabled: bool,
+    /// Whether high-resolution cover artwork decoding is enabled.
+    pub hi_res_covers: bool,
+    /// Last.fm API key input buffer (UI state only).
+    pub lastfm_api_key_text: String,
+    /// Last.fm API secret input buffer (UI state only).
+    pub lastfm_secret_text: String,
+    /// Last.fm session key input buffer (UI state only).
+    pub lastfm_session_key_text: String,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -152,6 +165,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             update_status: UpdateStatus::Unknown,
             updater: GithubUpdater::new(),
             scrobbler: Box::new(StubScrobbler::new()),
+            credentials: Box::new(MemoryCredentialStore::new()),
             started_at: None,
             theme: ThemeId::White,
             locale: Locale::English,
@@ -163,12 +177,23 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             detail_return: Page::Search,
             text_focused: false,
             shortcuts_enabled: true,
+            lastfm_enabled: false,
+            hi_res_covers: false,
+            lastfm_api_key_text: String::new(),
+            lastfm_secret_text: String::new(),
+            lastfm_session_key_text: String::new(),
         }
     }
 
     /// Injects an alternative scrobbler implementation.
     pub fn set_scrobbler(&mut self, scrobbler: Box<dyn Scrobbler>) {
         self.scrobbler = scrobbler;
+    }
+
+    /// Injects an alternative Last.fm credential store implementation.
+    pub fn set_credential_store(&mut self, store: Box<dyn CredentialStore>) {
+        self.credentials = store;
+        self.sync_lastfm_scrobbler();
     }
 
     /// Injects an alternative settings store implementation and synchronizes state.
@@ -178,9 +203,94 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.locale = loaded.locale;
         self.quality = loaded.quality;
         self.shortcuts_enabled = loaded.keyboard_shortcuts;
+        self.lastfm_enabled = loaded.lastfm_enabled;
+        self.hi_res_covers = loaded.hi_res_covers;
         self.audio.set_volume(loaded.volume);
         self.audio.set_quality(loaded.quality);
         self.settings_store = store;
+        self.sync_lastfm_scrobbler();
+    }
+
+    /// Sets whether Last.fm live scrobbling is enabled and persists the preference.
+    ///
+    /// Disabling scrobbling switches to a dormant client immediately to prevent
+    /// outgoing network requests, but preserves stored credentials in the vault
+    /// unless explicitly cleared.
+    pub fn set_lastfm_enabled(&mut self, enabled: bool) {
+        self.lastfm_enabled = enabled;
+        self.persist_settings();
+        self.sync_lastfm_scrobbler();
+    }
+
+    fn sync_lastfm_scrobbler(&mut self) {
+        if !self.lastfm_enabled {
+            self.scrobbler = Box::new(LastFmClient::new("", ""));
+            return;
+        }
+        let Some(creds) = self.credentials.load_lastfm() else {
+            self.scrobbler = Box::new(LastFmClient::new("", ""));
+            return;
+        };
+        if !creds.is_complete() {
+            self.scrobbler = Box::new(LastFmClient::new("", ""));
+            return;
+        }
+        self.scrobbler = Box::new(client_from_credentials(&creds));
+    }
+
+    /// Saves Last.fm credentials to the vault and synchronizes scrobbler state.
+    pub fn save_lastfm_credentials(&mut self, creds: &LastFmCredentials) {
+        self.credentials.save_lastfm(creds);
+        self.sync_lastfm_scrobbler();
+    }
+
+    /// Clears persisted Last.fm credentials from the vault, input buffers, and resets scrobbler to dormant.
+    pub fn clear_lastfm_credentials(&mut self) {
+        self.credentials.clear_lastfm();
+        self.lastfm_api_key_text.clear();
+        self.lastfm_secret_text.clear();
+        self.lastfm_session_key_text.clear();
+        self.sync_lastfm_scrobbler();
+    }
+
+    /// Saves credentials from UI input buffers and clears buffers on completion.
+    pub fn save_lastfm_credentials_from_input(&mut self) -> bool {
+        let creds = LastFmCredentials::new(
+            &self.lastfm_api_key_text,
+            &self.lastfm_secret_text,
+            &self.lastfm_session_key_text,
+        );
+        let complete = creds.is_complete();
+        self.save_lastfm_credentials(&creds);
+        self.lastfm_api_key_text.clear();
+        self.lastfm_secret_text.clear();
+        self.lastfm_session_key_text.clear();
+        complete
+    }
+
+    /// Returns true if the active scrobbler has a live authenticated session.
+    pub fn lastfm_is_live(&self) -> bool {
+        self.scrobbler.as_any().downcast_ref::<LastFmClient>().is_some_and(LastFmClient::is_live)
+    }
+
+    /// Sets whether high-resolution cover artwork is enabled and persists the preference.
+    pub fn set_hi_res_covers(&mut self, enabled: bool) {
+        if self.hi_res_covers == enabled {
+            return;
+        }
+        self.hi_res_covers = enabled;
+        self.clear_cover_texture();
+        self.persist_settings();
+    }
+
+    /// Resolves the maximum pixel bound for decoded cover art based on current settings.
+    pub fn cover_max_px(&self) -> u32 {
+        if self.hi_res_covers { COVER_HIRES_MAX_PX } else { COVER_MAX_PX }
+    }
+
+    /// Decodes raw cover art bytes into a color image bounded by the active setting.
+    pub fn decode_cover_image(&self, bytes: &[u8]) -> Option<egui::ColorImage> {
+        decode_cover(bytes, self.cover_max_px())
     }
 
     /// Sets the active UI theme and persists the change.
@@ -220,6 +330,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             volume: self.audio.volume(),
             quality: self.quality,
             keyboard_shortcuts: self.shortcuts_enabled,
+            lastfm_enabled: self.lastfm_enabled,
+            hi_res_covers: self.hi_res_covers,
         };
         if let Err(err) = self.settings_store.save(&settings) {
             tracing::warn!("failed to persist settings: {err:#}");
@@ -764,13 +876,13 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     }
 
     fn store_cover_texture(&mut self, ctx: &egui::Context, url: String, bytes: &[u8]) {
-        if let Some(img) = decode_cover(bytes, COVER_MAX_PX) {
-            let texture = ctx.load_texture("moggyt-cover", img, egui::TextureOptions::LINEAR);
-            self.cover_key = Some(url.clone());
-            self.cover_texture = Some((url, texture));
-        } else {
+        let Some(img) = self.decode_cover_image(bytes) else {
             self.clear_cover_texture();
-        }
+            return;
+        };
+        let texture = ctx.load_texture("moggyt-cover", img, egui::TextureOptions::LINEAR);
+        self.cover_key = Some(url.clone());
+        self.cover_texture = Some((url, texture));
     }
 
     /// Fetches, caches, decodes, and loads cover art for the currently playing track.
@@ -863,6 +975,8 @@ fn render_library<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource,
 ) {
     render_library_preferences(ui, state);
     ui.separator();
+    render_library_lastfm(ui, state);
+    ui.separator();
     render_library_sign_in(ui, state);
     ui.separator();
     render_library_updates(ui, state);
@@ -901,6 +1015,68 @@ fn render_library_preferences<
     if ui.checkbox(&mut shortcuts, "Keyboard shortcuts").changed() {
         state.set_shortcuts_enabled(shortcuts);
     }
+    let mut hi_res = state.hi_res_covers;
+    if ui.checkbox(&mut hi_res, "High-resolution covers").changed() {
+        state.set_hi_res_covers(hi_res);
+    }
+}
+
+fn render_library_lastfm<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.heading("Last.fm");
+    let mut enabled = state.lastfm_enabled;
+    if ui.checkbox(&mut enabled, "Enable scrobbling").changed() {
+        state.set_lastfm_enabled(enabled);
+    }
+    let status = if state.lastfm_is_live() { "Scrobbler: Live" } else { "Scrobbler: Dormant" };
+    ui.label(status);
+    render_lastfm_inputs(ui, state);
+}
+
+fn render_lastfm_inputs<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    render_lastfm_field(ui, &mut state.lastfm_api_key_text, &mut state.text_focused, "API Key");
+    render_lastfm_field(ui, &mut state.lastfm_secret_text, &mut state.text_focused, "Secret");
+    render_lastfm_field(
+        ui,
+        &mut state.lastfm_session_key_text,
+        &mut state.text_focused,
+        "Session Key",
+    );
+    ui.horizontal(|ui| {
+        if ui.button("Save").clicked() {
+            state.save_lastfm_credentials_from_input();
+        }
+        if ui.button("Clear").clicked() {
+            state.clear_lastfm_credentials();
+        }
+    });
+}
+
+fn render_lastfm_field(ui: &mut egui::Ui, text: &mut String, focused: &mut bool, label: &str) {
+    ui.horizontal(|ui| {
+        ui.label(format!("{label}:"));
+        let response = ui.add(egui::TextEdit::singleline(text).password(true));
+        if response.has_focus() {
+            *focused = true;
+        }
+    });
 }
 
 fn render_theme_button<
@@ -2030,6 +2206,8 @@ mod tests {
             volume: 64,
             quality: AudioQuality::Compact,
             keyboard_shortcuts: false,
+            lastfm_enabled: false,
+            hi_res_covers: false,
         };
         let store = MemorySettingsStore::default();
         store.save(&custom_settings).unwrap();
@@ -2411,10 +2589,135 @@ mod tests {
                 volume: 80,
                 quality: AudioQuality::Standard,
                 keyboard_shortcuts: false,
+                lastfm_enabled: false,
+                hi_res_covers: false,
             })
             .unwrap();
 
         state.set_settings_store(Box::new(store));
         assert!(!state.shortcuts_enabled);
+    }
+
+    #[test]
+    fn test_enabling_lastfm_with_complete_creds_yields_live_client() {
+        let mut state = wired();
+        let creds = LastFmCredentials::new("api-key", "api-secret", "session-key");
+        state.save_lastfm_credentials(&creds);
+        assert!(!state.lastfm_is_live());
+
+        state.set_lastfm_enabled(true);
+        assert!(state.lastfm_enabled);
+        assert!(state.lastfm_is_live());
+        assert!(state.settings_store.load().lastfm_enabled);
+    }
+
+    #[test]
+    fn test_disabling_lastfm_yields_dormant_client_and_preserves_stored_creds() {
+        let mut state = wired();
+        let creds = LastFmCredentials::new("api-key", "api-secret", "session-key");
+        state.save_lastfm_credentials(&creds);
+        state.set_lastfm_enabled(true);
+        assert!(state.lastfm_is_live());
+
+        state.set_lastfm_enabled(false);
+        assert!(!state.lastfm_enabled);
+        assert!(!state.lastfm_is_live());
+        assert!(!state.settings_store.load().lastfm_enabled);
+        // Disabling scrobbler clears the session client but keeps stored credentials in vault
+        assert_eq!(state.credentials.load_lastfm(), Some(creds));
+    }
+
+    #[test]
+    fn test_incomplete_creds_never_go_live() {
+        let mut state = wired();
+        state.set_lastfm_enabled(true);
+
+        for (k, s, sk) in [
+            ("", "secret", "sk"),
+            ("key", "", "sk"),
+            ("key", "secret", ""),
+            ("   ", "secret", "sk"),
+            ("key", "   ", "sk"),
+            ("key", "secret", "   "),
+        ] {
+            let incomplete = LastFmCredentials::new(k, s, sk);
+            state.save_lastfm_credentials(&incomplete);
+            assert!(
+                !state.lastfm_is_live(),
+                "expected incomplete creds ({k}, {s}, {sk}) to remain dormant"
+            );
+        }
+    }
+
+    #[test]
+    fn test_lastfm_credentials_save_clear_round_trip() {
+        let mut state = wired();
+        assert_eq!(state.credentials.load_lastfm(), None);
+
+        let creds = LastFmCredentials::new("my-key", "my-secret", "my-session");
+        state.save_lastfm_credentials(&creds);
+        assert_eq!(state.credentials.load_lastfm(), Some(creds));
+
+        state.clear_lastfm_credentials();
+        assert_eq!(state.credentials.load_lastfm(), None);
+        assert!(!state.lastfm_is_live());
+    }
+
+    #[test]
+    fn test_lastfm_credentials_from_input_buffers() {
+        let mut state = wired();
+        state.lastfm_api_key_text = "test-key".into();
+        state.lastfm_secret_text = "test-secret".into();
+        state.lastfm_session_key_text = "test-session".into();
+        state.set_lastfm_enabled(true);
+
+        let ok = state.save_lastfm_credentials_from_input();
+        assert!(ok);
+        assert!(state.lastfm_is_live());
+        assert!(state.lastfm_api_key_text.is_empty());
+        assert!(state.lastfm_secret_text.is_empty());
+        assert!(state.lastfm_session_key_text.is_empty());
+
+        state.clear_lastfm_credentials();
+        assert!(!state.lastfm_is_live());
+        assert_eq!(state.credentials.load_lastfm(), None);
+    }
+
+    #[test]
+    fn test_hi_res_covers_setting_toggles_decode_bound_and_persists() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        state.set_settings_store(Box::new(store.clone()));
+
+        assert!(!state.hi_res_covers);
+        assert_eq!(state.cover_max_px(), COVER_MAX_PX);
+
+        state.set_hi_res_covers(true);
+        assert!(state.hi_res_covers);
+        assert_eq!(state.cover_max_px(), COVER_HIRES_MAX_PX);
+        assert!(store.load().hi_res_covers);
+
+        state.set_hi_res_covers(false);
+        assert!(!state.hi_res_covers);
+        assert_eq!(state.cover_max_px(), COVER_MAX_PX);
+        assert!(!store.load().hi_res_covers);
+    }
+
+    #[test]
+    fn test_decode_cover_image_honors_hires_flag() {
+        let mut state = wired();
+        let img = image::RgbaImage::from_pixel(1200, 600, image::Rgba([10, 20, 30, 255]));
+        let mut buf = Vec::new();
+        img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+            .expect("encode test PNG");
+
+        // With default (flag off), capped at COVER_MAX_PX (512)
+        let decoded_default = state.decode_cover_image(&buf).expect("decode default");
+        assert_eq!(decoded_default.size, [512, 256]);
+
+        // With flag on, capped at COVER_HIRES_MAX_PX (1024)
+        state.set_hi_res_covers(true);
+        let decoded_hires = state.decode_cover_image(&buf).expect("decode hires");
+        assert_eq!(decoded_hires.size, [1024, 512]);
     }
 }

@@ -16,6 +16,10 @@ const fn default_true() -> bool {
     true
 }
 
+const fn default_false() -> bool {
+    false
+}
+
 const fn default_volume() -> u8 {
     100
 }
@@ -37,6 +41,12 @@ pub struct Settings {
     /// Whether global keyboard shortcuts are enabled.
     #[serde(default = "default_true")]
     pub keyboard_shortcuts: bool,
+    /// Whether Last.fm live scrobbling is enabled.
+    #[serde(default = "default_false")]
+    pub lastfm_enabled: bool,
+    /// Whether high-resolution cover artwork decoding is enabled.
+    #[serde(default = "default_false")]
+    pub hi_res_covers: bool,
 }
 
 impl Default for Settings {
@@ -48,6 +58,8 @@ impl Default for Settings {
             volume: 100,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
+            lastfm_enabled: false,
+            hi_res_covers: false,
         }
     }
 }
@@ -61,6 +73,8 @@ impl Settings {
             volume: 100,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
+            lastfm_enabled: false,
+            hi_res_covers: false,
         }
     }
 }
@@ -183,6 +197,8 @@ mod tests {
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
+        assert!(!loaded.lastfm_enabled);
+        assert!(!loaded.hi_res_covers);
         assert_eq!(loaded, Settings::default());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -222,6 +238,8 @@ mod tests {
             volume: 75,
             quality: AudioQuality::High,
             keyboard_shortcuts: false,
+            lastfm_enabled: true,
+            hi_res_covers: true,
         };
 
         store.save(&modified).expect("save should succeed");
@@ -243,6 +261,8 @@ mod tests {
         assert_eq!(fallback.volume, 100);
         assert_eq!(fallback.quality, AudioQuality::Standard);
         assert!(fallback.keyboard_shortcuts);
+        assert!(!fallback.lastfm_enabled);
+        assert!(!fallback.hi_res_covers);
     }
 
     #[test]
@@ -254,6 +274,8 @@ mod tests {
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
+        assert!(!loaded.lastfm_enabled);
+        assert!(!loaded.hi_res_covers);
         assert_eq!(loaded, Settings::default());
     }
 
@@ -274,6 +296,8 @@ mod tests {
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.quality, AudioQuality::Compact);
         assert!(loaded.keyboard_shortcuts);
+        assert!(!loaded.lastfm_enabled);
+        assert!(!loaded.hi_res_covers);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
@@ -290,5 +314,24 @@ mod tests {
 
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(omitted.keyboard_shortcuts);
+    }
+
+    #[test]
+    fn test_lastfm_and_hires_covers_serde_defaults_and_explicit_deserialization() {
+        let with_both_false: Settings =
+            serde_json::from_str(r#"{"lastfm_enabled": false, "hi_res_covers": false}"#)
+                .expect("deserialize false");
+        assert!(!with_both_false.lastfm_enabled);
+        assert!(!with_both_false.hi_res_covers);
+
+        let with_both_true: Settings =
+            serde_json::from_str(r#"{"lastfm_enabled": true, "hi_res_covers": true}"#)
+                .expect("deserialize true");
+        assert!(with_both_true.lastfm_enabled);
+        assert!(with_both_true.hi_res_covers);
+
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert!(!omitted.lastfm_enabled);
+        assert!(!omitted.hi_res_covers);
     }
 }

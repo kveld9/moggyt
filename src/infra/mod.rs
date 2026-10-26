@@ -31,7 +31,7 @@ pub use audio::{AudioBackend, AudioStub};
 pub use audio_rodio::{LiveAudio, RodioBackend, volume_to_amplitude};
 pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
-pub use cover_art::{COVER_MAX_PX, decode_cover, fetch_artwork};
+pub use cover_art::{COVER_HIRES_MAX_PX, COVER_MAX_PX, decode_cover, fetch_artwork};
 pub use cover_disk::{DiskCoverCache, cache_file_name, fnv1a_hex};
 pub use instance::{SingleInstanceGuard, instance_lock_name};
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
