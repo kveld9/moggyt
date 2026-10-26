@@ -95,7 +95,10 @@ pub fn browse_body(browse_id: &str) -> Value {
 /// Returns the InnerTube like endpoint URL.
 pub fn like_url(liked: bool) -> String {
     let action = if liked { "like" } else { "removelike" };
-    format!("https://music.youtube.com/youtubei/v1/like/{action}?key={YTM_API_KEY}&prettyPrint=false")
+    format!(
+        "https://music.youtube.com/youtubei/v1/like/{}?key={}&prettyPrint=false",
+        action, YTM_API_KEY
+    )
 }
 
 /// Builds the minimal WEB_REMIX like/removelike payload for `video_id`.
@@ -764,7 +767,7 @@ fn parse_track_count(text: &str) -> usize {
     text.split_whitespace().find_map(|w| w.parse::<usize>().ok()).unwrap_or(0)
 }
 
-fn find_grid_items<'a>(section: &'a Value) -> Option<&'a [Value]> {
+fn find_grid_items(section: &Value) -> Option<&[Value]> {
     const CANDIDATES: &[&str] = &[
         "/gridRenderer/items",
         "/musicGridRenderer/items",
@@ -778,11 +781,8 @@ fn find_grid_items<'a>(section: &'a Value) -> Option<&'a [Value]> {
 
 fn collect_library_items(value: &Value) -> Vec<&Value> {
     if let Some(sections) = detail_sections(value) {
-        let items: Vec<&Value> = sections
-            .iter()
-            .filter_map(find_grid_items)
-            .flat_map(|slice| slice.iter())
-            .collect();
+        let items: Vec<&Value> =
+            sections.iter().filter_map(find_grid_items).flat_map(|slice| slice.iter()).collect();
         if !items.is_empty() {
             return items;
         }
