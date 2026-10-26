@@ -119,8 +119,12 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     AppState<C, A, S, L, K>
 {
     /// Creates the shell with injected collaborators.
-    pub fn new(catalog: C, audio: A, session: S, lyrics: L, covers: K) -> Self {
-        let signed_in = session.load().is_some();
+    pub fn new(mut catalog: C, audio: A, session: S, lyrics: L, covers: K) -> Self {
+        let stored_session = session.load();
+        let signed_in = stored_session.is_some();
+        if let Some(ref cookies) = stored_session {
+            catalog.set_session_cookies(Some(cookies));
+        }
         Self {
             page: Page::default(),
             queue: PlaybackQueue::new(),
@@ -535,6 +539,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             return false;
         };
         self.session.save(&cleaned);
+        self.catalog.set_session_cookies(Some(&cleaned));
         self.signed_in = true;
         self.cookie_text.clear();
         true
@@ -543,6 +548,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Clears the stored session and resets the cookie input buffer.
     pub fn sign_out(&mut self) {
         self.session.clear();
+        self.catalog.set_session_cookies(None);
         self.signed_in = false;
         self.cookie_text.clear();
     }
@@ -1459,6 +1465,9 @@ mod tests {
         fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
             self.inner.detail(browse_id, kind)
         }
+        fn set_session_cookies(&mut self, cookies: Option<&str>) {
+            self.inner.set_session_cookies(cookies);
+        }
     }
 
     struct NoUpdates;
@@ -1492,6 +1501,7 @@ mod tests {
     fn sign_in_and_out_lifecycle_with_sanitized_input() {
         let mut state = wired();
         assert!(!state.is_signed_in());
+        assert_eq!(state.catalog.last_session_cookies(), None);
 
         state.cookie_text = "  cookie: SID=secret123; HSID=secret456  ".to_owned();
         let ok = state.sign_in_from_input();
@@ -1499,10 +1509,12 @@ mod tests {
         assert!(state.is_signed_in());
         assert_eq!(state.cookie_text, "");
         assert_eq!(state.session.load().as_deref(), Some("SID=secret123; HSID=secret456"));
+        assert_eq!(state.catalog.last_session_cookies(), Some("SID=secret123; HSID=secret456"));
 
         state.sign_out();
         assert!(!state.is_signed_in());
         assert_eq!(state.session.load(), None);
+        assert_eq!(state.catalog.last_session_cookies(), None);
     }
 
     #[test]
@@ -1513,7 +1525,23 @@ mod tests {
             let ok = state.sign_in_from_input();
             assert!(!ok, "expected '{invalid}' to be rejected");
             assert!(!state.is_signed_in());
+            assert_eq!(state.catalog.last_session_cookies(), None);
         }
+    }
+
+    #[test]
+    fn startup_with_preloaded_session_store_forwards_cookies() {
+        let mut session = MemorySessionStore::new();
+        session.save("PRELOADED=session_cookie_123");
+        let state = AppState::new(
+            CatalogStub::new(),
+            AudioStub::new(),
+            session,
+            LrclibStub::new(),
+            MemoryCoverCache::new(),
+        );
+        assert!(state.is_signed_in());
+        assert_eq!(state.catalog.last_session_cookies(), Some("PRELOADED=session_cookie_123"));
     }
 
     #[test]

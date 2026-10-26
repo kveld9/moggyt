@@ -37,17 +37,23 @@ pub trait Catalog {
 
     /// Returns detail view for `browse_id` and `kind` (None on blank id or failure).
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail>;
+
+    /// Updates the session cookies used for authenticated catalog requests.
+    ///
+    /// Default implementation is a no-op for anonymous catalogs or stubs.
+    fn set_session_cookies(&mut self, _cookies: Option<&str>) {}
 }
 
 /// Fixed-data stub: keeps UI and tests deterministic until the real API lands.
 #[derive(Debug, Clone)]
 pub struct CatalogStub {
     liked_ids: Vec<String>,
+    last_session_cookies: Option<String>,
 }
 
 impl Default for CatalogStub {
     fn default() -> Self {
-        Self { liked_ids: vec!["stub-1".to_owned()] }
+        Self { liked_ids: vec!["stub-1".to_owned()], last_session_cookies: None }
     }
 }
 
@@ -57,6 +63,11 @@ impl CatalogStub {
     /// Creates the stub catalog.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Returns the last session cookies received by the stub, if any.
+    pub fn last_session_cookies(&self) -> Option<&str> {
+        self.last_session_cookies.as_deref()
     }
 
     fn fixed_hits(query: &str) -> Vec<Track> {
@@ -191,6 +202,10 @@ impl Catalog for CatalogStub {
         ];
         Some(Detail::new(kind, &format!("{trimmed} Title"), "Stub Subtitle", tracks))
     }
+
+    fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        self.last_session_cookies = cookies.map(str::to_owned);
+    }
 }
 
 /// InnerTube-backed YouTube Music catalog implementing the [`Catalog`] port.
@@ -213,6 +228,20 @@ impl YtmCatalog {
     /// Creates a catalog injecting an InnerTube client for testing or custom configuration.
     pub fn with_tube(tube: InnerTube) -> Self {
         Self { tube }
+    }
+
+    /// Updates session cookies by swapping the inner InnerTube client.
+    pub fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        let clean = cookies.filter(|c| !c.trim().is_empty());
+        self.tube = match clean {
+            Some(c) => InnerTube::with_cookies(c),
+            None => InnerTube::new(),
+        };
+    }
+
+    /// Returns true if the catalog client has authenticated session credentials configured.
+    pub fn is_authenticated(&self) -> bool {
+        self.tube.is_authenticated()
     }
 
     fn fetch_hits(&self, query_text: &str) -> SearchHits {
@@ -316,6 +345,10 @@ impl Catalog for YtmCatalog {
             return None;
         }
         self.tube.detail(trimmed, kind)
+    }
+
+    fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        self.set_session_cookies(cookies);
     }
 }
 
@@ -601,5 +634,35 @@ mod tests {
         assert_eq!(catalog.detail("", DetailKind::Album), None);
         assert_eq!(catalog.detail("   ", DetailKind::Artist), None);
         assert_eq!(catalog.detail("   ", DetailKind::Playlist), None);
+    }
+
+    #[test]
+    fn stub_set_session_cookies_seam_records_and_clears() {
+        let mut catalog = CatalogStub::new();
+        assert_eq!(catalog.last_session_cookies(), None);
+
+        catalog.set_session_cookies(Some("SID=session123"));
+        assert_eq!(catalog.last_session_cookies(), Some("SID=session123"));
+
+        catalog.set_session_cookies(None);
+        assert_eq!(catalog.last_session_cookies(), None);
+    }
+
+    #[test]
+    fn ytm_catalog_set_session_cookies_swaps_authentication_state() {
+        let mut catalog = YtmCatalog::new();
+        assert!(!catalog.is_authenticated());
+
+        catalog.set_session_cookies(Some("SID=auth_cookie"));
+        assert!(catalog.is_authenticated());
+
+        catalog.set_session_cookies(Some("   "));
+        assert!(!catalog.is_authenticated());
+
+        catalog.set_session_cookies(Some("HSID=auth2"));
+        assert!(catalog.is_authenticated());
+
+        catalog.set_session_cookies(None);
+        assert!(!catalog.is_authenticated());
     }
 }
