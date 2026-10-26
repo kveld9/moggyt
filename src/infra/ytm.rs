@@ -3,7 +3,10 @@
 use super::innertube::{
     InnerTube, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
 };
-use crate::domain::{Album, Artist, Playlist, SearchFilter, SearchQuery, SearchResult, Track};
+use crate::domain::{
+    Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf,
+    Track,
+};
 
 /// Catalog port: search by free text and user library read/mutation access.
 pub trait Catalog {
@@ -12,6 +15,12 @@ pub trait Catalog {
 
     /// Returns catalog hits matching the query text and filter.
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult>;
+
+    /// Returns radio continuation tracks seeded by `seed_track_id` (empty when seed is blank).
+    fn radio(&self, seed_track_id: &str) -> Vec<Track>;
+
+    /// Returns home shelves (empty on failure).
+    fn home_shelves(&self) -> Vec<Shelf>;
 
     /// Returns saved or owned playlists.
     fn playlists(&self) -> Vec<Playlist>;
@@ -25,6 +34,9 @@ pub trait Catalog {
     /// Adds (`liked = true`) or removes (`liked = false`) a track from the liked collection.
     /// Blank identifiers are ignored.
     fn set_liked(&mut self, track_id: &str, liked: bool);
+
+    /// Returns detail view for `browse_id` and `kind` (None on blank id or failure).
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail>;
 }
 
 /// Fixed-data stub: keeps UI and tests deterministic until the real API lands.
@@ -76,6 +88,22 @@ impl CatalogStub {
     fn stub_playlists() -> Vec<Playlist> {
         vec![Self::stub_playlist(), Playlist::new("stub-playlist-2", "Favorites", 24)]
     }
+
+    fn stub_home_shelves() -> Vec<Shelf> {
+        vec![
+            Shelf {
+                title: "Trending".to_owned(),
+                items: vec![
+                    SearchResult::Album(Self::stub_album()),
+                    SearchResult::Artist(Self::stub_artist()),
+                ],
+            },
+            Shelf {
+                title: "Featured Playlists".to_owned(),
+                items: vec![SearchResult::Playlist(Self::stub_playlist())],
+            },
+        ]
+    }
 }
 
 impl Catalog for CatalogStub {
@@ -101,6 +129,23 @@ impl Catalog for CatalogStub {
             SearchFilter::Artists => vec![SearchResult::Artist(Self::stub_artist())],
             SearchFilter::Playlists => vec![SearchResult::Playlist(Self::stub_playlist())],
         }
+    }
+
+    fn radio(&self, seed_track_id: &str) -> Vec<Track> {
+        let trimmed = seed_track_id.trim();
+        if trimmed.is_empty() {
+            return Vec::new();
+        }
+        vec![
+            Track::new(&format!("{trimmed}-radio-1"), &format!("{trimmed} Radio 1"), "Stub Artist")
+                .with_duration(180),
+            Track::new(&format!("{trimmed}-radio-2"), &format!("{trimmed} Radio 2"), "Stub Artist")
+                .with_duration(210),
+        ]
+    }
+
+    fn home_shelves(&self) -> Vec<Shelf> {
+        Self::stub_home_shelves()
     }
 
     fn playlists(&self) -> Vec<Playlist> {
@@ -130,6 +175,21 @@ impl Catalog for CatalogStub {
         } else {
             self.liked_ids.retain(|id| id != trimmed);
         }
+    }
+
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+        let trimmed = browse_id.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let tracks = vec![
+            Track::new(&format!("{trimmed}-1"), &format!("{trimmed} Track 1"), "Stub Artist")
+                .with_duration(180)
+                .with_artwork(STUB_ARTWORK_URL),
+            Track::new(&format!("{trimmed}-2"), &format!("{trimmed} Track 2"), "Stub Artist")
+                .with_duration(210),
+        ];
+        Some(Detail::new(kind, &format!("{trimmed} Title"), "Stub Subtitle", tracks))
     }
 }
 
@@ -173,7 +233,10 @@ impl YtmCatalog {
 }
 
 fn raw_to_track(raw: RawTrack) -> Track {
-    let track = Track::new(&raw.video_id, &raw.title, &raw.artist);
+    let mut track = Track::new(&raw.video_id, &raw.title, &raw.artist);
+    if let Some(dur) = raw.duration_secs {
+        track = track.with_duration(dur);
+    }
     match raw.thumb_url {
         Some(url) => track.with_artwork(url),
         None => track,
@@ -207,6 +270,20 @@ impl Catalog for YtmCatalog {
         Self::map_hits(self.fetch_hits(query.text()), query.filter())
     }
 
+    /// Returns radio continuation tracks seeded by `seed_track_id`. Network failures map to an empty vector.
+    fn radio(&self, seed_track_id: &str) -> Vec<Track> {
+        let trimmed = seed_track_id.trim();
+        if trimmed.is_empty() {
+            return Vec::new();
+        }
+        self.tube.radio_tracks(trimmed).into_iter().map(raw_to_track).collect()
+    }
+
+    /// Returns home shelves. Network failures map to an empty vector.
+    fn home_shelves(&self) -> Vec<Shelf> {
+        self.tube.home_shelves()
+    }
+
     /// Returns saved or owned playlists. Anonymous interim returns an empty list
     /// because authenticated library endpoints require a signed-in InnerTube client.
     fn playlists(&self) -> Vec<Playlist> {
@@ -228,6 +305,15 @@ impl Catalog for YtmCatalog {
     /// Sets liked status. Anonymous interim is a no-op because an unauthenticated
     /// client cannot mutate remote user library state.
     fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+
+    /// Returns detail view for `browse_id` and `kind`. Network failures map to None.
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+        let trimmed = browse_id.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        self.tube.detail(trimmed, kind)
+    }
 }
 
 #[cfg(test)]
@@ -289,12 +375,14 @@ mod tests {
                     video_id: "v1".into(),
                     title: "T1".into(),
                     artist: "A1".into(),
+                    duration_secs: None,
                     thumb_url: Some("https://artwork.test/v1".into()),
                 },
                 RawTrack {
                     video_id: "v2".into(),
                     title: "T2".into(),
                     artist: "A2".into(),
+                    duration_secs: None,
                     thumb_url: None,
                 },
             ],
@@ -416,5 +504,93 @@ mod tests {
         assert!(catalog.playlists().is_empty());
         assert!(catalog.saved_albums().is_empty());
         assert!(catalog.liked_tracks().is_empty());
+    }
+
+    #[test]
+    fn stub_radio_determinism_and_blank_seed() {
+        let catalog = CatalogStub::new();
+        let first = catalog.radio("vid-seed");
+        let second = catalog.radio("vid-seed");
+        assert_eq!(first, second, "stub radio must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0].id, "vid-seed-radio-1");
+        assert_eq!(first[0].artist, "Stub Artist");
+        assert_eq!(first[0].duration_secs, Some(180));
+        assert_eq!(first[1].id, "vid-seed-radio-2");
+        assert_eq!(first[1].artist, "Stub Artist");
+        assert_eq!(first[1].duration_secs, Some(210));
+
+        assert!(catalog.radio("").is_empty());
+        assert!(catalog.radio("   ").is_empty());
+    }
+
+    #[test]
+    fn ytm_catalog_maps_radio_tracks() {
+        let raw = RawTrack {
+            video_id: "radio-vid-1".into(),
+            title: "Radio Title".into(),
+            artist: "Radio Artist".into(),
+            duration_secs: Some(225),
+            thumb_url: Some("https://img.local/radio.jpg".into()),
+        };
+        let track = raw_to_track(raw);
+        assert_eq!(track.id, "radio-vid-1");
+        assert_eq!(track.title, "Radio Title");
+        assert_eq!(track.artist, "Radio Artist");
+        assert_eq!(track.duration_secs, Some(225));
+        assert_eq!(track.artwork.as_deref(), Some("https://img.local/radio.jpg"));
+
+        let catalog = YtmCatalog::new();
+        assert!(catalog.radio("").is_empty());
+        assert!(catalog.radio("   ").is_empty());
+    }
+
+    #[test]
+    fn stub_home_shelves_determinism_and_content() {
+        let catalog = CatalogStub::new();
+        let first = catalog.home_shelves();
+        let second = catalog.home_shelves();
+        assert_eq!(first, second, "stub home shelves must be deterministic");
+        assert_eq!(first.len(), 2);
+
+        assert_eq!(first[0].title, "Trending");
+        assert_eq!(first[0].items.len(), 2);
+        assert_eq!(first[0].items[0], SearchResult::Album(CatalogStub::stub_album()));
+        assert_eq!(first[0].items[1], SearchResult::Artist(CatalogStub::stub_artist()));
+
+        assert_eq!(first[1].title, "Featured Playlists");
+        assert_eq!(first[1].items.len(), 1);
+        assert_eq!(first[1].items[0], SearchResult::Playlist(CatalogStub::stub_playlist()));
+    }
+
+    #[test]
+    fn stub_detail_determinism_per_kind_and_blank_none() {
+        let catalog = CatalogStub::new();
+        for kind in [DetailKind::Album, DetailKind::Artist, DetailKind::Playlist] {
+            let first = catalog.detail("browse-123", kind);
+            let second = catalog.detail("browse-123", kind);
+            assert_eq!(first, second, "stub detail must be deterministic");
+            let detail = first.expect("expected detail");
+            assert_eq!(detail.kind, kind);
+            assert_eq!(detail.title, "browse-123 Title");
+            assert_eq!(detail.subtitle, "Stub Subtitle");
+            assert_eq!(detail.tracks.len(), 2);
+            assert_eq!(detail.tracks[0].id, "browse-123-1");
+            assert_eq!(detail.tracks[0].duration_secs, Some(180));
+            assert_eq!(detail.tracks[0].artwork.as_deref(), Some(STUB_ARTWORK_URL));
+            assert_eq!(detail.tracks[1].id, "browse-123-2");
+            assert_eq!(detail.tracks[1].duration_secs, Some(210));
+        }
+
+        assert_eq!(catalog.detail("", DetailKind::Album), None);
+        assert_eq!(catalog.detail("   ", DetailKind::Album), None);
+    }
+
+    #[test]
+    fn ytm_catalog_detail_blank_returns_none() {
+        let catalog = YtmCatalog::new();
+        assert_eq!(catalog.detail("", DetailKind::Album), None);
+        assert_eq!(catalog.detail("   ", DetailKind::Artist), None);
+        assert_eq!(catalog.detail("   ", DetailKind::Playlist), None);
     }
 }

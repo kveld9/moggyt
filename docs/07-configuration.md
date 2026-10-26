@@ -77,7 +77,8 @@ The configuration file uses JSON serialization with atomic replacement:
   "theme": "white",
   "locale": "en",
   "volume": 100,
-  "quality": "standard"
+  "quality": "standard",
+  "keyboard_shortcuts": true
 }
 ```
 
@@ -98,6 +99,9 @@ The configuration file uses JSON serialization with atomic replacement:
   - `"compact"`: Low-bandwidth audio stream using yt-dlp selector `"bestaudio[abr<=64]/bestaudio/best"`.
   - `"standard"`: Balanced audio stream using yt-dlp selector `"bestaudio/best"` (default).
   - `"high"`: High-fidelity audio stream using yt-dlp selector `"bestaudio[abr>=192]/bestaudio/best"`.
+- **Keyboard Shortcuts (`keyboard_shortcuts`)**:
+  - `true`: Global transport and playback shortcuts enabled (default).
+  - `false`: Shortcuts disabled.
 
 ### Fault Tolerance & Atomic Persistence
 

@@ -6,8 +6,8 @@ This guide covers the interface layout, playback controls, queue management, and
 
 The interface consists of three primary regions:
 
-1. **Top Bar**: displays application title, page navigation tabs (`Search`, `Queue`, `Now playing`, `Library`), and an
-   update badge when a newer release is detected.
+1. **Top Bar**: displays application title, page navigation tabs (`Search`, `Queue`, `Now playing`, `Library`, `Detail`),
+   and an update badge when a newer release is detected.
 2. **Body Panel**: renders the active page selected in the top bar.
 3. **Player Bar**: persistent bottom panel providing transport controls, volume slider, and track position.
 
@@ -15,12 +15,24 @@ The interface consists of three primary regions:
 
 ### Search Page
 
-The search view accepts queries for tracks, artists, and albums:
+The search view presents curated home shelves and accepts queries for tracks, artists, and albums:
 
+- **Home Shelves**: displays categorized carousels (albums, artists, playlists) loaded lazily on open. Click `Refresh`
+  to clear the cache and refetch home shelves from the catalog. Click `Open` to view full container tracklistings.
 - Type your search terms into the single-line input field.
 - Press `Enter` or click the `Search` button.
 - Catalog hits are queried through the catalog adapter and the top hit is enqueued automatically, transitioning the
   view to the `Queue` page.
+
+### Detail Page
+
+The detail view displays full tracklistings for an album, artist, or playlist:
+
+- **Header**: displays container title and subtitle (such as artist, release year, or item count).
+- **Track List**: lists all tracks in the collection with title, artist, and duration.
+- **Playback**: click `Play` next to any track to push it to the playback queue and start playback immediately.
+- **Navigation**: click `Back` to close the detail view and return to the previous page.
+- Home shelf items in the `Search` page provide an `Open` button to navigate directly to their detail view.
 
 ### Queue Page
 
@@ -37,6 +49,8 @@ The queue view manages the ordered list of upcoming tracks:
 The now playing view presents rich playback details for the track under the active cursor:
 
 - Displays track title, artist name, and the stream identifier requested from the audio backend.
+- **Start Radio**: click `Start radio` to seed an autoplay continuation queue with the active track
+  and automatically fetch recommendations when reaching the end of the queue.
 - **Cover Art**: displays artwork fetched from the track thumbnail URL and cached locally. If offline or pending,
   shows `Cover art unavailable (offline or pending fetch)`.
 - **Synced Lyrics**: displays timestamped lyrics fetched from LRCLIB for the active artist and title pair.
@@ -78,6 +92,23 @@ The bottom player bar remains visible across all pages and provides continuous t
   - `+10s`: advances playback position forward by 10 seconds.
 - **Volume Slider**: interactive slider setting audio volume from 0 to 100.
 - **Position Display**: shows elapsed seconds against total duration (`<elapsed>s / <duration>s` or `<elapsed>s`).
+
+## Keyboard Shortcuts
+
+Global keyboard shortcuts provide transport and playback control when single-line text inputs are not focused:
+
+| Key | Action | Context / Notes |
+| --- | --- | --- |
+| `Space` | Play / Pause | Toggles playback state of current track. |
+| `Left Arrow` | Seek backward | Rewinds position by 10 seconds (clamped at 0). |
+| `Right Arrow` | Seek forward | Advances position by 10 seconds. |
+| `Up Arrow` | Volume up | Increases playback volume by 5% (up to 100%). |
+| `Down Arrow` | Volume down | Decreases playback volume by 5% (down to 0%). |
+| `N` | Next track | Skips to next track in queue (requires queued tracks). |
+| `P` | Previous track | Skips to previous track in queue (requires queued tracks). |
+| `L` | Toggle like | Adds or removes current track from liked songs. |
+
+Keyboard shortcuts can be toggled in the `Library` preferences section and are enabled by default.
 
 ## Desktop Integration
 
