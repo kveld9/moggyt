@@ -12,10 +12,12 @@ use crate::domain::{
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, AudioQuality, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence,
-    DiscordPresence, GithubUpdater, LyricLine, LyricsSource, MemorySettingsStore, Presence,
-    Scrobbler, SessionStore, Settings, SettingsStore, StubScrobbler, TrayAction, TrayHandle,
-    Updater, decode_cover, fetch_artwork, is_newer, sanitize_cookie_input, should_scrobble,
+    AudioBackend, AudioQuality, Catalog, CoverCache, CredentialStore, DesktopPresence,
+    DiscordPresence, GithubUpdater, LastFmClient, LastFmCredentials, LyricLine, LyricsSource,
+    MemoryCredentialStore, MemorySettingsStore, Presence, Scrobbler, SessionStore, Settings,
+    SettingsStore, StubScrobbler, TrayAction, TrayHandle, Updater, client_from_credentials,
+    cover_px_for_quality, decode_cover, fetch_artwork, is_newer, sanitize_cookie_input,
+    should_scrobble,
 };
 
 /// Navigation pages of the application shell.
@@ -101,6 +103,10 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub quality: AudioQuality,
     /// Injected settings storage adapter.
     pub settings_store: Box<dyn SettingsStore>,
+    /// Last.fm credential store adapter.
+    pub credential_store: Box<dyn CredentialStore>,
+    /// Last.fm configuration form fields (api_key, secret, session_key).
+    pub lastfm_form: (String, String, String),
     /// Whether radio autoplay queue continuation is active.
     pub autoplay: bool,
     /// Cached home shelves for the Search view.
@@ -126,6 +132,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             queue: PlaybackQueue::new(),
             search_text: String::new(),
             cookie_text: String::new(),
+            lastfm_form: (String::new(), String::new(), String::new()),
             catalog,
             audio,
             signed_in,
@@ -149,6 +156,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             locale: Locale::English,
             quality: AudioQuality::Standard,
             settings_store: Box::new(MemorySettingsStore::default()),
+            credential_store: Box::new(MemoryCredentialStore::new()),
             autoplay: false,
             home_shelves: Vec::new(),
             detail: None,
@@ -161,6 +169,60 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Injects an alternative scrobbler implementation.
     pub fn set_scrobbler(&mut self, scrobbler: Box<dyn Scrobbler>) {
         self.scrobbler = scrobbler;
+    }
+
+    /// Injects an alternative credential store implementation.
+    pub fn set_credential_store(&mut self, store: Box<dyn CredentialStore>) {
+        self.credential_store = store;
+    }
+
+    /// Returns true if Last.fm credentials are saved in the vault and the scrobbler client is live.
+    pub fn lastfm_configured(&self) -> bool {
+        self.credential_store.load_lastfm().is_some_and(|creds| creds.is_complete())
+            && self.scrobbler_is_live()
+    }
+
+    fn scrobbler_is_live(&self) -> bool {
+        self.scrobbler
+            .as_any()
+            .downcast_ref::<LastFmClient>()
+            .is_some_and(|client| client.is_live())
+    }
+
+    /// Saves Last.fm credentials to the vault and activates the live scrobbler.
+    ///
+    /// If credentials are incomplete or blank, clears the store, rebuilds a dormant client,
+    /// and returns `false`. Returns `true` on successful save.
+    pub fn save_lastfm_credentials(
+        &mut self,
+        api_key: &str,
+        secret: &str,
+        session_key: &str,
+    ) -> bool {
+        let creds = LastFmCredentials::new(api_key, secret, session_key);
+        if !creds.is_complete() {
+            self.clear_lastfm_credentials();
+            return false;
+        }
+        self.credential_store.save_lastfm(&creds);
+        self.scrobbler = Box::new(client_from_credentials(&creds));
+        true
+    }
+
+    /// Clears persisted Last.fm credentials, resets form inputs, and sets a dormant scrobbler client.
+    pub fn clear_lastfm_credentials(&mut self) {
+        self.credential_store.clear_lastfm();
+        self.scrobbler = Box::new(LastFmClient::new("", ""));
+        self.lastfm_form = (String::new(), String::new(), String::new());
+    }
+
+    /// Synchronizes the scrobbler client with credentials from the injected store.
+    pub fn reload_lastfm(&mut self) {
+        let Some(creds) = self.credential_store.load_lastfm() else {
+            self.scrobbler = Box::new(LastFmClient::new("", ""));
+            return;
+        };
+        self.scrobbler = Box::new(client_from_credentials(&creds));
     }
 
     /// Injects an alternative settings store implementation and synchronizes state.
@@ -724,7 +786,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     }
 
     fn store_cover_texture(&mut self, ctx: &egui::Context, url: String, bytes: &[u8]) {
-        if let Some(img) = decode_cover(bytes, COVER_MAX_PX) {
+        let max_px = cover_px_for_quality(self.quality);
+        if let Some(img) = decode_cover(bytes, max_px) {
             let texture = ctx.load_texture("moggyt-cover", img, egui::TextureOptions::LINEAR);
             self.cover_key = Some(url.clone());
             self.cover_texture = Some((url, texture));
@@ -857,6 +920,8 @@ fn render_library<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource,
     render_library_preferences(ui, state);
     ui.separator();
     render_library_sign_in(ui, state);
+    ui.separator();
+    render_library_lastfm(ui, state);
     ui.separator();
     render_library_updates(ui, state);
     ui.separator();
@@ -1010,6 +1075,74 @@ fn render_library_sign_in<
             state.sign_out();
         }
     });
+}
+
+fn render_library_lastfm<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    let status =
+        if state.lastfm_configured() { "Last.fm: connected" } else { "Last.fm: not configured" };
+    ui.label(status);
+    render_lastfm_inputs(ui, state);
+}
+
+fn render_lastfm_inputs<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.horizontal(|ui| {
+        let r1 = ui.add(
+            egui::TextEdit::singleline(&mut state.lastfm_form.0)
+                .password(true)
+                .hint_text("API key"),
+        );
+        let r2 = ui.add(
+            egui::TextEdit::singleline(&mut state.lastfm_form.1)
+                .password(true)
+                .hint_text("Shared secret"),
+        );
+        let r3 = ui.add(
+            egui::TextEdit::singleline(&mut state.lastfm_form.2)
+                .password(true)
+                .hint_text("Session key"),
+        );
+        if r1.has_focus() || r2.has_focus() || r3.has_focus() {
+            state.text_focused = true;
+        }
+        render_lastfm_buttons(ui, state);
+    });
+}
+
+fn render_lastfm_buttons<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    if ui.button("Save").clicked() {
+        let (k, s, sk) = state.lastfm_form.clone();
+        state.save_lastfm_credentials(&k, &s, &sk);
+    }
+    if ui.button("Clear").clicked() {
+        state.clear_lastfm_credentials();
+    }
 }
 
 fn render_library_playlists<
@@ -1420,8 +1553,8 @@ mod tests {
         Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
     };
     use crate::infra::{
-        AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
-        ReleaseInfo, StaticUpdater, Updater,
+        AudioStub, COVER_HIGH_PX, COVER_MAX_PX, CatalogStub, LrclibStub, LyricLine,
+        MemoryCoverCache, MemorySessionStore, ReleaseInfo, StaticUpdater, Updater,
     };
 
     #[derive(Default)]
@@ -2451,5 +2584,83 @@ mod tests {
 
         state.set_settings_store(Box::new(store));
         assert!(!state.shortcuts_enabled);
+    }
+
+    #[test]
+    fn lastfm_save_complete_activates_client_and_sets_configured() {
+        let mut state = wired();
+        assert!(!state.lastfm_configured());
+
+        let ok = state.save_lastfm_credentials("test_key", "test_secret", "test_session");
+        assert!(ok);
+        assert!(state.lastfm_configured());
+
+        let loaded = state.credential_store.load_lastfm().expect("stored credentials");
+        assert_eq!(loaded, LastFmCredentials::new("test_key", "test_secret", "test_session"));
+    }
+
+    #[test]
+    fn lastfm_save_incomplete_or_blank_clears_store_and_reverts_to_dormant() {
+        let mut state = wired();
+        let invalid_cases = [
+            ("", "test_secret", "test_session"),
+            ("test_key", "   ", "test_session"),
+            ("test_key", "test_secret", "\t"),
+            ("   ", "   ", "   "),
+        ];
+
+        for (k, s, sk) in invalid_cases {
+            state.save_lastfm_credentials("valid_key", "valid_secret", "valid_session");
+            assert!(state.lastfm_configured());
+
+            let ok = state.save_lastfm_credentials(k, s, sk);
+            assert!(!ok, "expected credentials ('{k}', '{s}', '{sk}') to be rejected");
+            assert!(!state.lastfm_configured());
+            assert_eq!(state.credential_store.load_lastfm(), None);
+        }
+    }
+
+    #[test]
+    fn lastfm_clear_credentials_lifecycle() {
+        let mut state = wired();
+        state.save_lastfm_credentials("key", "secret", "session");
+        assert!(state.lastfm_configured());
+
+        state.lastfm_form = ("key".into(), "secret".into(), "session".into());
+        state.clear_lastfm_credentials();
+
+        assert!(!state.lastfm_configured());
+        assert_eq!(state.credential_store.load_lastfm(), None);
+        assert_eq!(state.lastfm_form, (String::new(), String::new(), String::new()));
+    }
+
+    #[test]
+    fn lastfm_reload_synchronizes_from_credential_store() {
+        let mut state = wired();
+        let creds = LastFmCredentials::new("key", "secret", "session");
+        state.credential_store.save_lastfm(&creds);
+
+        // Before reload, scrobbler is still StubScrobbler from constructor
+        assert!(!state.lastfm_configured());
+
+        state.reload_lastfm();
+        assert!(state.lastfm_configured());
+
+        state.credential_store.clear_lastfm();
+        state.reload_lastfm();
+        assert!(!state.lastfm_configured());
+    }
+
+    #[test]
+    fn app_cover_px_for_quality_mapping_and_refresh() {
+        assert_eq!(cover_px_for_quality(AudioQuality::Standard), COVER_MAX_PX);
+        assert_eq!(cover_px_for_quality(AudioQuality::Compact), COVER_MAX_PX);
+        assert_eq!(cover_px_for_quality(AudioQuality::High), COVER_HIGH_PX);
+
+        let mut state = wired();
+        assert_eq!(cover_px_for_quality(state.quality), 512);
+
+        state.set_quality(AudioQuality::High);
+        assert_eq!(cover_px_for_quality(state.quality), 1024);
     }
 }

@@ -5,11 +5,24 @@ use std::time::Duration;
 use anyhow::Context;
 use eframe::egui;
 
+use super::AudioQuality;
+
 /// Maximum width or height in pixels for decoded cover art textures.
 ///
 /// Bounds GPU texture memory while preserving crisp visual quality on high-DPI displays.
 /// Source images exceeding this bound are downscaled using a Lanczos3 filter.
 pub const COVER_MAX_PX: u32 = 512;
+
+/// Maximum width or height in pixels for high-quality decoded cover art textures.
+pub const COVER_HIGH_PX: u32 = 1024;
+
+/// Returns the maximum pixel dimension for decoded cover art textures based on audio streaming quality.
+pub fn cover_px_for_quality(quality: AudioQuality) -> u32 {
+    match quality {
+        AudioQuality::High => COVER_HIGH_PX,
+        AudioQuality::Standard | AudioQuality::Compact => COVER_MAX_PX,
+    }
+}
 
 /// Fetches cover art bytes over HTTP with a blocking GET request and configurable timeout.
 ///
@@ -96,5 +109,12 @@ mod tests {
             .expect("encode test JPEG");
         let decoded = decode_cover(&buf, COVER_MAX_PX).expect("decode valid JPEG");
         assert_eq!(decoded.size, [16, 16]);
+    }
+
+    #[test]
+    fn cover_px_for_quality_mapping_table() {
+        assert_eq!(cover_px_for_quality(AudioQuality::Standard), COVER_MAX_PX);
+        assert_eq!(cover_px_for_quality(AudioQuality::Compact), COVER_MAX_PX);
+        assert_eq!(cover_px_for_quality(AudioQuality::High), COVER_HIGH_PX);
     }
 }

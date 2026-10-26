@@ -99,6 +99,8 @@ The configuration file uses JSON serialization with atomic replacement:
   - `"compact"`: Low-bandwidth audio stream using yt-dlp selector `"bestaudio[abr<=64]/bestaudio/best"`.
   - `"standard"`: Balanced audio stream using yt-dlp selector `"bestaudio/best"` (default).
   - `"high"`: High-fidelity audio stream using yt-dlp selector `"bestaudio[abr>=192]/bestaudio/best"`.
+  - Also bounds decoded cover texture resolution: 512px on Standard/Compact (`COVER_MAX_PX`), 1024px on High
+    (`COVER_HIGH_PX`).
 - **Keyboard Shortcuts (`keyboard_shortcuts`)**:
   - `true`: Global transport and playback shortcuts enabled (default).
   - `false`: Shortcuts disabled.
@@ -114,5 +116,5 @@ empty, or corrupted, `moggyt` automatically falls back to default settings witho
 - **Discord Rich Presence**: stays dormant in this build because `DISCORD_APP_ID` is 0 (unregistered); no IPC
   connection is attempted and playback is unaffected. Setting a valid Discord application client ID is required to
   activate it.
-- **Last.fm Scrobbler**: initialized with dormant stub credentials by default. Scrobbles are submitted only after
-  credentials and API keys are registered.
+- **Last.fm Scrobbler**: submits scrobbles and updates now-playing status when authenticated. Credentials (API key,
+  secret, session key) are persisted exclusively in the OS keyring, never in `settings.json` or plain text.

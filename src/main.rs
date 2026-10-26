@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
-    DesktopPresence, DiskCoverCache, DiskSettingsStore, KeyringSessionStore, LastFmClient,
-    LiveAudio, LrclibClient, RodioBackend, SingleInstanceGuard, TrayHandle, YtmCatalog,
-    default_config_dir, ensure_sidecar,
+    DesktopPresence, DiskCoverCache, DiskSettingsStore, KeyringCredentialStore,
+    KeyringSessionStore, LiveAudio, LrclibClient, RodioBackend, SingleInstanceGuard, TrayHandle,
+    YtmCatalog, default_config_dir, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -32,7 +32,9 @@ fn main() -> anyhow::Result<()> {
     let session = KeyringSessionStore::moggyt();
     let lyrics = LrclibClient::new();
     let covers = init_cover_cache(&data_dir);
+    let credentials = KeyringCredentialStore::moggyt();
     let mut state = AppState::new(catalog, audio, session, lyrics, covers);
+    state.set_credential_store(Box::new(credentials));
     match TrayHandle::try_new() {
         Some(h) => state.set_tray(h),
         None => tracing::warn!("tray unavailable; running without system tray icon"),
@@ -42,10 +44,8 @@ fn main() -> anyhow::Result<()> {
     state.set_presence(presence);
     tracing::debug!("discord rich presence live: {}", state.discord.is_live());
 
-    // Dormant without credentials; live scrobbling awaits user settings UI and Last.fm app registration.
-    let scrobbler = LastFmClient::new("", "");
-    tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
-    state.set_scrobbler(Box::new(scrobbler));
+    state.reload_lastfm();
+    tracing::debug!("last.fm scrobbler live: {}", state.lastfm_configured());
 
     let settings_dir = default_config_dir();
     let settings_store = DiskSettingsStore::new(settings_dir);
