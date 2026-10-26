@@ -68,6 +68,12 @@ The library view manages account authentication, release update actions, and sav
   - Input field: paste raw cookie string from your browser session on `music.youtube.com`.
   - `Save`: sanitizes input, stores session cookies securely in the OS credential store (keyring), and unlocks library.
   - `Clear`: removes stored credentials from the keyring and signs out.
+- **Last.fm Scrobbler Integration**:
+  - Displays connection status: `Last.fm: connected` or `Last.fm: not configured`.
+  - Input fields: three single-line password fields for API Key, Shared Secret, and Session Key.
+  - `Save`: stores credentials in the OS keyring and activates live scrobbling and now-playing status updates.
+  - `Clear`: removes stored Last.fm credentials from the keyring and reverts to a dormant client.
+  - **Security & Storage**: credentials reside exclusively in the platform keyring (never in `settings.json` or on disk).
 - **Updates Section**:
   - Displays current update status (`Never checked`, `moggyt is up to date`, `Update available: <version>`, or
     `Update check failed (offline?)`).
@@ -133,4 +139,5 @@ When supported by the desktop environment, `moggyt` creates a system tray icon:
 
 - **Discord Rich Presence**: dormant in this build (`DISCORD_APP_ID` is 0, no IPC attempted); it will publish track
   title and artist only once a valid application ID is configured.
-- **Last.fm Scrobbler**: initialized in a dormant state by default until credentials and registration are configured.
+- **Last.fm Scrobbler**: scrobbles played tracks (>= 30s duration, played for half duration or 240s) and updates
+  now-playing status when authenticated. Credentials configured in Library settings reside in the OS keyring.
