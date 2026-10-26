@@ -8,6 +8,10 @@ stage, evolving toward the v1 Software Design Document: core hexagonal architect
 `rodio` with a `yt-dlp` stream resolution sidecar, LRCLIB synced lyrics, disk cover art caching, and OS keyring
 session storage are functional.
 
+> **Personal project:** `moggyt` is a personal project built to cover the author's own needs.
+> Contributions are welcome, but maintenance is best-effort: expect limited review capacity
+> rather than commercial-grade polish or support.
+
 ## Features
 
 - **Playback & Transport**: persistent player bar with play, pause, next, previous, seek (-10s / +10s), volume
