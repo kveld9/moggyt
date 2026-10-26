@@ -10,6 +10,7 @@ use rodio::{Decoder, OutputStream, Sink};
 use super::audio::{AudioBackend, AudioStub};
 use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
 use super::stream::AudioQuality;
+use super::stream_cache::DiskStreamCache;
 use super::ytdlp::YtDlpResolver;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
@@ -29,11 +30,21 @@ fn fetch_audio_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
     Ok(bytes.to_vec())
 }
 
+fn decode_stream_source(
+    bytes: Vec<u8>,
+    track_id: &str,
+) -> anyhow::Result<Decoder<Cursor<Vec<u8>>>> {
+    let cursor = Cursor::new(bytes);
+    Decoder::new(cursor)
+        .with_context(|| format!("failed to decode audio stream for track '{track_id}'"))
+}
+
 /// Real rodio playback backend maintaining an active sink and position tracking.
 pub struct RodioBackend {
     _stream: OutputStream,
     sink: Sink,
     resolver: YtDlpResolver,
+    cache: DiskStreamCache,
     last_requested: Option<String>,
     volume: u8,
     anchor: Option<Instant>,
@@ -43,11 +54,30 @@ pub struct RodioBackend {
 }
 
 impl RodioBackend {
-    /// Acquires the default output audio stream and initializes an empty playback sink.
-    ///
-    /// Fails loud with descriptive context when running in headless environments
-    /// where no default audio output device is present.
+    /// Acquires the default output audio stream and initializes an empty playback sink
+    /// with a default stream cache directory under temp.
     pub fn new(binary: impl Into<PathBuf>) -> anyhow::Result<Self> {
+        let temp_dir = std::env::temp_dir().join(format!("moggyt-streams-{}", std::process::id()));
+        Self::with_cache_dir(binary, temp_dir, 512 * 1024 * 1024)
+    }
+
+    /// Initializes a rodio backend backed by a stream cache at `cache_dir` with `budget_bytes`.
+    pub fn with_cache_dir(
+        binary: impl Into<PathBuf>,
+        cache_dir: impl Into<PathBuf>,
+        budget_bytes: u64,
+    ) -> anyhow::Result<Self> {
+        let cache = DiskStreamCache::new(cache_dir, budget_bytes)
+            .or_else(|_| {
+                let fb = std::env::temp_dir().join(format!("moggyt-fb-{}", std::process::id()));
+                DiskStreamCache::new(fb, 0)
+            })
+            .context("failed to initialize disk stream cache")?;
+        Self::with_cache(binary, cache)
+    }
+
+    /// Initializes a rodio backend with an injected stream cache instance.
+    pub fn with_cache(binary: impl Into<PathBuf>, cache: DiskStreamCache) -> anyhow::Result<Self> {
         let stream = rodio::OutputStreamBuilder::open_default_stream()
             .context("failed to acquire default audio output stream")?;
         let sink = Sink::connect_new(stream.mixer());
@@ -57,6 +87,7 @@ impl RodioBackend {
             _stream: stream,
             sink,
             resolver: YtDlpResolver::new(binary),
+            cache,
             last_requested: None,
             volume: 100,
             anchor: None,
@@ -86,14 +117,33 @@ impl RodioBackend {
         }
     }
 
-    /// Downloads and decodes audio from `url`, immediately starting playback.
+    fn try_cached_source(&self, track_id: &str, url: &str) -> Option<Decoder<Cursor<Vec<u8>>>> {
+        let bytes = self.cache.get(url)?;
+        match decode_stream_source(bytes, track_id) {
+            Ok(source) => Some(source),
+            Err(err) => {
+                tracing::warn!(url = %url, error = %err, "cached stream corrupt; treating as miss");
+                let _ = self.cache.remove(url);
+                None
+            }
+        }
+    }
+
+    /// Downloads and decodes audio from `url`, consulting the stream cache first,
+    /// and immediately starts playback.
     ///
     /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
+    /// Stream cache failures soft-fail to allow uninterrupted playback.
     pub fn play_url(&mut self, track_id: &str, url: &str) -> anyhow::Result<()> {
-        let bytes = fetch_audio_bytes(url)?;
-        let cursor = Cursor::new(bytes);
-        let source = Decoder::new(cursor)
-            .with_context(|| format!("failed to decode audio stream for track '{track_id}'"))?;
+        let source = match self.try_cached_source(track_id, url) {
+            Some(source) => source,
+            None => {
+                let bytes = fetch_audio_bytes(url)?;
+                let source = decode_stream_source(bytes.clone(), track_id)?;
+                let _ = self.cache.put(url, &bytes);
+                source
+            }
+        };
 
         self.sink.stop();
         self.append_dsp_source(source);
@@ -143,6 +193,22 @@ impl RodioBackend {
     /// Returns whether loudness normalization processing is enabled.
     pub fn loudness_normalization(&self) -> bool {
         self.loudness_normalization
+    }
+
+    /// Updates the stream cache budget in megabytes.
+    pub fn set_stream_cache_budget_mb(&mut self, mb: u32) {
+        let bytes = u64::from(mb).saturating_mul(1024 * 1024);
+        let _ = self.cache.set_budget_bytes(bytes);
+    }
+
+    /// Accesses the underlying stream cache.
+    pub fn cache(&self) -> &DiskStreamCache {
+        &self.cache
+    }
+
+    /// Accesses the underlying stream cache mutably.
+    pub fn cache_mut(&mut self) -> &mut DiskStreamCache {
+        &mut self.cache
     }
 }
 
@@ -208,12 +274,20 @@ impl AudioBackend for RodioBackend {
     fn set_loudness_normalization(&mut self, on: bool) {
         self.loudness_normalization = on;
     }
+
+    fn set_stream_cache_budget_mb(&mut self, mb: u32) {
+        self.set_stream_cache_budget_mb(mb);
+    }
+
+    fn stream_cache_total_bytes(&self) -> Option<u64> {
+        self.cache.total_bytes().ok()
+    }
 }
 
 /// Dual-mode audio backend: hardware playback with graceful fallback to an in-memory stub.
 pub enum LiveAudio {
-    /// Live rodio backend connected to audio hardware.
-    Live(RodioBackend),
+    /// Live rodio backend connected to audio hardware (boxed: far larger than the stub).
+    Live(Box<RodioBackend>),
     /// Muted fallback storing state in memory when hardware or dependencies are unavailable.
     Muted(AudioStub),
 }
@@ -312,6 +386,20 @@ impl AudioBackend for LiveAudio {
         match self {
             Self::Live(backend) => backend.set_loudness_normalization(on),
             Self::Muted(stub) => stub.set_loudness_normalization(on),
+        }
+    }
+
+    fn set_stream_cache_budget_mb(&mut self, mb: u32) {
+        match self {
+            Self::Live(backend) => backend.set_stream_cache_budget_mb(mb),
+            Self::Muted(stub) => stub.set_stream_cache_budget_mb(mb),
+        }
+    }
+
+    fn stream_cache_total_bytes(&self) -> Option<u64> {
+        match self {
+            Self::Live(backend) => backend.stream_cache_total_bytes(),
+            Self::Muted(stub) => stub.stream_cache_total_bytes(),
         }
     }
 }
@@ -444,5 +532,44 @@ mod tests {
         audio.set_quality(AudioQuality::Compact);
         audio.set_skip_silence(true);
         audio.set_loudness_normalization(true);
+
+        audio.set_stream_cache_budget_mb(1024);
+        assert_eq!(audio.stream_cache_total_bytes(), Some(0));
+    }
+
+    #[test]
+    fn try_cached_source_corrupt_entry_treated_as_miss_and_deleted() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "moggyt-test-rodio-cache-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let mut backend = match RodioBackend::with_cache_dir(
+            "/definitely/missing/binary/yt-dlp",
+            temp_dir.clone(),
+            1024 * 1024,
+        ) {
+            Ok(b) => b,
+            Err(err) => {
+                eprintln!("Skipping hardware audio test in headless environment: {err:#}");
+                let _ = std::fs::remove_dir_all(&temp_dir);
+                return;
+            }
+        };
+
+        let corrupt_url = "https://example.com/corrupt.mp3";
+        backend
+            .cache_mut()
+            .put(corrupt_url, b"not a valid audio stream payload")
+            .expect("put in cache");
+
+        assert!(backend.try_cached_source("track-corrupt", corrupt_url).is_none());
+        assert_eq!(backend.cache().get(corrupt_url), None);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

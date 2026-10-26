@@ -16,6 +16,10 @@ pub trait AudioBackend {
     fn set_quality(&mut self, _q: AudioQuality) {}
     fn set_skip_silence(&mut self, _on: bool) {}
     fn set_loudness_normalization(&mut self, _on: bool) {}
+    fn set_stream_cache_budget_mb(&mut self, _mb: u32) {}
+    fn stream_cache_total_bytes(&self) -> Option<u64> {
+        None
+    }
 }
 
 /// Recording stub: captures intent without touching audio hardware.
@@ -27,6 +31,7 @@ pub struct AudioStub {
     position_secs: u64,
     skip_silence: bool,
     loudness_normalization: bool,
+    stream_cache_budget_mb: u32,
 }
 
 impl Default for AudioStub {
@@ -38,6 +43,7 @@ impl Default for AudioStub {
             position_secs: 0,
             skip_silence: false,
             loudness_normalization: false,
+            stream_cache_budget_mb: 512,
         }
     }
 }
@@ -53,6 +59,10 @@ impl AudioStub {
 
     pub fn loudness_normalization(&self) -> bool {
         self.loudness_normalization
+    }
+
+    pub fn stream_cache_budget_mb(&self) -> u32 {
+        self.stream_cache_budget_mb
     }
 }
 
@@ -104,6 +114,14 @@ impl AudioBackend for AudioStub {
     fn set_loudness_normalization(&mut self, on: bool) {
         self.loudness_normalization = on;
     }
+
+    fn set_stream_cache_budget_mb(&mut self, mb: u32) {
+        self.stream_cache_budget_mb = mb;
+    }
+
+    fn stream_cache_total_bytes(&self) -> Option<u64> {
+        Some(0)
+    }
 }
 
 #[cfg(test)]
@@ -136,5 +154,9 @@ mod tests {
         assert!(audio.skip_silence());
         audio.set_loudness_normalization(true);
         assert!(audio.loudness_normalization());
+        assert_eq!(audio.stream_cache_budget_mb(), 512);
+        audio.set_stream_cache_budget_mb(256);
+        assert_eq!(audio.stream_cache_budget_mb(), 256);
+        assert_eq!(audio.stream_cache_total_bytes(), Some(0));
     }
 }

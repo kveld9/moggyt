@@ -6,7 +6,10 @@ use crate::app::components::{empty_state, section_header, track_row};
 use crate::app::{AppState, UpdateStatus, theme};
 use crate::domain::{DesignTokens, ThemeId, Track};
 use crate::i18n::{Locale, tr};
-use crate::infra::{AudioBackend, Catalog, CoverCache, GithubUpdater, LyricsSource, SessionStore};
+use crate::infra::{
+    AudioBackend, Catalog, CoverCache, GithubUpdater, LyricsSource, STREAM_CACHE_MAX_MB,
+    SessionStore,
+};
 
 /// Renders the library page view including preferences, Last.fm, sign-in, updates, and collections.
 pub(crate) fn render_library<
@@ -89,6 +92,7 @@ pub(crate) fn render_library_preferences<
         state.set_hi_res_covers(hi_res);
     }
     render_dsp_preferences(ui, state);
+    render_stream_cache_preference(ui, state);
 }
 
 /// Renders DSP audio playback preferences (skip silence, loudness normalization).
@@ -109,6 +113,33 @@ pub(crate) fn render_dsp_preferences<
     let mut loudness = state.loudness_normalization;
     if ui.checkbox(&mut loudness, "Loudness normalization").changed() {
         state.set_loudness_normalization(loudness);
+    }
+}
+
+/// Renders stream cache storage budget preference controls.
+pub(crate) fn render_stream_cache_preference<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.add_space(4.0);
+    ui.heading("Stream Cache");
+    let mut cache_mb = state.stream_cache_mb;
+    ui.horizontal(|ui| {
+        ui.label("Cache budget (MB):");
+        let response =
+            ui.add(egui::DragValue::new(&mut cache_mb).range(0..=STREAM_CACHE_MAX_MB).speed(16));
+        if response.changed() {
+            state.set_stream_cache_mb(cache_mb);
+        }
+    });
+    if state.stream_cache_mb == 0 {
+        ui.label("Cache disabled (0 MB)");
     }
 }
 

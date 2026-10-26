@@ -19,11 +19,12 @@ use crate::domain::{
 use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, AudioQuality, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache,
-    CredentialStore, DesktopPresence, DiscordPresence, GithubUpdater, LastFmClient,
-    LastFmCredentials, LyricLine, LyricsSource, MediaKeyAction, MemoryCredentialStore,
-    MemoryQueueStore, MemorySettingsStore, Presence, QueueStore, Scrobbler, SessionStore, Settings,
-    SettingsStore, StubScrobbler, TrayAction, TrayHandle, Updater, client_from_credentials,
-    decode_cover, fetch_artwork, is_newer, sanitize_cookie_input, should_scrobble,
+    CredentialStore, DEFAULT_STREAM_CACHE_MB, DesktopPresence, DiscordPresence, GithubUpdater,
+    LastFmClient, LastFmCredentials, LyricLine, LyricsSource, MediaKeyAction,
+    MemoryCredentialStore, MemoryQueueStore, MemorySettingsStore, Presence, QueueStore,
+    STREAM_CACHE_MAX_MB, Scrobbler, SessionStore, Settings, SettingsStore, StubScrobbler,
+    TrayAction, TrayHandle, Updater, client_from_credentials, decode_cover, fetch_artwork,
+    is_newer, sanitize_cookie_input, should_scrobble,
 };
 
 /// Navigation pages of the application shell.
@@ -133,6 +134,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub skip_silence: bool,
     /// Whether loudness normalization to -14 LUFS is enabled.
     pub loudness_normalization: bool,
+    /// Storage budget for offline stream caching in megabytes.
+    pub stream_cache_mb: u32,
     /// Last.fm API key input buffer (UI state only).
     pub lastfm_api_key_text: String,
     /// Last.fm API secret input buffer (UI state only).
@@ -199,6 +202,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
+            stream_cache_mb: DEFAULT_STREAM_CACHE_MB,
             lastfm_api_key_text: String::new(),
             lastfm_secret_text: String::new(),
             lastfm_session_key_text: String::new(),
@@ -235,6 +239,10 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.audio.set_quality(loaded.quality);
         self.audio.set_skip_silence(loaded.skip_silence);
         self.audio.set_loudness_normalization(loaded.loudness_normalization);
+        self.stream_cache_mb = loaded.stream_cache_mb.min(STREAM_CACHE_MAX_MB);
+        self.audio.set_volume(loaded.volume);
+        self.audio.set_quality(loaded.quality);
+        self.audio.set_stream_cache_budget_mb(self.stream_cache_mb);
         self.settings_store = store;
         self.sync_lastfm_scrobbler();
     }
@@ -378,6 +386,17 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.persist_settings();
     }
 
+    /// Sets the stream cache storage budget in megabytes and persists the preference.
+    pub fn set_stream_cache_mb(&mut self, mb: u32) {
+        let clamped = mb.min(STREAM_CACHE_MAX_MB);
+        if self.stream_cache_mb == clamped {
+            return;
+        }
+        self.stream_cache_mb = clamped;
+        self.audio.set_stream_cache_budget_mb(clamped);
+        self.persist_settings();
+    }
+
     /// Returns whether keyboard shortcuts are enabled.
     pub fn keyboard_shortcuts_enabled(&self) -> bool {
         self.shortcuts_enabled
@@ -408,6 +427,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             hi_res_covers: self.hi_res_covers,
             skip_silence: self.skip_silence,
             loudness_normalization: self.loudness_normalization,
+            stream_cache_mb: self.stream_cache_mb,
         };
         if let Err(err) = self.settings_store.save(&settings) {
             tracing::warn!("failed to persist settings: {err:#}");
@@ -1864,6 +1884,7 @@ mod tests {
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
+            stream_cache_mb: 512,
         };
         let store = MemorySettingsStore::default();
         store.save(&custom_settings).unwrap();
@@ -2249,6 +2270,7 @@ mod tests {
                 hi_res_covers: false,
                 skip_silence: false,
                 loudness_normalization: false,
+                stream_cache_mb: 512,
             })
             .unwrap();
 
@@ -2540,5 +2562,32 @@ mod tests {
         assert!(state.loudness_normalization);
         assert!(state.audio.skip_silence());
         assert!(state.audio.loudness_normalization());
+    }
+
+    #[test]
+    fn test_stream_cache_mb_forwarding_and_persistence() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        state.set_settings_store(Box::new(store.clone()));
+
+        assert_eq!(state.stream_cache_mb, 512);
+        assert_eq!(state.audio.stream_cache_budget_mb(), 512);
+
+        state.set_stream_cache_mb(1024);
+        assert_eq!(state.stream_cache_mb, 1024);
+        assert_eq!(state.audio.stream_cache_budget_mb(), 1024);
+        assert_eq!(store.load().stream_cache_mb, 1024);
+
+        // Clamping to maximum limit
+        state.set_stream_cache_mb(999_999);
+        assert_eq!(state.stream_cache_mb, STREAM_CACHE_MAX_MB);
+        assert_eq!(state.audio.stream_cache_budget_mb(), STREAM_CACHE_MAX_MB);
+        assert_eq!(store.load().stream_cache_mb, STREAM_CACHE_MAX_MB);
+
+        // Disabling with 0
+        state.set_stream_cache_mb(0);
+        assert_eq!(state.stream_cache_mb, 0);
+        assert_eq!(state.audio.stream_cache_budget_mb(), 0);
+        assert_eq!(store.load().stream_cache_mb, 0);
     }
 }

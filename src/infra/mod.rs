@@ -23,6 +23,7 @@ mod session;
 mod session_keyring;
 mod settings;
 mod stream;
+mod stream_cache;
 mod tray;
 mod updater;
 mod updater_github;
@@ -58,6 +59,9 @@ pub use settings::{
     DiskSettingsStore, MemorySettingsStore, Settings, SettingsStore, default_config_dir,
 };
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
+pub use stream_cache::{
+    DEFAULT_STREAM_CACHE_MB, DiskStreamCache, STREAM_CACHE_MAX_MB, stream_cache_file_name,
+};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
 pub use updater_github::{

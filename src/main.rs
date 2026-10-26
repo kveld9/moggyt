@@ -27,8 +27,12 @@ fn main() -> anyhow::Result<()> {
 
     tracing_subscriber_setup();
 
+    let settings_dir = default_config_dir();
+    let settings_store = DiskSettingsStore::new(settings_dir.clone());
+    let settings = settings_store.load();
+
     let data_dir = app_data_dir();
-    let audio = init_live_audio(&data_dir);
+    let audio = init_live_audio(&data_dir, settings.stream_cache_mb);
     let catalog = LiveCatalog::new();
     let session = KeyringSessionStore::moggyt();
     let lyrics = LrclibClient::new();
@@ -46,9 +50,6 @@ fn main() -> anyhow::Result<()> {
     state.set_presence(presence);
     tracing::debug!("discord rich presence live: {}", state.discord.is_live());
 
-    let settings_dir = default_config_dir();
-    let settings_store = DiskSettingsStore::new(settings_dir.clone());
-    let settings = settings_store.load();
     state.set_settings_store(Box::new(settings_store));
     let queue_store = DiskQueueStore::new(settings_dir);
     state.set_queue_store(Box::new(queue_store));
@@ -104,18 +105,21 @@ fn ensure_data_dir(data_dir: &Path) -> anyhow::Result<()> {
     })
 }
 
-/// Attempts to initialize the live rodio backend and yt-dlp sidecar.
-fn init_rodio_backend(data_dir: &Path) -> anyhow::Result<RodioBackend> {
+/// Attempts to initialize the live rodio backend and yt-dlp sidecar with stream caching.
+fn init_rodio_backend(data_dir: &Path, budget_mb: u32) -> anyhow::Result<RodioBackend> {
     ensure_data_dir(data_dir)?;
     let binary =
         ensure_sidecar(data_dir).context("failed to locate or download yt-dlp sidecar binary")?;
-    RodioBackend::new(binary).context("failed to initialize rodio audio output stream")
+    let cache_dir = data_dir.join("streams");
+    let budget_bytes = u64::from(budget_mb).saturating_mul(1024 * 1024);
+    RodioBackend::with_cache_dir(binary, cache_dir, budget_bytes)
+        .context("failed to initialize rodio audio output stream")
 }
 
 /// Initializes audio backend with live rodio playback, falling back to muted stub on any failure.
-fn init_live_audio(data_dir: &Path) -> LiveAudio {
-    match init_rodio_backend(data_dir) {
-        Ok(backend) => LiveAudio::Live(backend),
+fn init_live_audio(data_dir: &Path, budget_mb: u32) -> LiveAudio {
+    match init_rodio_backend(data_dir, budget_mb) {
+        Ok(backend) => LiveAudio::Live(Box::new(backend)),
         Err(err) => {
             tracing::warn!("audio initialization failed; running with muted stub: {err:#}");
             LiveAudio::muted()

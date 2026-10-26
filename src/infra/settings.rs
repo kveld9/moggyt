@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 
 use super::stream::AudioQuality;
+use super::stream_cache::{DEFAULT_STREAM_CACHE_MB, STREAM_CACHE_MAX_MB};
 use crate::domain::ThemeId;
 use crate::i18n::Locale;
 
@@ -22,6 +23,10 @@ const fn default_false() -> bool {
 
 const fn default_volume() -> u8 {
     100
+}
+
+const fn default_stream_cache_mb() -> u32 {
+    DEFAULT_STREAM_CACHE_MB
 }
 
 /// Persistent user settings.
@@ -53,6 +58,9 @@ pub struct Settings {
     /// Whether loudness normalization to -14 LUFS is enabled.
     #[serde(default = "default_false")]
     pub loudness_normalization: bool,
+    /// Storage budget for offline stream caching in megabytes (0 disables caching).
+    #[serde(default = "default_stream_cache_mb")]
+    pub stream_cache_mb: u32,
 }
 
 impl Default for Settings {
@@ -68,6 +76,7 @@ impl Default for Settings {
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
+            stream_cache_mb: DEFAULT_STREAM_CACHE_MB,
         }
     }
 }
@@ -85,6 +94,7 @@ impl Settings {
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
+            stream_cache_mb: DEFAULT_STREAM_CACHE_MB,
         }
     }
 }
@@ -113,6 +123,7 @@ impl SettingsStore for MemorySettingsStore {
     fn load(&self) -> Settings {
         let mut settings = self.inner.lock().map(|g| g.clone()).unwrap_or_default();
         settings.volume = settings.volume.min(100);
+        settings.stream_cache_mb = settings.stream_cache_mb.min(STREAM_CACHE_MAX_MB);
         settings
     }
 
@@ -161,6 +172,7 @@ impl SettingsStore for DiskSettingsStore {
         let mut settings: Settings =
             serde_json::from_slice(&bytes).unwrap_or_else(|_| Settings::fallback());
         settings.volume = settings.volume.min(100);
+        settings.stream_cache_mb = settings.stream_cache_mb.min(STREAM_CACHE_MAX_MB);
         settings
     }
 
@@ -211,6 +223,7 @@ mod tests {
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
+        assert_eq!(loaded.stream_cache_mb, 512);
         assert_eq!(loaded, Settings::default());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -254,6 +267,7 @@ mod tests {
             hi_res_covers: true,
             skip_silence: true,
             loudness_normalization: true,
+            stream_cache_mb: 256,
         };
 
         store.save(&modified).expect("save should succeed");
@@ -279,6 +293,7 @@ mod tests {
         assert!(!fallback.hi_res_covers);
         assert!(!fallback.skip_silence);
         assert!(!fallback.loudness_normalization);
+        assert_eq!(fallback.stream_cache_mb, 512);
     }
 
     #[test]
@@ -294,6 +309,7 @@ mod tests {
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
+        assert_eq!(loaded.stream_cache_mb, 512);
         assert_eq!(loaded, Settings::default());
     }
 
@@ -318,6 +334,7 @@ mod tests {
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
+        assert_eq!(loaded.stream_cache_mb, 512);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
@@ -372,5 +389,33 @@ mod tests {
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(!omitted.skip_silence);
         assert!(!omitted.loudness_normalization);
+    }
+
+    #[test]
+    fn test_stream_cache_mb_clamping_and_serde_defaults() {
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(omitted.stream_cache_mb, 512);
+
+        let explicit: Settings =
+            serde_json::from_str(r#"{"stream_cache_mb": 1024}"#).expect("deserialize explicit");
+        assert_eq!(explicit.stream_cache_mb, 1024);
+
+        let disabled: Settings =
+            serde_json::from_str(r#"{"stream_cache_mb": 0}"#).expect("deserialize 0");
+        assert_eq!(disabled.stream_cache_mb, 0);
+
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-test-cache-clamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let store = DiskSettingsStore::new(temp_dir.clone());
+
+        let excessive = r#"{"stream_cache_mb": 999999}"#;
+        std::fs::write(store.file_path(), excessive).unwrap();
+
+        let loaded = store.load();
+        assert_eq!(loaded.stream_cache_mb, STREAM_CACHE_MAX_MB);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
