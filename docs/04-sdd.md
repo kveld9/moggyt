@@ -54,10 +54,10 @@ isolation, with domain logic remaining purely deterministic and free of I/O side
 Extended backlog requirements (milestones and port mappings):
 
 1. **Catalog API hardening** (`Catalog` port; v1 hardening / v1.1):
-   - Supply `X-Goog-FieldMask` headers on browse requests to slim JSON payloads to required fields.
-   - Parse the `OMV-vs-UGC` track flag (`is_official_music_video`) and expose a "prefer official releases" toggle.
-   - Encapsulate client identity (`clientName`, `clientVersion`, `apiKey`, `visitorData`) in a single
-     configuration module to enable rapid version bumps when YouTube alters endpoints.
+   - Request slim response payloads on browse requests to limit JSON payloads to required fields.
+   - Distinguish official releases from user uploads and expose a "prefer official releases" toggle.
+   - Encapsulate client identity in a single configuration module to enable rapid version bumps
+     when YouTube alters endpoints.
    - Retain cookie-based auth under locked decision D-2; record an alternative catalog API as a secondary
      catalog fallback, while keeping the `yt-dlp` sidecar as the primary stream resolver (D-1).
 2. **Lyrics specification and timing model** (`LyricsSource` port; FR-8 extension, v1.1+):
@@ -240,8 +240,7 @@ CI builds on `ubuntu-latest` and `windows-latest` only. Artifacts: `.AppImage` a
 NSIS `.exe` (x64) for Windows. No signing in v1, so the docs explain the expected SmartScreen and quarantine prompts.
 `Cargo.lock` stays committed. V1 auto-update is check-plus-link to the Releases page; silent self-update is
 deferred to v2.
-Arch Linux is served via `packaging/arch/moggyt-bin` PKGBUILD (`-bin`, repackages release tarball);
-AUR submission is TODO.
+Arch Linux is served via `packaging/arch/moggyt-bin` PKGBUILD (`-bin`, repackages release tarball).
 
 ## 11 Security and privacy
 
@@ -284,11 +283,11 @@ Each milestone ships as small PRs under 400 lines:
 - `egui` limits for rich media lists: virtualized rows and off-thread image decoding.
 - Linux keyring fragmentation: fall back to a clear error plus docs when no provider exists.
 - Scope creep from the 40-plugin reference: ports anticipate extensions; the SDK stays v2.
-- Catalog API client-identity rot: mitigated by a single client-identity configuration module (name,
-  clientVersion, apiKey, visitorData) combined with golden JSON response fixtures for early breakage detection.
-- Cipher and PoToken upkeep: avoided entirely via the `yt-dlp` sidecar; in-app signature deciphering
-  and botguard solvers are explicitly rejected (delegated to the `yt-dlp` sidecar instead) to prevent
-  ongoing maintenance churn.
+- Catalog API client-identity rot: mitigated by a single client-identity configuration module
+  combined with golden JSON response fixtures for early breakage detection.
+- Stream deciphering upkeep: avoided entirely via the `yt-dlp` sidecar; in-app deciphering
+  is explicitly rejected (delegated to the `yt-dlp` sidecar instead) to prevent ongoing
+  maintenance churn.
 
 ## 15 Open questions
 
