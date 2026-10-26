@@ -1,0 +1,15 @@
+{
+  "contents": { "singleColumnBrowseResultsRenderer": { "tabs": [{ "tabRenderer": { "content": { "sectionListRenderer": { "contents": [
+    { "musicCarouselShelfRenderer": {
+      "header": { "musicCarouselShelfBasicHeaderRenderer": { "title": { "runs": [{ "text": "Quick picks" }] } } },
+      "contents": [
+        { "musicResponsiveListItemRenderer": { "flexColumns": [{ "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Home Track" }] } } }, { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Home Artist" }] } } }], "navigationEndpoint": { "watchEndpoint": { "videoId": "home-t1" } } } },
+        { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Home Album", "navigationEndpoint": { "browseEndpoint": { "browseId": "MPREb_home_1" } } }] }, "subtitle": { "runs": [{ "text": "Home Artist" }] } } }
+      ]
+    } },
+    { "musicShelfRenderer": {
+      "title": { "runs": [{ "text": "Artists" }] },
+      "contents": [{ "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Featured Artist", "navigationEndpoint": { "browseEndpoint": { "browseId": "UC_feat_1" } } }] }, "subtitle": { "runs": [{ "text": "Artist" }] } } }]
+    } }
+  ] } } } }] } }
+}

@@ -1,6 +1,6 @@
 //! InnerTube API client and response parser for YouTube Music search.
 
-use crate::domain::SearchFilter;
+use crate::domain::{Album, Artist, Playlist, SearchFilter, SearchResult, Shelf, Track};
 use serde_json::Value;
 use std::time::Duration;
 
@@ -17,24 +17,47 @@ pub const YTM_API_KEY: &str = "AIzaSyC1xlcUPO2SCEmJEWeeIg4X6KyWnhDk-4M";
 /// requests with HTTP 400 FAILED_PRECONDITION. No auto-discovery in v1.
 pub const YTM_CLIENT_VERSION: &str = "1.20251022.01.00";
 
+/// InnerTube browse ID for the home recommendations page.
+pub const HOME_BROWSE_ID: &str = "FEmusic_home";
+
 /// Returns the InnerTube search endpoint URL.
 pub fn search_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/search?key={YTM_API_KEY}&prettyPrint=false")
 }
 
+/// Returns the InnerTube browse endpoint URL.
+pub fn browse_url() -> String {
+    format!("https://music.youtube.com/youtubei/v1/browse?key={YTM_API_KEY}&prettyPrint=false")
+}
+
+fn remix_context() -> Value {
+    serde_json::json!({
+        "client": {
+            "clientName": "WEB_REMIX",
+            "clientVersion": YTM_CLIENT_VERSION,
+            "hl": "en",
+            "gl": "US",
+        }
+    })
+}
+
 /// Builds the minimal WEB_REMIX search payload for `query`.
 pub fn search_body(query: &str) -> Value {
-    serde_json::json!({
-        "context": {
-            "client": {
-                "clientName": "WEB_REMIX",
-                "clientVersion": YTM_CLIENT_VERSION,
-                "hl": "en",
-                "gl": "US",
-            }
-        },
-        "query": query,
-    })
+    serde_json::json!({ "context": remix_context(), "query": query })
+}
+
+/// Builds the minimal WEB_REMIX browse payload for `browse_id`.
+pub fn browse_body(browse_id: &str) -> Value {
+    serde_json::json!({ "context": remix_context(), "browseId": browse_id })
+}
+
+/// Converts a raw track hit into a domain `Track`.
+pub fn raw_to_track(raw: RawTrack) -> Track {
+    let track = Track::new(&raw.video_id, &raw.title, &raw.artist);
+    match raw.thumb_url {
+        Some(url) => track.with_artwork(url),
+        None => track,
+    }
 }
 
 /// Parsed track hit from InnerTube search.
@@ -350,6 +373,145 @@ pub fn parse_search_all(value: &Value) -> SearchHits {
     hits
 }
 
+fn classify_two_row_filter(id: &str, category: Option<SearchFilter>) -> Option<SearchFilter> {
+    if let Some(cat) = category {
+        return Some(cat);
+    }
+    if id.starts_with("MPREb") {
+        return Some(SearchFilter::Albums);
+    }
+    if id.starts_with("UC") {
+        return Some(SearchFilter::Artists);
+    }
+    if id.starts_with("VL") || id.starts_with("PL") {
+        return Some(SearchFilter::Playlists);
+    }
+    None
+}
+
+fn parse_two_row_result(renderer: &Value, category: Option<SearchFilter>) -> Option<SearchResult> {
+    let (title, subtitle, id_opt) = parse_two_row(renderer)?;
+    let id = id_opt.unwrap_or_default();
+    let filter = classify_two_row_filter(&id, category).unwrap_or_else(|| {
+        let sub = subtitle.to_ascii_lowercase();
+        if sub.contains("artist") {
+            SearchFilter::Artists
+        } else if sub.contains("playlist") {
+            SearchFilter::Playlists
+        } else {
+            SearchFilter::Albums
+        }
+    });
+    match filter {
+        SearchFilter::Artists => Some(SearchResult::Artist(Artist::new(&id, &title))),
+        SearchFilter::Playlists => Some(SearchResult::Playlist(Playlist::new(&id, &title, 0))),
+        _ => Some(SearchResult::Album(Album::new(&id, &title, &subtitle))),
+    }
+}
+
+fn parse_shelf_item(item: &Value, category: Option<SearchFilter>) -> Option<SearchResult> {
+    if let Some(r) = item.get("musicResponsiveListItemRenderer") {
+        return parse_item(r).map(|t| SearchResult::Track(raw_to_track(t)));
+    }
+    if let Some(r) = item.get("musicTwoRowItemRenderer") {
+        return parse_two_row_result(r, category);
+    }
+    None
+}
+
+fn shelf_node_title(shelf: &Value) -> Option<&str> {
+    const PATHS: &[&str] =
+        &["/header/musicCarouselShelfBasicHeaderRenderer/title/runs/0/text", "/title/runs/0/text"];
+    for path in PATHS {
+        if let Some(t) = shelf.pointer(path).and_then(Value::as_str) {
+            let trimmed = t.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
+fn extract_shelf_node(section: &Value) -> Option<&Value> {
+    section.get("musicCarouselShelfRenderer").or_else(|| section.get("musicShelfRenderer"))
+}
+
+fn parse_shelf(shelf: &Value) -> Option<Shelf> {
+    let title = shelf_node_title(shelf)?;
+    let items_val = shelf.get("contents").and_then(Value::as_array)?;
+    let category = shelf_category(title);
+    let mut items = Vec::new();
+    for item in items_val {
+        if let Some(parsed) = parse_shelf_item(item, category) {
+            items.push(parsed);
+        }
+    }
+    if items.is_empty() {
+        return None;
+    }
+    Some(Shelf { title: title.to_owned(), items })
+}
+
+fn browse_sections(value: &Value) -> Option<&Vec<Value>> {
+    const PATHS: &[&str] = &[
+        "/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents",
+        "/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents",
+        "/contents/sectionListRenderer/contents",
+    ];
+    for path in PATHS {
+        if let Some(arr) = value.pointer(path).and_then(Value::as_array) {
+            return Some(arr);
+        }
+    }
+    None
+}
+
+/// Parses home shelves into domain `Shelf` items from an InnerTube browse response.
+pub fn parse_home_shelves(value: &Value) -> Vec<Shelf> {
+    let mut shelves = Vec::new();
+    let Some(sections) = browse_sections(value) else {
+        return shelves;
+    };
+    for section in sections {
+        if let Some(shelf_node) = extract_shelf_node(section) {
+            if let Some(shelf) = parse_shelf(shelf_node) {
+                shelves.push(shelf);
+            }
+        }
+    }
+    shelves
+}
+
+fn collect_shelf_tracks(items: &[Value], tracks: &mut Vec<Track>) {
+    for item in items {
+        if let Some(r) = item.get("musicResponsiveListItemRenderer") {
+            if let Some(raw) = parse_item(r) {
+                tracks.push(raw_to_track(raw));
+            }
+        }
+    }
+}
+
+fn collect_tracks_from_section(section: &Value, tracks: &mut Vec<Track>) {
+    let shelf =
+        section.get("musicShelfRenderer").or_else(|| section.get("musicPlaylistShelfRenderer"));
+    if let Some(items) = shelf.and_then(|s| s.get("contents")).and_then(Value::as_array) {
+        collect_shelf_tracks(items, tracks);
+    }
+}
+
+/// Parses album track list from an InnerTube album browse response.
+pub fn parse_album_tracks(value: &Value) -> Vec<Track> {
+    let mut tracks = Vec::new();
+    if let Some(sections) = browse_sections(value) {
+        for section in sections {
+            collect_tracks_from_section(section, &mut tracks);
+        }
+    }
+    tracks
+}
+
 /// Blocking HTTP client for the InnerTube API.
 #[derive(Debug)]
 pub struct InnerTube {
@@ -392,6 +554,29 @@ impl InnerTube {
     /// Performs search for `query` and returns grouped search hits across all shelves.
     pub fn search_all(&self, query: &str) -> anyhow::Result<SearchHits> {
         self.search_payload(query).map(|p| parse_search_all(&p))
+    }
+
+    /// Executes browse request for `browse_id` and returns unparsed JSON response payload.
+    pub fn browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
+        let url = browse_url();
+        let body = browse_body(browse_id);
+        let response = self.client.post(&url).json(&body).send()?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("InnerTube browse request failed with status: {status}");
+        }
+        let payload: Value = response.json()?;
+        Ok(payload)
+    }
+
+    /// Fetches and parses home shelves from InnerTube.
+    pub fn home_shelves(&self) -> anyhow::Result<Vec<Shelf>> {
+        self.browse_payload(HOME_BROWSE_ID).map(|p| parse_home_shelves(&p))
+    }
+
+    /// Fetches and parses album tracks for `album_id`.
+    pub fn album_tracks(&self, album_id: &str) -> anyhow::Result<Vec<Track>> {
+        self.browse_payload(album_id).map(|p| parse_album_tracks(&p))
     }
 
     /// Converts this InnerTube client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
@@ -669,5 +854,56 @@ mod tests {
         assert!(first.albums.is_empty());
         assert!(first.artists.is_empty());
         assert!(first.playlists.is_empty());
+    }
+
+    #[test]
+    fn browse_builders_structure() {
+        assert!(browse_url().contains("/youtubei/v1/browse"));
+        assert_eq!(browse_body("FEmusic_home")["browseId"], "FEmusic_home");
+    }
+
+    #[test]
+    fn parse_home_shelves_golden_fixture_and_determinism() {
+        assert!(parse_home_shelves(&serde_json::json!({})).is_empty());
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let path = std::path::Path::new(manifest_dir).join("tests/fixtures/innertube_home.json");
+        let raw = std::fs::read_to_string(path).expect("fixture readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture");
+
+        let first = parse_home_shelves(&payload);
+        assert_eq!(first, parse_home_shelves(&payload), "home shelves must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0].title, "Quick picks");
+        assert_eq!(first[0].items.len(), 2);
+        assert_eq!(
+            first[0].items[0],
+            SearchResult::Track(Track::new("home-t1", "Home Track", "Home Artist"))
+        );
+        assert_eq!(
+            first[0].items[1],
+            SearchResult::Album(Album::new("MPREb_home_1", "Home Album", "Home Artist"))
+        );
+        assert_eq!(first[1].title, "Artists");
+        assert_eq!(first[1].items.len(), 1);
+        assert_eq!(
+            first[1].items[0],
+            SearchResult::Artist(Artist::new("UC_feat_1", "Featured Artist"))
+        );
+    }
+
+    #[test]
+    fn parse_album_tracks_golden_fixture_and_determinism() {
+        assert!(parse_album_tracks(&serde_json::json!({})).is_empty());
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let path =
+            std::path::Path::new(manifest_dir).join("tests/fixtures/innertube_album_detail.json");
+        let raw = std::fs::read_to_string(path).expect("fixture readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture");
+
+        let first = parse_album_tracks(&payload);
+        assert_eq!(first, parse_album_tracks(&payload), "album tracks must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0], Track::new("alb-t1", "Album Track 1", "Band"));
+        assert_eq!(first[1], Track::new("alb-t2", "Album Track 2", "Band"));
     }
 }

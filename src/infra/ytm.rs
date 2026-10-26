@@ -2,8 +2,11 @@
 
 use super::innertube::{
     InnerTube, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
+    raw_to_track,
 };
-use crate::domain::{Album, Artist, Playlist, SearchFilter, SearchQuery, SearchResult, Track};
+use crate::domain::{
+    Album, Artist, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf, Track,
+};
 
 /// Catalog port: search by free text and user library read/mutation access.
 pub trait Catalog {
@@ -25,6 +28,17 @@ pub trait Catalog {
     /// Adds (`liked = true`) or removes (`liked = false`) a track from the liked collection.
     /// Blank identifiers are ignored.
     fn set_liked(&mut self, track_id: &str, liked: bool);
+
+    /// Returns home shelves with catalog recommendations.
+    fn home_shelves(&self) -> Vec<Shelf>;
+
+    /// Returns tracks for the specified album.
+    fn album_tracks(&self, album_id: &str) -> Vec<Track>;
+
+    /// Returns tracks for the specified album (alias for `album_tracks`).
+    fn album_detail(&self, album_id: &str) -> Vec<Track> {
+        self.album_tracks(album_id)
+    }
 }
 
 /// Fixed-data stub: keeps UI and tests deterministic until the real API lands.
@@ -131,6 +145,26 @@ impl Catalog for CatalogStub {
             self.liked_ids.retain(|id| id != trimmed);
         }
     }
+
+    fn home_shelves(&self) -> Vec<Shelf> {
+        vec![
+            Shelf {
+                title: "Quick picks".to_owned(),
+                items: vec![SearchResult::Track(Self::fixed_hits("quick")[0].clone())],
+            },
+            Shelf {
+                title: "Featured Albums".to_owned(),
+                items: vec![SearchResult::Album(Self::stub_album())],
+            },
+        ]
+    }
+
+    fn album_tracks(&self, _album_id: &str) -> Vec<Track> {
+        vec![
+            Track::new("stub-album-t1", "Album Track 1", "Stub Artist"),
+            Track::new("stub-album-t2", "Album Track 2", "Stub Artist"),
+        ]
+    }
 }
 
 /// InnerTube-backed YouTube Music catalog implementing the [`Catalog`] port.
@@ -169,14 +203,6 @@ impl YtmCatalog {
             SearchFilter::Artists => map_artists(hits.artists).collect(),
             SearchFilter::Playlists => map_playlists(hits.playlists).collect(),
         }
-    }
-}
-
-fn raw_to_track(raw: RawTrack) -> Track {
-    let track = Track::new(&raw.video_id, &raw.title, &raw.artist);
-    match raw.thumb_url {
-        Some(url) => track.with_artwork(url),
-        None => track,
     }
 }
 
@@ -228,6 +254,16 @@ impl Catalog for YtmCatalog {
     /// Sets liked status. Anonymous interim is a no-op because an unauthenticated
     /// client cannot mutate remote user library state.
     fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+
+    /// Returns home recommendation shelves. Network failures map to an empty vector.
+    fn home_shelves(&self) -> Vec<Shelf> {
+        self.tube.home_shelves().unwrap_or_default()
+    }
+
+    /// Returns tracks for the specified album. Network failures map to an empty vector.
+    fn album_tracks(&self, album_id: &str) -> Vec<Track> {
+        self.tube.album_tracks(album_id).unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
@@ -416,5 +452,20 @@ mod tests {
         assert!(catalog.playlists().is_empty());
         assert!(catalog.saved_albums().is_empty());
         assert!(catalog.liked_tracks().is_empty());
+    }
+
+    #[test]
+    fn stub_catalog_home_and_album_methods_are_deterministic() {
+        let catalog = CatalogStub::new();
+
+        let shelves = catalog.home_shelves();
+        assert_eq!(shelves, catalog.home_shelves());
+        assert_eq!(shelves.len(), 2);
+        assert_eq!(shelves[0].title, "Quick picks");
+
+        let album_tracks = catalog.album_tracks("stub-album-1");
+        assert_eq!(album_tracks, catalog.album_tracks("stub-album-1"));
+        assert_eq!(album_tracks, catalog.album_detail("stub-album-1"));
+        assert_eq!(album_tracks.len(), 2);
     }
 }
