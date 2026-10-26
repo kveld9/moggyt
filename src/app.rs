@@ -13,9 +13,10 @@ use crate::domain::{
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, AudioQuality, COVER_MAX_PX, Catalog, CoverCache, DesktopPresence,
-    DiscordPresence, GithubUpdater, LyricLine, LyricsSource, MemorySettingsStore, Presence,
-    Scrobbler, SessionStore, Settings, SettingsStore, StubScrobbler, TrayAction, TrayHandle,
-    Updater, decode_cover, fetch_artwork, is_newer, sanitize_cookie_input, should_scrobble,
+    DiscordPresence, GithubUpdater, LyricLine, LyricsSource, MediaKeyAction, MemorySettingsStore,
+    Presence, Scrobbler, SessionStore, Settings, SettingsStore, StubScrobbler, TrayAction,
+    TrayHandle, Updater, decode_cover, fetch_artwork, is_newer, sanitize_cookie_input,
+    should_scrobble,
 };
 
 /// Navigation pages of the application shell.
@@ -301,11 +302,41 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.apply_actions(&actions)
     }
 
+    /// Dispatches a single media key action to application state.
+    fn handle_media_key(&mut self, action: MediaKeyAction) {
+        match action {
+            MediaKeyAction::Toggle => self.toggle_play(),
+            MediaKeyAction::Next => self.next_track(),
+            MediaKeyAction::Previous => self.prev_track(),
+            MediaKeyAction::Stop => self.stop_playback(),
+        }
+    }
+
+    fn stop_playback(&mut self) {
+        if self.audio.is_playing() {
+            self.audio.pause();
+        }
+    }
+
+    /// Applies a batch of media key actions to application state.
+    fn apply_media_keys(&mut self, actions: &[MediaKeyAction]) {
+        for action in actions {
+            self.handle_media_key(*action);
+        }
+    }
+
+    /// Drains pending inbound media key actions from desktop presence and applies them.
+    fn drain_media_keys(&mut self) {
+        let actions = self.presence.drain_actions();
+        self.apply_media_keys(&actions);
+    }
+
     /// Synchronizes current playback state and track metadata with presence adapters.
     ///
-    /// Fans out active track metadata or queue clearance to both desktop media presence
-    /// (MPRIS on Linux, SMTC on Windows) and Discord Rich Presence.
+    /// Drains inbound media key actions first, then fans out active track metadata or queue
+    /// clearance to both desktop media presence (MPRIS on Linux, SMTC on Windows) and Discord Rich Presence.
     fn sync_presence(&mut self) {
+        self.drain_media_keys();
         let is_playing = self.audio.is_playing();
         let track_info = self.queue.current().map(|t| (t.artist.clone(), t.title.clone()));
         match track_info {
@@ -1784,6 +1815,55 @@ mod tests {
         let quit = state.apply_actions(&[TrayAction::TogglePlay, TrayAction::Quit]);
         assert!(quit);
         assert!(!state.audio.is_playing());
+    }
+
+    #[test]
+    fn inbound_media_keys_dispatch_via_presence_queue() {
+        let mut state = wired();
+        state.search_text = "midnight".into();
+        state.submit_search();
+        state.search_text = "sunrise".into();
+        state.submit_search();
+        assert_eq!(state.queue.len(), 2);
+        assert!(!state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("midnight"));
+
+        // Queued Toggle flips playback state via existing fakes (starts playing head)
+        state.presence.enqueue_action(MediaKeyAction::Toggle);
+        state.sync_presence();
+        assert!(state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("midnight"));
+
+        // Queued Next advances the queue head and plays
+        state.presence.enqueue_action(MediaKeyAction::Next);
+        state.sync_presence();
+        assert!(state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("sunrise"));
+
+        // Queued Toggle flips playback state back to paused
+        state.presence.enqueue_action(MediaKeyAction::Toggle);
+        state.sync_presence();
+        assert!(!state.audio.is_playing());
+
+        // Queued Stop on paused playback remains paused
+        state.presence.enqueue_action(MediaKeyAction::Stop);
+        state.sync_presence();
+        assert!(!state.audio.is_playing());
+
+        // Resume playback with Toggle, then Stop pauses
+        state.presence.enqueue_action(MediaKeyAction::Toggle);
+        state.sync_presence();
+        assert!(state.audio.is_playing());
+
+        state.presence.enqueue_action(MediaKeyAction::Stop);
+        state.sync_presence();
+        assert!(!state.audio.is_playing());
+
+        // Queued Previous retreats the queue head and plays
+        state.presence.enqueue_action(MediaKeyAction::Previous);
+        state.sync_presence();
+        assert!(state.audio.is_playing());
+        assert_eq!(state.queue.current().map(|t| t.title.as_str()), Some("midnight"));
     }
 
     #[test]

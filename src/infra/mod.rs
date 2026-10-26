@@ -37,7 +37,7 @@ pub use instance::{SingleInstanceGuard, instance_lock_name};
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
 pub use lyrics_lrclib::{LrclibClient, lrclib_get_url, parse_lrc};
 pub use presence::{NoopPresence, Presence};
-pub use presence_desktop::{DesktopPresence, metadata_for, status_for};
+pub use presence_desktop::{DesktopPresence, MediaKeyAction, action_for, metadata_for, status_for};
 pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts};
 pub use scrobble::{
     CredentialStore, KeyringCredentialStore, LastFmClient, LastFmCredentials,
