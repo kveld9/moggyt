@@ -232,7 +232,7 @@ image decoding runs off the UI thread with placeholders. Theming is a single nat
 - Windows: SMTC integration, tray icon with thumbnail controls, single instance via named mutex.
 - Shared: media keys, desktop notifications, configurable global shortcuts (off by default
   where the compositor restricts them, with an explanatory note).
-  Note: inbound MPRIS/SMTC media-key routing is attach-no-op (outbound metadata only; inbound dispatch deferred).
+  Note: inbound MPRIS/SMTC media-key routing is live (non-blocking dispatch to UI thread).
 
 ## 10 Packaging and releases
 
@@ -272,7 +272,7 @@ Each milestone ships as small PRs under 400 lines:
 3. `yt-dlp` resolver plus `rodio` playback plus player bar.
 4. Cookie-import auth with OS keyring plus library views.
 5. LRCLIB lyrics plus cover cache.
-6. MPRIS/SMTC plus tray plus single instance (inbound media-key routing deferred; outbound metadata only).
+6. MPRIS/SMTC plus tray plus single instance (inbound media-key routing is live).
 7. Release pipeline (AppImage, deb, exe) plus update check.
 8. Polish: Discord presence, Last.fm, hi-res covers.
 
