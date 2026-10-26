@@ -2,7 +2,8 @@
 
 use eframe::egui;
 
-use crate::app::{AppState, render_home_shelves};
+use crate::app::AppState;
+use crate::app::pages::home::render_home_shelves;
 use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 
 /// Renders the search page view with home shelves and search input.

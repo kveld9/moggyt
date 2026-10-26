@@ -8,7 +8,7 @@ pub mod pages;
 pub mod theme;
 
 use components::{render_player_bar, render_top_bar};
-use pages::{render_library, render_now_playing, render_queue, render_search};
+use pages::{render_detail, render_library, render_now_playing, render_queue, render_search};
 
 use eframe::egui;
 
@@ -971,7 +971,7 @@ fn render_body<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K:
     });
 }
 
-fn shelf_item_display(item: &SearchResult) -> String {
+pub(crate) fn shelf_item_display(item: &SearchResult) -> String {
     match item {
         SearchResult::Track(track) => format!("{} - {}", track.title, track.artist),
         SearchResult::Album(album) => {
@@ -983,98 +983,12 @@ fn shelf_item_display(item: &SearchResult) -> String {
     }
 }
 
-fn item_detail_target(item: &SearchResult) -> Option<(String, DetailKind)> {
+pub(crate) fn item_detail_target(item: &SearchResult) -> Option<(String, DetailKind)> {
     match item {
         SearchResult::Album(album) => Some((album.id.clone(), DetailKind::Album)),
         SearchResult::Artist(artist) => Some((artist.id.clone(), DetailKind::Artist)),
         SearchResult::Playlist(playlist) => Some((playlist.id.clone(), DetailKind::Playlist)),
         SearchResult::Track(_) => None,
-    }
-}
-
-fn render_home_shelves<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S, L, K>,
-) {
-    ui.horizontal(|ui| {
-        ui.heading("Home");
-        if ui.button("Refresh").clicked() {
-            state.reload_home();
-        }
-    });
-    let mut to_open = None;
-    for shelf in &state.home_shelves {
-        ui.heading(&shelf.title);
-        for item in &shelf.items {
-            ui.horizontal(|ui| {
-                ui.label(shelf_item_display(item));
-                if let Some((id, kind)) = item_detail_target(item) {
-                    if ui.button("Open").clicked() {
-                        to_open = Some((id, kind));
-                    }
-                }
-            });
-        }
-    }
-    if let Some((id, kind)) = to_open {
-        state.open_detail(&id, kind);
-    }
-}
-
-fn render_detail<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
-    ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S, L, K>,
-) {
-    if ui.button("Back").clicked() {
-        state.close_detail();
-        return;
-    }
-    let Some(detail) = state.detail.clone() else {
-        ui.label("No detail available.");
-        return;
-    };
-    ui.heading(&detail.title);
-    if !detail.subtitle.is_empty() {
-        ui.label(&detail.subtitle);
-    }
-    ui.separator();
-    render_detail_tracks(ui, state, &detail.tracks);
-}
-
-fn render_detail_tracks<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    ui: &mut egui::Ui,
-    state: &mut AppState<C, A, S, L, K>,
-    tracks: &[Track],
-) {
-    if tracks.is_empty() {
-        ui.label("No tracks available.");
-        return;
-    }
-    let mut to_play = None;
-    for track in tracks {
-        ui.horizontal(|ui| {
-            let dur_text = track.duration_secs.map_or_else(String::new, |d| format!(" ({d}s)"));
-            ui.label(format!("{} - {}{dur_text}", track.title, track.artist));
-            if ui.button("Play").clicked() {
-                to_play = Some(track.clone());
-            }
-        });
-    }
-    if let Some(track) = to_play {
-        state.queue.push(track);
-        state.play_head();
     }
 }
 
