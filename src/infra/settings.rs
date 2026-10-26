@@ -47,6 +47,12 @@ pub struct Settings {
     /// Whether high-resolution cover artwork decoding is enabled.
     #[serde(default = "default_false")]
     pub hi_res_covers: bool,
+    /// Whether leading/trailing silence should be skipped during playback.
+    #[serde(default = "default_false")]
+    pub skip_silence: bool,
+    /// Whether loudness normalization to -14 LUFS is enabled.
+    #[serde(default = "default_false")]
+    pub loudness_normalization: bool,
 }
 
 impl Default for Settings {
@@ -60,6 +66,8 @@ impl Default for Settings {
             keyboard_shortcuts: true,
             lastfm_enabled: false,
             hi_res_covers: false,
+            skip_silence: false,
+            loudness_normalization: false,
         }
     }
 }
@@ -75,6 +83,8 @@ impl Settings {
             keyboard_shortcuts: true,
             lastfm_enabled: false,
             hi_res_covers: false,
+            skip_silence: false,
+            loudness_normalization: false,
         }
     }
 }
@@ -199,6 +209,8 @@ mod tests {
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
         assert!(!loaded.hi_res_covers);
+        assert!(!loaded.skip_silence);
+        assert!(!loaded.loudness_normalization);
         assert_eq!(loaded, Settings::default());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -240,6 +252,8 @@ mod tests {
             keyboard_shortcuts: false,
             lastfm_enabled: true,
             hi_res_covers: true,
+            skip_silence: true,
+            loudness_normalization: true,
         };
 
         store.save(&modified).expect("save should succeed");
@@ -263,6 +277,8 @@ mod tests {
         assert!(fallback.keyboard_shortcuts);
         assert!(!fallback.lastfm_enabled);
         assert!(!fallback.hi_res_covers);
+        assert!(!fallback.skip_silence);
+        assert!(!fallback.loudness_normalization);
     }
 
     #[test]
@@ -276,6 +292,8 @@ mod tests {
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
         assert!(!loaded.hi_res_covers);
+        assert!(!loaded.skip_silence);
+        assert!(!loaded.loudness_normalization);
         assert_eq!(loaded, Settings::default());
     }
 
@@ -298,6 +316,8 @@ mod tests {
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
         assert!(!loaded.hi_res_covers);
+        assert!(!loaded.skip_silence);
+        assert!(!loaded.loudness_normalization);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
@@ -333,5 +353,24 @@ mod tests {
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(!omitted.lastfm_enabled);
         assert!(!omitted.hi_res_covers);
+    }
+
+    #[test]
+    fn test_dsp_settings_serde_defaults_and_explicit_deserialization() {
+        let with_both_false: Settings =
+            serde_json::from_str(r#"{"skip_silence": false, "loudness_normalization": false}"#)
+                .expect("deserialize false");
+        assert!(!with_both_false.skip_silence);
+        assert!(!with_both_false.loudness_normalization);
+
+        let with_both_true: Settings =
+            serde_json::from_str(r#"{"skip_silence": true, "loudness_normalization": true}"#)
+                .expect("deserialize true");
+        assert!(with_both_true.skip_silence);
+        assert!(with_both_true.loudness_normalization);
+
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert!(!omitted.skip_silence);
+        assert!(!omitted.loudness_normalization);
     }
 }

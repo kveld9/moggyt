@@ -5,6 +5,7 @@
 //! without touching `domain` or `app`.
 
 mod audio;
+mod audio_dsp;
 mod audio_rodio;
 mod catalog_client;
 mod cover;
@@ -29,6 +30,11 @@ mod ytdlp;
 mod ytm;
 
 pub use audio::{AudioBackend, AudioStub};
+pub use audio_dsp::{
+    DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, LoudnessNormalizer,
+    SkipSilence, TARGET_LUFS_DB, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
+    is_silent_sample, linear_to_db, rms_to_db,
+};
 pub use audio_rodio::{LiveAudio, RodioBackend, volume_to_amplitude};
 pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
