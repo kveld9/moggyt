@@ -11,6 +11,9 @@ use eframe::egui;
 /// Source images exceeding this bound are downscaled using a Lanczos3 filter.
 pub const COVER_MAX_PX: u32 = 512;
 
+/// Maximum width or height in pixels for high-resolution decoded cover art textures.
+pub const COVER_HIRES_MAX_PX: u32 = 1024;
+
 /// Fetches cover art bytes over HTTP with a blocking GET request and configurable timeout.
 ///
 /// Fails loud with rich context on network, timeout, or HTTP error status codes.
@@ -86,6 +89,16 @@ mod tests {
         let bytes = sample_png_bytes(1024, 4, [0, 255, 0, 255]);
         let decoded = decode_cover(&bytes, 512).expect("decode oversized PNG");
         assert_eq!(decoded.size, [512, 2]);
+    }
+
+    #[test]
+    fn decode_cover_downscales_oversized_images_to_hires_bound() {
+        let bytes = sample_png_bytes(2048, 1024, [0, 255, 0, 255]);
+        let decoded_default = decode_cover(&bytes, COVER_MAX_PX).expect("decode default PNG");
+        assert_eq!(decoded_default.size, [512, 256]);
+
+        let decoded_hires = decode_cover(&bytes, COVER_HIRES_MAX_PX).expect("decode hires PNG");
+        assert_eq!(decoded_hires.size, [1024, 512]);
     }
 
     #[test]

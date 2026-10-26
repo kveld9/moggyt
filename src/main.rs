@@ -10,9 +10,10 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
-    DesktopPresence, DiskCoverCache, DiskSettingsStore, KeyringSessionStore, LastFmClient,
-    LiveAudio, LiveCatalog, LrclibClient, RodioBackend, SessionStore, SingleInstanceGuard,
-    TrayHandle, default_config_dir, ensure_sidecar,
+    CredentialStore, DesktopPresence, DiskCoverCache, DiskSettingsStore, KeyringCredentialStore,
+    KeyringSessionStore, LastFmClient, LiveAudio, LiveCatalog, LrclibClient, RodioBackend,
+    SessionStore, SettingsStore, SingleInstanceGuard, TrayHandle, client_from_credentials,
+    default_config_dir, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -45,14 +46,15 @@ fn main() -> anyhow::Result<()> {
     state.set_presence(presence);
     tracing::debug!("discord rich presence live: {}", state.discord.is_live());
 
-    // Dormant without credentials; live scrobbling awaits user settings UI and Last.fm app registration.
-    let scrobbler = LastFmClient::new("", "");
-    tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
-    state.set_scrobbler(Box::new(scrobbler));
-
     let settings_dir = default_config_dir();
     let settings_store = DiskSettingsStore::new(settings_dir);
+    let settings = settings_store.load();
     state.set_settings_store(Box::new(settings_store));
+
+    let scrobbler = init_lastfm_scrobbler(settings.lastfm_enabled);
+    tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
+    state.set_scrobbler(Box::new(scrobbler));
+    state.set_credential_store(Box::new(KeyringCredentialStore::moggyt()));
 
     let options = eframe::NativeOptions::default();
     eframe::run_native(
@@ -133,6 +135,29 @@ fn init_cover_cache(data_dir: &Path) -> DiskCoverCache {
         eprintln!("Fatal: failed to initialize cover cache: {err}");
         std::process::exit(1);
     })
+}
+
+/// Initializes the Last.fm client based on persistent settings and stored keyring credentials.
+///
+/// Falls back safely to a dormant client on any keyring access error or missing credentials.
+fn init_lastfm_scrobbler(enabled: bool) -> LastFmClient {
+    if !enabled {
+        tracing::debug!("Last.fm scrobbling disabled in settings; keeping dormant client");
+        return LastFmClient::new("", "");
+    }
+    let store = KeyringCredentialStore::moggyt();
+    let Some(creds) = store.load_lastfm() else {
+        tracing::warn!(
+            "Last.fm enabled in settings but credentials absent or unreadable; scrobbler dormant"
+        );
+        return LastFmClient::new("", "");
+    };
+    if !creds.is_complete() {
+        tracing::warn!("Last.fm credentials incomplete; scrobbler dormant");
+        return LastFmClient::new("", "");
+    }
+    tracing::info!("initializing live Last.fm scrobbler from stored credentials");
+    client_from_credentials(&creds)
 }
 
 fn tracing_subscriber_setup() {
