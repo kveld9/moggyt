@@ -14,7 +14,7 @@ session storage are functional.
   adjustment, and elapsed position reporting.
 - **Queue Management**: ordered in-memory playback queue with cursor navigation, shuffle, and repeat modes (off, all,
   one).
-- **Search & Catalog**: catalog search powered by InnerTube queries with client-side query sanitization.
+- **Search & Catalog**: catalog search powered by catalog API queries with client-side query sanitization.
 - **Library & Authentication**: anonymous browsing by default; optional session cookie import into the OS credential
   store (Secret Service on Linux, Credential Manager on Windows) for library collections. Authenticated library
   endpoints are interim anonymous empty readers.

@@ -1,7 +1,7 @@
 # 02 - Architecture
 
-Minimal hexagonal architecture, aligned with the `principios-git` (repo governance) and
-`principios-codigo` (design, TDD, modularity) kits.
+Minimal hexagonal architecture, aligned with repository governance and
+modular design principles.
 
 ## Dependency direction
 
@@ -36,7 +36,7 @@ src/
     ├── audio.rs       # AudioBackend trait definition
     ├── audio_rodio.rs # rodio playback adapter with LiveAudio fallback
     ├── cover*.rs      # CoverCache port and memory/disk caching adapters
-    ├── innertube.rs   # InnerTube search request builder and parser
+    ├── innertube.rs   # Catalog API search request builder and parser
     ├── instance.rs    # SingleInstanceGuard lock
     ├── lyrics*.rs     # LyricsSource port and LRCLIB synced lyrics client
     ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence

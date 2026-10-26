@@ -63,7 +63,7 @@ pub struct Track {
     pub album: Option<String>,
     /// Optional track duration in seconds.
     pub duration_secs: Option<u32>,
-    /// Highest-resolution InnerTube thumbnail URL when known.
+    /// Highest-resolution catalog thumbnail URL when known.
     pub artwork: Option<String>,
 }
 

@@ -1,4 +1,4 @@
-//! InnerTube API client and response parser for YouTube Music search.
+//! Catalog API client and response parser for YouTube Music search.
 
 use crate::domain::{
     Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchResult, Shelf, Track,
@@ -18,25 +18,25 @@ pub const LIBRARY_LIKED_BROWSE_ID: &str = "FEmusic_liked_videos";
 /// Library saved albums browse identifier for YouTube Music.
 pub const LIBRARY_ALBUMS_BROWSE_ID: &str = "FEmusic_liked_albums";
 
-/// Public InnerTube web API key for the WEB_REMIX client context.
+/// Public catalog API web key for the WEB_REMIX client context.
 ///
 /// Embedded by every unofficial client; grants no private-data or billable-resource
 /// access and cannot be rotated per installation (see `.gitleaks.toml` allowlist).
 pub const YTM_API_KEY: &str = "AIzaSyC1xlcUPO2SCEmJEWeeIg4X6KyWnhDk-4M";
 
-/// InnerTube client version for the WEB_REMIX client context.
+/// Catalog API client version for the WEB_REMIX client context.
 ///
 /// Verified against live API on 2026-10-24. WEB_REMIX client versions
 /// rotate over time; bump this value when YouTube starts rejecting search
 /// requests with HTTP 400 FAILED_PRECONDITION. No auto-discovery in v1.
 pub const YTM_CLIENT_VERSION: &str = "1.20251022.01.00";
 
-/// Returns the InnerTube search endpoint URL.
+/// Returns the catalog API search endpoint URL.
 pub fn search_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/search?key={YTM_API_KEY}&prettyPrint=false")
 }
 
-/// Returns the InnerTube next endpoint URL.
+/// Returns the catalog API next endpoint URL.
 pub fn next_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/next?key={YTM_API_KEY}&prettyPrint=false")
 }
@@ -72,7 +72,7 @@ pub fn next_body(video_id: &str) -> Value {
     })
 }
 
-/// Returns the InnerTube browse endpoint URL.
+/// Returns the catalog API browse endpoint URL.
 pub fn browse_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/browse?key={YTM_API_KEY}&prettyPrint=false")
 }
@@ -92,7 +92,7 @@ pub fn browse_body(browse_id: &str) -> Value {
     })
 }
 
-/// Returns the InnerTube like endpoint URL.
+/// Returns the catalog API like endpoint URL.
 pub fn like_url(liked: bool) -> String {
     let action = if liked { "like" } else { "removelike" };
     format!(
@@ -118,12 +118,12 @@ pub fn like_body(video_id: &str) -> Value {
     })
 }
 
-/// Validates if an InnerTube mutation response succeeded (no error object).
+/// Validates if a catalog API mutation response succeeded (no error object).
 pub fn parse_mutation_response(value: &Value) -> bool {
     value.get("error").is_none()
 }
 
-/// Parsed track hit from InnerTube search.
+/// Parsed track hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawTrack {
     /// YouTube video identifier.
@@ -138,7 +138,7 @@ pub struct RawTrack {
     pub thumb_url: Option<String>,
 }
 
-/// Parsed album hit from InnerTube search.
+/// Parsed album hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawAlbum {
     pub browse_id: String,
@@ -146,14 +146,14 @@ pub struct RawAlbum {
     pub artist: String,
 }
 
-/// Parsed artist hit from InnerTube search.
+/// Parsed artist hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawArtist {
     pub browse_id: String,
     pub name: String,
 }
 
-/// Parsed playlist hit from InnerTube search.
+/// Parsed playlist hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawPlaylist {
     pub browse_id: String,
@@ -263,7 +263,7 @@ fn collect_tab_tracks(tab: &Value, out: &mut Vec<RawTrack>) {
     }
 }
 
-/// Parses search track hits from InnerTube search response payload.
+/// Parses search track hits from catalog API search response payload.
 pub fn parse_search_tracks(value: &Value) -> Vec<RawTrack> {
     let mut tracks = Vec::new();
     let path = "/contents/tabbedSearchResultsRenderer/tabs";
@@ -517,7 +517,7 @@ fn playlist_panel_contents(value: &Value) -> Option<&[Value]> {
         .find_map(|path| value.pointer(path).and_then(Value::as_array).map(Vec::as_slice))
 }
 
-/// Parses radio track hits from InnerTube next response payload.
+/// Parses radio track hits from catalog API next response payload.
 pub fn parse_radio_all(value: &Value) -> Vec<RawTrack> {
     playlist_panel_contents(value)
         .map_or_else(Vec::new, |items| items.iter().filter_map(parse_radio_item).collect())
@@ -580,7 +580,7 @@ fn parse_home_section(section: &Value) -> Option<Shelf> {
     parse_carousel_shelf(shelf)
 }
 
-/// Parses home carousel shelves from InnerTube browse response payload.
+/// Parses home carousel shelves from catalog API browse response payload.
 ///
 /// Browse items are classified using the following heuristic on `browseId`:
 /// - Starts with `"UC"`: [`SearchResult::Artist`]
@@ -750,7 +750,7 @@ fn collect_detail_tracks(value: &Value) -> Vec<Track> {
     tracks
 }
 
-/// Parses a detail view (album, artist, or playlist) from InnerTube browse response payload.
+/// Parses a detail view (album, artist, or playlist) from catalog API browse response payload.
 ///
 /// Returns `None` when neither a header title nor any valid track items are found.
 pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
@@ -798,7 +798,7 @@ fn parse_library_playlist_item(item: &Value) -> Option<Playlist> {
     Some(Playlist::new(&id, &title, count))
 }
 
-/// Parses saved or owned playlists from InnerTube browse response payload.
+/// Parses saved or owned playlists from catalog API browse response payload.
 pub fn parse_library_playlists(value: &Value) -> Vec<Playlist> {
     collect_library_items(value).into_iter().filter_map(parse_library_playlist_item).collect()
 }
@@ -810,17 +810,17 @@ fn parse_library_album_item(item: &Value) -> Option<Album> {
     Some(Album::new(&id, &title, &subtitle))
 }
 
-/// Parses saved albums from InnerTube browse response payload.
+/// Parses saved albums from catalog API browse response payload.
 pub fn parse_library_albums(value: &Value) -> Vec<Album> {
     collect_library_items(value).into_iter().filter_map(parse_library_album_item).collect()
 }
 
-/// Parses liked tracks from InnerTube browse response payload.
+/// Parses liked tracks from catalog API browse response payload.
 pub fn parse_library_liked_tracks(value: &Value) -> Vec<Track> {
     collect_detail_tracks(value)
 }
 
-/// Blocking HTTP client for the InnerTube API.
+/// Blocking HTTP client for the catalog API.
 pub struct InnerTube {
     client: reqwest::blocking::Client,
     api_key: String,
@@ -837,12 +837,12 @@ impl std::fmt::Debug for InnerTube {
 }
 
 impl InnerTube {
-    /// Creates a new InnerTube client with a 10-second request timeout (anonymous).
+    /// Creates a new catalog API client with a 10-second request timeout (anonymous).
     pub fn new() -> Self {
         Self::with_optional_cookies(None)
     }
 
-    /// Creates an authenticated InnerTube client with stored session cookies.
+    /// Creates an authenticated catalog API client with stored session cookies.
     ///
     /// Empty or whitespace-only cookie strings are treated as unauthenticated (`None`).
     pub fn with_cookies(cookies: &str) -> Self {
@@ -1018,7 +1018,7 @@ impl InnerTube {
         let _ = self.set_liked_payload(trimmed, liked);
     }
 
-    /// Converts this InnerTube client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
+    /// Converts this catalog API client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
     pub fn into_catalog(self) -> super::ytm::YtmCatalog {
         super::ytm::YtmCatalog::with_tube(self)
     }
