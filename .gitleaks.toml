@@ -1,14 +1,14 @@
 # Gitleaks allowlist for moggyt.
 #
-# The InnerTube WEB_REMIX client key in src/infra/innertube.rs is a PUBLIC,
+# The catalog API WEB_REMIX client key in src/infra/catalog_client.rs is a PUBLIC,
 # embedded, non-account-bound key shipped by every unofficial YouTube Music
-# client (same key as YTubic/ytmdesktop). It grants no access to private data
+# client (same key as other reference clients). It grants no access to private data
 # or billable GCP resources and cannot be rotated per installation, so it
-# lives in source by design (see the module docs in src/infra/innertube.rs).
+# lives in source by design (see the module docs in src/infra/catalog_client.rs).
 # This entry silences the generic gcp-api-key rule for that single line only.
 
 [allowlist]
-description = "Public InnerTube WEB_REMIX client key (not a private secret)"
+description = "Public CatalogClient WEB_REMIX client key (not a private secret)"
 regexTarget = "line"
 regexes = ["AIzaSyC1xlcUPO2SCEmJEWeeIg4X6KyWnhDk-4M"]
-paths = ["src/infra/innertube\\.rs"]
+paths = ["src/infra/catalog_client\\.rs"]

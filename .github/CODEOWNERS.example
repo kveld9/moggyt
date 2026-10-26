@@ -18,9 +18,9 @@
 /.github/workflows/ @devops-team @kveld9
 
 # Documentation and standards
-/docs/ @docs-team @kveld9
-/README.md @docs-team @kveld9
-/CONTRIBUTING.md @docs-team @kveld9
+/docs/ @kveld9
+/README.md @kveld9
+/CONTRIBUTING.md @kveld9
 
 # Automation and maintenance scripts
 /scripts/ @devops-team

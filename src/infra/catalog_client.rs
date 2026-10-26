@@ -1,4 +1,4 @@
-//! InnerTube API client and response parser for YouTube Music search.
+//! Catalog API client and response parser for YouTube Music search.
 
 use crate::domain::{
     Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchResult, Shelf, Track,
@@ -18,27 +18,27 @@ pub const LIBRARY_LIKED_BROWSE_ID: &str = "FEmusic_liked_videos";
 /// Library saved albums browse identifier for YouTube Music.
 pub const LIBRARY_ALBUMS_BROWSE_ID: &str = "FEmusic_liked_albums";
 
-/// Public InnerTube web API key for the WEB_REMIX client context.
+/// Public catalog API web key for the WEB_REMIX client context.
 ///
 /// Embedded by every unofficial client; grants no private-data or billable-resource
 /// access and cannot be rotated per installation (see `.gitleaks.toml` allowlist).
-pub const YTM_API_KEY: &str = "AIzaSyC1xlcUPO2SCEmJEWeeIg4X6KyWnhDk-4M";
+pub const CATALOG_API_KEY: &str = "AIzaSyC1xlcUPO2SCEmJEWeeIg4X6KyWnhDk-4M";
 
-/// InnerTube client version for the WEB_REMIX client context.
+/// Catalog API client version for the WEB_REMIX client context.
 ///
 /// Verified against live API on 2026-10-24. WEB_REMIX client versions
 /// rotate over time; bump this value when YouTube starts rejecting search
 /// requests with HTTP 400 FAILED_PRECONDITION. No auto-discovery in v1.
-pub const YTM_CLIENT_VERSION: &str = "1.20251022.01.00";
+pub const CATALOG_CLIENT_VERSION: &str = "1.20251022.01.00";
 
-/// Returns the InnerTube search endpoint URL.
+/// Returns the catalog API search endpoint URL.
 pub fn search_url() -> String {
-    format!("https://music.youtube.com/youtubei/v1/search?key={YTM_API_KEY}&prettyPrint=false")
+    format!("https://music.youtube.com/youtubei/v1/search?key={CATALOG_API_KEY}&prettyPrint=false")
 }
 
-/// Returns the InnerTube next endpoint URL.
+/// Returns the catalog API next endpoint URL.
 pub fn next_url() -> String {
-    format!("https://music.youtube.com/youtubei/v1/next?key={YTM_API_KEY}&prettyPrint=false")
+    format!("https://music.youtube.com/youtubei/v1/next?key={CATALOG_API_KEY}&prettyPrint=false")
 }
 
 /// Builds the minimal WEB_REMIX search payload for `query`.
@@ -47,7 +47,7 @@ pub fn search_body(query: &str) -> Value {
         "context": {
             "client": {
                 "clientName": "WEB_REMIX",
-                "clientVersion": YTM_CLIENT_VERSION,
+                "clientVersion": CATALOG_CLIENT_VERSION,
                 "hl": "en",
                 "gl": "US",
             }
@@ -62,7 +62,7 @@ pub fn next_body(video_id: &str) -> Value {
         "context": {
             "client": {
                 "clientName": "WEB_REMIX",
-                "clientVersion": YTM_CLIENT_VERSION,
+                "clientVersion": CATALOG_CLIENT_VERSION,
                 "hl": "en",
                 "gl": "US",
             }
@@ -72,9 +72,9 @@ pub fn next_body(video_id: &str) -> Value {
     })
 }
 
-/// Returns the InnerTube browse endpoint URL.
+/// Returns the catalog API browse endpoint URL.
 pub fn browse_url() -> String {
-    format!("https://music.youtube.com/youtubei/v1/browse?key={YTM_API_KEY}&prettyPrint=false")
+    format!("https://music.youtube.com/youtubei/v1/browse?key={CATALOG_API_KEY}&prettyPrint=false")
 }
 
 /// Builds the minimal WEB_REMIX browse payload for `browse_id`.
@@ -83,7 +83,7 @@ pub fn browse_body(browse_id: &str) -> Value {
         "context": {
             "client": {
                 "clientName": "WEB_REMIX",
-                "clientVersion": YTM_CLIENT_VERSION,
+                "clientVersion": CATALOG_CLIENT_VERSION,
                 "hl": "en",
                 "gl": "US",
             }
@@ -92,12 +92,12 @@ pub fn browse_body(browse_id: &str) -> Value {
     })
 }
 
-/// Returns the InnerTube like endpoint URL.
+/// Returns the catalog API like endpoint URL.
 pub fn like_url(liked: bool) -> String {
     let action = if liked { "like" } else { "removelike" };
     format!(
         "https://music.youtube.com/youtubei/v1/like/{}?key={}&prettyPrint=false",
-        action, YTM_API_KEY
+        action, CATALOG_API_KEY
     )
 }
 
@@ -107,7 +107,7 @@ pub fn like_body(video_id: &str) -> Value {
         "context": {
             "client": {
                 "clientName": "WEB_REMIX",
-                "clientVersion": YTM_CLIENT_VERSION,
+                "clientVersion": CATALOG_CLIENT_VERSION,
                 "hl": "en",
                 "gl": "US",
             }
@@ -118,12 +118,12 @@ pub fn like_body(video_id: &str) -> Value {
     })
 }
 
-/// Validates if an InnerTube mutation response succeeded (no error object).
+/// Validates if a catalog API mutation response succeeded (no error object).
 pub fn parse_mutation_response(value: &Value) -> bool {
     value.get("error").is_none()
 }
 
-/// Parsed track hit from InnerTube search.
+/// Parsed track hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawTrack {
     /// YouTube video identifier.
@@ -138,7 +138,7 @@ pub struct RawTrack {
     pub thumb_url: Option<String>,
 }
 
-/// Parsed album hit from InnerTube search.
+/// Parsed album hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawAlbum {
     pub browse_id: String,
@@ -146,14 +146,14 @@ pub struct RawAlbum {
     pub artist: String,
 }
 
-/// Parsed artist hit from InnerTube search.
+/// Parsed artist hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawArtist {
     pub browse_id: String,
     pub name: String,
 }
 
-/// Parsed playlist hit from InnerTube search.
+/// Parsed playlist hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawPlaylist {
     pub browse_id: String,
@@ -263,7 +263,7 @@ fn collect_tab_tracks(tab: &Value, out: &mut Vec<RawTrack>) {
     }
 }
 
-/// Parses search track hits from InnerTube search response payload.
+/// Parses search track hits from catalog API search response payload.
 pub fn parse_search_tracks(value: &Value) -> Vec<RawTrack> {
     let mut tracks = Vec::new();
     let path = "/contents/tabbedSearchResultsRenderer/tabs";
@@ -517,7 +517,7 @@ fn playlist_panel_contents(value: &Value) -> Option<&[Value]> {
         .find_map(|path| value.pointer(path).and_then(Value::as_array).map(Vec::as_slice))
 }
 
-/// Parses radio track hits from InnerTube next response payload.
+/// Parses radio track hits from catalog API next response payload.
 pub fn parse_radio_all(value: &Value) -> Vec<RawTrack> {
     playlist_panel_contents(value)
         .map_or_else(Vec::new, |items| items.iter().filter_map(parse_radio_item).collect())
@@ -580,7 +580,7 @@ fn parse_home_section(section: &Value) -> Option<Shelf> {
     parse_carousel_shelf(shelf)
 }
 
-/// Parses home carousel shelves from InnerTube browse response payload.
+/// Parses home carousel shelves from catalog API browse response payload.
 ///
 /// Browse items are classified using the following heuristic on `browseId`:
 /// - Starts with `"UC"`: [`SearchResult::Artist`]
@@ -750,7 +750,7 @@ fn collect_detail_tracks(value: &Value) -> Vec<Track> {
     tracks
 }
 
-/// Parses a detail view (album, artist, or playlist) from InnerTube browse response payload.
+/// Parses a detail view (album, artist, or playlist) from catalog API browse response payload.
 ///
 /// Returns `None` when neither a header title nor any valid track items are found.
 pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
@@ -798,7 +798,7 @@ fn parse_library_playlist_item(item: &Value) -> Option<Playlist> {
     Some(Playlist::new(&id, &title, count))
 }
 
-/// Parses saved or owned playlists from InnerTube browse response payload.
+/// Parses saved or owned playlists from catalog API browse response payload.
 pub fn parse_library_playlists(value: &Value) -> Vec<Playlist> {
     collect_library_items(value).into_iter().filter_map(parse_library_playlist_item).collect()
 }
@@ -810,39 +810,39 @@ fn parse_library_album_item(item: &Value) -> Option<Album> {
     Some(Album::new(&id, &title, &subtitle))
 }
 
-/// Parses saved albums from InnerTube browse response payload.
+/// Parses saved albums from catalog API browse response payload.
 pub fn parse_library_albums(value: &Value) -> Vec<Album> {
     collect_library_items(value).into_iter().filter_map(parse_library_album_item).collect()
 }
 
-/// Parses liked tracks from InnerTube browse response payload.
+/// Parses liked tracks from catalog API browse response payload.
 pub fn parse_library_liked_tracks(value: &Value) -> Vec<Track> {
     collect_detail_tracks(value)
 }
 
-/// Blocking HTTP client for the InnerTube API.
-pub struct InnerTube {
+/// Blocking HTTP client for the catalog API.
+pub struct CatalogClient {
     client: reqwest::blocking::Client,
     api_key: String,
     cookies: Option<String>,
 }
 
-impl std::fmt::Debug for InnerTube {
+impl std::fmt::Debug for CatalogClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("InnerTube")
+        f.debug_struct("CatalogClient")
             .field("api_key", &self.api_key)
             .field("has_cookies", &self.cookies.is_some())
             .finish()
     }
 }
 
-impl InnerTube {
-    /// Creates a new InnerTube client with a 10-second request timeout (anonymous).
+impl CatalogClient {
+    /// Creates a new catalog API client with a 10-second request timeout (anonymous).
     pub fn new() -> Self {
         Self::with_optional_cookies(None)
     }
 
-    /// Creates an authenticated InnerTube client with stored session cookies.
+    /// Creates an authenticated catalog API client with stored session cookies.
     ///
     /// Empty or whitespace-only cookie strings are treated as unauthenticated (`None`).
     pub fn with_cookies(cookies: &str) -> Self {
@@ -856,7 +856,7 @@ impl InnerTube {
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
-        Self { client, api_key: YTM_API_KEY.to_owned(), cookies }
+        Self { client, api_key: CATALOG_API_KEY.to_owned(), cookies }
     }
 
     /// Returns true if this client has credentials configured for authenticated requests.
@@ -874,7 +874,7 @@ impl InnerTube {
         let response = self.client.post(&url).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("InnerTube search request failed with status: {status}");
+            anyhow::bail!("CatalogClient search request failed with status: {status}");
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -898,7 +898,7 @@ impl InnerTube {
         let response = self.client.post(&url).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("InnerTube next request failed with status: {status}");
+            anyhow::bail!("CatalogClient next request failed with status: {status}");
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -921,7 +921,7 @@ impl InnerTube {
         let response = self.client.post(&url).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("InnerTube browse request failed with status: {status}");
+            anyhow::bail!("CatalogClient browse request failed with status: {status}");
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -947,14 +947,14 @@ impl InnerTube {
     /// Executes authenticated browse request for `browse_id`.
     pub fn library_browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
         let Some(cookie) = &self.cookies else {
-            anyhow::bail!("Unauthenticated InnerTube client cannot request library endpoint");
+            anyhow::bail!("Unauthenticated CatalogClient cannot request library endpoint");
         };
         let url = browse_url();
         let body = browse_body(browse_id);
         let response = self.client.post(&url).header("Cookie", cookie).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("InnerTube library browse request failed with status: {status}");
+            anyhow::bail!("CatalogClient library browse request failed with status: {status}");
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -993,18 +993,18 @@ impl InnerTube {
     /// Executes authenticated like/removelike mutation for `video_id`.
     pub fn set_liked_payload(&self, video_id: &str, liked: bool) -> anyhow::Result<Value> {
         let Some(cookie) = &self.cookies else {
-            anyhow::bail!("Unauthenticated InnerTube client cannot execute library mutations");
+            anyhow::bail!("Unauthenticated CatalogClient cannot execute library mutations");
         };
         let url = like_url(liked);
         let body = like_body(video_id);
         let response = self.client.post(&url).header("Cookie", cookie).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("InnerTube like mutation failed with status: {status}");
+            anyhow::bail!("CatalogClient like mutation failed with status: {status}");
         }
         let payload: Value = response.json()?;
         if !parse_mutation_response(&payload) {
-            anyhow::bail!("InnerTube like mutation response reported an error");
+            anyhow::bail!("CatalogClient like mutation response reported an error");
         }
         Ok(payload)
     }
@@ -1018,13 +1018,13 @@ impl InnerTube {
         let _ = self.set_liked_payload(trimmed, liked);
     }
 
-    /// Converts this InnerTube client into a [`YtmCatalog`](super::ytm::YtmCatalog) adapter.
-    pub fn into_catalog(self) -> super::ytm::YtmCatalog {
-        super::ytm::YtmCatalog::with_tube(self)
+    /// Converts this catalog API client into a [`LiveCatalog`](super::ytm::LiveCatalog) adapter.
+    pub fn into_catalog(self) -> super::ytm::LiveCatalog {
+        super::ytm::LiveCatalog::with_client(self)
     }
 }
 
-impl Default for InnerTube {
+impl Default for CatalogClient {
     fn default() -> Self {
         Self::new()
     }
@@ -1085,7 +1085,7 @@ mod tests {
         assert_eq!(
             url,
             format!(
-                "https://music.youtube.com/youtubei/v1/search?key={YTM_API_KEY}&prettyPrint=false"
+                "https://music.youtube.com/youtubei/v1/search?key={CATALOG_API_KEY}&prettyPrint=false"
             )
         );
     }
@@ -1095,7 +1095,7 @@ mod tests {
         let body = search_body("midnight");
         assert_eq!(body["query"], "midnight");
         assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
-        assert_eq!(body["context"]["client"]["clientVersion"], YTM_CLIENT_VERSION);
+        assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
         assert_eq!(body["context"]["client"]["hl"], "en");
         assert_eq!(body["context"]["client"]["gl"], "US");
     }
@@ -1118,7 +1118,7 @@ mod tests {
         let fixture_path = std::path::Path::new(manifest_dir)
             .join("tests")
             .join("fixtures")
-            .join("innertube_search.json");
+            .join("catalog_search.json");
         let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
         let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
 
@@ -1217,7 +1217,7 @@ mod tests {
     fn parse_search_all_golden_fixture_and_determinism() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let fixture_path =
-            std::path::Path::new(manifest_dir).join("tests/fixtures/innertube_shelves.json");
+            std::path::Path::new(manifest_dir).join("tests/fixtures/catalog_shelves.json");
         let raw = std::fs::read_to_string(fixture_path).expect("fixture file readable");
         let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
 
@@ -1259,7 +1259,7 @@ mod tests {
         let fixture_path = std::path::Path::new(manifest_dir)
             .join("tests")
             .join("fixtures")
-            .join("innertube_live_shape.json");
+            .join("catalog_live_shape.json");
         let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
         let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
 
@@ -1282,7 +1282,7 @@ mod tests {
         let fixture_path = std::path::Path::new(manifest_dir)
             .join("tests")
             .join("fixtures")
-            .join("innertube_live_shape.json");
+            .join("catalog_live_shape.json");
         let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
         let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
 
@@ -1302,7 +1302,7 @@ mod tests {
         assert_eq!(
             next_url(),
             format!(
-                "https://music.youtube.com/youtubei/v1/next?key={YTM_API_KEY}&prettyPrint=false"
+                "https://music.youtube.com/youtubei/v1/next?key={CATALOG_API_KEY}&prettyPrint=false"
             )
         );
     }
@@ -1313,7 +1313,7 @@ mod tests {
         assert_eq!(body["videoId"], "abc-123");
         assert_eq!(body["playlistId"], "RDabc-123");
         assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
-        assert_eq!(body["context"]["client"]["clientVersion"], YTM_CLIENT_VERSION);
+        assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
     }
 
     #[test]
@@ -1345,7 +1345,7 @@ mod tests {
 
     #[test]
     fn parse_radio_all_golden_fixture() {
-        let raw = include_str!("../../tests/fixtures/innertube_radio.json");
+        let raw = include_str!("../../tests/fixtures/catalog_radio.json");
         let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
         let tracks = parse_radio_all(&payload);
         assert_eq!(tracks.len(), 2);
@@ -1376,7 +1376,7 @@ mod tests {
         assert_eq!(
             browse_url(),
             format!(
-                "https://music.youtube.com/youtubei/v1/browse?key={YTM_API_KEY}&prettyPrint=false"
+                "https://music.youtube.com/youtubei/v1/browse?key={CATALOG_API_KEY}&prettyPrint=false"
             )
         );
     }
@@ -1386,7 +1386,7 @@ mod tests {
         let body = browse_body(HOME_BROWSE_ID);
         assert_eq!(body["browseId"], HOME_BROWSE_ID);
         assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
-        assert_eq!(body["context"]["client"]["clientVersion"], YTM_CLIENT_VERSION);
+        assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
     }
 
     #[test]
@@ -1413,7 +1413,7 @@ mod tests {
 
     #[test]
     fn parse_home_all_golden_fixture() {
-        let raw = include_str!("../../tests/fixtures/innertube_home.json");
+        let raw = include_str!("../../tests/fixtures/catalog_home.json");
         let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
         let shelves = parse_home_all(&payload);
         assert_eq!(shelves.len(), 2);
@@ -1440,7 +1440,7 @@ mod tests {
 
     #[test]
     fn parse_detail_all_golden_fixture_and_empty() {
-        let raw = include_str!("../../tests/fixtures/innertube_detail.json");
+        let raw = include_str!("../../tests/fixtures/catalog_detail.json");
         let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
         let detail = parse_detail_all(&payload, DetailKind::Album).expect("parsed detail");
         assert_eq!(detail.kind, DetailKind::Album);
@@ -1466,15 +1466,15 @@ mod tests {
     }
 
     #[test]
-    fn innertube_detail_blank_id_returns_none() {
-        let tube = InnerTube::new();
-        assert_eq!(tube.detail("", DetailKind::Album), None);
-        assert_eq!(tube.detail("   ", DetailKind::Artist), None);
+    fn catalog_client_detail_blank_id_returns_none() {
+        let client = CatalogClient::new();
+        assert_eq!(client.detail("", DetailKind::Album), None);
+        assert_eq!(client.detail("   ", DetailKind::Artist), None);
     }
 
     #[test]
     fn parse_library_playlists_golden_fixture_and_determinism() {
-        let raw = include_str!("../../tests/fixtures/innertube_library_playlists.json");
+        let raw = include_str!("../../tests/fixtures/catalog_library_playlists.json");
         let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
         let first = parse_library_playlists(&payload);
         let second = parse_library_playlists(&payload);
@@ -1492,7 +1492,7 @@ mod tests {
 
     #[test]
     fn parse_library_liked_tracks_golden_fixture_and_determinism() {
-        let raw = include_str!("../../tests/fixtures/innertube_library_liked.json");
+        let raw = include_str!("../../tests/fixtures/catalog_library_liked.json");
         let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
         let first = parse_library_liked_tracks(&payload);
         let second = parse_library_liked_tracks(&payload);
@@ -1515,7 +1515,7 @@ mod tests {
 
     #[test]
     fn parse_library_albums_golden_fixture_and_determinism() {
-        let raw = include_str!("../../tests/fixtures/innertube_library_albums.json");
+        let raw = include_str!("../../tests/fixtures/catalog_library_albums.json");
         let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
         let first = parse_library_albums(&payload);
         let second = parse_library_albums(&payload);
@@ -1543,16 +1543,16 @@ mod tests {
     }
 
     #[test]
-    fn innertube_cookies_masking_and_unauthenticated_guard() {
-        assert!(!InnerTube::new().is_authenticated());
-        assert!(!InnerTube::with_cookies("   ").is_authenticated());
-        let tube = InnerTube::with_cookies("secret-cookie-val");
-        assert!(tube.is_authenticated());
-        let debug_str = format!("{tube:?}");
+    fn catalog_client_cookies_masking_and_unauthenticated_guard() {
+        assert!(!CatalogClient::new().is_authenticated());
+        assert!(!CatalogClient::with_cookies("   ").is_authenticated());
+        let client = CatalogClient::with_cookies("secret-cookie-val");
+        assert!(client.is_authenticated());
+        let debug_str = format!("{client:?}");
         assert!(!debug_str.contains("secret-cookie-val"));
         assert!(debug_str.contains("has_cookies: true"));
 
-        let anon = InnerTube::new();
+        let anon = CatalogClient::new();
         assert!(anon.library_playlists().is_empty());
         assert!(anon.library_liked_tracks().is_empty());
         assert!(anon.library_saved_albums().is_empty());
