@@ -39,7 +39,7 @@ an active `music.youtube.com` browser session:
 - **Zero Disk Exposure**: raw session cookies and access tokens are never written to plain text configuration files,
   caches, or log outputs.
 - **Anonymous Streaming Invariant**: audio streaming requests and `yt-dlp` sidecar queries remain anonymous and never
-  transmit account cookies. Account credentials are used strictly for InnerTube library endpoints.
+  transmit account cookies. Account credentials are used strictly for catalog library endpoints.
 
 ## Logging and Diagnostics
 

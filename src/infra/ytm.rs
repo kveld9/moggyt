@@ -208,14 +208,14 @@ impl Catalog for CatalogStub {
     }
 }
 
-/// InnerTube-backed YouTube Music catalog implementing the [`Catalog`] port.
+/// Catalog API-backed YouTube Music catalog implementing the [`Catalog`] port.
 #[derive(Debug, Default)]
 pub struct YtmCatalog {
     tube: InnerTube,
 }
 
 impl YtmCatalog {
-    /// Creates a new catalog backed by default InnerTube client.
+    /// Creates a new catalog backed by default catalog API client.
     pub fn new() -> Self {
         Self::default()
     }
@@ -225,12 +225,12 @@ impl YtmCatalog {
         Self::with_tube(InnerTube::with_cookies(cookies))
     }
 
-    /// Creates a catalog injecting an InnerTube client for testing or custom configuration.
+    /// Creates a catalog injecting a catalog API client for testing or custom configuration.
     pub fn with_tube(tube: InnerTube) -> Self {
         Self { tube }
     }
 
-    /// Updates session cookies by swapping the inner InnerTube client.
+    /// Updates session cookies by swapping the inner catalog API client.
     pub fn set_session_cookies(&mut self, cookies: Option<&str>) {
         let clean = cookies.filter(|c| !c.trim().is_empty());
         self.tube = match clean {
