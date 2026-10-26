@@ -43,10 +43,9 @@ Run all five before finishing. `cargo run` launches the window.
 - Branch from `main`: `<type>/<short-desc>` (`feat/`, `fix/`, `refactor/`, `docs/`,
   `test/`, `chore/`). One logical change per commit, PRs < 400 lines.
 - Stacked PRs (a chain where each PR targets the previous branch instead of `main`):
-  CI only runs on PRs targeting `main` (`.github/workflows/ci.yml` `branches` filter),
-  so stacked PRs show no checks until retargeted. Land bottom-up: merge the lowest
-  PR into `main` first, retarget the next PR to `main`, wait for its green CI,
-  and repeat. Never merge a PR whose checks never ran.
+  CI and secret scanning run on every PR, so stacked PRs show checks immediately.
+  Land bottom-up: merge the lowest PR into `main` first, retarget the next PR to
+  `main`, wait for its green CI, and repeat. Never merge a PR whose checks never ran.
 - Commits in English, Conventional Commits, imperative mood, no emojis.
 - Update `docs/` or `README.md` in the same PR when behavior, flags, config,
   or public APIs change.
