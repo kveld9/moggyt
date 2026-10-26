@@ -1,0 +1,11 @@
+{
+  "contents": { "singleColumnBrowseResultsRenderer": { "tabs": [{ "tabRenderer": { "content": { "sectionListRenderer": { "contents": [
+    { "gridRenderer": {
+      "items": [
+        { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Favorites Mix" }] }, "subtitle": { "runs": [{ "text": "Playlist • 25 tracks" }] }, "navigationEndpoint": { "browseEndpoint": { "browseId": "VL_fav_mix" } } } },
+        { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Workout Beats" }] }, "subtitle": { "runs": [{ "text": "Playlist • 10 songs" }] }, "navigationEndpoint": { "browseEndpoint": { "browseId": "VL_workout" } } } },
+        { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "   " }] }, "subtitle": { "runs": [{ "text": "Ignored Blank" }] }, "navigationEndpoint": { "browseEndpoint": { "browseId": "VL_blank" } } } }
+      ]
+    } }
+  ] } } } }] } }
+}
