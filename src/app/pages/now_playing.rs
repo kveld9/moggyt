@@ -236,6 +236,15 @@ pub(crate) fn render_lyrics_panel<
     state: &mut AppState<C, A, S, L, K>,
 ) {
     section_header(ui, "Lyrics");
+    if state.lyrics_from_override {
+        let tokens = DesignTokens::desktop();
+        ui.label(
+            egui::RichText::new("Local override")
+                .size(tokens.font_caption)
+                .color(ui.visuals().weak_text_color()),
+        );
+        ui.add_space(tokens.space_xxs);
+    }
     let lines = state.visible_lyric_lines();
     if lines.is_empty() {
         empty_state(ui, "No synced lyrics for this track.");
