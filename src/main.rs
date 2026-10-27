@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
-    CredentialStore, DesktopPresence, DiskCoverCache, DiskQueueStore, DiskSettingsStore,
-    DiskSkipStore, KeyringCredentialStore, KeyringSessionStore, LastFmClient, LiveAudio,
-    LiveCatalog, LrclibClient, LyricOverrideDir, RodioBackend, Scrobbler, SessionStore,
+    CredentialStore, DesktopPresence, DiskCoverCache, DiskMetaStore, DiskQueueStore,
+    DiskSettingsStore, DiskSkipStore, KeyringCredentialStore, KeyringSessionStore, LastFmClient,
+    LiveAudio, LiveCatalog, LrclibClient, LyricOverrideDir, RodioBackend, Scrobbler, SessionStore,
     SettingsStore, SingleInstanceGuard, TrayHandle, client_from_credentials, default_config_dir,
     ensure_sidecar,
 };
@@ -56,8 +56,10 @@ fn main() -> anyhow::Result<()> {
     let queue_store = DiskQueueStore::new(settings_dir.clone());
     state.set_queue_store(Box::new(queue_store));
 
-    let skip_store = DiskSkipStore::new(settings_dir);
+    let skip_store = DiskSkipStore::new(settings_dir.clone());
     state.set_skip_store(Box::new(skip_store));
+    let meta_store = DiskMetaStore::new(settings_dir);
+    state.set_meta_store(Box::new(meta_store));
 
     let scrobbler = init_lastfm_scrobbler(settings.lastfm_enabled);
     tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());

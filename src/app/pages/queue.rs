@@ -77,7 +77,8 @@ fn render_queue_tracks<
     let tokens = DesignTokens::desktop();
     for track in state.queue.tracks() {
         let is_active = state.queue.current().is_some_and(|cur| cur.id == track.id);
-        track_row(ui, &track.title, &track.artist, is_active);
+        let (title, artist) = state.resolved_track_text(track);
+        track_row(ui, &title, &artist, is_active);
         ui.add_space(tokens.space_xxs);
     }
 }

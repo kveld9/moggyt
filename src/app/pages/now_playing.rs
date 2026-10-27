@@ -67,11 +67,16 @@ fn render_track_details<
     track: &Track,
 ) {
     let tokens = DesignTokens::desktop();
+    let (resolved_title, resolved_artist) = state.resolved_track_text(track);
     ui.vertical(|ui| {
-        ui.label(egui::RichText::new(track.display()).size(tokens.font_display).strong());
+        ui.label(
+            egui::RichText::new(format!("{resolved_title} - {resolved_artist}"))
+                .size(tokens.font_display)
+                .strong(),
+        );
         ui.add_space(tokens.space_xxs);
         ui.label(
-            egui::RichText::new(format!("by {}", track.artist))
+            egui::RichText::new(format!("by {resolved_artist}"))
                 .size(tokens.font_body)
                 .color(ui.visuals().weak_text_color()),
         );
@@ -81,6 +86,8 @@ fn render_track_details<
         }
         ui.add_space(tokens.space_xs);
         render_offset_controls(ui, state);
+        ui.add_space(tokens.space_xs);
+        render_metadata_edit_controls(ui, state, track);
         ui.add_space(tokens.space_xxs);
         let requested = state.audio.last_requested().unwrap_or("none");
         ui.label(
@@ -88,6 +95,42 @@ fn render_track_details<
                 .size(tokens.font_caption)
                 .color(ui.visuals().weak_text_color()),
         );
+    });
+}
+
+fn has_edit_focus(r1: &egui::Response, r2: &egui::Response) -> bool {
+    r1.has_focus() || r2.has_focus()
+}
+
+fn render_metadata_edit_controls<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+    track: &Track,
+) {
+    state.sync_meta_edit_buffers(track);
+    let tokens = DesignTokens::desktop();
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Title:").size(tokens.font_caption));
+        let r1 = ui.text_edit_singleline(&mut state.meta_edit_title);
+        ui.add_space(tokens.space_xs);
+        ui.label(egui::RichText::new("Artist:").size(tokens.font_caption));
+        let r2 = ui.text_edit_singleline(&mut state.meta_edit_artist);
+        if has_edit_focus(&r1, &r2) {
+            state.text_focused = true;
+        }
+        ui.add_space(tokens.space_xs);
+        if ui.button("Save").clicked() {
+            state.save_meta_override_from_input(track);
+        }
+        if ui.button("Clear").clicked() {
+            state.clear_meta_override_and_reset(track);
+        }
     });
 }
 
