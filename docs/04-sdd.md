@@ -70,9 +70,12 @@ Extended backlog requirements (milestones and port mappings):
      LRU (deferred to v1.1+).
 3. **Playback DSP pipeline ordering** (`AudioBackend` port; v1.1 / V2):
    - DSP execution sequence: gapless playback -> crossfade (V2) -> skip-silence -> -14 LUFS loudness
-     normalization -> 10-band EQ with EQ profile import (V2) -> tempo/pitch adjustment (0.5x-2.0x speed)
+     normalization -> 10-band EQ with EQ profile import (V2) -> playback rate adjustment (0.5x-2.0x,
+     live rate-only resampling; pitch preservation out of scope)
      -> sleep timer (presets + stop-after-track) -> per-network stream quality ceiling (Wi-Fi vs metered).
-   - Sleep timer, persistent queue, skip-silence, and loudness normalization are v1.1 candidates; remainder V2.
+   - Playback rate adjustment (0.5x-2.0x, rate-only, pitch preservation out of scope) is live; sleep
+     timer, persistent queue, skip-silence, and loudness normalization are v1.1 candidates;
+     remainder V2.
 4. **Offline caching tiers** (`CoverCache` and future `DownloadCache` port; v1.1 / V2):
    - Stream-cache LRU: configurable stream-cache byte budget for instant offline replay (v1.1).
    - Explicit tagged downloads: export audio files with Vorbis Comment and ID3 metadata into a standalone

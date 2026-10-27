@@ -2,6 +2,17 @@
 
 use super::stream::AudioQuality;
 
+/// Clamps a playback speed factor to the valid `0.5..=2.0` range.
+///
+/// NaN, negative, zero, and infinite values fall back to 1.0.
+/// Finite positive values below 0.5 clamp to 0.5; values above 2.0 clamp to 2.0.
+pub fn clamp_speed(speed: f32) -> f32 {
+    if !speed.is_finite() || speed <= 0.0 {
+        return 1.0;
+    }
+    speed.clamp(0.5, 2.0)
+}
+
 /// Playback port: stream control and observable playback state.
 pub trait AudioBackend {
     fn play(&mut self, track_id: &str);
@@ -16,6 +27,15 @@ pub trait AudioBackend {
     fn set_quality(&mut self, _q: AudioQuality) {}
     fn set_skip_silence(&mut self, _on: bool) {}
     fn set_loudness_normalization(&mut self, _on: bool) {}
+    /// Sets playback speed (valid range: 0.5..=2.0).
+    ///
+    /// Non-finite or non-positive values fall back to 1.0; finite values outside
+    /// the range are clamped. Pitch preservation is out of scope (rate-only resampling).
+    fn set_speed(&mut self, _speed: f32) {}
+    /// Returns current playback speed factor (defaults to 1.0).
+    fn speed(&self) -> f32 {
+        1.0
+    }
 }
 
 /// Recording stub: captures intent without touching audio hardware.
@@ -24,6 +44,7 @@ pub struct AudioStub {
     last_requested: Option<String>,
     playing: bool,
     volume: u8,
+    speed: f32,
     position_secs: u64,
     skip_silence: bool,
     loudness_normalization: bool,
@@ -35,6 +56,7 @@ impl Default for AudioStub {
             last_requested: None,
             playing: false,
             volume: 100,
+            speed: 1.0,
             position_secs: 0,
             skip_silence: false,
             loudness_normalization: false,
@@ -104,11 +126,67 @@ impl AudioBackend for AudioStub {
     fn set_loudness_normalization(&mut self, on: bool) {
         self.loudness_normalization = on;
     }
+
+    fn set_speed(&mut self, speed: f32) {
+        self.speed = clamp_speed(speed);
+    }
+
+    fn speed(&self) -> f32 {
+        self.speed
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clamp_speed_validation_table() {
+        assert_eq!(clamp_speed(f32::NAN), 1.0);
+        assert_eq!(clamp_speed(f32::INFINITY), 1.0);
+        assert_eq!(clamp_speed(f32::NEG_INFINITY), 1.0);
+        assert_eq!(clamp_speed(0.0), 1.0);
+        assert_eq!(clamp_speed(-0.0), 1.0);
+        assert_eq!(clamp_speed(-1.0), 1.0);
+        assert_eq!(clamp_speed(-0.5), 1.0);
+
+        // Lower boundary and below
+        assert_eq!(clamp_speed(0.2), 0.5);
+        assert_eq!(clamp_speed(0.49), 0.5);
+        assert_eq!(clamp_speed(0.5), 0.5);
+
+        // Presets
+        assert_eq!(clamp_speed(0.75), 0.75);
+        assert_eq!(clamp_speed(1.0), 1.0);
+        assert_eq!(clamp_speed(1.25), 1.25);
+        assert_eq!(clamp_speed(1.5), 1.5);
+
+        // Upper boundary and above
+        assert_eq!(clamp_speed(2.0), 2.0);
+        assert_eq!(clamp_speed(2.01), 2.0);
+        assert_eq!(clamp_speed(5.0), 2.0);
+    }
+
+    #[test]
+    fn audio_stub_speed_recording_and_clamping() {
+        let mut audio = AudioStub::new();
+        assert_eq!(audio.speed(), 1.0);
+
+        audio.set_speed(1.25);
+        assert_eq!(audio.speed(), 1.25);
+
+        audio.set_speed(0.1);
+        assert_eq!(audio.speed(), 0.5);
+
+        audio.set_speed(3.0);
+        assert_eq!(audio.speed(), 2.0);
+
+        audio.set_speed(f32::NAN);
+        assert_eq!(audio.speed(), 1.0);
+
+        audio.set_speed(-0.5);
+        assert_eq!(audio.speed(), 1.0);
+    }
 
     #[test]
     fn audio_state_transitions_and_volume_clamp() {
