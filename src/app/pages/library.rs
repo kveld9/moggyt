@@ -30,6 +30,8 @@ pub(crate) fn render_library<
     render_library_separator(ui, &tokens);
     render_library_backup(ui, state);
     render_library_separator(ui, &tokens);
+    render_library_import(ui, state);
+    render_library_separator(ui, &tokens);
     render_library_playlists(ui, state);
     render_library_separator(ui, &tokens);
     render_library_liked(ui, state);
@@ -496,5 +498,107 @@ pub(crate) fn render_library_albums<
     }
     for album in &albums {
         track_row(ui, &album.title, &album.artist, false);
+    }
+}
+
+/// Renders playlist URL import controls and status line.
+pub(crate) fn render_library_import<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.heading("Import playlist");
+    render_import_input_row(ui, state);
+    render_import_status(ui, state.playlist_import_status.as_deref());
+}
+
+fn render_import_input_row<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.horizontal(|ui| {
+        let response = ui.text_edit_singleline(&mut state.playlist_url_text);
+        if response.has_focus() {
+            state.text_focused = true;
+        }
+        if ui.button("Import").clicked() {
+            handle_import_click(state);
+        }
+    });
+}
+
+pub(crate) fn handle_import_click<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    let url = state.playlist_url_text.clone();
+    match state.import_playlist_url(&url) {
+        Ok(count) => {
+            state.playlist_import_status = Some(format!("Imported {count} track(s) to queue"));
+            state.playlist_url_text.clear();
+        }
+        Err(err) => {
+            state.playlist_import_status = Some(format!("Import error: {err}"));
+        }
+    }
+}
+
+fn render_import_status(ui: &mut egui::Ui, status: Option<&str>) {
+    if let Some(msg) = status {
+        ui.label(msg);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infra::{AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, MemorySessionStore};
+
+    fn test_state()
+    -> AppState<CatalogStub, AudioStub, MemorySessionStore, LrclibStub, MemoryCoverCache> {
+        AppState::new(
+            CatalogStub::new(),
+            AudioStub::new(),
+            MemorySessionStore::new(),
+            LrclibStub::new(),
+            MemoryCoverCache::new(),
+        )
+    }
+
+    #[test]
+    fn handle_import_click_success_updates_status_and_clears_input() {
+        let mut state = test_state();
+        state.playlist_url_text = "https://music.youtube.com/playlist?list=PLtest_123".into();
+        handle_import_click(&mut state);
+        assert_eq!(state.playlist_import_status.as_deref(), Some("Imported 2 track(s) to queue"));
+        assert!(state.playlist_url_text.is_empty());
+        assert_eq!(state.queue.len(), 2);
+    }
+
+    #[test]
+    fn handle_import_click_failure_sets_error_status_and_preserves_input() {
+        let mut state = test_state();
+        let invalid = "https://example.com/playlist?list=PLtest_123";
+        state.playlist_url_text = invalid.into();
+        handle_import_click(&mut state);
+        assert!(state.playlist_import_status.as_ref().unwrap().starts_with("Import error:"));
+        assert_eq!(state.playlist_url_text, invalid);
+        assert!(state.queue.is_empty());
     }
 }

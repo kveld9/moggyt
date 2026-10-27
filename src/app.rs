@@ -18,6 +18,7 @@ use eframe::egui;
 use crate::domain::{
     Detail, DetailKind, LyricsSnippet, LyricsSnippetError, PlaybackQueue, SearchQuery,
     SearchResult, Shelf, SkipRanges, SkipSegment, SleepTimer, ThemeId, TimerPreset, Track,
+    extract_playlist_id,
 };
 use crate::i18n::Locale;
 use crate::infra::{
@@ -191,6 +192,10 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub skip_error: Option<String>,
     /// Last target position skipped to, preventing re-trigger loops on the same range.
     pub last_skip_target: Option<(String, u32)>,
+    /// Text typed into the playlist import URL box (UI state only).
+    pub playlist_url_text: String,
+    /// Status message from the last playlist URL import attempt (UI state only).
+    pub playlist_import_status: Option<String>,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -268,6 +273,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             marked_start_secs: None,
             skip_error: None,
             last_skip_target: None,
+            playlist_url_text: String::new(),
+            playlist_import_status: None,
         }
     }
 
@@ -723,6 +730,31 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 
     /// Handles a search submission: routes to lyrics search when lyrics mode is active,
     /// otherwise parses standard query, queries the catalog, and enqueues the first hit.
+    /// Enqueues a single track at the tail of the playback queue.
+    pub fn enqueue_track(&mut self, track: Track) {
+        self.queue.push(track);
+    }
+
+    /// Imports a playlist from a URL and enqueues all tracks to the playback queue.
+    ///
+    /// Resolves the canonical playlist identifier, fetches playlist detail from the
+    /// catalog, and enqueues tracks through the queue-mutation choke point. Returns
+    /// the number of enqueued tracks. Empty-track playlists enqueue zero tracks and
+    /// report zero without error. Parse and lookup failures return loud errors.
+    pub fn import_playlist_url(&mut self, url: &str) -> anyhow::Result<usize> {
+        let playlist_id = extract_playlist_id(url)
+            .ok_or_else(|| anyhow::anyhow!("invalid or unsupported playlist URL: '{url}'"))?;
+        let detail = self
+            .catalog
+            .detail(&playlist_id, DetailKind::Playlist)
+            .ok_or_else(|| anyhow::anyhow!("playlist detail not found: '{playlist_id}'"))?;
+        let count = detail.tracks.len();
+        for track in detail.tracks {
+            self.enqueue_track(track);
+        }
+        Ok(count)
+    }
+
     pub fn submit_search(&mut self) {
         if self.lyrics_mode {
             self.submit_lyrics_search();
@@ -3423,5 +3455,121 @@ mod tests {
         assert_eq!(state.visible_lyric_lines(), vec![(0, "Override line".to_string())]);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[derive(Default)]
+    struct ImportTestingCatalog {
+        inner: CatalogStub,
+    }
+
+    impl Catalog for ImportTestingCatalog {
+        fn search(&self, query: &str) -> Vec<Track> {
+            self.inner.search(query)
+        }
+        fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
+            self.inner.search_filtered(query)
+        }
+        fn radio(&self, seed_track_id: &str) -> Vec<Track> {
+            self.inner.radio(seed_track_id)
+        }
+        fn home_shelves(&self) -> Vec<Shelf> {
+            self.inner.home_shelves()
+        }
+        fn playlists(&self) -> Vec<Playlist> {
+            self.inner.playlists()
+        }
+        fn liked_tracks(&self) -> Vec<Track> {
+            self.inner.liked_tracks()
+        }
+        fn saved_albums(&self) -> Vec<Album> {
+            self.inner.saved_albums()
+        }
+        fn set_liked(&mut self, track_id: &str, liked: bool) {
+            self.inner.set_liked(track_id, liked);
+        }
+        fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+            if browse_id.contains("unknown") {
+                return None;
+            }
+            if browse_id.contains("empty") {
+                return Some(Detail::new(kind, "Empty Title", "Subtitle", Vec::new()));
+            }
+            self.inner.detail(browse_id, kind)
+        }
+        fn set_session_cookies(&mut self, cookies: Option<&str>) {
+            self.inner.set_session_cookies(cookies);
+        }
+    }
+
+    #[test]
+    fn import_playlist_url_enqueues_stub_detail_tracks_and_returns_count() {
+        let mut state = wired();
+        let count = state
+            .import_playlist_url("https://music.youtube.com/playlist?list=PLstub123")
+            .expect("import succeeds");
+        assert_eq!(count, 2);
+        assert_eq!(state.queue.len(), 2);
+        assert_eq!(state.queue.tracks()[0].id, "PLstub123-1");
+        assert_eq!(state.queue.tracks()[1].id, "PLstub123-2");
+    }
+
+    #[test]
+    fn import_playlist_url_unknown_id_errors_loudly() {
+        let mut state = AppState::new(
+            ImportTestingCatalog::default(),
+            AudioStub::new(),
+            MemorySessionStore::new(),
+            LrclibStub::new(),
+            MemoryCoverCache::new(),
+        );
+        let result =
+            state.import_playlist_url("https://music.youtube.com/playlist?list=PLunknown_456");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("playlist detail not found"));
+        assert!(state.queue.is_empty());
+    }
+
+    #[test]
+    fn import_playlist_url_blank_url_errors() {
+        let mut state = wired();
+        assert!(state.import_playlist_url("").is_err());
+        assert!(state.import_playlist_url("   ").is_err());
+        assert!(state.queue.is_empty());
+    }
+
+    #[test]
+    fn import_playlist_url_invalid_url_leaves_queue_untouched() {
+        let mut state = wired();
+        state.queue.push(Track::new("pre-existing", "Title", "Artist"));
+        assert_eq!(state.queue.len(), 1);
+
+        assert!(state.import_playlist_url("https://spotify.com/playlist?list=PL123").is_err());
+        assert_eq!(state.queue.len(), 1);
+
+        assert!(
+            state.import_playlist_url("https://music.youtube.com/playlist?list=BADPREFIX").is_err()
+        );
+        assert_eq!(state.queue.len(), 1);
+
+        assert!(state.import_playlist_url("ftp://music.youtube.com/playlist?list=PL123").is_err());
+        assert_eq!(state.queue.len(), 1);
+
+        assert_eq!(state.queue.tracks()[0].id, "pre-existing");
+    }
+
+    #[test]
+    fn import_playlist_url_empty_tracks_enqueues_zero_and_reports_zero() {
+        let mut state = AppState::new(
+            ImportTestingCatalog::default(),
+            AudioStub::new(),
+            MemorySessionStore::new(),
+            LrclibStub::new(),
+            MemoryCoverCache::new(),
+        );
+        let count = state
+            .import_playlist_url("https://music.youtube.com/playlist?list=PLempty_999")
+            .expect("empty playlist succeeds");
+        assert_eq!(count, 0);
+        assert!(state.queue.is_empty());
     }
 }
