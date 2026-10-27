@@ -2,8 +2,9 @@
 
 use eframe::egui;
 
+use crate::app::components::{empty_state, section_header, track_row};
 use crate::app::{AppState, UpdateStatus, theme};
-use crate::domain::ThemeId;
+use crate::domain::{ThemeId, Track};
 use crate::i18n::{Locale, tr};
 use crate::infra::{AudioBackend, Catalog, CoverCache, GithubUpdater, LyricsSource, SessionStore};
 
@@ -288,24 +289,34 @@ pub(crate) fn render_library_liked<
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
-    ui.heading("Liked songs");
+    section_header(ui, "Liked songs");
     let liked = state.catalog.liked_tracks();
     if liked.is_empty() {
-        ui.label("No liked tracks");
+        empty_state(ui, "No liked tracks");
         return;
     }
+    let current_id = state.queue.current().map(|t| t.id.as_str());
     let mut to_toggle = None;
     for track in &liked {
-        ui.horizontal(|ui| {
-            ui.label(track.display());
-            if ui.button("Unlike").clicked() {
-                to_toggle = Some(track.id.clone());
-            }
-        });
+        if render_liked_item(ui, track, current_id) {
+            to_toggle = Some(track.id.clone());
+        }
     }
     if let Some(id) = to_toggle {
         state.toggle_like(&id);
     }
+}
+
+fn render_liked_item(ui: &mut egui::Ui, track: &Track, current_track_id: Option<&str>) -> bool {
+    let mut unliked = false;
+    ui.horizontal(|ui| {
+        let is_active = current_track_id == Some(track.id.as_str());
+        track_row(ui, &track.title, &track.artist, is_active);
+        if ui.button("Unlike").clicked() {
+            unliked = true;
+        }
+    });
+    unliked
 }
 
 /// Renders saved albums collection summary.
