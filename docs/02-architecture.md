@@ -22,9 +22,13 @@ src/
 ├── main.rs            # Composition root (bin): tracing, tokio runtime, eframe bootstrap
 ├── lib.rs             # Public contracts: app + domain + i18n + infra
 ├── i18n.rs            # Interface localization skeleton and translation lookup
-├── app.rs             # UI shell: navigation state, delegates events to domain and ports
+├── app.rs             # UI shell facade: AppState struct, enums, and public re-exports
 ├── app/
-│   └── theme.rs       # egui Visuals mapping adapter for domain Palette
+│   ├── components.rs  # Reusable UI component modules (top bar, player bar, track row)
+│   ├── pages.rs       # Page view modules (search, queue, now playing, library, detail)
+│   ├── state/         # Feature-based AppState impl modules (playback, queue, search, etc.)
+│   ├── theme.rs       # egui Visuals mapping adapter for domain Palette
+│   └── views.rs       # eframe::App shell wrapper (MoggytApp)
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
 │   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)

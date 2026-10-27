@@ -3,7 +3,6 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use eframe::egui;
 
 /// Maximum width or height in pixels for decoded cover art textures.
 ///
@@ -36,17 +35,15 @@ pub fn fetch_artwork(url: &str, timeout_secs: u64) -> anyhow::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// Decodes raw image bytes into an egui-compatible [`egui::ColorImage`].
+/// Decodes raw image bytes into an [`image::RgbaImage`].
 ///
 /// Downscales images exceeding `max_px` on either dimension to fit within `max_px` × `max_px`
 /// while preserving the aspect ratio and using a high-quality Lanczos3 filter.
 /// Returns `None` if the byte payload cannot be decoded as an image.
-pub fn decode_cover(bytes: &[u8], max_px: u32) -> Option<egui::ColorImage> {
+pub fn decode_cover(bytes: &[u8], max_px: u32) -> Option<image::RgbaImage> {
     let img = image::load_from_memory(bytes).ok()?;
     let img = downscale_if_oversized(img, max_px);
-    let rgba = img.to_rgba8();
-    let size = [rgba.width() as usize, rgba.height() as usize];
-    Some(egui::ColorImage::from_rgba_unmultiplied(size, &rgba))
+    Some(img.to_rgba8())
 }
 
 fn downscale_if_oversized(img: image::DynamicImage, max_px: u32) -> image::DynamicImage {
@@ -79,26 +76,26 @@ mod tests {
     fn decode_cover_decodes_valid_png_within_bounds() {
         let bytes = sample_png_bytes(8, 8, [255, 0, 0, 255]);
         let decoded = decode_cover(&bytes, COVER_MAX_PX).expect("decode valid PNG");
-        assert_eq!(decoded.size, [8, 8]);
-        assert_eq!(decoded.pixels.len(), 64);
-        assert_eq!(decoded.pixels[0], egui::Color32::from_rgba_unmultiplied(255, 0, 0, 255));
+        assert_eq!(decoded.dimensions(), (8, 8));
+        assert_eq!(decoded.as_raw().len(), 64 * 4);
+        assert_eq!(decoded.get_pixel(0, 0), &image::Rgba([255, 0, 0, 255]));
     }
 
     #[test]
     fn decode_cover_downscales_oversized_images() {
         let bytes = sample_png_bytes(1024, 4, [0, 255, 0, 255]);
         let decoded = decode_cover(&bytes, 512).expect("decode oversized PNG");
-        assert_eq!(decoded.size, [512, 2]);
+        assert_eq!(decoded.dimensions(), (512, 2));
     }
 
     #[test]
     fn decode_cover_downscales_oversized_images_to_hires_bound() {
         let bytes = sample_png_bytes(2048, 1024, [0, 255, 0, 255]);
         let decoded_default = decode_cover(&bytes, COVER_MAX_PX).expect("decode default PNG");
-        assert_eq!(decoded_default.size, [512, 256]);
+        assert_eq!(decoded_default.dimensions(), (512, 256));
 
         let decoded_hires = decode_cover(&bytes, COVER_HIRES_MAX_PX).expect("decode hires PNG");
-        assert_eq!(decoded_hires.size, [1024, 512]);
+        assert_eq!(decoded_hires.dimensions(), (1024, 512));
     }
 
     #[test]
@@ -108,6 +105,6 @@ mod tests {
         img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Jpeg)
             .expect("encode test JPEG");
         let decoded = decode_cover(&buf, COVER_MAX_PX).expect("decode valid JPEG");
-        assert_eq!(decoded.size, [16, 16]);
+        assert_eq!(decoded.dimensions(), (16, 16));
     }
 }
