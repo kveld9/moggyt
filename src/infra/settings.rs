@@ -44,6 +44,9 @@ pub struct Settings {
     /// Whether Last.fm live scrobbling is enabled.
     #[serde(default = "default_false")]
     pub lastfm_enabled: bool,
+    /// Whether secondary Last.fm live scrobbling is enabled.
+    #[serde(default = "default_false")]
+    pub secondary_lastfm_enabled: bool,
     /// Whether high-resolution cover artwork decoding is enabled.
     #[serde(default = "default_false")]
     pub hi_res_covers: bool,
@@ -65,6 +68,7 @@ impl Default for Settings {
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             lastfm_enabled: false,
+            secondary_lastfm_enabled: false,
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
@@ -82,6 +86,7 @@ impl Settings {
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             lastfm_enabled: false,
+            secondary_lastfm_enabled: false,
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
@@ -208,6 +213,7 @@ mod tests {
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
+        assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
@@ -251,6 +257,7 @@ mod tests {
             quality: AudioQuality::High,
             keyboard_shortcuts: false,
             lastfm_enabled: true,
+            secondary_lastfm_enabled: true,
             hi_res_covers: true,
             skip_silence: true,
             loudness_normalization: true,
@@ -276,6 +283,7 @@ mod tests {
         assert_eq!(fallback.quality, AudioQuality::Standard);
         assert!(fallback.keyboard_shortcuts);
         assert!(!fallback.lastfm_enabled);
+        assert!(!fallback.secondary_lastfm_enabled);
         assert!(!fallback.hi_res_covers);
         assert!(!fallback.skip_silence);
         assert!(!fallback.loudness_normalization);
@@ -291,6 +299,7 @@ mod tests {
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
+        assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
@@ -315,6 +324,7 @@ mod tests {
         assert_eq!(loaded.quality, AudioQuality::Compact);
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
+        assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
@@ -372,5 +382,24 @@ mod tests {
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(!omitted.skip_silence);
         assert!(!omitted.loudness_normalization);
+    }
+
+    #[test]
+    fn test_secondary_lastfm_serde_back_compat() {
+        // Old settings payload lacking secondary_lastfm_enabled
+        let json = r#"{"theme": "white", "locale": "en", "lastfm_enabled": true}"#;
+        let loaded: Settings = serde_json::from_str(json).expect("deserialization succeeds");
+        assert!(loaded.lastfm_enabled);
+        assert!(!loaded.secondary_lastfm_enabled);
+
+        // Explicit true deserializes as true
+        let json_true = r#"{"secondary_lastfm_enabled": true}"#;
+        let loaded_true: Settings =
+            serde_json::from_str(json_true).expect("deserialization succeeds");
+        assert!(loaded_true.secondary_lastfm_enabled);
+
+        // Empty object defaults to false
+        let empty: Settings = serde_json::from_str("{}").expect("deserialization succeeds");
+        assert!(!empty.secondary_lastfm_enabled);
     }
 }

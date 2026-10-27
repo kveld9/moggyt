@@ -114,6 +114,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub updater: GithubUpdater,
     /// Last.fm scrobbler port for now-playing notifications and scrobbles.
     pub scrobbler: Box<dyn Scrobbler>,
+    /// Optional secondary scrobbler port receiving the same playback events.
+    pub secondary_scrobbler: Option<Box<dyn Scrobbler>>,
     /// Playback start monotonic instant and unix timestamp pair.
     pub started_at: Option<(std::time::Instant, u64)>,
     /// Active UI theme.
@@ -144,8 +146,12 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub shortcuts_enabled: bool,
     /// Port for persisting and retrieving Last.fm credentials.
     pub credentials: Box<dyn CredentialStore>,
+    /// Port for persisting and retrieving secondary Last.fm credentials.
+    pub secondary_credentials: Box<dyn CredentialStore>,
     /// Whether Last.fm live scrobbling is enabled.
     pub lastfm_enabled: bool,
+    /// Whether secondary Last.fm live scrobbling is enabled.
+    pub secondary_lastfm_enabled: bool,
     /// Whether high-resolution cover artwork decoding is enabled.
     pub hi_res_covers: bool,
     /// Whether leading/trailing silence skipping is enabled.
@@ -158,6 +164,12 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub lastfm_secret_text: String,
     /// Last.fm session key input buffer (UI state only).
     pub lastfm_session_key_text: String,
+    /// Secondary Last.fm API key input buffer (UI state only).
+    pub secondary_lastfm_api_key_text: String,
+    /// Secondary Last.fm API secret input buffer (UI state only).
+    pub secondary_lastfm_secret_text: String,
+    /// Secondary Last.fm session key input buffer (UI state only).
+    pub secondary_lastfm_session_key_text: String,
     /// Pure sleep timer domain model.
     pub sleep_timer: SleepTimer,
     /// Last sleep timer fire marker.
@@ -234,7 +246,9 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             update_status: UpdateStatus::Unknown,
             updater: GithubUpdater::new(),
             scrobbler: Box::new(StubScrobbler::new()),
+            secondary_scrobbler: None,
             credentials: Box::new(MemoryCredentialStore::new()),
+            secondary_credentials: Box::new(MemoryCredentialStore::with_namespace("secondary")),
             started_at: None,
             theme: ThemeId::White,
             locale: Locale::English,
@@ -250,12 +264,16 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             text_focused: false,
             shortcuts_enabled: true,
             lastfm_enabled: false,
+            secondary_lastfm_enabled: false,
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
             lastfm_api_key_text: String::new(),
             lastfm_secret_text: String::new(),
             lastfm_session_key_text: String::new(),
+            secondary_lastfm_api_key_text: String::new(),
+            secondary_lastfm_secret_text: String::new(),
+            secondary_lastfm_session_key_text: String::new(),
             sleep_timer: SleepTimer::new(),
             last_sleep_timer_fire: None,
             sleep_timer_accumulated: 0,
@@ -288,10 +306,21 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.scrobbler = scrobbler;
     }
 
+    /// Injects an alternative secondary scrobbler implementation.
+    pub fn set_secondary_scrobbler(&mut self, scrobbler: Option<Box<dyn Scrobbler>>) {
+        self.secondary_scrobbler = scrobbler;
+    }
+
     /// Injects an alternative Last.fm credential store implementation.
     pub fn set_credential_store(&mut self, store: Box<dyn CredentialStore>) {
         self.credentials = store;
         self.sync_lastfm_scrobbler();
+    }
+
+    /// Injects an alternative secondary Last.fm credential store implementation.
+    pub fn set_secondary_credential_store(&mut self, store: Box<dyn CredentialStore>) {
+        self.secondary_credentials = store;
+        self.sync_secondary_lastfm_scrobbler();
     }
 
     /// Injects an alternative settings store implementation and synchronizes state.
@@ -302,6 +331,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.quality = loaded.quality;
         self.shortcuts_enabled = loaded.keyboard_shortcuts;
         self.lastfm_enabled = loaded.lastfm_enabled;
+        self.secondary_lastfm_enabled = loaded.secondary_lastfm_enabled;
         self.hi_res_covers = loaded.hi_res_covers;
         self.skip_silence = loaded.skip_silence;
         self.loudness_normalization = loaded.loudness_normalization;
@@ -311,6 +341,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.audio.set_loudness_normalization(loaded.loudness_normalization);
         self.settings_store = store;
         self.sync_lastfm_scrobbler();
+        self.sync_secondary_lastfm_scrobbler();
     }
 
     /// Injects an alternative skip store implementation and loads persisted ranges into state.
@@ -385,6 +416,67 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Returns true if the active scrobbler has a live authenticated session.
     pub fn lastfm_is_live(&self) -> bool {
         self.scrobbler.as_any().downcast_ref::<LastFmClient>().is_some_and(LastFmClient::is_live)
+    }
+
+    /// Sets whether secondary Last.fm live scrobbling is enabled and persists the preference.
+    pub fn set_secondary_lastfm_enabled(&mut self, enabled: bool) {
+        self.secondary_lastfm_enabled = enabled;
+        self.persist_settings();
+        self.sync_secondary_lastfm_scrobbler();
+    }
+
+    fn sync_secondary_lastfm_scrobbler(&mut self) {
+        if !self.secondary_lastfm_enabled {
+            self.secondary_scrobbler = None;
+            return;
+        }
+        let Some(creds) = self.secondary_credentials.load_lastfm() else {
+            self.secondary_scrobbler = None;
+            return;
+        };
+        if !creds.is_complete() {
+            self.secondary_scrobbler = None;
+            return;
+        }
+        self.secondary_scrobbler = Some(Box::new(client_from_credentials(&creds)));
+    }
+
+    /// Saves secondary Last.fm credentials to the vault and synchronizes secondary scrobbler state.
+    pub fn save_secondary_lastfm_credentials(&mut self, creds: &LastFmCredentials) {
+        self.secondary_credentials.save_lastfm(creds);
+        self.sync_secondary_lastfm_scrobbler();
+    }
+
+    /// Clears persisted secondary Last.fm credentials from the vault, input buffers, and resets secondary scrobbler to None.
+    pub fn clear_secondary_lastfm_credentials(&mut self) {
+        self.secondary_credentials.clear_lastfm();
+        self.secondary_lastfm_api_key_text.clear();
+        self.secondary_lastfm_secret_text.clear();
+        self.secondary_lastfm_session_key_text.clear();
+        self.sync_secondary_lastfm_scrobbler();
+    }
+
+    /// Saves secondary credentials from UI input buffers and clears buffers on completion.
+    pub fn save_secondary_lastfm_credentials_from_input(&mut self) -> bool {
+        let creds = LastFmCredentials::new(
+            &self.secondary_lastfm_api_key_text,
+            &self.secondary_lastfm_secret_text,
+            &self.secondary_lastfm_session_key_text,
+        );
+        let complete = creds.is_complete();
+        self.save_secondary_lastfm_credentials(&creds);
+        self.secondary_lastfm_api_key_text.clear();
+        self.secondary_lastfm_secret_text.clear();
+        self.secondary_lastfm_session_key_text.clear();
+        complete
+    }
+
+    /// Returns true if the secondary scrobbler has a live authenticated session.
+    pub fn secondary_lastfm_is_live(&self) -> bool {
+        self.secondary_scrobbler
+            .as_ref()
+            .and_then(|s| s.as_any().downcast_ref::<LastFmClient>())
+            .is_some_and(LastFmClient::is_live)
     }
 
     /// Sets whether high-resolution cover artwork is enabled and persists the preference.
@@ -491,6 +583,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             quality: self.quality,
             keyboard_shortcuts: self.shortcuts_enabled,
             lastfm_enabled: self.lastfm_enabled,
+            secondary_lastfm_enabled: self.secondary_lastfm_enabled,
             hi_res_covers: self.hi_res_covers,
             skip_silence: self.skip_silence,
             loudness_normalization: self.loudness_normalization,
@@ -876,6 +969,20 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         }
     }
 
+    fn forward_now_playing(&mut self, artist: &str, title: &str) {
+        self.scrobbler.now_playing(artist, title);
+        if let Some(sec) = self.secondary_scrobbler.as_mut() {
+            sec.now_playing(artist, title);
+        }
+    }
+
+    fn forward_scrobble(&mut self, artist: &str, title: &str, timestamp: u64) {
+        self.scrobbler.scrobble(artist, title, timestamp);
+        if let Some(sec) = self.secondary_scrobbler.as_mut() {
+            sec.scrobble(artist, title, timestamp);
+        }
+    }
+
     /// Plays the track currently under the queue cursor without modifying active page.
     pub fn play_current_quiet(&mut self) {
         let Some(track) = self.queue.current() else {
@@ -886,7 +993,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         let title = track.title.clone();
         self.audio.play(&id);
         self.started_at = Some((std::time::Instant::now(), current_unix_secs()));
-        self.scrobbler.now_playing(&artist, &title);
+        self.forward_now_playing(&artist, &title);
         self.last_skip_target = None;
     }
 
@@ -1004,7 +1111,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         let timestamp = self.started_at.map_or(0, |(_, ts)| ts);
         let artist = track.artist.clone();
         let title = track.title.clone();
-        self.scrobbler.scrobble(&artist, &title, timestamp);
+        self.forward_scrobble(&artist, &title, timestamp);
     }
 
     /// Configures the active sleep timer preset, resetting accumulated timer elapsed.
@@ -2336,6 +2443,7 @@ mod tests {
             quality: AudioQuality::Compact,
             keyboard_shortcuts: false,
             lastfm_enabled: false,
+            secondary_lastfm_enabled: false,
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
@@ -2835,6 +2943,7 @@ mod tests {
                 quality: AudioQuality::Standard,
                 keyboard_shortcuts: false,
                 lastfm_enabled: false,
+                secondary_lastfm_enabled: false,
                 hi_res_covers: false,
                 skip_silence: false,
                 loudness_normalization: false,
@@ -3138,6 +3247,118 @@ mod tests {
             let res = state.import_library_backup(invalid);
             assert!(res.is_err());
             assert!(state.backup_status_text.contains("backup path cannot be blank"));
+        }
+    }
+
+    #[test]
+    fn test_dual_scrobbling_forwards_events_to_both_scrobblers_with_identical_args() {
+        let mut state = wired();
+        let primary_stub = Box::new(StubScrobbler::new());
+        let secondary_stub = Box::new(StubScrobbler::new());
+
+        state.set_scrobbler(primary_stub);
+        state.set_secondary_scrobbler(Some(secondary_stub));
+
+        let track = Track::new_full("vid-dual", "Paranoid Android", "Radiohead", None, Some(380));
+        state.queue.push(track);
+        state.play_current_quiet();
+
+        let prim = state.scrobbler.as_any().downcast_ref::<StubScrobbler>().unwrap();
+        let sec = state
+            .secondary_scrobbler
+            .as_ref()
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StubScrobbler>()
+            .unwrap();
+
+        assert_eq!(prim.now_playing_calls, vec![("Radiohead".into(), "Paranoid Android".into())]);
+        assert_eq!(sec.now_playing_calls, vec![("Radiohead".into(), "Paranoid Android".into())]);
+
+        state.maybe_scrobble_with_elapsed(200);
+
+        let prim = state.scrobbler.as_any().downcast_ref::<StubScrobbler>().unwrap();
+        let sec = state
+            .secondary_scrobbler
+            .as_ref()
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StubScrobbler>()
+            .unwrap();
+
+        assert_eq!(prim.scrobble_calls.len(), 1);
+        assert_eq!(sec.scrobble_calls.len(), 1);
+        assert_eq!(prim.scrobble_calls[0].0, "Radiohead");
+        assert_eq!(prim.scrobble_calls[0].1, "Paranoid Android");
+        assert_eq!(sec.scrobble_calls[0].0, "Radiohead");
+        assert_eq!(sec.scrobble_calls[0].1, "Paranoid Android");
+        assert_eq!(prim.scrobble_calls[0].2, sec.scrobble_calls[0].2);
+    }
+
+    #[test]
+    fn test_secondary_none_keeps_primary_only_behavior() {
+        let mut state = wired();
+        let primary_stub = Box::new(StubScrobbler::new());
+        state.set_scrobbler(primary_stub);
+        state.set_secondary_scrobbler(None);
+
+        assert!(state.secondary_scrobbler.is_none());
+        assert!(!state.secondary_lastfm_is_live());
+
+        let track = Track::new_full("vid-single", "Karma Police", "Radiohead", None, Some(240));
+        state.queue.push(track);
+        state.play_current_quiet();
+        state.maybe_scrobble_with_elapsed(150);
+
+        let prim = state.scrobbler.as_any().downcast_ref::<StubScrobbler>().unwrap();
+        assert_eq!(prim.now_playing_calls, vec![("Radiohead".into(), "Karma Police".into())]);
+        assert_eq!(prim.scrobble_calls.len(), 1);
+        assert_eq!(prim.scrobble_calls[0].0, "Radiohead");
+        assert_eq!(prim.scrobble_calls[0].1, "Karma Police");
+        assert!(state.secondary_scrobbler.is_none());
+    }
+
+    #[test]
+    fn test_enabling_secondary_lastfm_with_complete_creds_yields_live_secondary() {
+        let mut state = wired();
+        let creds = LastFmCredentials::new("sec-key", "sec-secret", "sec-session");
+        state.save_secondary_lastfm_credentials(&creds);
+        assert!(!state.secondary_lastfm_is_live());
+        assert!(state.secondary_scrobbler.is_none());
+
+        state.set_secondary_lastfm_enabled(true);
+        assert!(state.secondary_lastfm_enabled);
+        assert!(state.secondary_lastfm_is_live());
+        assert!(state.settings_store.load().secondary_lastfm_enabled);
+
+        state.set_secondary_lastfm_enabled(false);
+        assert!(!state.secondary_lastfm_enabled);
+        assert!(!state.secondary_lastfm_is_live());
+        assert!(state.secondary_scrobbler.is_none());
+        assert!(!state.settings_store.load().secondary_lastfm_enabled);
+        assert_eq!(state.secondary_credentials.load_lastfm(), Some(creds));
+    }
+
+    #[test]
+    fn test_incomplete_secondary_creds_never_go_live() {
+        let mut state = wired();
+        state.set_secondary_lastfm_enabled(true);
+
+        for (k, s, sk) in [
+            ("", "secret", "sk"),
+            ("key", "", "sk"),
+            ("key", "secret", ""),
+            ("   ", "secret", "sk"),
+            ("key", "   ", "sk"),
+            ("key", "secret", "   "),
+        ] {
+            let incomplete = LastFmCredentials::new(k, s, sk);
+            state.save_secondary_lastfm_credentials(&incomplete);
+            assert!(
+                !state.secondary_lastfm_is_live(),
+                "expected incomplete secondary creds ({k}, {s}, {sk}) to remain dormant"
+            );
+            assert!(state.secondary_scrobbler.is_none());
         }
     }
 
@@ -3571,5 +3792,55 @@ mod tests {
             .expect("empty playlist succeeds");
         assert_eq!(count, 0);
         assert!(state.queue.is_empty());
+    }
+
+    #[test]
+    fn test_secondary_credentials_save_clear_round_trip_and_namespace_separation() {
+        let mut state = wired();
+        assert_eq!(state.credentials.load_lastfm(), None);
+        assert_eq!(state.secondary_credentials.load_lastfm(), None);
+
+        let primary_creds = LastFmCredentials::new("prim-key", "prim-sec", "prim-session");
+        let secondary_creds = LastFmCredentials::new("sec-key", "sec-sec", "sec-session");
+
+        // Primary save does not satisfy secondary load
+        state.save_lastfm_credentials(&primary_creds);
+        assert_eq!(state.credentials.load_lastfm(), Some(primary_creds.clone()));
+        assert_eq!(state.secondary_credentials.load_lastfm(), None);
+
+        // Secondary save does not overwrite primary
+        state.save_secondary_lastfm_credentials(&secondary_creds);
+        assert_eq!(state.credentials.load_lastfm(), Some(primary_creds));
+        assert_eq!(state.secondary_credentials.load_lastfm(), Some(secondary_creds.clone()));
+
+        // Clearing primary leaves secondary intact
+        state.clear_lastfm_credentials();
+        assert_eq!(state.credentials.load_lastfm(), None);
+        assert_eq!(state.secondary_credentials.load_lastfm(), Some(secondary_creds));
+
+        // Clearing secondary leaves both empty
+        state.clear_secondary_lastfm_credentials();
+        assert_eq!(state.secondary_credentials.load_lastfm(), None);
+        assert!(!state.secondary_lastfm_is_live());
+    }
+
+    #[test]
+    fn test_secondary_credentials_from_input_buffers() {
+        let mut state = wired();
+        state.secondary_lastfm_api_key_text = "sec-input-key".into();
+        state.secondary_lastfm_secret_text = "sec-input-sec".into();
+        state.secondary_lastfm_session_key_text = "sec-input-session".into();
+        state.set_secondary_lastfm_enabled(true);
+
+        let ok = state.save_secondary_lastfm_credentials_from_input();
+        assert!(ok);
+        assert!(state.secondary_lastfm_is_live());
+        assert!(state.secondary_lastfm_api_key_text.is_empty());
+        assert!(state.secondary_lastfm_secret_text.is_empty());
+        assert!(state.secondary_lastfm_session_key_text.is_empty());
+
+        state.clear_secondary_lastfm_credentials();
+        assert!(!state.secondary_lastfm_is_live());
+        assert_eq!(state.secondary_credentials.load_lastfm(), None);
     }
 }

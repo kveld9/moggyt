@@ -12,8 +12,9 @@ use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
     CredentialStore, DesktopPresence, DiskCoverCache, DiskQueueStore, DiskSettingsStore,
     DiskSkipStore, KeyringCredentialStore, KeyringSessionStore, LastFmClient, LiveAudio,
-    LiveCatalog, LrclibClient, LyricOverrideDir, RodioBackend, SessionStore, SettingsStore,
-    SingleInstanceGuard, TrayHandle, client_from_credentials, default_config_dir, ensure_sidecar,
+    LiveCatalog, LrclibClient, LyricOverrideDir, RodioBackend, Scrobbler, SessionStore,
+    SettingsStore, SingleInstanceGuard, TrayHandle, client_from_credentials, default_config_dir,
+    ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -62,6 +63,12 @@ fn main() -> anyhow::Result<()> {
     tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
     state.set_scrobbler(Box::new(scrobbler));
     state.set_credential_store(Box::new(KeyringCredentialStore::moggyt()));
+
+    let secondary_scrobbler = init_secondary_lastfm_scrobbler(settings.secondary_lastfm_enabled);
+    let sec_live = secondary_scrobbler.as_ref().is_some_and(LastFmClient::is_live);
+    tracing::debug!("secondary last.fm scrobbler live: {sec_live}");
+    state.set_secondary_scrobbler(secondary_scrobbler.map(|c| Box::new(c) as Box<dyn Scrobbler>));
+    state.set_secondary_credential_store(Box::new(KeyringCredentialStore::moggyt_secondary()));
 
     let options = eframe::NativeOptions::default();
     eframe::run_native(
@@ -165,6 +172,32 @@ fn init_lastfm_scrobbler(enabled: bool) -> LastFmClient {
     }
     tracing::info!("initializing live Last.fm scrobbler from stored credentials");
     client_from_credentials(&creds)
+}
+
+/// Initializes the optional secondary Last.fm client based on persistent settings and stored keyring credentials.
+///
+/// Returns `Some(client)` when secondary scrobbling is enabled and stored credentials are complete;
+/// otherwise returns `None`. Never panics on keyring errors.
+fn init_secondary_lastfm_scrobbler(enabled: bool) -> Option<LastFmClient> {
+    if !enabled {
+        tracing::debug!("Secondary Last.fm scrobbling disabled in settings; keeping None");
+        return None;
+    }
+    // Dedicated account names under the shared "moggyt" service namespace preserve
+    // credential isolation between primary and secondary scrobblers.
+    let store = KeyringCredentialStore::moggyt_secondary();
+    let Some(creds) = store.load_lastfm() else {
+        tracing::warn!(
+            "Secondary Last.fm enabled in settings but credentials absent or unreadable; keeping None"
+        );
+        return None;
+    };
+    if !creds.is_complete() {
+        tracing::warn!("Secondary Last.fm credentials incomplete; keeping None");
+        return None;
+    }
+    tracing::info!("initializing live secondary Last.fm scrobbler from stored credentials");
+    Some(client_from_credentials(&creds))
 }
 
 fn tracing_subscriber_setup() {
