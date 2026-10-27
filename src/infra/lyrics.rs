@@ -12,7 +12,8 @@ pub struct SyncedLyrics {
 }
 
 pub trait LyricsSource {
-    fn lookup(&self, artist: &str, title: &str) -> Option<SyncedLyrics>;
+    fn lookup(&self, artist: &str, title: &str, duration_secs: Option<u64>)
+    -> Option<SyncedLyrics>;
 }
 
 #[derive(Debug, Default)]
@@ -25,7 +26,12 @@ impl LrclibStub {
 }
 
 impl LyricsSource for LrclibStub {
-    fn lookup(&self, artist: &str, title: &str) -> Option<SyncedLyrics> {
+    fn lookup(
+        &self,
+        artist: &str,
+        title: &str,
+        _duration_secs: Option<u64>,
+    ) -> Option<SyncedLyrics> {
         let trimmed_artist = artist.trim();
         let trimmed_title = title.trim();
         if trimmed_artist.is_empty() || trimmed_title.is_empty() {
@@ -48,12 +54,20 @@ mod tests {
     #[test]
     fn lyrics_lookup_returns_synced_lines_or_none_on_blank() {
         let lyrics = LrclibStub::new();
-        let hit = lyrics.lookup("Radiohead", "Creep").expect("lyrics");
+        let hit = lyrics.lookup("Radiohead", "Creep", Some(236)).expect("lyrics");
         assert_eq!(hit.lines.len(), 2);
         assert_eq!(hit.lines[0].start_ms, 0);
 
         for (artist, title) in [("", "Creep"), ("Radiohead", ""), (" ", " ")] {
-            assert_eq!(lyrics.lookup(artist, title), None);
+            assert_eq!(lyrics.lookup(artist, title, None), None);
         }
+    }
+
+    #[test]
+    fn lyrics_stub_ignores_duration() {
+        let lyrics = LrclibStub::new();
+        let without_dur = lyrics.lookup("Radiohead", "Creep", None);
+        let with_dur = lyrics.lookup("Radiohead", "Creep", Some(9999));
+        assert_eq!(without_dur, with_dur);
     }
 }

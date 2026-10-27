@@ -957,7 +957,9 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         if self.lyrics_key.as_ref() == Some(&key) {
             return;
         }
-        let lines = self.lyrics.lookup(&key.0, &key.1).map(|s| s.lines).unwrap_or_default();
+        let duration = track.duration_secs.map(u64::from);
+        let lines =
+            self.lyrics.lookup(&key.0, &key.1, duration).map(|s| s.lines).unwrap_or_default();
         self.lyrics_lines = lines;
         self.lyrics_key = Some(key);
     }
@@ -1145,7 +1147,7 @@ mod tests {
     };
     use crate::infra::{
         AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
-        ReleaseInfo, StaticUpdater, Updater,
+        ReleaseInfo, StaticUpdater, SyncedLyrics, Updater,
     };
 
     #[derive(Default)]
@@ -1449,6 +1451,60 @@ mod tests {
         assert_eq!(state.lyrics_key, Some(("Sunrise Band".into(), "sunrise".into())));
         assert_eq!(state.lyrics_lines.len(), 2);
         assert_eq!(state.lyrics_lines[0].text, "sunrise - Sunrise Band");
+    }
+
+    type RecordedLookups = Vec<(String, String, Option<u64>)>;
+
+    #[derive(Default, Clone)]
+    struct TrackingLyricsSource {
+        recorded: std::sync::Arc<std::sync::Mutex<RecordedLookups>>,
+    }
+
+    impl LyricsSource for TrackingLyricsSource {
+        fn lookup(
+            &self,
+            artist: &str,
+            title: &str,
+            duration_secs: Option<u64>,
+        ) -> Option<SyncedLyrics> {
+            if let Ok(mut lock) = self.recorded.lock() {
+                lock.push((artist.to_owned(), title.to_owned(), duration_secs));
+            }
+            None
+        }
+    }
+
+    #[test]
+    fn refresh_lyrics_forwards_track_duration_to_lyrics_source() {
+        let lyrics = TrackingLyricsSource::default();
+        let recorded = lyrics.recorded.clone();
+        let mut state = AppState::new(
+            CatalogStub::new(),
+            AudioStub::new(),
+            MemorySessionStore::new(),
+            lyrics,
+            MemoryCoverCache::new(),
+        );
+
+        // Track with duration passes Some(secs)
+        let track_with_dur = Track::new("t1", "Paranoid Android", "Radiohead").with_duration(383);
+        state.queue.push(track_with_dur);
+        state.refresh_lyrics();
+
+        // Advance to track without duration passes None
+        let track_without_dur = Track::new("t2", "Karma Police", "Radiohead");
+        state.queue.push(track_without_dur);
+        state.queue.advance();
+        state.refresh_lyrics();
+
+        let entries = recorded.lock().unwrap().clone();
+        assert_eq!(
+            entries,
+            vec![
+                ("Radiohead".into(), "Paranoid Android".into(), Some(383)),
+                ("Radiohead".into(), "Karma Police".into(), None),
+            ]
+        );
     }
 
     #[test]
