@@ -28,6 +28,8 @@ pub(crate) fn render_library<
     render_library_separator(ui, &tokens);
     render_library_updates(ui, state);
     render_library_separator(ui, &tokens);
+    render_library_backup(ui, state);
+    render_library_separator(ui, &tokens);
     render_library_playlists(ui, state);
     render_library_separator(ui, &tokens);
     render_library_liked(ui, state);
@@ -287,6 +289,51 @@ pub(crate) fn render_update_available(ui: &mut egui::Ui, version: &str, url: &st
         }
     });
     dismissed
+}
+
+/// Renders library backup export and import controls.
+pub(crate) fn render_library_backup<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.heading("Library Backup");
+    if ui.button("Export").clicked() {
+        let _ = state.export_library_backup();
+    }
+    render_backup_import_row(ui, state);
+    if !state.backup_status_text.is_empty() {
+        ui.label(&state.backup_status_text);
+    }
+}
+
+/// Renders the single-line backup path input row and import trigger.
+pub(crate) fn render_backup_import_row<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Import path:");
+        let response = ui.text_edit_singleline(&mut state.backup_path_text);
+        if response.has_focus() {
+            state.text_focused = true;
+        }
+        if ui.button("Import").clicked() {
+            let path = state.backup_path_text.clone();
+            let _ = state.import_library_backup(&path);
+        }
+    });
 }
 
 /// Renders session status and cookie input controls.

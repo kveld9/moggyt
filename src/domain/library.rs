@@ -1,9 +1,11 @@
 //! Catalog library models: albums, artists, playlists, shelves, and pagination.
 
+use serde::{Deserialize, Serialize};
+
 use super::search::{SearchFilter, Track};
 
 /// Catalog album hit.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Album {
     pub id: String,
     pub title: String,
@@ -38,7 +40,7 @@ impl Artist {
 }
 
 /// Catalog playlist hit.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Playlist {
     pub id: String,
     pub title: String,
@@ -262,5 +264,19 @@ mod tests {
             assert_eq!(page.page_items().len(), len);
             assert_eq!(page.has_more(), expected_has_more);
         }
+    }
+
+    #[test]
+    fn album_and_playlist_serde_roundtrip() {
+        let album = Album::new("a1", "Album Title", "Artist Name");
+        let album_json = serde_json::to_string(&album).expect("serialize album");
+        let album_de: Album = serde_json::from_str(&album_json).expect("deserialize album");
+        assert_eq!(album, album_de);
+
+        let playlist = Playlist::new("p1", "Playlist Title", 42);
+        let playlist_json = serde_json::to_string(&playlist).expect("serialize playlist");
+        let playlist_de: Playlist =
+            serde_json::from_str(&playlist_json).expect("deserialize playlist");
+        assert_eq!(playlist, playlist_de);
     }
 }

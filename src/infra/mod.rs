@@ -12,6 +12,7 @@ mod cover;
 mod cover_art;
 mod cover_disk;
 mod instance;
+mod library_backup;
 mod lyrics;
 mod lyrics_lrclib;
 mod presence;
@@ -41,6 +42,10 @@ pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use cover_art::{COVER_HIRES_MAX_PX, COVER_MAX_PX, decode_cover, fetch_artwork};
 pub use cover_disk::{DiskCoverCache, cache_file_name, fnv1a_hex};
 pub use instance::{SingleInstanceGuard, instance_lock_name};
+pub use library_backup::{
+    BackupSummary, CURRENT_BACKUP_VERSION, LibraryBackup, apply_backup, export_backup,
+    read_backup_file, write_backup_file,
+};
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
 pub use lyrics_lrclib::{
     CONFIDENCE_THRESHOLD, DURATION_NEUTRAL_SCORE, DURATION_TOLERANCE_SECS, LrclibClient,

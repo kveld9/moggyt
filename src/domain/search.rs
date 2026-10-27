@@ -172,4 +172,13 @@ mod tests {
         assert_eq!(built.artwork.as_deref(), Some("https://artwork.local/art"));
         assert_eq!(built.display(), "Title - Artist");
     }
+
+    #[test]
+    fn track_serde_roundtrip() {
+        let track = Track::new_full("id-1", "Title", "Artist", Some("Album".into()), Some(180))
+            .with_artwork("https://artwork.local/1");
+        let json = serde_json::to_string(&track).expect("serialize track");
+        let deserialized: Track = serde_json::from_str(&json).expect("deserialize track");
+        assert_eq!(track, deserialized);
+    }
 }

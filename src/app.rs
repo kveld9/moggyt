@@ -7,6 +7,8 @@ pub mod components;
 pub mod pages;
 pub mod theme;
 
+use std::path::{Path, PathBuf};
+
 use components::{render_player_bar, render_top_bar};
 use pages::{render_detail, render_library, render_now_playing, render_queue, render_search};
 
@@ -18,12 +20,13 @@ use crate::domain::{
 };
 use crate::i18n::Locale;
 use crate::infra::{
-    AudioBackend, AudioQuality, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache,
-    CredentialStore, DesktopPresence, DiscordPresence, GithubUpdater, LastFmClient,
+    AudioBackend, AudioQuality, BackupSummary, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog,
+    CoverCache, CredentialStore, DesktopPresence, DiscordPresence, GithubUpdater, LastFmClient,
     LastFmCredentials, LyricLine, LyricsSource, MediaKeyAction, MemoryCredentialStore,
     MemoryQueueStore, MemorySettingsStore, Presence, QueueStore, Scrobbler, SessionStore, Settings,
-    SettingsStore, StubScrobbler, TrayAction, TrayHandle, Updater, client_from_credentials,
-    decode_cover, fetch_artwork, is_newer, sanitize_cookie_input, should_scrobble,
+    SettingsStore, StubScrobbler, TrayAction, TrayHandle, Updater, apply_backup,
+    client_from_credentials, decode_cover, default_config_dir, export_backup, fetch_artwork,
+    is_newer, read_backup_file, sanitize_cookie_input, should_scrobble, write_backup_file,
 };
 
 /// Navigation pages of the application shell.
@@ -147,6 +150,12 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub sleep_timer_accumulated: u64,
     /// Elapsed seconds of active track at the moment sleep timer was armed.
     pub sleep_timer_base_offset: u64,
+    /// Path entered for library backup import (UI state only).
+    pub backup_path_text: String,
+    /// Result or error status message from backup export or import (UI state only).
+    pub backup_status_text: String,
+    /// Optional backup directory override for deterministic testing.
+    pub backup_dir: Option<PathBuf>,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -206,6 +215,9 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             last_sleep_timer_fire: None,
             sleep_timer_accumulated: 0,
             sleep_timer_base_offset: 0,
+            backup_path_text: String::new(),
+            backup_status_text: String::new(),
+            backup_dir: None,
         }
     }
 
@@ -860,6 +872,61 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         }
         let next_liked = !self.is_liked(trimmed);
         self.catalog.set_liked(trimmed, next_liked);
+    }
+
+    /// Exports the current library into a JSON backup file in the backup directory.
+    pub fn export_library_backup(&mut self) -> anyhow::Result<PathBuf> {
+        let dir = self.backup_dir.clone().unwrap_or_else(default_config_dir);
+        self.export_library_backup_to(&dir)
+    }
+
+    /// Exports the current library into `dir` using caller-supplied directory.
+    pub fn export_library_backup_to(&mut self, dir: &Path) -> anyhow::Result<PathBuf> {
+        let timestamp = current_unix_secs();
+        let backup = export_backup(&self.catalog, timestamp);
+        let res = write_backup_file(dir, &backup);
+        self.record_export_status(&res);
+        res
+    }
+
+    fn record_export_status(&mut self, res: &anyhow::Result<PathBuf>) {
+        match res {
+            Ok(path) => self.backup_status_text = format!("Exported to: {}", path.display()),
+            Err(err) => self.backup_status_text = format!("Export error: {err:#}"),
+        }
+    }
+
+    /// Imports a library backup from the given filesystem `path`.
+    pub fn import_library_backup(&mut self, path: &str) -> anyhow::Result<BackupSummary> {
+        let trimmed = path.trim();
+        if trimmed.is_empty() {
+            let err = anyhow::anyhow!("backup path cannot be blank");
+            self.backup_status_text = format!("Import error: {err}");
+            return Err(err);
+        }
+        let res = self.execute_backup_import(trimmed);
+        self.record_import_status(&res);
+        res
+    }
+
+    fn execute_backup_import(&mut self, path: &str) -> anyhow::Result<BackupSummary> {
+        let backup = read_backup_file(Path::new(path))?;
+        let summary = apply_backup(&mut self.catalog, &backup);
+        Ok(summary)
+    }
+
+    fn record_import_status(&mut self, res: &anyhow::Result<BackupSummary>) {
+        match res {
+            Ok(s) => {
+                self.backup_status_text = format!(
+                    "Imported: {} liked, {} playlists, {} albums",
+                    s.liked_applied, s.playlists_recorded, s.albums_recorded
+                );
+            }
+            Err(err) => {
+                self.backup_status_text = format!("Import error: {err:#}");
+            }
+        }
     }
 
     /// Handles a global keyboard shortcut event.
@@ -2596,5 +2663,53 @@ mod tests {
         assert!(state.loudness_normalization);
         assert!(state.audio.skip_silence());
         assert!(state.audio.loudness_normalization());
+    }
+
+    #[test]
+    fn test_blank_import_path_rejected() {
+        let mut state = wired();
+        for invalid in ["", "   "] {
+            let res = state.import_library_backup(invalid);
+            assert!(res.is_err());
+            assert!(state.backup_status_text.contains("backup path cannot be blank"));
+        }
+    }
+
+    #[test]
+    fn test_app_state_export_clear_likes_import_restores_likes() {
+        let mut state = wired();
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-test-app-backup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).expect("create test temp dir");
+        state.backup_dir = Some(temp_dir.clone());
+
+        assert!(state.is_liked("stub-1"));
+
+        let path = state.export_library_backup().expect("export succeeds");
+        assert!(path.exists());
+        assert!(state.backup_status_text.contains("Exported to:"));
+
+        state.catalog.set_liked("stub-1", false);
+        assert!(!state.is_liked("stub-1"));
+        assert!(state.catalog.liked_tracks().is_empty());
+
+        let summary = state
+            .import_library_backup(path.to_str().expect("valid utf-8 path"))
+            .expect("import succeeds");
+        assert_eq!(summary.liked_applied, 1);
+        assert!(state.is_liked("stub-1"));
+        assert!(state.backup_status_text.contains("Imported: 1 liked"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_import_library_backup_nonexistent_file_surfaces_error() {
+        let mut state = wired();
+        let bad_path = "/tmp/moggyt_definitely_nonexistent_backup.json";
+        let res = state.import_library_backup(bad_path);
+        assert!(res.is_err());
+        assert!(state.backup_status_text.contains("Import error:"));
     }
 }
