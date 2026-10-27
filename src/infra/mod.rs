@@ -35,7 +35,12 @@ pub use cover_art::{COVER_HIRES_MAX_PX, COVER_MAX_PX, decode_cover, fetch_artwor
 pub use cover_disk::{DiskCoverCache, cache_file_name, fnv1a_hex};
 pub use instance::{SingleInstanceGuard, instance_lock_name};
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
-pub use lyrics_lrclib::{LrclibClient, lrclib_get_url, parse_lrc};
+pub use lyrics_lrclib::{
+    CONFIDENCE_THRESHOLD, DURATION_NEUTRAL_SCORE, DURATION_TOLERANCE_SECS, LrclibClient,
+    LyricsCandidate, PARTIAL_MATCH_SCORE, WEIGHT_ARTIST, WEIGHT_DURATION, WEIGHT_TITLE,
+    duration_similarity, lrclib_get_url, match_confidence, normalize_text, parse_lrc,
+    payload_matches, text_similarity,
+};
 pub use presence::{NoopPresence, Presence};
 pub use presence_desktop::{DesktopPresence, MediaKeyAction, action_for, metadata_for, status_for};
 pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts};
