@@ -23,11 +23,11 @@ use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, AudioQuality, BackupSummary, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog,
     CoverCache, CredentialStore, DesktopPresence, DiscordPresence, GithubUpdater, LastFmClient,
-    LastFmCredentials, LyricLine, LyricsSource, MediaKeyAction, MemoryCredentialStore,
-    MemoryQueueStore, MemorySettingsStore, MemorySkipStore, Presence, QueueStore, Scrobbler,
-    SessionStore, Settings, SettingsStore, SkipStore, StubScrobbler, TrayAction, TrayHandle,
-    Updater, apply_backup, client_from_credentials, decode_cover, decode_handoff,
-    default_config_dir, export_backup, fetch_artwork, is_newer, read_backup_file,
+    LastFmCredentials, LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction,
+    MemoryCredentialStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore, Presence,
+    QueueStore, Scrobbler, SessionStore, Settings, SettingsStore, SkipStore, StubScrobbler,
+    TrayAction, TrayHandle, Updater, apply_backup, client_from_credentials, decode_cover,
+    decode_handoff, default_config_dir, export_backup, fetch_artwork, is_newer, read_backup_file,
     sanitize_cookie_input, should_scrobble, write_backup_file,
 };
 
@@ -101,6 +101,10 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub lyrics_key: Option<(String, String)>,
     pub lyrics_lines: Vec<LyricLine>,
     pub lyrics_offset_ms: i64,
+    /// Optional directory for local lyric override files (*.lrc keyed by videoId).
+    pub lyric_overrides: Option<LyricOverrideDir>,
+    /// Whether the currently displayed lyrics were resolved from a local override file.
+    pub lyrics_from_override: bool,
     /// Artwork URL for the currently rendered cover art texture.
     pub cover_key: Option<String>,
     /// Single-entry texture cache for the currently active cover art.
@@ -218,6 +222,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             lyrics_key: None,
             lyrics_lines: Vec::new(),
             lyrics_offset_ms: 0,
+            lyric_overrides: None,
+            lyrics_from_override: false,
             cover_key: None,
             cover_texture: None,
             update_status: UpdateStatus::Unknown,
@@ -263,6 +269,11 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             skip_error: None,
             last_skip_target: None,
         }
+    }
+
+    /// Injects a local lyric overrides directory.
+    pub fn set_lyric_overrides(&mut self, overrides: LyricOverrideDir) {
+        self.lyric_overrides = Some(overrides);
     }
 
     /// Injects an alternative scrobbler implementation.
@@ -1252,11 +1263,13 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Fetches and caches synced lyrics for the currently playing track.
     ///
     /// No-op if lyrics for the current (artist, title) pair have already been resolved.
+    /// Override content refreshes on track change like provider content (no file watcher).
     pub fn refresh_lyrics(&mut self) {
         let Some(track) = self.queue.current() else {
             if self.lyrics_key.is_some() {
                 self.lyrics_key = None;
                 self.lyrics_lines.clear();
+                self.lyrics_from_override = false;
             }
             return;
         };
@@ -1264,10 +1277,16 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         if self.lyrics_key.as_ref() == Some(&key) {
             return;
         }
-        let duration = track.duration_secs.map(u64::from);
-        let lines =
-            self.lyrics.lookup(&key.0, &key.1, duration).map(|s| s.lines).unwrap_or_default();
-        self.lyrics_lines = lines;
+        let override_hit = self.lyric_overrides.as_ref().and_then(|dir| dir.load(&track.id));
+        if let Some(override_lyrics) = override_hit {
+            self.lyrics_lines = override_lyrics.lines;
+            self.lyrics_from_override = true;
+        } else {
+            let duration = track.duration_secs.map(u64::from);
+            self.lyrics_lines =
+                self.lyrics.lookup(&key.0, &key.1, duration).map(|s| s.lines).unwrap_or_default();
+            self.lyrics_from_override = false;
+        }
         self.lyrics_key = Some(key);
     }
 
@@ -3120,6 +3139,38 @@ mod tests {
     }
 
     #[test]
+    fn test_app_state_prefers_override_over_stub_provider_lines_and_falls_back_when_absent() {
+        let mut state = wired();
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-test-override-pref-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let override_dir = LyricOverrideDir::new(&temp_dir);
+        state.set_lyric_overrides(override_dir.clone());
+
+        state.queue.push(Track::new("video-pref-1", "Prefer Song", "Prefer Artist"));
+
+        // When override file does not exist, falls back to provider
+        state.refresh_lyrics();
+        assert!(!state.lyrics_from_override);
+        assert_eq!(state.lyrics_lines.len(), 2);
+        assert_eq!(state.lyrics_lines[1].text, "Deterministic synced lyrics");
+
+        // Save override for the current track id
+        let lrc = "[00:02.50]Local override line\n";
+        override_dir.save("video-pref-1", lrc).expect("save override");
+
+        // Simulate track change or cache clear
+        state.lyrics_key = None;
+        state.refresh_lyrics();
+        assert!(state.lyrics_from_override);
+        assert_eq!(state.lyrics_lines.len(), 1);
+        assert_eq!(state.lyrics_lines[0].start_ms, 2500);
+        assert_eq!(state.lyrics_lines[0].text, "Local override line");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
     fn test_import_library_backup_nonexistent_file_surfaces_error() {
         let mut state = wired();
         let bad_path = "/tmp/moggyt_definitely_nonexistent_backup.json";
@@ -3339,5 +3390,38 @@ mod tests {
 
         let stored = state.current_skip_ranges().expect("stored ranges");
         assert_eq!(stored.segments(), &[SkipSegment { start_secs: 12, end_secs: 24 }]);
+    }
+
+    #[test]
+    fn test_offset_applies_to_override_lines() {
+        let mut state = wired();
+        let temp_dir = std::env::temp_dir()
+            .join(format!("moggyt-test-override-offset-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let override_dir = LyricOverrideDir::new(&temp_dir);
+        let lrc = "[00:10.00]Override line\n";
+        override_dir.save("video-offset-1", lrc).expect("save override");
+        state.set_lyric_overrides(override_dir);
+
+        state.queue.push(Track::new("video-offset-1", "Offset Song", "Offset Artist"));
+        state.refresh_lyrics();
+        assert!(state.lyrics_from_override);
+
+        // Baseline (0ms offset)
+        assert_eq!(state.visible_lyric_lines(), vec![(10000, "Override line".to_string())]);
+
+        // Positive offset (+500ms)
+        state.nudge_lyrics_offset(500);
+        assert_eq!(state.visible_lyric_lines(), vec![(10500, "Override line".to_string())]);
+
+        // Negative offset (-2000ms): 10000 + 500 - 2000 = 8500ms
+        state.nudge_lyrics_offset(-2000);
+        assert_eq!(state.visible_lyric_lines(), vec![(8500, "Override line".to_string())]);
+
+        // Clamping at zero: nudge by -20000ms
+        state.nudge_lyrics_offset(-20000);
+        assert_eq!(state.visible_lyric_lines(), vec![(0, "Override line".to_string())]);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

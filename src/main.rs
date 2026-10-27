@@ -12,8 +12,8 @@ use moggyt::app::{AppState, MoggytApp};
 use moggyt::infra::{
     CredentialStore, DesktopPresence, DiskCoverCache, DiskQueueStore, DiskSettingsStore,
     DiskSkipStore, KeyringCredentialStore, KeyringSessionStore, LastFmClient, LiveAudio,
-    LiveCatalog, LrclibClient, RodioBackend, SessionStore, SettingsStore, SingleInstanceGuard,
-    TrayHandle, client_from_credentials, default_config_dir, ensure_sidecar,
+    LiveCatalog, LrclibClient, LyricOverrideDir, RodioBackend, SessionStore, SettingsStore,
+    SingleInstanceGuard, TrayHandle, client_from_credentials, default_config_dir, ensure_sidecar,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -47,6 +47,8 @@ fn main() -> anyhow::Result<()> {
     tracing::debug!("discord rich presence live: {}", state.discord.is_live());
 
     let settings_dir = default_config_dir();
+    let lyric_overrides = LyricOverrideDir::new(settings_dir.join("lyrics"));
+    state.set_lyric_overrides(lyric_overrides);
     let settings_store = DiskSettingsStore::new(settings_dir.clone());
     let settings = settings_store.load();
     state.set_settings_store(Box::new(settings_store));
