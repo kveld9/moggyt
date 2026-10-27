@@ -52,6 +52,85 @@ impl SearchQuery {
     }
 }
 
+/// Maximum allowed length (in unicode characters) for a lyrics search snippet.
+pub const MAX_LYRICS_SNIPPET_LEN: usize = 200;
+
+/// Validation errors for a lyrics search snippet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LyricsSnippetError {
+    /// Snippet is empty or contains only whitespace.
+    Empty,
+    /// Snippet exceeds the maximum allowed length of [`MAX_LYRICS_SNIPPET_LEN`] characters.
+    TooLong,
+}
+
+impl std::fmt::Display for LyricsSnippetError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(f, "lyrics snippet cannot be blank"),
+            Self::TooLong => write!(
+                f,
+                "lyrics snippet exceeds maximum length of {MAX_LYRICS_SNIPPET_LEN} characters"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for LyricsSnippetError {}
+
+/// Validated lyrics snippet for search-by-lyrics lookup (trimmed, non-empty, capped length).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LyricsSnippet(String);
+
+impl LyricsSnippet {
+    /// Parses and validates a raw lyrics snippet at the boundary.
+    ///
+    /// Trims leading and trailing whitespace. Rejects blank queries and
+    /// queries exceeding [`MAX_LYRICS_SNIPPET_LEN`] characters.
+    pub fn parse(raw: &str) -> Result<Self, LyricsSnippetError> {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return Err(LyricsSnippetError::Empty);
+        }
+        if trimmed.chars().count() > MAX_LYRICS_SNIPPET_LEN {
+            return Err(LyricsSnippetError::TooLong);
+        }
+        Ok(Self(trimmed.to_owned()))
+    }
+
+    /// Snippet text (already trimmed).
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Snippet text (already trimmed).
+    pub fn text(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for LyricsSnippet {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for LyricsSnippet {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for LyricsSnippet {
+    type Error = LyricsSnippetError;
+
+    fn try_from(raw: &str) -> Result<Self, Self::Error> {
+        Self::parse(raw)
+    }
+}
+
 /// A catalog track hit: plain data, no behavior, no I/O.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Track {
@@ -131,6 +210,40 @@ mod tests {
     #[test]
     fn blank_query_is_rejected() {
         assert_eq!(SearchQuery::parse("   "), None);
+    }
+
+    #[test]
+    fn blank_lyrics_snippet_is_rejected() {
+        assert_eq!(LyricsSnippet::parse(""), Err(LyricsSnippetError::Empty));
+        assert_eq!(LyricsSnippet::parse("   "), Err(LyricsSnippetError::Empty));
+        assert_eq!(LyricsSnippet::parse("\n\t  "), Err(LyricsSnippetError::Empty));
+    }
+
+    #[test]
+    fn overlong_lyrics_snippet_is_rejected() {
+        let exact = "a".repeat(MAX_LYRICS_SNIPPET_LEN);
+        assert!(LyricsSnippet::parse(&exact).is_ok());
+
+        let overlong = "a".repeat(MAX_LYRICS_SNIPPET_LEN + 1);
+        assert_eq!(LyricsSnippet::parse(&overlong), Err(LyricsSnippetError::TooLong));
+    }
+
+    #[test]
+    fn lyrics_snippet_is_trimmed() {
+        let snippet = LyricsSnippet::parse("  city lights glowing  ").expect("valid snippet");
+        assert_eq!(snippet.as_str(), "city lights glowing");
+        assert_eq!(snippet.text(), "city lights glowing");
+        assert_eq!(&*snippet, "city lights glowing");
+        assert_eq!(snippet.as_ref(), "city lights glowing");
+    }
+
+    #[test]
+    fn lyrics_snippet_error_display_and_trait() {
+        assert_eq!(LyricsSnippetError::Empty.to_string(), "lyrics snippet cannot be blank");
+        assert_eq!(
+            LyricsSnippetError::TooLong.to_string(),
+            format!("lyrics snippet exceeds maximum length of {MAX_LYRICS_SNIPPET_LEN} characters")
+        );
     }
 
     #[test]

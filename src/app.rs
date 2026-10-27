@@ -15,8 +15,8 @@ use pages::{render_detail, render_library, render_now_playing, render_queue, ren
 use eframe::egui;
 
 use crate::domain::{
-    Detail, DetailKind, PlaybackQueue, SearchQuery, SearchResult, Shelf, SleepTimer, ThemeId,
-    TimerPreset, Track,
+    Detail, DetailKind, LyricsSnippet, LyricsSnippetError, PlaybackQueue, SearchQuery,
+    SearchResult, Shelf, SleepTimer, ThemeId, TimerPreset, Track,
 };
 use crate::i18n::Locale;
 use crate::infra::{
@@ -156,6 +156,16 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub backup_status_text: String,
     /// Optional backup directory override for deterministic testing.
     pub backup_dir: Option<PathBuf>,
+    /// Whether lyrics search lookup mode is active.
+    pub lyrics_mode: bool,
+    /// Last search validation error message to display in UI.
+    pub search_error: Option<String>,
+    /// Last lyrics search validation error message to display in UI.
+    pub lyrics_error: Option<String>,
+    /// Result hits populated by the last lyrics search.
+    pub lyrics_results: Vec<Track>,
+    /// Result hits populated by the last search.
+    pub search_results: Vec<Track>,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -218,6 +228,11 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             backup_path_text: String::new(),
             backup_status_text: String::new(),
             backup_dir: None,
+            lyrics_mode: false,
+            search_error: None,
+            lyrics_error: None,
+            lyrics_results: Vec::new(),
+            search_results: Vec::new(),
         }
     }
 
@@ -599,13 +614,58 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.detail = None;
     }
 
-    /// Handles a search submission: parses the raw input at the boundary,
-    /// queries the catalog, and enqueues the first hit.
+    /// Sets whether lyrics search lookup mode is enabled.
+    pub fn set_lyrics_mode(&mut self, enabled: bool) {
+        self.lyrics_mode = enabled;
+        self.search_error = None;
+        self.lyrics_error = None;
+    }
+
+    /// Returns whether lyrics search lookup mode is enabled.
+    pub fn is_lyrics_mode(&self) -> bool {
+        self.lyrics_mode
+    }
+
+    fn record_lyrics_error(&mut self, err: LyricsSnippetError) {
+        let msg = err.to_string();
+        self.search_error = Some(msg.clone());
+        self.lyrics_error = Some(msg);
+        self.lyrics_results.clear();
+        self.search_results.clear();
+    }
+
+    /// Handles a search submission: routes to lyrics search when lyrics mode is active,
+    /// otherwise parses standard query, queries the catalog, and enqueues the first hit.
     pub fn submit_search(&mut self) {
+        if self.lyrics_mode {
+            self.submit_lyrics_search();
+            return;
+        }
+        self.search_error = None;
+        self.lyrics_error = None;
         let Some(query) = SearchQuery::parse(&self.search_text) else {
             return;
         };
         let hits = self.catalog.search(query.text());
+        self.search_results = hits.clone();
+        if let Some(track) = hits.into_iter().next() {
+            self.queue.push(track);
+            self.page = Page::Queue;
+        }
+    }
+
+    /// Submits a lyrics-based search query using `search_text`.
+    /// Surfaces validation errors on blank or overlong input without panicking.
+    pub fn submit_lyrics_search(&mut self) {
+        let snippet = match LyricsSnippet::parse(&self.search_text) {
+            Ok(s) => s,
+            Err(err) => return self.record_lyrics_error(err),
+        };
+        self.search_error = None;
+        self.lyrics_error = None;
+        let hits = self.catalog.search_by_lyrics(&snippet);
+        self.lyrics_results = hits.clone();
+        self.search_results = hits.clone();
         if let Some(track) = hits.into_iter().next() {
             self.mutate_queue(|q| q.push(track));
             self.page = Page::Queue;
@@ -1229,6 +1289,9 @@ mod tests {
         }
         fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
             self.inner.search_filtered(query)
+        }
+        fn search_by_lyrics(&self, snippet: &LyricsSnippet) -> Vec<Track> {
+            self.inner.search_by_lyrics(snippet)
         }
         fn radio(&self, seed_track_id: &str) -> Vec<Track> {
             self.inner.radio(seed_track_id)
@@ -2711,5 +2774,78 @@ mod tests {
         let res = state.import_library_backup(bad_path);
         assert!(res.is_err());
         assert!(state.backup_status_text.contains("Import error:"));
+    }
+
+    #[test]
+    fn app_state_lyrics_submit_surfaces_validation_errors_for_blank_input() {
+        let mut state = wired();
+        state.set_lyrics_mode(true);
+        assert!(state.is_lyrics_mode());
+        state.search_text = "   ".into();
+        state.submit_search();
+
+        assert_eq!(state.search_error.as_deref(), Some("lyrics snippet cannot be blank"));
+        assert_eq!(state.lyrics_error.as_deref(), Some("lyrics snippet cannot be blank"));
+        assert!(state.lyrics_results.is_empty());
+        assert!(state.search_results.is_empty());
+        assert_eq!(state.page, Page::Search);
+        assert!(state.queue.is_empty());
+    }
+
+    #[test]
+    fn app_state_lyrics_submit_surfaces_validation_errors_for_overlong_input() {
+        let mut state = wired();
+        state.lyrics_mode = true;
+        state.search_text = "x".repeat(201);
+        state.submit_search();
+
+        assert!(state.search_error.is_some());
+        assert!(state.lyrics_results.is_empty());
+        assert_eq!(state.page, Page::Search);
+        assert!(state.queue.is_empty());
+    }
+
+    #[test]
+    fn app_state_lyrics_submit_populates_results_and_enqueues_hit() {
+        let mut state = wired();
+        state.lyrics_mode = true;
+        state.search_text = "  midnight breeze  ".into();
+        state.submit_search();
+
+        assert_eq!(state.search_error, None);
+        assert_eq!(state.lyrics_error, None);
+        assert_eq!(state.lyrics_results.len(), 1);
+        assert_eq!(state.lyrics_results[0].id, "stub-1");
+        assert_eq!(state.lyrics_results[0].title, "Midnight City");
+        assert_eq!(state.search_results, state.lyrics_results);
+        assert_eq!(state.page, Page::Queue);
+        assert_eq!(state.queue.len(), 1);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("stub-1"));
+    }
+
+    #[test]
+    fn app_state_direct_submit_lyrics_search_call() {
+        let mut state = wired();
+        state.search_text = "whisper softly".into();
+        state.submit_lyrics_search();
+
+        assert_eq!(state.search_error, None);
+        assert_eq!(state.lyrics_results.len(), 1);
+        assert_eq!(state.lyrics_results[0].id, "stub-2");
+        assert_eq!(state.lyrics_results[0].title, "Echoes of Silence");
+        assert_eq!(state.page, Page::Queue);
+    }
+
+    #[test]
+    fn app_state_lyrics_submit_miss_clears_results_and_stays_on_page() {
+        let mut state = wired();
+        state.lyrics_mode = true;
+        state.search_text = "lyrics not matching anything".into();
+        state.submit_search();
+
+        assert_eq!(state.search_error, None);
+        assert!(state.lyrics_results.is_empty());
+        assert_eq!(state.page, Page::Search);
+        assert!(state.queue.is_empty());
     }
 }
