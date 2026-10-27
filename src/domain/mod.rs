@@ -13,6 +13,8 @@ pub use library::{
     Album, Artist, Detail, DetailKind, Playlist, SearchPage, SearchResult, Shelf, apply_filter,
 };
 pub use queue::{PlaybackQueue, RepeatMode};
-pub use search::{SearchFilter, SearchQuery, Track};
+pub use search::{
+    LyricsSnippet, LyricsSnippetError, MAX_LYRICS_SNIPPET_LEN, SearchFilter, SearchQuery, Track,
+};
 pub use sleep_timer::{SleepTimer, TimerPreset};
 pub use theme::{DesignTokens, Palette, ThemeId};

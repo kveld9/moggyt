@@ -4,8 +4,8 @@ use super::catalog_client::{
     CatalogClient, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
 };
 use crate::domain::{
-    Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf,
-    Track,
+    Album, Artist, Detail, DetailKind, LyricsSnippet, Playlist, SearchFilter, SearchQuery,
+    SearchResult, Shelf, Track,
 };
 
 /// Catalog port: search by free text and user library read/mutation access.
@@ -15,6 +15,13 @@ pub trait Catalog {
 
     /// Returns catalog hits matching the query text and filter.
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult>;
+
+    /// Returns catalog hits matching lyrics in `snippet` (empty when nothing matches).
+    ///
+    /// Default implementation forwards the snippet text to [`Catalog::search`].
+    fn search_by_lyrics(&self, snippet: &LyricsSnippet) -> Vec<Track> {
+        self.search(snippet.as_str())
+    }
 
     /// Returns radio continuation tracks seeded by `seed_track_id` (empty when seed is blank).
     fn radio(&self, seed_track_id: &str) -> Vec<Track>;
@@ -84,6 +91,29 @@ impl CatalogStub {
         ]
     }
 
+    fn stub_lyrics_index() -> Vec<(Track, &'static str)> {
+        vec![
+            (
+                Track::new("stub-1", "Midnight City", "Stub Artist").with_artwork(STUB_ARTWORK_URL),
+                "city lights are glowing in the midnight breeze",
+            ),
+            (
+                Track::new("stub-2", "Echoes of Silence", "Stub Artist"),
+                "hear the echoes whisper softly in the dark",
+            ),
+        ]
+    }
+
+    fn stub_lyrics_hits(snippet: &str) -> Vec<Track> {
+        let needle = snippet.to_ascii_lowercase();
+        Self::stub_lyrics_index()
+            .into_iter()
+            .filter_map(|(track, lyrics)| {
+                lyrics.to_ascii_lowercase().contains(&needle).then_some(track)
+            })
+            .collect()
+    }
+
     fn stub_album() -> Album {
         Album::new("stub-album-1", "Stub Album", "Stub Artist")
     }
@@ -120,6 +150,10 @@ impl CatalogStub {
 impl Catalog for CatalogStub {
     fn search(&self, query: &str) -> Vec<Track> {
         Self::fixed_hits(query)
+    }
+
+    fn search_by_lyrics(&self, snippet: &LyricsSnippet) -> Vec<Track> {
+        Self::stub_lyrics_hits(snippet.as_str())
     }
 
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
@@ -668,5 +702,74 @@ mod tests {
 
         catalog.set_session_cookies(None);
         assert!(!catalog.is_authenticated());
+    }
+
+    #[test]
+    fn stub_matches_lyric_substring_and_misses_on_unrelated_text() {
+        let catalog = CatalogStub::new();
+
+        let hit1 = catalog.search_by_lyrics(&LyricsSnippet::parse("midnight breeze").unwrap());
+        assert_eq!(hit1.len(), 1);
+        assert_eq!(hit1[0].id, "stub-1");
+        assert_eq!(hit1[0].title, "Midnight City");
+        assert_eq!(hit1[0].artwork.as_deref(), Some(STUB_ARTWORK_URL));
+
+        // Case-insensitive substring match
+        let hit2 = catalog.search_by_lyrics(&LyricsSnippet::parse("WHISPER SOFTLY").unwrap());
+        assert_eq!(hit2.len(), 1);
+        assert_eq!(hit2[0].id, "stub-2");
+        assert_eq!(hit2[0].title, "Echoes of Silence");
+
+        // Unrelated query returns empty vec
+        let misses = catalog.search_by_lyrics(
+            &LyricsSnippet::parse("completely unrelated lyrics not in index").unwrap(),
+        );
+        assert!(misses.is_empty());
+    }
+
+    #[derive(Default)]
+    struct PassThroughCatalog {
+        last_query: std::sync::Mutex<Option<String>>,
+    }
+
+    impl Catalog for PassThroughCatalog {
+        fn search(&self, query: &str) -> Vec<Track> {
+            *self.last_query.lock().unwrap() = Some(query.to_owned());
+            vec![Track::new("pass-1", query, "Pass Artist")]
+        }
+        fn search_filtered(&self, _query: &SearchQuery) -> Vec<SearchResult> {
+            Vec::new()
+        }
+        fn radio(&self, _seed_track_id: &str) -> Vec<Track> {
+            Vec::new()
+        }
+        fn home_shelves(&self) -> Vec<Shelf> {
+            Vec::new()
+        }
+        fn playlists(&self) -> Vec<Playlist> {
+            Vec::new()
+        }
+        fn liked_tracks(&self) -> Vec<Track> {
+            Vec::new()
+        }
+        fn saved_albums(&self) -> Vec<Album> {
+            Vec::new()
+        }
+        fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+        fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
+            None
+        }
+    }
+
+    #[test]
+    fn default_forwarding_works_through_pass_through_catalog() {
+        let pass_through = PassThroughCatalog::default();
+        let snippet = LyricsSnippet::parse("running through the night").unwrap();
+        let hits = pass_through.search_by_lyrics(&snippet);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].id, "pass-1");
+        assert_eq!(hits[0].title, "running through the night");
+        let recorded = pass_through.last_query.lock().unwrap().clone();
+        assert_eq!(recorded.as_deref(), Some("running through the night"));
     }
 }

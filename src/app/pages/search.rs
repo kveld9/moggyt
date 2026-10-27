@@ -7,7 +7,20 @@ use crate::app::pages::home::render_home_shelves;
 use crate::domain::DesignTokens;
 use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 
-/// Renders the search page view with search input and catalog shelves.
+fn render_search_error(ui: &mut egui::Ui, error: Option<&str>) {
+    let Some(err) = error else {
+        return;
+    };
+    ui.colored_label(egui::Color32::from_rgb(220, 50, 50), err);
+}
+
+fn render_search_controls(ui: &mut egui::Ui, lyrics_mode: &mut bool) {
+    ui.horizontal(|ui| {
+        ui.checkbox(lyrics_mode, "Lyrics");
+    });
+}
+
+/// Renders the search page view with search input, lyrics mode toggle, and catalog shelves.
 pub(crate) fn render_search<
     C: Catalog,
     A: AudioBackend,
@@ -47,10 +60,12 @@ fn render_search_bar<
         if ui.button("Search").clicked() || submitted {
             state.submit_search();
         }
+        render_search_controls(ui, &mut state.lyrics_mode);
         ui.label(
             egui::RichText::new("(stub returns fixed hits)")
                 .size(tokens.font_caption)
                 .color(ui.visuals().weak_text_color()),
         );
     });
+    render_search_error(ui, state.search_error.as_deref().or(state.lyrics_error.as_deref()));
 }
