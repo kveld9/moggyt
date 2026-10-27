@@ -14,6 +14,8 @@ pub trait AudioBackend {
     fn is_playing(&self) -> bool;
     fn last_requested(&self) -> Option<&str>;
     fn set_quality(&mut self, _q: AudioQuality) {}
+    fn set_skip_silence(&mut self, _on: bool) {}
+    fn set_loudness_normalization(&mut self, _on: bool) {}
 }
 
 /// Recording stub: captures intent without touching audio hardware.
@@ -23,17 +25,34 @@ pub struct AudioStub {
     playing: bool,
     volume: u8,
     position_secs: u64,
+    skip_silence: bool,
+    loudness_normalization: bool,
 }
 
 impl Default for AudioStub {
     fn default() -> Self {
-        Self { last_requested: None, playing: false, volume: 100, position_secs: 0 }
+        Self {
+            last_requested: None,
+            playing: false,
+            volume: 100,
+            position_secs: 0,
+            skip_silence: false,
+            loudness_normalization: false,
+        }
     }
 }
 
 impl AudioStub {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn skip_silence(&self) -> bool {
+        self.skip_silence
+    }
+
+    pub fn loudness_normalization(&self) -> bool {
+        self.loudness_normalization
     }
 }
 
@@ -77,6 +96,14 @@ impl AudioBackend for AudioStub {
     fn last_requested(&self) -> Option<&str> {
         self.last_requested.as_deref()
     }
+
+    fn set_skip_silence(&mut self, on: bool) {
+        self.skip_silence = on;
+    }
+
+    fn set_loudness_normalization(&mut self, on: bool) {
+        self.loudness_normalization = on;
+    }
 }
 
 #[cfg(test)]
@@ -86,6 +113,8 @@ mod tests {
     #[test]
     fn audio_state_transitions_and_volume_clamp() {
         let mut audio = AudioStub::new();
+        assert!(!audio.skip_silence());
+        assert!(!audio.loudness_normalization());
         for (v, exp) in [(0, 0), (50, 50), (100, 100), (150, 100)] {
             audio.set_volume(v);
             assert_eq!(audio.volume(), exp);
@@ -103,5 +132,9 @@ mod tests {
         audio.play("s-2");
         assert!(audio.is_playing() && audio.position_secs() == 0);
         audio.set_quality(AudioQuality::High);
+        audio.set_skip_silence(true);
+        assert!(audio.skip_silence());
+        audio.set_loudness_normalization(true);
+        assert!(audio.loudness_normalization());
     }
 }

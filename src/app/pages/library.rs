@@ -88,6 +88,28 @@ pub(crate) fn render_library_preferences<
     if ui.checkbox(&mut hi_res, "High-resolution covers").changed() {
         state.set_hi_res_covers(hi_res);
     }
+    render_dsp_preferences(ui, state);
+}
+
+/// Renders DSP audio playback preferences (skip silence, loudness normalization).
+pub(crate) fn render_dsp_preferences<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    let mut skip_silence = state.skip_silence;
+    if ui.checkbox(&mut skip_silence, "Skip silence").changed() {
+        state.set_skip_silence(skip_silence);
+    }
+    let mut loudness = state.loudness_normalization;
+    if ui.checkbox(&mut loudness, "Loudness normalization").changed() {
+        state.set_loudness_normalization(loudness);
+    }
 }
 
 /// Renders Last.fm configuration and status.

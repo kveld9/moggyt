@@ -8,6 +8,7 @@ use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink};
 
 use super::audio::{AudioBackend, AudioStub};
+use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
 use super::stream::AudioQuality;
 use super::ytdlp::YtDlpResolver;
 
@@ -37,6 +38,8 @@ pub struct RodioBackend {
     volume: u8,
     anchor: Option<Instant>,
     paused_accum: Duration,
+    skip_silence: bool,
+    loudness_normalization: bool,
 }
 
 impl RodioBackend {
@@ -58,7 +61,29 @@ impl RodioBackend {
             volume: 100,
             anchor: None,
             paused_accum: Duration::ZERO,
+            skip_silence: false,
+            loudness_normalization: false,
         })
+    }
+
+    fn append_dsp_source(&self, source: Decoder<Cursor<Vec<u8>>>) {
+        match (self.skip_silence, self.loudness_normalization) {
+            (true, true) => {
+                let dsp = LoudnessNormalizer::new(SkipSilence::new(source));
+                self.sink.append(dsp);
+            }
+            (true, false) => {
+                let dsp = SkipSilence::new(source);
+                self.sink.append(dsp);
+            }
+            (false, true) => {
+                let dsp = LoudnessNormalizer::new(source);
+                self.sink.append(dsp);
+            }
+            (false, false) => {
+                self.sink.append(source);
+            }
+        }
     }
 
     /// Downloads and decodes audio from `url`, immediately starting playback.
@@ -71,7 +96,7 @@ impl RodioBackend {
             .with_context(|| format!("failed to decode audio stream for track '{track_id}'"))?;
 
         self.sink.stop();
-        self.sink.append(source);
+        self.append_dsp_source(source);
         self.sink.play();
         self.anchor = Some(Instant::now());
         self.paused_accum = Duration::ZERO;
@@ -108,6 +133,16 @@ impl RodioBackend {
     /// Returns the currently configured audio quality preference.
     pub fn quality(&self) -> AudioQuality {
         self.resolver.quality()
+    }
+
+    /// Returns whether skip-silence processing is enabled.
+    pub fn skip_silence(&self) -> bool {
+        self.skip_silence
+    }
+
+    /// Returns whether loudness normalization processing is enabled.
+    pub fn loudness_normalization(&self) -> bool {
+        self.loudness_normalization
     }
 }
 
@@ -164,6 +199,14 @@ impl AudioBackend for RodioBackend {
 
     fn set_quality(&mut self, quality: AudioQuality) {
         self.resolver.set_quality(quality);
+    }
+
+    fn set_skip_silence(&mut self, on: bool) {
+        self.skip_silence = on;
+    }
+
+    fn set_loudness_normalization(&mut self, on: bool) {
+        self.loudness_normalization = on;
     }
 }
 
@@ -257,6 +300,20 @@ impl AudioBackend for LiveAudio {
             Self::Muted(stub) => stub.set_quality(quality),
         }
     }
+
+    fn set_skip_silence(&mut self, on: bool) {
+        match self {
+            Self::Live(backend) => backend.set_skip_silence(on),
+            Self::Muted(stub) => stub.set_skip_silence(on),
+        }
+    }
+
+    fn set_loudness_normalization(&mut self, on: bool) {
+        match self {
+            Self::Live(backend) => backend.set_loudness_normalization(on),
+            Self::Muted(stub) => stub.set_loudness_normalization(on),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -277,12 +334,18 @@ mod tests {
     #[test]
     fn constructor_tolerance_on_missing_binary() {
         match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => {
+            Ok(mut backend) => {
                 assert_eq!(backend.volume(), 100);
                 assert_eq!(backend.quality(), AudioQuality::Standard);
                 assert_eq!(backend.last_requested(), None);
                 assert!(!backend.is_playing());
                 assert_eq!(backend.position_secs(), 0);
+                assert!(!backend.skip_silence());
+                assert!(!backend.loudness_normalization());
+                backend.set_skip_silence(true);
+                assert!(backend.skip_silence());
+                backend.set_loudness_normalization(true);
+                assert!(backend.loudness_normalization());
             }
             Err(err) => {
                 eprintln!("Skipping audio hardware assertions in headless environment: {err:#}");
@@ -379,5 +442,7 @@ mod tests {
 
         audio.set_quality(AudioQuality::High);
         audio.set_quality(AudioQuality::Compact);
+        audio.set_skip_silence(true);
+        audio.set_loudness_normalization(true);
     }
 }

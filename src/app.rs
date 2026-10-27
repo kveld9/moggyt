@@ -129,6 +129,10 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub lastfm_enabled: bool,
     /// Whether high-resolution cover artwork decoding is enabled.
     pub hi_res_covers: bool,
+    /// Whether leading/trailing silence skipping is enabled.
+    pub skip_silence: bool,
+    /// Whether loudness normalization to -14 LUFS is enabled.
+    pub loudness_normalization: bool,
     /// Last.fm API key input buffer (UI state only).
     pub lastfm_api_key_text: String,
     /// Last.fm API secret input buffer (UI state only).
@@ -193,6 +197,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             shortcuts_enabled: true,
             lastfm_enabled: false,
             hi_res_covers: false,
+            skip_silence: false,
+            loudness_normalization: false,
             lastfm_api_key_text: String::new(),
             lastfm_secret_text: String::new(),
             lastfm_session_key_text: String::new(),
@@ -223,8 +229,12 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.shortcuts_enabled = loaded.keyboard_shortcuts;
         self.lastfm_enabled = loaded.lastfm_enabled;
         self.hi_res_covers = loaded.hi_res_covers;
+        self.skip_silence = loaded.skip_silence;
+        self.loudness_normalization = loaded.loudness_normalization;
         self.audio.set_volume(loaded.volume);
         self.audio.set_quality(loaded.quality);
+        self.audio.set_skip_silence(loaded.skip_silence);
+        self.audio.set_loudness_normalization(loaded.loudness_normalization);
         self.settings_store = store;
         self.sync_lastfm_scrobbler();
     }
@@ -373,6 +383,20 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.shortcuts_enabled
     }
 
+    /// Sets whether skip-silence processing is enabled, forwards to audio backend, and persists.
+    pub fn set_skip_silence(&mut self, enabled: bool) {
+        self.skip_silence = enabled;
+        self.audio.set_skip_silence(enabled);
+        self.persist_settings();
+    }
+
+    /// Sets whether loudness normalization is enabled, forwards to audio backend, and persists.
+    pub fn set_loudness_normalization(&mut self, enabled: bool) {
+        self.loudness_normalization = enabled;
+        self.audio.set_loudness_normalization(enabled);
+        self.persist_settings();
+    }
+
     fn persist_settings(&self) {
         let settings = Settings {
             theme: self.theme,
@@ -382,6 +406,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             keyboard_shortcuts: self.shortcuts_enabled,
             lastfm_enabled: self.lastfm_enabled,
             hi_res_covers: self.hi_res_covers,
+            skip_silence: self.skip_silence,
+            loudness_normalization: self.loudness_normalization,
         };
         if let Err(err) = self.settings_store.save(&settings) {
             tracing::warn!("failed to persist settings: {err:#}");
@@ -1836,6 +1862,8 @@ mod tests {
             keyboard_shortcuts: false,
             lastfm_enabled: false,
             hi_res_covers: false,
+            skip_silence: false,
+            loudness_normalization: false,
         };
         let store = MemorySettingsStore::default();
         store.save(&custom_settings).unwrap();
@@ -2219,6 +2247,8 @@ mod tests {
                 keyboard_shortcuts: false,
                 lastfm_enabled: false,
                 hi_res_covers: false,
+                skip_silence: false,
+                loudness_normalization: false,
             })
             .unwrap();
 
@@ -2463,5 +2493,52 @@ mod tests {
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("track-2"));
         assert!(!state.audio.is_playing());
         assert!(!state.sleep_timer.is_armed());
+    }
+
+    #[test]
+    fn test_dsp_settings_toggle_forward_to_audio_backend_and_persist() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        state.set_settings_store(Box::new(store.clone()));
+
+        assert!(!state.skip_silence);
+        assert!(!state.loudness_normalization);
+        assert!(!state.audio.skip_silence());
+        assert!(!state.audio.loudness_normalization());
+
+        state.set_skip_silence(true);
+        assert!(state.skip_silence);
+        assert!(state.audio.skip_silence());
+        assert!(store.load().skip_silence);
+
+        state.set_loudness_normalization(true);
+        assert!(state.loudness_normalization);
+        assert!(state.audio.loudness_normalization());
+        assert!(store.load().loudness_normalization);
+
+        state.set_skip_silence(false);
+        assert!(!state.skip_silence);
+        assert!(!state.audio.skip_silence());
+        assert!(!store.load().skip_silence);
+
+        state.set_loudness_normalization(false);
+        assert!(!state.loudness_normalization);
+        assert!(!state.audio.loudness_normalization());
+        assert!(!store.load().loudness_normalization);
+    }
+
+    #[test]
+    fn test_dsp_settings_forward_on_set_settings_store() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        let custom_settings =
+            Settings { skip_silence: true, loudness_normalization: true, ..Default::default() };
+        store.save(&custom_settings).expect("save custom settings");
+
+        state.set_settings_store(Box::new(store));
+        assert!(state.skip_silence);
+        assert!(state.loudness_normalization);
+        assert!(state.audio.skip_silence());
+        assert!(state.audio.loudness_normalization());
     }
 }
