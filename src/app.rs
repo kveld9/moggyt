@@ -26,9 +26,9 @@ use crate::infra::{
     LastFmCredentials, LyricLine, LyricsSource, MediaKeyAction, MemoryCredentialStore,
     MemoryQueueStore, MemorySettingsStore, MemorySkipStore, Presence, QueueStore, Scrobbler,
     SessionStore, Settings, SettingsStore, SkipStore, StubScrobbler, TrayAction, TrayHandle,
-    Updater, apply_backup, client_from_credentials, decode_cover, default_config_dir,
-    export_backup, fetch_artwork, is_newer, read_backup_file, sanitize_cookie_input,
-    should_scrobble, write_backup_file,
+    Updater, apply_backup, client_from_credentials, decode_cover, decode_handoff,
+    default_config_dir, export_backup, fetch_artwork, is_newer, read_backup_file,
+    sanitize_cookie_input, should_scrobble, write_backup_file,
 };
 
 /// Navigation pages of the application shell.
@@ -78,6 +78,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub search_text: String,
     /// Text typed into the sign-in cookie box (UI state only).
     pub cookie_text: String,
+    /// Text typed into the companion handoff box (UI state only).
+    pub handoff_text: String,
     /// Catalog adapter (injected port).
     pub catalog: C,
     /// Audio adapter (injected port).
@@ -202,6 +204,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             queue: PlaybackQueue::new(),
             search_text: String::new(),
             cookie_text: String::new(),
+            handoff_text: String::new(),
             catalog,
             audio,
             signed_in,
@@ -1053,6 +1056,12 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.signed_in
     }
 
+    fn apply_session(&mut self, cleaned: &str) {
+        self.session.save(cleaned);
+        self.catalog.set_session_cookies(Some(cleaned));
+        self.signed_in = true;
+    }
+
     /// Attempts to parse and save the current cookie input.
     ///
     /// Returns true and clears the buffer if valid, otherwise returns false.
@@ -1060,19 +1069,30 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         let Some(cleaned) = sanitize_cookie_input(&self.cookie_text) else {
             return false;
         };
-        self.session.save(&cleaned);
-        self.catalog.set_session_cookies(Some(&cleaned));
-        self.signed_in = true;
+        self.apply_session(&cleaned);
         self.cookie_text.clear();
         true
     }
 
-    /// Clears the stored session and resets the cookie input buffer.
+    /// Attempts to decode and import a companion handoff code.
+    ///
+    /// Returns true and clears the buffer if valid, otherwise returns false.
+    pub fn import_handoff(&mut self) -> bool {
+        let Ok(cleaned) = decode_handoff(&self.handoff_text) else {
+            return false;
+        };
+        self.apply_session(&cleaned);
+        self.handoff_text.clear();
+        true
+    }
+
+    /// Clears the stored session and resets cookie and handoff input buffers.
     pub fn sign_out(&mut self) {
         self.session.clear();
         self.catalog.set_session_cookies(None);
         self.signed_in = false;
         self.cookie_text.clear();
+        self.handoff_text.clear();
     }
 
     /// Returns true if the track id is present in the user's liked collection.
@@ -1435,7 +1455,7 @@ mod tests {
     };
     use crate::infra::{
         AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
-        ReleaseInfo, StaticUpdater, SyncedLyrics, Updater,
+        ReleaseInfo, StaticUpdater, SyncedLyrics, Updater, encode_handoff,
     };
 
     #[derive(Default)]
@@ -1521,6 +1541,7 @@ mod tests {
         assert_eq!(state.catalog.last_session_cookies(), None);
 
         state.cookie_text = "  cookie: SID=secret123; HSID=secret456  ".to_owned();
+        state.handoff_text = "leftover_handoff".to_owned();
         let ok = state.sign_in_from_input();
         assert!(ok);
         assert!(state.is_signed_in());
@@ -1532,6 +1553,7 @@ mod tests {
         assert!(!state.is_signed_in());
         assert_eq!(state.session.load(), None);
         assert_eq!(state.catalog.last_session_cookies(), None);
+        assert_eq!(state.handoff_text, "");
     }
 
     #[test]
@@ -1543,6 +1565,55 @@ mod tests {
             assert!(!ok, "expected '{invalid}' to be rejected");
             assert!(!state.is_signed_in());
             assert_eq!(state.catalog.last_session_cookies(), None);
+        }
+    }
+
+    #[test]
+    fn import_handoff_success_applies_session_and_clears_buffer() {
+        let mut state = wired();
+        assert!(!state.is_signed_in());
+        assert_eq!(state.catalog.last_session_cookies(), None);
+
+        let code = encode_handoff("cookie: SID=companion123; HSID=companion456").expect("encode");
+        state.handoff_text = code;
+
+        let ok = state.import_handoff();
+        assert!(ok);
+        assert!(state.is_signed_in());
+        assert_eq!(state.handoff_text, "");
+        assert_eq!(state.session.load().as_deref(), Some("SID=companion123; HSID=companion456"));
+        assert_eq!(
+            state.catalog.last_session_cookies(),
+            Some("SID=companion123; HSID=companion456")
+        );
+
+        state.sign_out();
+        assert!(!state.is_signed_in());
+        assert_eq!(state.session.load(), None);
+        assert_eq!(state.catalog.last_session_cookies(), None);
+        assert_eq!(state.handoff_text, "");
+        assert_eq!(state.cookie_text, "");
+    }
+
+    #[test]
+    fn import_handoff_failure_leaves_state_untouched() {
+        let mut state = wired();
+        let invalid_cases = [
+            "",
+            "   ",
+            "MG1.invalid_base64!.12345678",
+            "corrupt_handoff_envelope",
+            "MG2.Zm9v.12345678",
+        ];
+
+        for invalid in invalid_cases {
+            state.handoff_text = invalid.to_owned();
+            let ok = state.import_handoff();
+            assert!(!ok, "expected '{invalid}' to fail");
+            assert!(!state.is_signed_in());
+            assert_eq!(state.catalog.last_session_cookies(), None);
+            assert_eq!(state.session.load(), None);
+            assert_eq!(state.handoff_text, invalid);
         }
     }
 

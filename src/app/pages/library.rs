@@ -356,6 +356,21 @@ pub(crate) fn render_library_sign_in<
     };
     render_status_caption(ui, status);
     ui.add_space(tokens.space_xs);
+    render_cookie_input_row(ui, state);
+    ui.add_space(tokens.space_xs);
+    render_companion_handoff_row(ui, state);
+}
+
+fn render_cookie_input_row<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
     ui.horizontal(|ui| {
         let response = ui.text_edit_singleline(&mut state.cookie_text);
         state.text_focused = response.has_focus();
@@ -364,6 +379,28 @@ pub(crate) fn render_library_sign_in<
         }
         if ui.button("Clear").clicked() {
             state.sign_out();
+        }
+    });
+}
+
+fn render_companion_handoff_row<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Companion import:");
+        let response = ui.text_edit_singleline(&mut state.handoff_text);
+        if response.has_focus() {
+            state.text_focused = true;
+        }
+        if ui.button("Import").clicked() {
+            state.import_handoff();
         }
     });
 }
