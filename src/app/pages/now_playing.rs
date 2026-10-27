@@ -30,6 +30,8 @@ pub(crate) fn render_now_playing<
     render_hero_section(ui, state, &track);
     ui.add_space(DesignTokens::desktop().space_lg);
     ui.separator();
+    render_segment_skip_section(ui, state, &track.id);
+    ui.separator();
     ui.add_space(DesignTokens::desktop().space_xs);
     render_lyrics_panel(ui, state);
 }
@@ -113,6 +115,82 @@ fn render_offset_controls<
             state.nudge_lyrics_offset(250);
         }
     });
+}
+
+/// Renders non-music segment skip controls and stored ranges list.
+pub(crate) fn render_segment_skip_section<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+    track_id: &str,
+) {
+    ui.heading("Skip segments");
+    render_mark_controls(ui, state);
+    render_segment_list(ui, state, track_id);
+}
+
+fn render_mark_controls<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.horizontal(|ui| {
+        if ui.button("Mark start").clicked() {
+            state.mark_segment_start();
+        }
+        if ui.button("Mark end").clicked() {
+            let _ = state.mark_segment_end();
+        }
+        if let Some(start) = state.marked_start_secs {
+            ui.label(format!("Start: {start}s"));
+        }
+    });
+    if let Some(ref err) = state.skip_error {
+        ui.label(format!("Error: {err}"));
+    }
+}
+
+fn render_segment_list<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+    track_id: &str,
+) {
+    let Some(ranges) = state.skips.get(track_id) else {
+        ui.label("No skip segments for this track.");
+        return;
+    };
+    if ranges.is_empty() {
+        ui.label("No skip segments for this track.");
+        return;
+    }
+    let mut delete_index = None;
+    for (idx, seg) in ranges.segments().iter().enumerate() {
+        ui.horizontal(|ui| {
+            ui.label(format!("{}: {}s - {}s", idx + 1, seg.start_secs, seg.end_secs));
+            if ui.button("Delete").clicked() {
+                delete_index = Some(idx);
+            }
+        });
+    }
+    if let Some(idx) = delete_index {
+        state.delete_segment(track_id, idx);
+    }
 }
 
 /// Renders cover art texture or placeholder when unavailable.

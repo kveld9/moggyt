@@ -17,17 +17,18 @@ use eframe::egui;
 
 use crate::domain::{
     Detail, DetailKind, LyricsSnippet, LyricsSnippetError, PlaybackQueue, SearchQuery,
-    SearchResult, Shelf, SleepTimer, ThemeId, TimerPreset, Track,
+    SearchResult, Shelf, SkipRanges, SkipSegment, SleepTimer, ThemeId, TimerPreset, Track,
 };
 use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, AudioQuality, BackupSummary, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog,
     CoverCache, CredentialStore, DesktopPresence, DiscordPresence, GithubUpdater, LastFmClient,
     LastFmCredentials, LyricLine, LyricsSource, MediaKeyAction, MemoryCredentialStore,
-    MemoryQueueStore, MemorySettingsStore, Presence, QueueStore, Scrobbler, SessionStore, Settings,
-    SettingsStore, StubScrobbler, TrayAction, TrayHandle, Updater, apply_backup,
-    client_from_credentials, decode_cover, default_config_dir, export_backup, fetch_artwork,
-    is_newer, read_backup_file, sanitize_cookie_input, should_scrobble, write_backup_file,
+    MemoryQueueStore, MemorySettingsStore, MemorySkipStore, Presence, QueueStore, Scrobbler,
+    SessionStore, Settings, SettingsStore, SkipStore, StubScrobbler, TrayAction, TrayHandle,
+    Updater, apply_backup, client_from_credentials, decode_cover, default_config_dir,
+    export_backup, fetch_artwork, is_newer, read_backup_file, sanitize_cookie_input,
+    should_scrobble, write_backup_file,
 };
 
 /// Navigation pages of the application shell.
@@ -174,6 +175,16 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub lyrics_results: Vec<Track>,
     /// Result hits populated by the last search.
     pub search_results: Vec<Track>,
+    /// Injected skip ranges storage adapter.
+    pub skip_store: Box<dyn SkipStore>,
+    /// In-memory cache of skip ranges keyed by video id.
+    pub skips: HashMap<String, SkipRanges>,
+    /// Pending marked segment start boundary in seconds.
+    pub marked_start_secs: Option<u32>,
+    /// User-facing skip validation or operation error message.
+    pub skip_error: Option<String>,
+    /// Last target position skipped to, preventing re-trigger loops on the same range.
+    pub last_skip_target: Option<(String, u32)>,
 }
 
 impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
@@ -243,6 +254,11 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             lyrics_error: None,
             lyrics_results: Vec::new(),
             search_results: Vec::new(),
+            skip_store: Box::new(MemorySkipStore::new()),
+            skips: HashMap::new(),
+            marked_start_secs: None,
+            skip_error: None,
+            last_skip_target: None,
         }
     }
 
@@ -274,6 +290,18 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.audio.set_loudness_normalization(loaded.loudness_normalization);
         self.settings_store = store;
         self.sync_lastfm_scrobbler();
+    }
+
+    /// Injects an alternative skip store implementation and loads persisted ranges into state.
+    pub fn set_skip_store(&mut self, store: Box<dyn SkipStore>) {
+        self.skips = store.load();
+        self.skip_store = store;
+    }
+
+    fn persist_skips(&self) {
+        if let Err(err) = self.skip_store.save(&self.skips) {
+            tracing::warn!("failed to persist skips: {err:#}");
+        }
     }
 
     /// Sets whether Last.fm live scrobbling is enabled and persists the preference.
@@ -813,6 +841,93 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.audio.play(&id);
         self.started_at = Some((std::time::Instant::now(), current_unix_secs()));
         self.scrobbler.now_playing(&artist, &title);
+        self.last_skip_target = None;
+    }
+
+    /// Evaluates per-frame auto-skip, advancing audio position when strictly inside a range.
+    pub fn check_auto_skip(&mut self) {
+        let Some(track) = self.queue.current() else {
+            self.last_skip_target = None;
+            return;
+        };
+        let current_pos = u32::try_from(self.audio.position_secs()).unwrap_or(u32::MAX);
+        if self
+            .last_skip_target
+            .as_ref()
+            .is_some_and(|(id, t)| id != &track.id || current_pos >= *t)
+        {
+            self.last_skip_target = None;
+        }
+        let Some(ranges) = self.skips.get(&track.id) else {
+            return;
+        };
+        let Some(target) = ranges.jump_target(current_pos) else {
+            return;
+        };
+        let already_skipped =
+            self.last_skip_target.as_ref().is_some_and(|(id, t)| id == &track.id && *t == target);
+        if target > current_pos && !already_skipped {
+            self.last_skip_target = Some((track.id.clone(), target));
+            self.audio.seek(target as u64);
+        }
+    }
+
+    /// Captures the current audio playback position as the segment start.
+    pub fn mark_segment_start(&mut self) {
+        let pos = u32::try_from(self.audio.position_secs()).unwrap_or(u32::MAX);
+        self.mark_segment_start_at(pos);
+    }
+
+    /// Sets the segment start boundary explicitly (for testing and exact positioning).
+    pub fn mark_segment_start_at(&mut self, pos_secs: u32) {
+        self.marked_start_secs = Some(pos_secs);
+        self.skip_error = None;
+    }
+
+    /// Captures current playback position as segment end and stores the range when valid.
+    pub fn mark_segment_end(&mut self) -> bool {
+        let pos = u32::try_from(self.audio.position_secs()).unwrap_or(u32::MAX);
+        self.mark_segment_end_at(pos)
+    }
+
+    /// Sets segment end boundary explicitly and stores range when valid.
+    pub fn mark_segment_end_at(&mut self, pos_secs: u32) -> bool {
+        let Some(track) = self.queue.current() else {
+            self.skip_error = Some("No active track".to_string());
+            return false;
+        };
+        let Some(start) = self.marked_start_secs else {
+            self.skip_error = Some("Mark start first".to_string());
+            return false;
+        };
+        let Ok(segment) = SkipSegment::new(start, pos_secs) else {
+            self.skip_error = Some("End must be greater than start".to_string());
+            return false;
+        };
+        let track_id = track.id.clone();
+        self.skips.entry(track_id).or_default().insert(segment);
+        self.persist_skips();
+        self.marked_start_secs = None;
+        self.skip_error = None;
+        true
+    }
+
+    /// Deletes a stored range at `index` for `track_id`, persisting changes.
+    pub fn delete_segment(&mut self, track_id: &str, index: usize) -> bool {
+        let Some(ranges) = self.skips.get_mut(track_id) else {
+            return false;
+        };
+        let removed = ranges.remove(index).is_some();
+        if removed {
+            self.persist_skips();
+        }
+        removed
+    }
+
+    /// Returns stored skip ranges for the currently playing track.
+    pub fn current_skip_ranges(&self) -> Option<&SkipRanges> {
+        let track = self.queue.current()?;
+        self.skips.get(&track.id)
     }
 
     /// Toggles playback: pauses if currently playing, resumes if previously requested,
@@ -1253,6 +1368,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.state.sync_presence();
         self.state.continue_autoplay_if_ended();
         self.state.poll_sleep_timer();
+        self.state.check_auto_skip();
         if !self.state.text_focused {
             for key in [
                 egui::Key::Space,
@@ -3012,5 +3128,145 @@ mod tests {
         assert!(state.lyrics_results.is_empty());
         assert_eq!(state.page, Page::Search);
         assert!(state.queue.is_empty());
+    }
+
+    #[test]
+    fn test_auto_skip_advances_past_marked_intro_and_does_not_loop() {
+        let mut state = wired();
+        let track = Track::new("intro-vid", "Intro Song", "Artist");
+        state.queue.push(track);
+        state.play_head();
+
+        state.mark_segment_start_at(0);
+        assert!(state.mark_segment_end_at(15));
+        assert_eq!(state.audio.position_secs(), 0);
+
+        // First frame: inside 0..15 range -> auto-skip seeks to 15
+        state.check_auto_skip();
+        assert_eq!(state.audio.position_secs(), 15);
+
+        // Second frame: at boundary (15) -> does not seek again
+        state.check_auto_skip();
+        assert_eq!(state.audio.position_secs(), 15);
+
+        // Advance playback past range -> does not seek
+        state.audio.seek(25);
+        state.check_auto_skip();
+        assert_eq!(state.audio.position_secs(), 25);
+    }
+
+    #[test]
+    fn test_auto_skip_does_not_seek_backwards_or_outside_ranges() {
+        let mut state = wired();
+        let track = Track::new("seg-vid", "Segment Song", "Artist");
+        state.queue.push(track);
+        state.play_head();
+
+        state.mark_segment_start_at(20);
+        assert!(state.mark_segment_end_at(30));
+
+        // Position 10 is outside -> no jump
+        state.audio.seek(10);
+        state.check_auto_skip();
+        assert_eq!(state.audio.position_secs(), 10);
+
+        // Position 20 is at start -> jumps to 30
+        state.audio.seek(20);
+        state.check_auto_skip();
+        assert_eq!(state.audio.position_secs(), 30);
+
+        // Position 30 is at end -> no jump
+        state.check_auto_skip();
+        assert_eq!(state.audio.position_secs(), 30);
+    }
+
+    #[test]
+    fn test_mark_segment_flow_validation_and_errors() {
+        let mut state = wired();
+
+        // 1. Mark end without active track
+        assert!(!state.mark_segment_end_at(10));
+        assert_eq!(state.skip_error.as_deref(), Some("No active track"));
+
+        let track = Track::new("track-flow", "Flow Song", "Artist");
+        state.queue.push(track);
+
+        // 2. Mark end without marking start first
+        assert!(!state.mark_segment_end_at(10));
+        assert_eq!(state.skip_error.as_deref(), Some("Mark start first"));
+
+        // 3. Mark start at 20, then mark end at 10 (end < start)
+        state.mark_segment_start_at(20);
+        assert_eq!(state.marked_start_secs, Some(20));
+        assert!(!state.mark_segment_end_at(10));
+        assert_eq!(state.skip_error.as_deref(), Some("End must be greater than start"));
+        assert_eq!(state.marked_start_secs, Some(20));
+
+        // 4. Mark end at 20 (end == start)
+        assert!(!state.mark_segment_end_at(20));
+        assert_eq!(state.skip_error.as_deref(), Some("End must be greater than start"));
+
+        // 5. Mark end at 35 (valid: 20 < 35)
+        assert!(state.mark_segment_end_at(35));
+        assert_eq!(state.marked_start_secs, None);
+        assert_eq!(state.skip_error, None);
+
+        let stored = state.current_skip_ranges().expect("ranges present");
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored.segments(), &[SkipSegment { start_secs: 20, end_secs: 35 }]);
+    }
+
+    #[test]
+    fn test_delete_segment_and_store_persistence() {
+        let mut state = wired();
+        let store = MemorySkipStore::new();
+        state.set_skip_store(Box::new(store.clone()));
+
+        let track = Track::new("track-del", "Delete Song", "Artist");
+        state.queue.push(track);
+
+        state.mark_segment_start_at(5);
+        state.mark_segment_end_at(15);
+        state.mark_segment_start_at(30);
+        state.mark_segment_end_at(40);
+
+        assert_eq!(state.current_skip_ranges().unwrap().len(), 2);
+        assert_eq!(store.load().get("track-del").unwrap().len(), 2);
+
+        // Delete invalid index returns false
+        assert!(!state.delete_segment("track-del", 5));
+
+        // Delete first segment
+        assert!(state.delete_segment("track-del", 0));
+        assert_eq!(state.current_skip_ranges().unwrap().len(), 1);
+        assert_eq!(
+            state.current_skip_ranges().unwrap().segments(),
+            &[SkipSegment { start_secs: 30, end_secs: 40 }]
+        );
+        assert_eq!(store.load().get("track-del").unwrap().len(), 1);
+
+        // Delete remaining segment
+        assert!(state.delete_segment("track-del", 0));
+        assert_eq!(state.current_skip_ranges().unwrap().len(), 0);
+        assert_eq!(store.load().get("track-del").unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_mark_segment_captures_audio_position() {
+        let mut state = wired();
+        let track = Track::new("track-audio", "Audio Pos Song", "Artist");
+        state.queue.push(track);
+        state.play_head();
+
+        state.audio.seek(12);
+        state.mark_segment_start();
+        assert_eq!(state.marked_start_secs, Some(12));
+
+        state.audio.seek(24);
+        assert!(state.mark_segment_end());
+        assert_eq!(state.marked_start_secs, None);
+
+        let stored = state.current_skip_ranges().expect("stored ranges");
+        assert_eq!(stored.segments(), &[SkipSegment { start_secs: 12, end_secs: 24 }]);
     }
 }
