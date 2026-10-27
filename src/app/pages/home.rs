@@ -7,6 +7,9 @@ use crate::app::{AppState, item_detail_target};
 use crate::domain::{DesignTokens, DetailKind, SearchResult, Shelf};
 use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 
+/// Shelf detail navigation target: browse id plus content kind.
+type ShelfNavTarget = (String, DetailKind);
+
 /// Renders home catalog shelves with browsing links.
 pub(crate) fn render_home_shelves<
     C: Catalog,
@@ -24,7 +27,11 @@ pub(crate) fn render_home_shelves<
         empty_state(ui, "No shelves available.");
         return;
     }
-    let to_open = render_shelves_list(ui, &state.home_shelves, &tokens);
+    let mut to_prefetch = Vec::new();
+    let to_open = render_shelves_list(ui, &state.home_shelves, &tokens, &mut to_prefetch);
+    for (id, kind) in to_prefetch {
+        state.prefetch_detail(&id, kind);
+    }
     if let Some((id, kind)) = to_open {
         state.open_detail(&id, kind);
     }
@@ -54,14 +61,15 @@ fn render_shelves_list(
     ui: &mut egui::Ui,
     shelves: &[Shelf],
     tokens: &DesignTokens,
-) -> Option<(String, DetailKind)> {
+    to_prefetch: &mut Vec<ShelfNavTarget>,
+) -> Option<ShelfNavTarget> {
     let mut to_open = None;
     for shelf in shelves {
         section_header(ui, &shelf.title);
         if shelf.items.is_empty() {
             empty_state(ui, "No items available.");
         } else {
-            render_shelf_items(ui, &shelf.items, &mut to_open);
+            render_shelf_items(ui, &shelf.items, &mut to_open, to_prefetch);
         }
         ui.add_space(tokens.space_sm);
     }
@@ -71,29 +79,44 @@ fn render_shelves_list(
 fn render_shelf_items(
     ui: &mut egui::Ui,
     items: &[SearchResult],
-    to_open: &mut Option<(String, DetailKind)>,
+    to_open: &mut Option<ShelfNavTarget>,
+    to_prefetch: &mut Vec<ShelfNavTarget>,
 ) {
     for item in items {
-        if let Some(target) = render_shelf_item(ui, item) {
+        let (open, prefetch) = render_shelf_item(ui, item);
+        if let Some(target) = open {
             *to_open = Some(target);
+        }
+        if let Some(target) = prefetch {
+            to_prefetch.push(target);
         }
     }
 }
 
-fn render_shelf_item(ui: &mut egui::Ui, item: &SearchResult) -> Option<(String, DetailKind)> {
+fn render_shelf_item(
+    ui: &mut egui::Ui,
+    item: &SearchResult,
+) -> (Option<ShelfNavTarget>, Option<ShelfNavTarget>) {
     let (title, subtitle) = shelf_item_parts(item);
     let target = item_detail_target(item);
     let mut selected = None;
+    let mut prefetch = None;
 
     ui.horizontal(|ui| {
         let response = track_row(ui, title, subtitle, false);
-        let button_clicked = if target.is_some() { ui.button("Open").clicked() } else { false };
+        let Some(target) = target else {
+            return;
+        };
+        if response_has_intent(&response) {
+            prefetch = Some(target.clone());
+        }
+        let button_clicked = ui.button("Open").clicked();
         if response.clicked() || button_clicked {
-            selected = target;
+            selected = Some(target);
         }
     });
 
-    selected
+    (selected, prefetch)
 }
 
 fn shelf_item_parts(item: &SearchResult) -> (&str, &str) {
@@ -106,4 +129,8 @@ fn shelf_item_parts(item: &SearchResult) -> (&str, &str) {
         SearchResult::Artist(artist) => (&artist.name, "Artist"),
         SearchResult::Playlist(playlist) => (&playlist.title, "Playlist"),
     }
+}
+
+fn response_has_intent(response: &egui::Response) -> bool {
+    response.hovered() || response.has_focus()
 }

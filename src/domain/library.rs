@@ -141,7 +141,7 @@ pub fn apply_filter(items: &[SearchResult], filter: SearchFilter) -> Vec<SearchR
 }
 
 /// Category of detail container view.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DetailKind {
     Album,
     Artist,
