@@ -971,18 +971,6 @@ fn render_body<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K:
     });
 }
 
-pub(crate) fn shelf_item_display(item: &SearchResult) -> String {
-    match item {
-        SearchResult::Track(track) => format!("{} - {}", track.title, track.artist),
-        SearchResult::Album(album) => {
-            let subtitle = if album.artist.is_empty() { "Album" } else { &album.artist };
-            format!("{} - {subtitle}", album.title)
-        }
-        SearchResult::Artist(artist) => format!("{} - Artist", artist.name),
-        SearchResult::Playlist(playlist) => format!("{} - Playlist", playlist.title),
-    }
-}
-
 pub(crate) fn item_detail_target(item: &SearchResult) -> Option<(String, DetailKind)> {
     match item {
         SearchResult::Album(album) => Some((album.id.clone(), DetailKind::Album)),
@@ -995,6 +983,18 @@ pub(crate) fn item_detail_target(item: &SearchResult) -> Option<(String, DetailK
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn shelf_item_display(item: &SearchResult) -> String {
+        match item {
+            SearchResult::Track(track) => format!("{} - {}", track.title, track.artist),
+            SearchResult::Album(album) => {
+                let subtitle = if album.artist.is_empty() { "Album" } else { &album.artist };
+                format!("{} - {subtitle}", album.title)
+            }
+            SearchResult::Artist(artist) => format!("{} - Artist", artist.name),
+            SearchResult::Playlist(playlist) => format!("{} - Playlist", playlist.title),
+        }
+    }
     use crate::domain::{
         Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
     };
