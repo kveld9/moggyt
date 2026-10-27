@@ -24,6 +24,8 @@ pub(crate) fn render_library<
     render_library_separator(ui, &tokens);
     render_library_lastfm(ui, state);
     render_library_separator(ui, &tokens);
+    render_library_secondary_lastfm(ui, state);
+    render_library_separator(ui, &tokens);
     render_library_sign_in(ui, state);
     render_library_separator(ui, &tokens);
     render_library_updates(ui, state);
@@ -167,6 +169,70 @@ pub(crate) fn render_lastfm_inputs<
         }
         if ui.button("Clear").clicked() {
             state.clear_lastfm_credentials();
+        }
+    });
+}
+
+/// Renders secondary Last.fm configuration and status.
+pub(crate) fn render_library_secondary_lastfm<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    ui.heading("Secondary Last.fm");
+    let mut enabled = state.secondary_lastfm_enabled;
+    if ui.checkbox(&mut enabled, "Enable secondary scrobbling").changed() {
+        state.set_secondary_lastfm_enabled(enabled);
+    }
+    let status = if state.secondary_lastfm_is_live() {
+        "Secondary scrobbler: Live"
+    } else {
+        "Secondary scrobbler: Dormant"
+    };
+    ui.label(status);
+    render_secondary_lastfm_inputs(ui, state);
+}
+
+/// Renders secondary Last.fm credential input fields and persistence buttons.
+pub(crate) fn render_secondary_lastfm_inputs<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    render_lastfm_field(
+        ui,
+        &mut state.secondary_lastfm_api_key_text,
+        &mut state.text_focused,
+        "API Key",
+    );
+    render_lastfm_field(
+        ui,
+        &mut state.secondary_lastfm_secret_text,
+        &mut state.text_focused,
+        "Secret",
+    );
+    render_lastfm_field(
+        ui,
+        &mut state.secondary_lastfm_session_key_text,
+        &mut state.text_focused,
+        "Session Key",
+    );
+    ui.horizontal(|ui| {
+        if ui.button("Save").clicked() {
+            state.save_secondary_lastfm_credentials_from_input();
+        }
+        if ui.button("Clear").clicked() {
+            state.clear_secondary_lastfm_credentials();
         }
     });
 }

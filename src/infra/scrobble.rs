@@ -219,12 +219,23 @@ pub trait CredentialStore: Send + Sync {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct MemoryCredentialStore {
     inner: Option<LastFmCredentials>,
+    namespace: String,
 }
 
 impl MemoryCredentialStore {
     /// Creates an empty memory store.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Creates an empty memory store under a designated namespace.
+    pub fn with_namespace(namespace: impl Into<String>) -> Self {
+        Self { inner: None, namespace: namespace.into() }
+    }
+
+    /// Returns the namespace of this store.
+    pub fn namespace(&self) -> &str {
+        &self.namespace
     }
 }
 
@@ -270,6 +281,22 @@ impl KeyringCredentialStore {
     /// Creates the default application store targeting Last.fm credentials.
     pub fn moggyt() -> Self {
         Self::new("moggyt", "lastfm-api-key", "lastfm-secret", "lastfm-session-key")
+    }
+
+    /// Creates the application store targeting secondary Last.fm credentials.
+    ///
+    /// The secondary store shares the "moggyt" service namespace with the primary
+    /// store, but uses distinct account names (`lastfm-secondary-api-key`,
+    /// `lastfm-secondary-secret`, `lastfm-secondary-session-key`). This groups all
+    /// moggyt credentials cleanly in the OS credential manager while guaranteeing
+    /// strict credential isolation between primary and secondary scrobblers.
+    pub fn moggyt_secondary() -> Self {
+        Self::new(
+            "moggyt",
+            "lastfm-secondary-api-key",
+            "lastfm-secondary-secret",
+            "lastfm-secondary-session-key",
+        )
     }
 
     fn entry(&self, account: &str) -> anyhow::Result<keyring::Entry> {
@@ -469,6 +496,19 @@ mod tests {
         assert_eq!(def.api_key_account, "lastfm-api-key");
         assert_eq!(def.secret_account, "lastfm-secret");
         assert_eq!(def.session_account, "lastfm-session-key");
+
+        let sec = KeyringCredentialStore::moggyt_secondary();
+        assert_eq!(sec.service, "moggyt");
+        assert_eq!(sec.api_key_account, "lastfm-secondary-api-key");
+        assert_eq!(sec.secret_account, "lastfm-secondary-secret");
+        assert_eq!(sec.session_account, "lastfm-secondary-session-key");
+    }
+
+    #[test]
+    fn memory_credential_store_with_namespace() {
+        let store = MemoryCredentialStore::with_namespace("test-secondary");
+        assert_eq!(store.namespace(), "test-secondary");
+        assert_eq!(store.load_lastfm(), None);
     }
 
     #[test]
