@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 
+use super::audio::clamp_speed;
 use super::stream::AudioQuality;
 use crate::domain::ThemeId;
 use crate::i18n::Locale;
@@ -24,8 +25,12 @@ const fn default_volume() -> u8 {
     100
 }
 
+const fn default_playback_speed() -> f32 {
+    1.0
+}
+
 /// Persistent user settings.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
     /// Active UI theme.
@@ -35,6 +40,9 @@ pub struct Settings {
     /// Playback volume level (0..=100).
     #[serde(default = "default_volume")]
     pub volume: u8,
+    /// Playback speed factor (0.5..=2.0).
+    #[serde(default = "default_playback_speed")]
+    pub playback_speed: f32,
     /// Preferred audio streaming quality.
     #[serde(default)]
     pub quality: AudioQuality,
@@ -59,12 +67,13 @@ pub struct Settings {
 }
 
 impl Default for Settings {
-    /// Tranche 1 default settings: White theme + English locale + volume 100 + Standard quality.
+    /// Tranche 1 default settings: White theme + English locale + volume 100 + speed 1.0 + Standard quality.
     fn default() -> Self {
         Self {
             theme: ThemeId::White,
             locale: Locale::English,
             volume: 100,
+            playback_speed: 1.0,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             lastfm_enabled: false,
@@ -83,6 +92,7 @@ impl Settings {
             theme: ThemeId::White,
             locale: Locale::detect(),
             volume: 100,
+            playback_speed: 1.0,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             lastfm_enabled: false,
@@ -118,6 +128,7 @@ impl SettingsStore for MemorySettingsStore {
     fn load(&self) -> Settings {
         let mut settings = self.inner.lock().map(|g| g.clone()).unwrap_or_default();
         settings.volume = settings.volume.min(100);
+        settings.playback_speed = clamp_speed(settings.playback_speed);
         settings
     }
 
@@ -166,6 +177,7 @@ impl SettingsStore for DiskSettingsStore {
         let mut settings: Settings =
             serde_json::from_slice(&bytes).unwrap_or_else(|_| Settings::fallback());
         settings.volume = settings.volume.min(100);
+        settings.playback_speed = clamp_speed(settings.playback_speed);
         settings
     }
 
@@ -210,6 +222,7 @@ mod tests {
         assert_eq!(loaded.theme, ThemeId::White);
         assert_eq!(loaded.locale, Locale::English);
         assert_eq!(loaded.volume, 100);
+        assert_eq!(loaded.playback_speed, 1.0);
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
@@ -254,6 +267,7 @@ mod tests {
             theme: ThemeId::BlackOled,
             locale: Locale::Spanish,
             volume: 75,
+            playback_speed: 1.25,
             quality: AudioQuality::High,
             keyboard_shortcuts: false,
             lastfm_enabled: true,
@@ -280,6 +294,7 @@ mod tests {
         assert_eq!(fallback.theme, ThemeId::White);
         assert_eq!(fallback.locale, Locale::detect());
         assert_eq!(fallback.volume, 100);
+        assert_eq!(fallback.playback_speed, 1.0);
         assert_eq!(fallback.quality, AudioQuality::Standard);
         assert!(fallback.keyboard_shortcuts);
         assert!(!fallback.lastfm_enabled);
@@ -296,6 +311,7 @@ mod tests {
         assert_eq!(loaded.theme, ThemeId::White);
         assert_eq!(loaded.locale, Locale::English);
         assert_eq!(loaded.volume, 100);
+        assert_eq!(loaded.playback_speed, 1.0);
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
@@ -321,6 +337,7 @@ mod tests {
         assert_eq!(loaded.theme, ThemeId::Mono);
         assert_eq!(loaded.locale, Locale::Spanish);
         assert_eq!(loaded.volume, 100);
+        assert_eq!(loaded.playback_speed, 1.0);
         assert_eq!(loaded.quality, AudioQuality::Compact);
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.lastfm_enabled);
@@ -401,5 +418,38 @@ mod tests {
         // Empty object defaults to false
         let empty: Settings = serde_json::from_str("{}").expect("deserialization succeeds");
         assert!(!empty.secondary_lastfm_enabled);
+    }
+
+    #[test]
+    fn test_playback_speed_serde_defaults_and_explicit_deserialization() {
+        let explicit: Settings =
+            serde_json::from_str(r#"{"playback_speed": 1.5}"#).expect("deserialize explicit");
+        assert_eq!(explicit.playback_speed, 1.5);
+
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(omitted.playback_speed, 1.0);
+    }
+
+    #[test]
+    fn test_playback_speed_clamped_on_load_from_disk() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-test-speed-clamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let store = DiskSettingsStore::new(temp_dir.clone());
+
+        // Above max -> clamped to 2.0
+        std::fs::write(store.file_path(), r#"{"playback_speed": 99.0}"#).unwrap();
+        assert_eq!(store.load().playback_speed, 2.0);
+
+        // Below min -> clamped to 0.5
+        std::fs::write(store.file_path(), r#"{"playback_speed": 0.1}"#).unwrap();
+        assert_eq!(store.load().playback_speed, 0.5);
+
+        // Non-positive -> clamped to 1.0
+        std::fs::write(store.file_path(), r#"{"playback_speed": -1.0}"#).unwrap();
+        assert_eq!(store.load().playback_speed, 1.0);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

@@ -85,6 +85,8 @@ fn render_track_details<
             state.start_radio(track.clone());
         }
         ui.add_space(tokens.space_xs);
+        render_speed_controls(ui, state);
+        ui.add_space(tokens.space_xs);
         render_offset_controls(ui, state);
         ui.add_space(tokens.space_xs);
         render_metadata_edit_controls(ui, state, track);
@@ -175,6 +177,58 @@ pub(crate) fn render_segment_skip_section<
     ui.heading("Skip segments");
     render_mark_controls(ui, state);
     render_segment_list(ui, state, track_id);
+}
+
+/// Fixed playback speed presets available in the UI selector.
+pub(crate) const SPEED_PRESETS: [f32; 6] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+/// Formats a playback speed factor into an ASCII label (e.g. 1.25 -> "1.25x").
+pub fn format_speed(speed: f32) -> String {
+    for &(val, label) in &[
+        (0.5, "0.5x"),
+        (0.75, "0.75x"),
+        (1.0, "1.0x"),
+        (1.25, "1.25x"),
+        (1.5, "1.5x"),
+        (2.0, "2.0x"),
+    ] {
+        if (speed - val).abs() < 0.01 {
+            return label.to_owned();
+        }
+    }
+    format!("{speed}x")
+}
+
+/// Renders playback speed selector matching transport and offset controls style.
+pub(crate) fn render_speed_controls<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    let tokens = DesignTokens::desktop();
+    let current = state.audio.speed();
+    ui.horizontal(|ui| {
+        ui.label(
+            egui::RichText::new("Speed:")
+                .size(tokens.font_caption)
+                .color(ui.visuals().weak_text_color()),
+        );
+        egui::ComboBox::from_id_salt("playback_speed_selector")
+            .selected_text(format_speed(current))
+            .show_ui(ui, |ui| {
+                for preset in SPEED_PRESETS {
+                    let is_selected = (current - preset).abs() < 0.01;
+                    if ui.selectable_label(is_selected, format_speed(preset)).clicked() {
+                        state.set_playback_speed(preset);
+                    }
+                }
+            });
+    });
 }
 
 fn render_mark_controls<
@@ -315,4 +369,25 @@ fn render_lyrics_lines(ui: &mut egui::Ui, lines: &[(u64, String)], active_idx: O
             ui.label(rich);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_speed_presets_table() {
+        assert_eq!(format_speed(0.5), "0.5x");
+        assert_eq!(format_speed(0.75), "0.75x");
+        assert_eq!(format_speed(1.0), "1.0x");
+        assert_eq!(format_speed(1.25), "1.25x");
+        assert_eq!(format_speed(1.5), "1.5x");
+        assert_eq!(format_speed(2.0), "2.0x");
+        assert_eq!(format_speed(1.33), "1.33x");
+    }
+
+    #[test]
+    fn speed_presets_constants_bounds() {
+        assert_eq!(SPEED_PRESETS, [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]);
+    }
 }

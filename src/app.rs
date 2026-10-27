@@ -27,9 +27,10 @@ use crate::infra::{
     LastFmCredentials, LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction,
     MemoryCredentialStore, MemoryMetaStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore,
     MetaStore, Presence, QueueStore, Scrobbler, SessionStore, Settings, SettingsStore, SkipStore,
-    StubScrobbler, TrayAction, TrayHandle, Updater, apply_backup, client_from_credentials,
-    decode_cover, decode_handoff, default_config_dir, export_backup, fetch_artwork, is_newer,
-    read_backup_file, sanitize_cookie_input, should_scrobble, write_backup_file,
+    StubScrobbler, TrayAction, TrayHandle, Updater, apply_backup, clamp_speed,
+    client_from_credentials, decode_cover, decode_handoff, default_config_dir, export_backup,
+    fetch_artwork, is_newer, read_backup_file, sanitize_cookie_input, should_scrobble,
+    write_backup_file,
 };
 
 /// Navigation pages of the application shell.
@@ -354,6 +355,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         self.audio.set_quality(loaded.quality);
         self.audio.set_skip_silence(loaded.skip_silence);
         self.audio.set_loudness_normalization(loaded.loudness_normalization);
+        self.audio.set_speed(loaded.playback_speed);
         self.settings_store = store;
         self.sync_lastfm_scrobbler();
         self.sync_secondary_lastfm_scrobbler();
@@ -684,6 +686,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             theme: self.theme,
             locale: self.locale,
             volume: self.audio.volume(),
+            playback_speed: self.audio.speed(),
             quality: self.quality,
             keyboard_shortcuts: self.shortcuts_enabled,
             lastfm_enabled: self.lastfm_enabled,
@@ -1302,6 +1305,13 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Sets playback volume level (0..=100, clamped by audio adapter) and persists the change.
     pub fn set_volume(&mut self, volume: u8) {
         self.audio.set_volume(volume);
+        self.persist_settings();
+    }
+
+    /// Sets playback speed (0.5..=2.0, clamped by audio adapter) and persists the change.
+    pub fn set_playback_speed(&mut self, speed: f32) {
+        let clamped = clamp_speed(speed);
+        self.audio.set_speed(clamped);
         self.persist_settings();
     }
 
@@ -2558,6 +2568,7 @@ mod tests {
             lastfm_enabled: false,
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
+            playback_speed: 1.0,
             skip_silence: false,
             loudness_normalization: false,
         };
@@ -3053,6 +3064,7 @@ mod tests {
                 theme: ThemeId::White,
                 locale: Locale::English,
                 volume: 80,
+                playback_speed: 1.0,
                 quality: AudioQuality::Standard,
                 keyboard_shortcuts: false,
                 lastfm_enabled: false,
@@ -4107,5 +4119,45 @@ mod tests {
         assert_eq!(a, "Band");
         assert_eq!(state.meta_edit_title, "Song");
         assert_eq!(state.meta_edit_artist, "Band");
+    }
+
+    #[test]
+    fn test_set_playback_speed_forwards_clamped_and_persists() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        state.set_settings_store(Box::new(store.clone()));
+
+        assert_eq!(state.audio.speed(), 1.0);
+
+        // In-range preset
+        state.set_playback_speed(1.25);
+        assert_eq!(state.audio.speed(), 1.25);
+        assert_eq!(store.load().playback_speed, 1.25);
+
+        // Clamp above max 2.0
+        state.set_playback_speed(5.0);
+        assert_eq!(state.audio.speed(), 2.0);
+        assert_eq!(store.load().playback_speed, 2.0);
+
+        // Clamp below min 0.5
+        state.set_playback_speed(0.1);
+        assert_eq!(state.audio.speed(), 0.5);
+        assert_eq!(store.load().playback_speed, 0.5);
+
+        // Non-finite falls back to 1.0
+        state.set_playback_speed(f32::NAN);
+        assert_eq!(state.audio.speed(), 1.0);
+        assert_eq!(store.load().playback_speed, 1.0);
+    }
+
+    #[test]
+    fn test_startup_applies_stored_playback_speed() {
+        let mut state = wired();
+        let store = MemorySettingsStore::default();
+        let settings = Settings { playback_speed: 1.5, ..Default::default() };
+        store.save(&settings).unwrap();
+
+        state.set_settings_store(Box::new(store));
+        assert_eq!(state.audio.speed(), 1.5);
     }
 }

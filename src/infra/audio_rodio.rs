@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink};
 
-use super::audio::{AudioBackend, AudioStub};
+use super::audio::{AudioBackend, AudioStub, clamp_speed};
 use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
 use super::stream::AudioQuality;
 use super::ytdlp::YtDlpResolver;
@@ -36,6 +36,7 @@ pub struct RodioBackend {
     resolver: YtDlpResolver,
     last_requested: Option<String>,
     volume: u8,
+    speed: f32,
     anchor: Option<Instant>,
     paused_accum: Duration,
     skip_silence: bool,
@@ -52,6 +53,7 @@ impl RodioBackend {
             .context("failed to acquire default audio output stream")?;
         let sink = Sink::connect_new(stream.mixer());
         sink.set_volume(1.0);
+        sink.set_speed(1.0);
 
         Ok(Self {
             _stream: stream,
@@ -59,6 +61,7 @@ impl RodioBackend {
             resolver: YtDlpResolver::new(binary),
             last_requested: None,
             volume: 100,
+            speed: 1.0,
             anchor: None,
             paused_accum: Duration::ZERO,
             skip_silence: false,
@@ -102,6 +105,7 @@ impl RodioBackend {
         self.paused_accum = Duration::ZERO;
         self.last_requested = Some(track_id.to_owned());
         self.sink.set_volume(volume_to_amplitude(self.volume));
+        self.sink.set_speed(self.speed);
 
         Ok(())
     }
@@ -183,6 +187,16 @@ impl AudioBackend for RodioBackend {
 
     fn volume(&self) -> u8 {
         self.volume
+    }
+
+    fn set_speed(&mut self, speed: f32) {
+        let clamped = clamp_speed(speed);
+        self.speed = clamped;
+        self.sink.set_speed(clamped);
+    }
+
+    fn speed(&self) -> f32 {
+        self.speed
     }
 
     fn position_secs(&self) -> u64 {
@@ -273,6 +287,20 @@ impl AudioBackend for LiveAudio {
         }
     }
 
+    fn set_speed(&mut self, speed: f32) {
+        match self {
+            Self::Live(backend) => backend.set_speed(speed),
+            Self::Muted(stub) => stub.set_speed(speed),
+        }
+    }
+
+    fn speed(&self) -> f32 {
+        match self {
+            Self::Live(backend) => backend.speed(),
+            Self::Muted(stub) => stub.speed(),
+        }
+    }
+
     fn position_secs(&self) -> u64 {
         match self {
             Self::Live(backend) => backend.position_secs(),
@@ -336,6 +364,7 @@ mod tests {
         match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
             Ok(mut backend) => {
                 assert_eq!(backend.volume(), 100);
+                assert_eq!(backend.speed(), 1.0);
                 assert_eq!(backend.quality(), AudioQuality::Standard);
                 assert_eq!(backend.last_requested(), None);
                 assert!(!backend.is_playing());
@@ -439,6 +468,16 @@ mod tests {
 
         audio.set_volume(150);
         assert_eq!(audio.volume(), 100);
+
+        assert_eq!(audio.speed(), 1.0);
+        audio.set_speed(1.25);
+        assert_eq!(audio.speed(), 1.25);
+        audio.set_speed(3.0);
+        assert_eq!(audio.speed(), 2.0);
+        audio.set_speed(0.1);
+        assert_eq!(audio.speed(), 0.5);
+        audio.set_speed(f32::NAN);
+        assert_eq!(audio.speed(), 1.0);
 
         audio.set_quality(AudioQuality::High);
         audio.set_quality(AudioQuality::Compact);
