@@ -4,7 +4,7 @@ use eframe::egui;
 
 use crate::app::components::{empty_state, section_header, track_row};
 use crate::app::{AppState, UpdateStatus, theme};
-use crate::domain::{ThemeId, Track};
+use crate::domain::{DesignTokens, ThemeId, Track};
 use crate::i18n::{Locale, tr};
 use crate::infra::{AudioBackend, Catalog, CoverCache, GithubUpdater, LyricsSource, SessionStore};
 
@@ -19,19 +19,33 @@ pub(crate) fn render_library<
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
+    let tokens = DesignTokens::desktop();
     render_library_preferences(ui, state);
-    ui.separator();
+    render_library_separator(ui, &tokens);
     render_library_lastfm(ui, state);
-    ui.separator();
+    render_library_separator(ui, &tokens);
     render_library_sign_in(ui, state);
-    ui.separator();
+    render_library_separator(ui, &tokens);
     render_library_updates(ui, state);
-    ui.separator();
+    render_library_separator(ui, &tokens);
     render_library_playlists(ui, state);
-    ui.separator();
+    render_library_separator(ui, &tokens);
     render_library_liked(ui, state);
-    ui.separator();
+    render_library_separator(ui, &tokens);
     render_library_albums(ui, state);
+}
+
+fn render_library_separator(ui: &mut egui::Ui, tokens: &DesignTokens) {
+    ui.add_space(tokens.space_sm);
+    ui.separator();
+    ui.add_space(tokens.space_xs);
+}
+
+fn render_status_caption(ui: &mut egui::Ui, text: &str) {
+    let tokens = DesignTokens::desktop();
+    ui.label(
+        egui::RichText::new(text).size(tokens.font_caption).color(ui.visuals().weak_text_color()),
+    );
 }
 
 /// Renders theme, locale, and behavioral preferences.
@@ -45,23 +59,31 @@ pub(crate) fn render_library_preferences<
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
-    ui.heading(tr(state.locale, "Theme"));
+    let tokens = DesignTokens::desktop();
+    section_header(ui, tr(state.locale, "Preferences"));
     ui.horizontal(|ui| {
+        ui.label(
+            egui::RichText::new(format!("{}:", tr(state.locale, "Theme"))).size(tokens.font_body),
+        );
         render_theme_button(ui, state, ThemeId::White, "White");
         render_theme_button(ui, state, ThemeId::BlackOled, "Black OLED");
         render_theme_button(ui, state, ThemeId::Mono, "Mono");
     });
-    ui.add_space(4.0);
-    ui.heading(tr(state.locale, "Language"));
+    ui.add_space(tokens.space_xs);
     ui.horizontal(|ui| {
+        ui.label(
+            egui::RichText::new(format!("{}:", tr(state.locale, "Language")))
+                .size(tokens.font_body),
+        );
         render_locale_button(ui, state, Locale::English, "English");
         render_locale_button(ui, state, Locale::Spanish, "Spanish");
     });
-    ui.add_space(4.0);
+    ui.add_space(tokens.space_xs);
     let mut shortcuts = state.shortcuts_enabled;
     if ui.checkbox(&mut shortcuts, "Keyboard shortcuts").changed() {
         state.set_shortcuts_enabled(shortcuts);
     }
+    ui.add_space(tokens.space_xxs);
     let mut hi_res = state.hi_res_covers;
     if ui.checkbox(&mut hi_res, "High-resolution covers").changed() {
         state.set_hi_res_covers(hi_res);
@@ -79,13 +101,16 @@ pub(crate) fn render_library_lastfm<
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
-    ui.heading("Last.fm");
+    let tokens = DesignTokens::desktop();
+    section_header(ui, "Last.fm");
     let mut enabled = state.lastfm_enabled;
     if ui.checkbox(&mut enabled, "Enable scrobbling").changed() {
         state.set_lastfm_enabled(enabled);
     }
+    ui.add_space(tokens.space_xxs);
     let status = if state.lastfm_is_live() { "Scrobbler: Live" } else { "Scrobbler: Dormant" };
-    ui.label(status);
+    render_status_caption(ui, status);
+    ui.add_space(tokens.space_xs);
     render_lastfm_inputs(ui, state);
 }
 
@@ -100,6 +125,7 @@ pub(crate) fn render_lastfm_inputs<
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
+    let tokens = DesignTokens::desktop();
     render_lastfm_field(ui, &mut state.lastfm_api_key_text, &mut state.text_focused, "API Key");
     render_lastfm_field(ui, &mut state.lastfm_secret_text, &mut state.text_focused, "Secret");
     render_lastfm_field(
@@ -108,6 +134,7 @@ pub(crate) fn render_lastfm_inputs<
         &mut state.text_focused,
         "Session Key",
     );
+    ui.add_space(tokens.space_xs);
     ui.horizontal(|ui| {
         if ui.button("Save").clicked() {
             state.save_lastfm_credentials_from_input();
@@ -125,13 +152,15 @@ pub(crate) fn render_lastfm_field(
     focused: &mut bool,
     label: &str,
 ) {
+    let tokens = DesignTokens::desktop();
     ui.horizontal(|ui| {
-        ui.label(format!("{label}:"));
+        ui.label(egui::RichText::new(format!("{label}:")).size(tokens.font_body));
         let response = ui.add(egui::TextEdit::singleline(text).password(true));
         if response.has_focus() {
             *focused = true;
         }
     });
+    ui.add_space(tokens.space_xxs);
 }
 
 /// Renders a selectable theme button and applies selection changes.
@@ -147,9 +176,11 @@ pub(crate) fn render_theme_button<
     theme: ThemeId,
     key: &str,
 ) {
+    let tokens = DesignTokens::desktop();
     let label = tr(state.locale, key);
+    let text = egui::RichText::new(label).size(tokens.font_body);
     let is_selected = state.theme == theme;
-    if ui.selectable_label(is_selected, label).clicked() && !is_selected {
+    if ui.selectable_label(is_selected, text).clicked() && !is_selected {
         state.set_theme(theme);
         theme::apply(ui.ctx(), &theme.palette());
     }
@@ -168,9 +199,11 @@ pub(crate) fn render_locale_button<
     locale: Locale,
     key: &str,
 ) {
+    let tokens = DesignTokens::desktop();
     let label = tr(state.locale, key);
+    let text = egui::RichText::new(label).size(tokens.font_body);
     let is_selected = state.locale == locale;
-    if ui.selectable_label(is_selected, label).clicked() && !is_selected {
+    if ui.selectable_label(is_selected, text).clicked() && !is_selected {
         state.set_locale(locale);
     }
 }
@@ -186,10 +219,12 @@ pub(crate) fn render_library_updates<
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
-    ui.heading("Updates");
+    let tokens = DesignTokens::desktop();
+    section_header(ui, "Updates");
     if render_update_status_body(ui, &state.update_status) {
         state.dismiss_update();
     }
+    ui.add_space(tokens.space_xs);
     if ui.button("Check for updates").clicked() {
         state.refresh_update();
     }
@@ -199,16 +234,17 @@ pub(crate) fn render_library_updates<
 pub(crate) fn render_update_status_body(ui: &mut egui::Ui, status: &UpdateStatus) -> bool {
     match status {
         UpdateStatus::Unknown => {
-            ui.label("Never checked");
+            render_status_caption(ui, "Never checked");
         }
         UpdateStatus::Current => {
-            ui.label(format!("moggyt is up to date (v{})", GithubUpdater::current_version()));
+            let message = format!("moggyt is up to date (v{})", GithubUpdater::current_version());
+            render_status_caption(ui, &message);
         }
         UpdateStatus::Available { version, url } => {
             return render_update_available(ui, version, url);
         }
         UpdateStatus::CheckFailed => {
-            ui.label("Update check failed (offline?)");
+            render_status_caption(ui, "Update check failed (offline?)");
         }
     }
     false
@@ -216,7 +252,11 @@ pub(crate) fn render_update_status_body(ui: &mut egui::Ui, status: &UpdateStatus
 
 /// Renders release download link and dismiss control for available updates.
 pub(crate) fn render_update_available(ui: &mut egui::Ui, version: &str, url: &str) -> bool {
-    ui.label(format!("Update available: {version}"));
+    let tokens = DesignTokens::desktop();
+    ui.label(
+        egui::RichText::new(format!("Update available: {version}")).size(tokens.font_body).strong(),
+    );
+    ui.add_space(tokens.space_xxs);
     let mut dismissed = false;
     ui.horizontal(|ui| {
         ui.hyperlink_to("Download page", url);
@@ -238,12 +278,15 @@ pub(crate) fn render_library_sign_in<
     ui: &mut egui::Ui,
     state: &mut AppState<C, A, S, L, K>,
 ) {
+    let tokens = DesignTokens::desktop();
+    section_header(ui, "Sign in");
     let status = if state.is_signed_in() {
         "Signed in — library unlocked"
     } else {
         "Anonymous — paste cookies to unlock library"
     };
-    ui.label(status);
+    render_status_caption(ui, status);
+    ui.add_space(tokens.space_xs);
     ui.horizontal(|ui| {
         let response = ui.text_edit_singleline(&mut state.cookie_text);
         state.text_focused = response.has_focus();
@@ -267,14 +310,15 @@ pub(crate) fn render_library_playlists<
     ui: &mut egui::Ui,
     state: &AppState<C, A, S, L, K>,
 ) {
-    ui.heading("Playlists");
+    section_header(ui, "Playlists");
     let playlists = state.catalog.playlists();
     if playlists.is_empty() {
-        ui.label("No playlists");
+        empty_state(ui, "No playlists");
         return;
     }
-    for playlist in playlists {
-        ui.label(format!("{} ({} tracks)", playlist.title, playlist.track_count));
+    for playlist in &playlists {
+        let subtitle = format!("({} tracks)", playlist.track_count);
+        track_row(ui, &playlist.title, &subtitle, false);
     }
 }
 
@@ -296,15 +340,23 @@ pub(crate) fn render_library_liked<
         return;
     }
     let current_id = state.queue.current().map(|t| t.id.as_str());
+    if let Some(id) = render_liked_tracks(ui, &liked, current_id) {
+        state.toggle_like(&id);
+    }
+}
+
+fn render_liked_tracks(
+    ui: &mut egui::Ui,
+    liked: &[Track],
+    current_id: Option<&str>,
+) -> Option<String> {
     let mut to_toggle = None;
-    for track in &liked {
+    for track in liked {
         if render_liked_item(ui, track, current_id) {
             to_toggle = Some(track.id.clone());
         }
     }
-    if let Some(id) = to_toggle {
-        state.toggle_like(&id);
-    }
+    to_toggle
 }
 
 fn render_liked_item(ui: &mut egui::Ui, track: &Track, current_track_id: Option<&str>) -> bool {
@@ -330,13 +382,13 @@ pub(crate) fn render_library_albums<
     ui: &mut egui::Ui,
     state: &AppState<C, A, S, L, K>,
 ) {
-    ui.heading("Saved albums");
+    section_header(ui, "Saved albums");
     let albums = state.catalog.saved_albums();
     if albums.is_empty() {
-        ui.label("No saved albums");
+        empty_state(ui, "No saved albums");
         return;
     }
-    for album in albums {
-        ui.label(format!("{} - {}", album.title, album.artist));
+    for album in &albums {
+        track_row(ui, &album.title, &album.artist, false);
     }
 }
