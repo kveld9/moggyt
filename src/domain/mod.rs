@@ -6,6 +6,7 @@
 mod library;
 mod queue;
 mod search;
+mod segments;
 mod sleep_timer;
 mod theme;
 
@@ -16,5 +17,6 @@ pub use queue::{PlaybackQueue, RepeatMode};
 pub use search::{
     LyricsSnippet, LyricsSnippetError, MAX_LYRICS_SNIPPET_LEN, SearchFilter, SearchQuery, Track,
 };
+pub use segments::{InvalidSegment, SkipRanges, SkipSegment};
 pub use sleep_timer::{SleepTimer, TimerPreset};
 pub use theme::{DesignTokens, Palette, ThemeId};

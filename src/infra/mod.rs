@@ -23,6 +23,7 @@ mod scrobble;
 mod session;
 mod session_keyring;
 mod settings;
+mod skip_store;
 mod stream;
 mod tray;
 mod updater;
@@ -67,6 +68,7 @@ pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
 pub use settings::{
     DiskSettingsStore, MemorySettingsStore, Settings, SettingsStore, default_config_dir,
 };
+pub use skip_store::{DiskSkipStore, MemorySkipStore, SkipStore};
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
