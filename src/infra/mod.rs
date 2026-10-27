@@ -11,6 +11,7 @@ mod catalog_client;
 mod cover;
 mod cover_art;
 mod cover_disk;
+mod handoff;
 mod instance;
 mod library_backup;
 mod lyrics;
@@ -42,6 +43,9 @@ pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use cover_art::{COVER_HIRES_MAX_PX, COVER_MAX_PX, decode_cover, fetch_artwork};
 pub use cover_disk::{DiskCoverCache, cache_file_name, fnv1a_hex};
+pub use handoff::{
+    CHECKSUM_HEX_LEN, HANDOFF_PREFIX, MAX_HANDOFF_COOKIES, decode_handoff, encode_handoff,
+};
 pub use instance::{SingleInstanceGuard, instance_lock_name};
 pub use library_backup::{
     BackupSummary, CURRENT_BACKUP_VERSION, LibraryBackup, apply_backup, export_backup,
