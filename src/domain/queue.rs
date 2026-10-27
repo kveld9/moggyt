@@ -1,9 +1,11 @@
 //! Pure playback queue: ordering rules without I/O or clocks.
 
+use serde::{Deserialize, Serialize};
+
 use super::search::Track;
 
 /// Traversal repetition policy for a playback queue.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum RepeatMode {
     /// Advance stops at tail, retreat stops at head.
     #[default]
@@ -15,7 +17,8 @@ pub enum RepeatMode {
 }
 
 /// Ordered playback queue with a cursor over the current track.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PlaybackQueue {
     tracks: Vec<Track>,
     cursor: usize,
@@ -61,6 +64,22 @@ impl PlaybackQueue {
     /// Track under the cursor, if any.
     pub fn current(&self) -> Option<&Track> {
         self.tracks.get(self.cursor)
+    }
+
+    /// Active cursor index.
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+
+    /// Clamps the cursor to valid bounds within the track list.
+    ///
+    /// Resets cursor to 0 if the queue is empty; otherwise clamps to `tracks.len() - 1`.
+    pub fn clamp_cursor(&mut self) {
+        if self.tracks.is_empty() {
+            self.cursor = 0;
+        } else if self.cursor >= self.tracks.len() {
+            self.cursor = self.tracks.len() - 1;
+        }
     }
 
     /// Advances the cursor according to the active repeat policy.
@@ -333,5 +352,46 @@ mod tests {
         assert!(empty.shuffle_with(&[]));
         assert!(!empty.shuffle_with(&[0]));
         assert_eq!(current_id(&empty), None);
+    }
+
+    #[test]
+    fn serde_round_trip_with_cursor_and_repeat() {
+        let mut queue = PlaybackQueue::new();
+        queue.push(Track::new("id-1", "Title 1", "Artist 1"));
+        queue.push(Track::new("id-2", "Title 2", "Artist 2"));
+        queue.advance();
+        queue.set_repeat(RepeatMode::All);
+
+        let json = serde_json::to_string(&queue).expect("serialization succeeds");
+        let deserialized: PlaybackQueue =
+            serde_json::from_str(&json).expect("deserialization succeeds");
+
+        assert_eq!(queue, deserialized);
+        assert_eq!(deserialized.cursor(), 1);
+        assert_eq!(deserialized.repeat(), RepeatMode::All);
+        assert_eq!(deserialized.len(), 2);
+    }
+
+    #[test]
+    fn cursor_clamp_on_empty_and_out_of_bounds() {
+        let mut empty = PlaybackQueue::new();
+        empty.cursor = 10;
+        empty.clamp_cursor();
+        assert_eq!(empty.cursor(), 0);
+
+        let mut queue = PlaybackQueue::new();
+        queue.push(Track::new("id-1", "Title 1", "Artist 1"));
+        queue.push(Track::new("id-2", "Title 2", "Artist 2"));
+        queue.cursor = 10;
+        queue.clamp_cursor();
+        assert_eq!(queue.cursor(), 1);
+
+        let json =
+            r#"{"tracks":[{"id":"t1","title":"T1","artist":"A1"}],"cursor":99,"repeat":"Off"}"#;
+        let mut loaded: PlaybackQueue =
+            serde_json::from_str(json).expect("deserialization succeeds");
+        assert_eq!(loaded.cursor(), 99);
+        loaded.clamp_cursor();
+        assert_eq!(loaded.cursor(), 0);
     }
 }

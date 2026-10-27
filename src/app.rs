@@ -20,9 +20,9 @@ use crate::infra::{
     AudioBackend, AudioQuality, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache,
     CredentialStore, DesktopPresence, DiscordPresence, GithubUpdater, LastFmClient,
     LastFmCredentials, LyricLine, LyricsSource, MediaKeyAction, MemoryCredentialStore,
-    MemorySettingsStore, Presence, Scrobbler, SessionStore, Settings, SettingsStore, StubScrobbler,
-    TrayAction, TrayHandle, Updater, client_from_credentials, decode_cover, fetch_artwork,
-    is_newer, sanitize_cookie_input, should_scrobble,
+    MemoryQueueStore, MemorySettingsStore, Presence, QueueStore, Scrobbler, SessionStore, Settings,
+    SettingsStore, StubScrobbler, TrayAction, TrayHandle, Updater, client_from_credentials,
+    decode_cover, fetch_artwork, is_newer, sanitize_cookie_input, should_scrobble,
 };
 
 /// Navigation pages of the application shell.
@@ -108,6 +108,8 @@ pub struct AppState<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSourc
     pub quality: AudioQuality,
     /// Injected settings storage adapter.
     pub settings_store: Box<dyn SettingsStore>,
+    /// Injected playback queue storage adapter.
+    pub queue_store: Box<dyn QueueStore>,
     /// Whether radio autoplay queue continuation is active.
     pub autoplay: bool,
     /// Cached home shelves for the Search view.
@@ -173,6 +175,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             locale: Locale::English,
             quality: AudioQuality::Standard,
             settings_store: Box::new(MemorySettingsStore::default()),
+            queue_store: Box::new(MemoryQueueStore::default()),
             autoplay: false,
             home_shelves: Vec::new(),
             detail: None,
@@ -293,6 +296,38 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Decodes raw cover art bytes into a color image bounded by the active setting.
     pub fn decode_cover_image(&self, bytes: &[u8]) -> Option<egui::ColorImage> {
         decode_cover(bytes, self.cover_max_px())
+    }
+
+    /// Injects an alternative queue store implementation and restores the queue.
+    pub fn set_queue_store(&mut self, store: Box<dyn QueueStore>) {
+        self.queue_store = store;
+        self.restore_queue();
+    }
+
+    /// Restores the playback queue from storage, clamping cursor to valid bounds.
+    pub fn restore_queue(&mut self) {
+        let mut queue = self.queue_store.load();
+        queue.clamp_cursor();
+        self.queue = queue;
+    }
+
+    /// Persists the active playback queue to storage, logging errors without panicking.
+    pub fn save_queue(&self) {
+        if let Err(err) = self.queue_store.save(&self.queue) {
+            tracing::warn!("failed to persist queue: {err:#}");
+        }
+    }
+
+    /// Mutates the playback queue in-place and persists the updated queue.
+    ///
+    /// Persistence policy (SDD FR-13):
+    /// All queue mutations pass through `mutate_queue`, which immediately persists the queue
+    /// to `queue_store` (via atomic tmp+rename writes on disk). This ensures crash resilience
+    /// without relying on graceful exit hooks or risking lost updates during unexpected termination.
+    pub fn mutate_queue<R>(&mut self, f: impl FnOnce(&mut PlaybackQueue) -> R) -> R {
+        let result = f(&mut self.queue);
+        self.save_queue();
+        result
     }
 
     /// Sets the active UI theme and persists the change.
@@ -521,7 +556,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         };
         let hits = self.catalog.search(query.text());
         if let Some(track) = hits.into_iter().next() {
-            self.queue.push(track);
+            self.mutate_queue(|q| q.push(track));
             self.page = Page::Queue;
         }
     }
@@ -542,15 +577,17 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             return;
         }
         let radio_tracks = self.catalog.radio(seed_id);
-        self.queue.clear();
         let seed_key = seed.id.clone();
-        self.queue.push(seed);
-        for track in radio_tracks {
-            let trimmed = track.id.trim();
-            if !trimmed.is_empty() && trimmed != seed_key {
-                self.queue.push(track);
+        self.mutate_queue(|q| {
+            q.clear();
+            q.push(seed);
+            for track in radio_tracks {
+                let trimmed = track.id.trim();
+                if !trimmed.is_empty() && trimmed != seed_key {
+                    q.push(track);
+                }
             }
-        }
+        });
         self.autoplay = true;
         self.play_current_quiet();
         self.page = Page::NowPlaying;
@@ -589,16 +626,20 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     fn append_autoplay_and_advance(&mut self, current_id: &str) {
         let recommendations = self.catalog.radio(current_id);
         let mut appended = false;
-        for track in recommendations {
-            let trimmed = track.id.trim();
-            if trimmed.is_empty() || self.queue.tracks().iter().any(|t| t.id == trimmed) {
-                continue;
+        self.mutate_queue(|q| {
+            for track in recommendations {
+                let trimmed = track.id.trim();
+                if trimmed.is_empty() || q.tracks().iter().any(|t| t.id == trimmed) {
+                    continue;
+                }
+                q.push(track);
+                appended = true;
             }
-            self.queue.push(track);
-            appended = true;
-        }
+            if appended {
+                q.advance();
+            }
+        });
         if appended {
-            self.queue.advance();
             self.play_current_quiet();
         }
     }
@@ -650,14 +691,14 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Advances the queue cursor and deterministically starts playback of the new head.
     pub fn next_track(&mut self) {
         self.maybe_scrobble_current();
-        self.queue.advance();
+        self.mutate_queue(|q| q.advance());
         self.play_current_quiet();
     }
 
     /// Retreats the queue cursor and deterministically starts playback of the new head.
     pub fn prev_track(&mut self) {
         self.maybe_scrobble_current();
-        self.queue.retreat();
+        self.mutate_queue(|q| q.retreat());
         self.play_current_quiet();
     }
 
@@ -930,6 +971,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         if self.state.drain_tray() {
+            self.state.save_queue();
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
@@ -996,7 +1038,8 @@ mod tests {
         }
     }
     use crate::domain::{
-        Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
+        Album, Artist, Detail, DetailKind, Playlist, RepeatMode, SearchQuery, SearchResult, Shelf,
+        Track,
     };
     use crate::infra::{
         AudioStub, CatalogStub, LrclibStub, LyricLine, MemoryCoverCache, MemorySessionStore,
@@ -2228,5 +2271,57 @@ mod tests {
         state.set_hi_res_covers(true);
         let decoded_hires = state.decode_cover_image(&buf).expect("decode hires");
         assert_eq!(decoded_hires.size, [1024, 512]);
+    }
+
+    #[test]
+    fn test_app_state_queue_persistence_across_instances() {
+        let store = MemoryQueueStore::new();
+
+        // Instance 1: populate queue, advance cursor, set repeat mode
+        let mut state1 = wired();
+        state1.set_queue_store(Box::new(store.clone()));
+
+        state1.mutate_queue(|q| {
+            q.push(Track::new("track-1", "Track 1", "Artist 1"));
+            q.push(Track::new("track-2", "Track 2", "Artist 2"));
+            q.push(Track::new("track-3", "Track 3", "Artist 3"));
+            q.advance();
+            q.set_repeat(RepeatMode::All);
+        });
+
+        assert_eq!(state1.queue.len(), 3);
+        assert_eq!(state1.queue.cursor(), 1);
+        assert_eq!(state1.queue.repeat(), RepeatMode::All);
+
+        // Instance 2: new state instance injected with the same store
+        let mut state2 = wired();
+        state2.set_queue_store(Box::new(store));
+
+        assert_eq!(state2.queue.len(), 3);
+        assert_eq!(state2.queue.cursor(), 1);
+        assert_eq!(state2.queue.repeat(), RepeatMode::All);
+        assert_eq!(state2.queue.tracks(), state1.queue.tracks());
+    }
+
+    #[test]
+    fn test_app_state_queue_mutations_persist_automatically() {
+        let store = MemoryQueueStore::new();
+        let mut state1 = wired();
+        state1.set_queue_store(Box::new(store.clone()));
+
+        state1.search_text = "midnight".to_owned();
+        state1.submit_search();
+        state1.search_text = "sunrise".to_owned();
+        state1.submit_search();
+
+        assert_eq!(state1.queue.len(), 2);
+        state1.next_track();
+        assert_eq!(state1.queue.cursor(), 1);
+
+        let mut state2 = wired();
+        state2.set_queue_store(Box::new(store));
+        assert_eq!(state2.queue.len(), 2);
+        assert_eq!(state2.queue.cursor(), 1);
+        assert_eq!(state2.queue.current().map(|t| t.title.as_str()), Some("sunrise"));
     }
 }
