@@ -4,6 +4,7 @@ use eframe::egui;
 
 use crate::app::AppState;
 use crate::domain::DesignTokens;
+use crate::domain::TimerPreset;
 use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 
 /// Renders the bottom persistent player bar panel with controls and status info.
@@ -30,6 +31,8 @@ pub(crate) fn render_player_bar<
             render_seek_controls(ui, state);
             ui.separator();
             render_volume_controls(ui, state);
+            ui.separator();
+            render_sleep_timer_controls(ui, state);
         });
         ui.add_space(tokens.space_xxs);
     });
@@ -151,4 +154,82 @@ pub(crate) fn render_position_info<
     ui.label(
         egui::RichText::new(text).size(tokens.font_caption).color(ui.visuals().weak_text_color()),
     );
+}
+
+/// Renders sleep timer preset selector, countdown display, and cancel button.
+pub(crate) fn render_sleep_timer_controls<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    render_sleep_timer_preset_menu(ui, state);
+    if state.sleep_timer.is_armed() {
+        render_sleep_timer_armed_info(ui, state);
+    }
+}
+
+fn render_sleep_timer_preset_menu<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    let label = state.sleep_timer.preset().display_name();
+    egui::ComboBox::from_id_salt("sleep_timer_dropdown").selected_text(label).show_ui(ui, |ui| {
+        render_preset_option(ui, state, TimerPreset::Off, "Off");
+        render_preset_option(ui, state, TimerPreset::Minutes15, "15 min");
+        render_preset_option(ui, state, TimerPreset::Minutes30, "30 min");
+        render_preset_option(ui, state, TimerPreset::Minutes45, "45 min");
+        render_preset_option(ui, state, TimerPreset::Minutes60, "60 min");
+        render_preset_option(ui, state, TimerPreset::StopAfterTrack, "After track");
+    });
+}
+
+fn render_preset_option<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+    preset: TimerPreset,
+    label: &str,
+) {
+    let is_selected = state.sleep_timer.preset() == preset;
+    if ui.selectable_label(is_selected, label).clicked() && !is_selected {
+        state.set_sleep_timer_preset(preset);
+    }
+}
+
+fn render_sleep_timer_armed_info<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    ui: &mut egui::Ui,
+    state: &mut AppState<C, A, S, L, K>,
+) {
+    if let Some(remaining) = state.sleep_timer.remaining_secs() {
+        let mins = remaining / 60;
+        let secs = remaining % 60;
+        ui.label(format!("{mins}:{secs:02}"));
+    } else {
+        ui.label("After track");
+    }
+    if ui.button("Cancel").clicked() {
+        state.cancel_sleep_timer();
+    }
 }
