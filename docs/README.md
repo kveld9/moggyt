@@ -1,7 +1,7 @@
 # Documentation Index
 
 This directory contains technical and user documentation for `moggyt`, a native YouTube Music desktop client written
-in Rust (`eframe`/`egui`).
+in Rust (Slint).
 
 ## Document Directory
 

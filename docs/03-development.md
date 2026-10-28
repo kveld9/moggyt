@@ -8,7 +8,7 @@
 ## Commands
 
 ```bash
-cargo run                                  # run the app (eframe window)
+cargo run                                  # run the app (Slint window)
 cargo test --all-features                  # full suite
 cargo fmt --all -- --check                 # formatting (CI fails on drift)
 cargo clippy --all-targets --all-features -- -D warnings

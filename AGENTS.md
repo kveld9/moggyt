@@ -1,7 +1,7 @@
 # AGENTS.md — moggyt
 
-Native YouTube Music client in Rust (`eframe`/`egui`). Hexagonal skeleton:
-UI shell (`src/app.rs`) → pure domain (`src/domain/`) ← ports ← adapters (`src/infra/`).
+Native YouTube Music client in Rust (Slint). Hexagonal skeleton:
+UI shell (`src/slint_shell/`) → pure domain (`src/domain/`) ← ports ← adapters (`src/infra/`).
 
 ## Verify (same gates as CI)
 
@@ -17,7 +17,7 @@ Run all five before finishing. `cargo run` launches the window.
 
 ## Architecture invariants (see `docs/02-architecture.md`)
 
-- Dependency direction: `app`/`infra` → `domain`. `domain` never touches I/O
+- Dependency direction: `slint_shell`/`infra` → `domain`. `domain` never touches I/O
   (`net`, `fs`, `process`, clocks, randomness); inject those as parameters or ports.
 - `src/main.rs` is the only composition root. One concept, one owner module (SSOT).
 - External crates hide behind ports in `src/infra/`; the binary crate exposes
@@ -25,7 +25,7 @@ Run all five before finishing. `cargo run` launches the window.
 
 ## Code rules (see `docs/03-development.md`)
 
-- TDD for `domain/` and `app/`: red test on public behavior first, then minimal
+- TDD for `domain/` and `slint_shell/`: red test on public behavior first, then minimal
   code, refactor on green. Fakes in memory; no network/audio in tests; no `sleep`.
 - CC <= 5 per function (hard limit 10); guard clauses first; DRY from 3rd repetition.
 - English identifiers (verbs for functions, nouns for types); boolean predicates

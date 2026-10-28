@@ -2,9 +2,8 @@
 //!
 //! The binary (`src/main.rs`) is only the composition root: it builds
 //! logging, instantiates adapters, injects them into the UI shell, and
-//! bootstraps eframe.
+//! bootstraps Slint.
 
-pub mod app;
 pub mod domain;
 pub mod i18n;
 pub mod infra;

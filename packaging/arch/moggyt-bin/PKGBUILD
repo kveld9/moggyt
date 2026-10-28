@@ -8,7 +8,7 @@
 pkgname=moggyt-bin
 pkgver=1.0.0
 pkgrel=1
-pkgdesc="Native YouTube Music client (eframe/egui)"
+pkgdesc="Native YouTube Music client (Slint)"
 arch=('x86_64')
 url="https://github.com/kveld9/moggyt"
 license=('MIT')

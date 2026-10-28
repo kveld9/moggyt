@@ -2,14 +2,18 @@
 name = "moggyt"
 version = "0.1.0"
 edition = "2024"
-description = "Native YouTube Music client (eframe/egui)"
+description = "Native YouTube Music client (Slint)"
 license = "MIT"
 repository = "https://github.com/kveld9/moggyt"
 rust-version = "1.85"
+autoexamples = false
+
+[[example]]
+name = "ui_preview"
+required-features = ["legacy-eframe"]
 
 [dependencies]
 anyhow = "1.0.104"
-eframe = "0.37.0"
 keyring = "3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
@@ -39,7 +43,7 @@ assets = [
     ["packaging/deb/moggyt.desktop", "usr/share/applications/", "644"],
 ]
 extended-description = """\
-Native YouTube Music client written in Rust (eframe/egui)."""
+Native YouTube Music client written in Rust (Slint)."""
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
@@ -52,4 +56,3 @@ panic = "abort"
 
 [profile.dev.package."*"]
 opt-level = 2
-

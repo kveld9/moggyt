@@ -26,12 +26,14 @@ slint::include_modules!();
 
 pub use MoggytWindow as AppWindow;
 
+pub mod app;
 pub mod detail;
 pub mod library;
 pub mod platform;
 pub mod playback;
 pub mod search;
 
+pub use app::{SlintAppState, build_window, run};
 pub use detail::{DetailState, detail_kind_label, detail_track_rows};
 pub use library::{LibraryItemRow, LibraryState, album_row, artist_row, playlist_row};
 pub use platform::{

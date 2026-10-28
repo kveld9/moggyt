@@ -7,8 +7,8 @@ LRCLIB-only synced lyrics in v1.
 
 ## 1 Context and goals
 
-`moggyt` is a native YouTube Music client written in Rust, with an `eframe`/`egui` interface.
-The repository already provides a hexagonal scaffold: the UI shell (`src/app.rs`) delegates to a
+`moggyt` is a native YouTube Music client written in Rust, with a Slint interface.
+The repository already provides a hexagonal scaffold: the UI shell (`src/slint_shell`) delegates to a
 pure domain (`src/domain/`), all I/O hides behind ports implemented in `src/infra/`, and
 `src/main.rs` is the sole composition root. This document fixes what v1 means on top of that base.
 
@@ -31,7 +31,7 @@ Three existing reference architectures were used as requirements sources:
 - native-backend reference (Tauri 2 + React, catalog API direct): talks to the catalog API directly, prefetches
   with aggressive caching, resolves audio through a `yt-dlp` sidecar, and keeps a Rust backend
   for streaming proxy, cookies, tray, and media keys. Closest to the target design, minus the
-  webview: `moggyt` renders its own UI in `egui` instead.
+  webview: `moggyt` renders its own UI in Slint instead.
 - plugin-taxonomy reference (Electron, plugin system with around 40 plugins): taxonomy source
   (non-music segment skipping, `synced-lyrics`, `scrobbler`, `downloader`, `equalizer`, `crossfade`,
   `quality-changer`, `picture-in-picture`, `shortcuts`, `discord`, `taskbar-mediacontrol`,
@@ -166,7 +166,7 @@ Anonymous use covers FR-1 through FR-6, FR-8 through FR-12, and FR-13 through FR
 Dependency direction is unchanged:
 
 ```text
-app (egui shell) --> domain (pure) <-- ports <-- infra (adapters)
+slint_shell (Slint shell) --> domain (pure) <-- ports <-- infra (adapters)
 ```
 
 Ports (each a trait in `infra/`, with in-memory fakes in tests):
@@ -180,8 +180,8 @@ Ports (each a trait in `infra/`, with in-memory fakes in tests):
 - `Presence`: Discord status updates; a no-op implementation when disabled.
 - `Updater`: GitHub Releases check returning the latest version and asset URLs (FR-12).
 
-Crate layout stays `src/{main.rs, lib.rs, app.rs, domain/, infra/}`. `main.rs` builds the
-`tokio` runtime, instantiates adapters, injects them into `AppState`, and bootstraps `eframe`.
+Crate layout stays `src/{main.rs, lib.rs, slint_shell/, domain/, infra/}`. `main.rs` builds the
+`tokio` runtime, instantiates adapters, injects them into `SlintAppState`, and bootstraps Slint.
 New adapters are added behind existing ports; `domain` never depends on `infra` or `app`.
 
 The modular api/stream/lyrics/playback/cache/stats subsystem split maps directly to moggyt ports and
@@ -283,7 +283,7 @@ Each milestone ships as small PRs under 400 lines:
 
 - YouTube changes stream extraction: mitigated by the `yt-dlp` sidecar and the port boundary.
 - YouTube changes catalog API schemas: golden fixtures plus a narrow parser layer per endpoint.
-- `egui` limits for rich media lists: virtualized rows and off-thread image decoding.
+- Slint UI limits for rich media lists: virtualized rows and off-thread image decoding.
 - Linux keyring fragmentation: fall back to a clear error plus docs when no provider exists.
 - Scope creep from the 40-plugin reference: ports anticipate extensions; the SDK stays v2.
 - Catalog API client-identity rot: mitigated by a single client-identity configuration module

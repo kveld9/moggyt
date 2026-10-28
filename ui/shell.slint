@@ -410,9 +410,102 @@ component LibraryItemCard inherits Rectangle {
 }
 
 export component LibraryView inherits VerticalLayout {
-    in property <[LibraryItemData]> playlists: []; in property <[LibraryItemData]> albums: []; in property <[LibraryItemData]> artists: [];
-    callback playlist-selected(int); callback album-selected(int); callback artist-selected(int);
-    spacing: 16px; alignment: start;
+    in-out property <string> cookie-text: "";
+    in property <bool> signed-in: false;
+    in property <[LibraryItemData]> playlists: [];
+    in property <[LibraryItemData]> albums: [];
+    in property <[LibraryItemData]> artists: [];
+    callback playlist-selected(int);
+    callback album-selected(int);
+    callback artist-selected(int);
+    callback sign-in-submitted(string);
+    callback sign-out();
+    spacing: 16px;
+    alignment: start;
+
+    Rectangle {
+        border-radius: 8px;
+        background: #181818;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+
+            if !root.signed-in : VerticalLayout {
+                spacing: 8px;
+
+                Text {
+                    text: "Anonymous — paste cookies to unlock library";
+                    color: #b3b3b3;
+                    font-size: 13px;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    height: 32px;
+
+                    LineEdit {
+                        text <=> root.cookie-text;
+                        placeholder-text: "Paste session cookies...";
+                        input-type: password;
+                        accepted(t) => { root.sign-in-submitted(t); }
+                    }
+
+                    Rectangle {
+                        width: 90px;
+                        border-radius: 4px;
+                        background: sign-in-btn.has-hover ? #1ed760 : #1db954;
+
+                        sign-in-btn := TouchArea {
+                            clicked => { root.sign-in-submitted(root.cookie-text); }
+                        }
+
+                        Text {
+                            text: "Sign in";
+                            color: #000000;
+                            font-size: 12px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            if root.signed-in : HorizontalLayout {
+                spacing: 12px;
+                alignment: space-between;
+
+                Text {
+                    text: "Signed in — library unlocked";
+                    color: #1db954;
+                    font-size: 13px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 90px;
+                    height: 28px;
+                    border-radius: 4px;
+                    background: sign-out-btn.has-hover ? #333333 : #222222;
+
+                    sign-out-btn := TouchArea {
+                        clicked => { root.sign-out(); }
+                    }
+
+                    Text {
+                        text: "Sign out";
+                        color: #ffffff;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
 
     VerticalLayout {
         spacing: 6px;
@@ -473,6 +566,8 @@ component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
     in property <string> header-title: "Search";
     in-out property <string> query: "";
+    in-out property <string> cookie-text: "";
+    in property <bool> signed-in: false;
     in property <[ShelfData]> shelves: [];
     in property <[TrackRowData]> queue-tracks: [];
     in property <int> queue-selected-index: -1;
@@ -493,6 +588,8 @@ component ContentArea inherits Rectangle {
     callback track-selected(int);
     callback queue-track-selected(int);
     callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
+    callback sign-in-submitted(string);
+    callback sign-out();
 
     background: #121212;
 
@@ -539,10 +636,14 @@ component ContentArea inherits Rectangle {
         }
 
         if root.active-page == 3 : LibraryView {
+            cookie-text <=> root.cookie-text;
+            signed-in: root.signed-in;
             playlists: root.library-playlists; albums: root.library-albums; artists: root.library-artists;
             playlist-selected(idx) => { root.playlist-selected(idx); }
             album-selected(idx) => { root.album-selected(idx); }
             artist-selected(idx) => { root.artist-selected(idx); }
+            sign-in-submitted(t) => { root.sign-in-submitted(t); }
+            sign-out() => { root.sign-out(); }
         }
 
         if root.active-page == 4 : DetailView {
@@ -564,6 +665,8 @@ export component MoggytWindow inherits Window {
     in-out property <int> active-page: 0;
     in-out property <string> header-title: "Search";
     in-out property <string> query: "";
+    in-out property <string> cookie-text: "";
+    in-out property <bool> signed-in: false;
     in-out property <[ShelfData]> shelves: [];
     in-out property <[TrackRowData]> queue-tracks: [];
     in-out property <int> queue-selected-index: -1;
@@ -587,6 +690,8 @@ export component MoggytWindow inherits Window {
     callback track-selected(int);
     callback queue-track-selected(int);
     callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
+    callback sign-in-submitted(string);
+    callback sign-out();
     callback toggle-play();
     callback prev-track();
     callback next-track();
@@ -608,6 +713,7 @@ export component MoggytWindow inherits Window {
 
             ContentArea {
                 active-page: root.active-page; header-title: root.header-title; query <=> root.query; shelves: root.shelves;
+                cookie-text <=> root.cookie-text; signed-in: root.signed-in;
                 queue-tracks: root.queue-tracks; queue-selected-index: root.queue-selected-index;
                 active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
                 position-text: root.position-text; duration-text: root.duration-text; playback-progress: root.playback-progress;
@@ -620,6 +726,7 @@ export component MoggytWindow inherits Window {
                 queue-track-selected(idx) => { root.queue-track-selected(idx); }
                 playlist-selected(idx) => { root.playlist-selected(idx); } album-selected(idx) => { root.album-selected(idx); }
                 artist-selected(idx) => { root.artist-selected(idx); } detail-track-selected(idx) => { root.detail-track-selected(idx); }
+                sign-in-submitted(t) => { root.sign-in-submitted(t); } sign-out() => { root.sign-out(); }
             }
         }
 

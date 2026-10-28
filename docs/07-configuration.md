@@ -54,7 +54,7 @@ cargo run
 RUST_LOG=debug cargo run
 
 # Target specific modules
-RUST_LOG=moggyt::infra=debug,moggyt::app=trace cargo run
+RUST_LOG=moggyt::infra=debug,moggyt::slint_shell=trace cargo run
 ```
 
 Log messages record sidecar downloads, audio backend status, cover cache resolutions, and update checks.

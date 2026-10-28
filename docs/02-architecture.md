@@ -6,29 +6,25 @@ modular design principles.
 ## Dependency direction
 
 ```text
-UI (app.rs, eframe) --> domain (domain/) <-- ports <-- adapters (infra/)
+UI (slint_shell/, Slint) --> domain (domain/) <-- ports <-- adapters (infra/)
 ```
 
 - `domain/`: immutable types and pure rules. Direct `std::net`, `std::fs`, `std::process`, clocks, and randomness are forbidden.
 - `infra/`: implements the ports with real I/O (HTTP to YouTube Music, audio backend).
 - `main.rs` (bin) is the only *composition root*: builds the `tokio` runtime,
-  instantiates adapters, and injects dependencies into `app.rs`.
+  instantiates adapters, and injects dependencies into `slint_shell`.
 - Time and randomness are injected as parameters or fake clocks in tests (determinism, zero `sleep` in tests).
 
 ## Module map
 
 ```text
 src/
-├── main.rs            # Composition root (bin): tracing, tokio runtime, eframe bootstrap
-├── lib.rs             # Public contracts: app + domain + i18n + infra
+├── main.rs            # Composition root (bin): tracing, tokio runtime, Slint bootstrap
+├── lib.rs             # Public contracts: slint_shell + domain + i18n + infra
 ├── i18n.rs            # Interface localization skeleton and translation lookup
-├── app.rs             # UI shell facade: AppState struct, enums, and public re-exports
-├── app/
-│   ├── components.rs  # Reusable UI component modules (top bar, player bar, track row)
-│   ├── pages.rs       # Page view modules (search, queue, now playing, library, detail)
-│   ├── state/         # Feature-based AppState impl modules (playback, queue, search, etc.)
-│   ├── theme.rs       # egui Visuals mapping adapter for domain Palette
-│   └── views.rs       # eframe::App shell wrapper (MoggytApp)
+├── slint_shell/       # Slint UI shell: window controller, bridges, and app runner
+│   ├── app.rs         # Shell composition root: SlintAppState, event handlers, and window wiring
+│   └── bridges/       # Platform and domain integration bridges
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
 │   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)
@@ -57,6 +53,6 @@ src/
 ## Evolution rules
 
 1. One concept, one owner: each domain type lives in a single module (single source of truth).
-2. Acyclic graph: `domain` never depends on `infra` or `app`; `infra` never depends on `app`.
+2. Acyclic graph: `domain` never depends on `infra` or `slint_shell`; `infra` never depends on `slint_shell`.
 3. New adapters (real API, `rodio`/`gstreamer`) are added behind the existing port, never touching the domain.
 4. Cyclomatic complexity CC <= 5 per function; guard clauses first; DRY only from the third repetition.
