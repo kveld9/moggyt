@@ -32,6 +32,7 @@ pub mod library;
 pub mod platform;
 pub mod playback;
 pub mod search;
+pub mod theme;
 
 pub use app::{SlintAppState, build_window, run};
 pub use detail::{DetailState, detail_kind_label, detail_track_rows};
@@ -42,6 +43,7 @@ pub use platform::{
 };
 pub use playback::{PlaybackState, format_position, format_track_duration, queue_track_rows};
 pub use search::{SearchState, TrackDisplayRow, canned_shelves, format_duration, shelf_tracks};
+pub use theme::{ThemeColors, apply_theme, palette_for, rgb_to_slint};
 
 /// Navigation pages of the Slint UI shell, matching domain Page order.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]

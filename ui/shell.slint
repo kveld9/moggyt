@@ -23,6 +23,19 @@ export struct LyricLineData {
     text: string,
 }
 
+global Theme {
+    in-out property <color> window;
+    in-out property <color> panel;
+    in-out property <color> surface;
+    in-out property <color> text;
+    in-out property <color> secondary;
+    in-out property <color> accent;
+    in-out property <color> border;
+    in-out property <color> hover;
+    in-out property <color> overlay;
+    in-out property <bool> dark;
+}
+
 component NavItem inherits Rectangle {
     in property <string> text;
     in property <bool> is-active: false;
@@ -30,7 +43,7 @@ component NavItem inherits Rectangle {
 
     height: 40px;
     border-radius: 6px;
-    background: root.is-active ? #282828 : (touch.has-hover ? #1a1a1a : #00000000);
+    background: root.is-active ? Theme.surface : (touch.has-hover ? Theme.hover : transparent);
 
     touch := TouchArea {
         clicked => { root.clicked(); }
@@ -43,7 +56,7 @@ component NavItem inherits Rectangle {
 
         Text {
             text: root.text;
-            color: root.is-active ? #ffffff : #b3b3b3;
+            color: root.is-active ? Theme.text : Theme.secondary;
             font-size: 14px;
             font-weight: 700;
             vertical-alignment: center;
@@ -56,7 +69,7 @@ component Sidebar inherits Rectangle {
     callback page-selected(int);
 
     width: 200px;
-    background: #000000;
+    background: Theme.panel;
 
     VerticalLayout {
         padding: 16px;
@@ -65,7 +78,7 @@ component Sidebar inherits Rectangle {
 
         Text {
             text: "Moggyt";
-            color: #1db954;
+            color: Theme.accent;
             font-size: 20px;
             font-weight: 800;
         }
@@ -113,7 +126,7 @@ component TrackRow inherits Rectangle {
 
     height: 36px;
     border-radius: 4px;
-    background: root.is-active ? #282828 : (touch.has-hover ? #1f1f1f : #00000000);
+    background: root.is-active ? Theme.surface : (touch.has-hover ? Theme.hover : transparent);
 
     touch := TouchArea {
         clicked => { root.clicked(); }
@@ -126,7 +139,7 @@ component TrackRow inherits Rectangle {
 
         Text {
             text: root.title;
-            color: root.is-active ? #1db954 : #ffffff;
+            color: root.is-active ? Theme.accent : Theme.text;
             font-size: 14px;
             font-weight: 500;
             vertical-alignment: center;
@@ -134,7 +147,7 @@ component TrackRow inherits Rectangle {
 
         Text {
             text: root.artist;
-            color: #b3b3b3;
+            color: Theme.secondary;
             font-size: 13px;
             vertical-alignment: center;
         }
@@ -143,7 +156,7 @@ component TrackRow inherits Rectangle {
 
         Text {
             text: root.duration;
-            color: #b3b3b3;
+            color: Theme.secondary;
             font-size: 13px;
             vertical-alignment: center;
             horizontal-alignment: right;
@@ -175,7 +188,7 @@ component SearchView inherits VerticalLayout {
         Rectangle {
             width: 80px;
             border-radius: 6px;
-            background: btn-touch.has-hover ? #1ed760 : #1db954;
+            background: btn-touch.has-hover ? Theme.hover : Theme.accent;
 
             btn-touch := TouchArea {
                 clicked => { root.query-submitted(root.query); }
@@ -183,7 +196,7 @@ component SearchView inherits VerticalLayout {
 
             Text {
                 text: "Search";
-                color: #000000;
+                color: btn-touch.has-hover ? Theme.text : Theme.window;
                 font-size: 13px;
                 font-weight: 700;
                 vertical-alignment: center;
@@ -198,7 +211,7 @@ component SearchView inherits VerticalLayout {
 
         Text {
             text: "No results found.";
-            color: #b3b3b3;
+            color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
         }
@@ -209,7 +222,7 @@ component SearchView inherits VerticalLayout {
 
         Text {
             text: shelf.title;
-            color: #ffffff;
+            color: Theme.text;
             font-size: 18px;
             font-weight: 700;
         }
@@ -239,17 +252,17 @@ export component PlayerBar inherits Rectangle {
     callback set-volume(int);
 
     height: 64px;
-    background: #181818;
+    background: Theme.panel;
 
-    Rectangle { y: 0; height: 1px; background: #282828; }
+    Rectangle { y: 0; height: 1px; background: Theme.border; }
 
     HorizontalLayout {
         padding-left: 16px; padding-right: 16px; spacing: 16px; alignment: space-between;
 
         VerticalLayout {
             width: 200px; alignment: center; spacing: 2px;
-            Text { text: root.active-track-title; color: #ffffff; font-size: 13px; font-weight: 700; }
-            Text { text: root.active-track-artist; color: #b3b3b3; font-size: 12px; }
+            Text { text: root.active-track-title; color: Theme.text; font-size: 13px; font-weight: 700; }
+            Text { text: root.active-track-artist; color: Theme.secondary; font-size: 12px; }
         }
 
         VerticalLayout {
@@ -257,52 +270,52 @@ export component PlayerBar inherits Rectangle {
             HorizontalLayout {
                 spacing: 10px; alignment: center;
                 Rectangle {
-                    width: 32px; height: 26px; border-radius: 4px; background: sb.has-hover ? #282828 : #00000000;
+                    width: 32px; height: 26px; border-radius: 4px; background: sb.has-hover ? Theme.hover : transparent;
                     sb := TouchArea { clicked => { root.seek-by(-10); } }
-                    Text { text: "-10s"; color: #b3b3b3; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                    Text { text: "-10s"; color: Theme.secondary; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
                 }
                 Rectangle {
-                    width: 32px; height: 26px; border-radius: 4px; background: pt.has-hover ? #282828 : #00000000;
+                    width: 32px; height: 26px; border-radius: 4px; background: pt.has-hover ? Theme.hover : transparent;
                     pt := TouchArea { clicked => { root.prev-track(); } }
-                    Text { text: "Prev"; color: #ffffff; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                    Text { text: "Prev"; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
                 }
                 Rectangle {
-                    width: 56px; height: 26px; border-radius: 13px; background: pp.has-hover ? #1ed760 : #1db954;
+                    width: 56px; height: 26px; border-radius: 13px; background: pp.has-hover ? Theme.hover : Theme.accent;
                     pp := TouchArea { clicked => { root.toggle-play(); } }
-                    Text { text: root.is-playing ? "Pause" : "Play"; color: #000000; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                    Text { text: root.is-playing ? "Pause" : "Play"; color: pp.has-hover ? Theme.text : Theme.window; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
                 }
                 Rectangle {
-                    width: 32px; height: 26px; border-radius: 4px; background: nt.has-hover ? #282828 : #00000000;
+                    width: 32px; height: 26px; border-radius: 4px; background: nt.has-hover ? Theme.hover : transparent;
                     nt := TouchArea { clicked => { root.next-track(); } }
-                    Text { text: "Next"; color: #ffffff; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                    Text { text: "Next"; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
                 }
                 Rectangle {
-                    width: 32px; height: 26px; border-radius: 4px; background: sf.has-hover ? #282828 : #00000000;
+                    width: 32px; height: 26px; border-radius: 4px; background: sf.has-hover ? Theme.hover : transparent;
                     sf := TouchArea { clicked => { root.seek-by(10); } }
-                    Text { text: "+10s"; color: #b3b3b3; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                    Text { text: "+10s"; color: Theme.secondary; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
                 }
             }
             HorizontalLayout {
                 spacing: 6px; alignment: center;
-                Text { text: root.position-text; color: #b3b3b3; font-size: 11px; vertical-alignment: center; }
-                Text { text: "/"; color: #555555; font-size: 11px; vertical-alignment: center; }
-                Text { text: root.duration-text; color: #b3b3b3; font-size: 11px; vertical-alignment: center; }
+                Text { text: root.position-text; color: Theme.secondary; font-size: 11px; vertical-alignment: center; }
+                Text { text: "/"; color: Theme.secondary; font-size: 11px; vertical-alignment: center; }
+                Text { text: root.duration-text; color: Theme.secondary; font-size: 11px; vertical-alignment: center; }
             }
         }
 
         HorizontalLayout {
             width: 200px; alignment: end; spacing: 6px;
-            Text { text: "Vol:"; color: #b3b3b3; font-size: 12px; vertical-alignment: center; }
+            Text { text: "Vol:"; color: Theme.secondary; font-size: 12px; vertical-alignment: center; }
             Rectangle {
-                width: 22px; height: 22px; border-radius: 4px; background: vd.has-hover ? #333333 : #222222;
+                width: 22px; height: 22px; border-radius: 4px; background: vd.has-hover ? Theme.hover : Theme.surface;
                 vd := TouchArea { clicked => { root.set-volume(max(0, root.volume - 5)); } }
-                Text { text: "-"; color: #ffffff; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                Text { text: "-"; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
             }
-            Text { text: "\{root.volume}%"; color: #ffffff; font-size: 12px; width: 34px; horizontal-alignment: center; vertical-alignment: center; }
+            Text { text: "\{root.volume}%"; color: Theme.text; font-size: 12px; width: 34px; horizontal-alignment: center; vertical-alignment: center; }
             Rectangle {
-                width: 22px; height: 22px; border-radius: 4px; background: vu.has-hover ? #333333 : #222222;
+                width: 22px; height: 22px; border-radius: 4px; background: vu.has-hover ? Theme.hover : Theme.surface;
                 vu := TouchArea { clicked => { root.set-volume(min(100, root.volume + 5)); } }
-                Text { text: "+"; color: #ffffff; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                Text { text: "+"; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
             }
         }
     }
@@ -316,7 +329,7 @@ export component QueueView inherits VerticalLayout {
     spacing: 8px; alignment: start;
     if root.tracks.length == 0 : VerticalLayout {
         padding-top: 24px; alignment: center;
-        Text { text: "Queue is empty."; color: #b3b3b3; font-size: 14px; horizontal-alignment: center; }
+        Text { text: "Queue is empty."; color: Theme.secondary; font-size: 14px; horizontal-alignment: center; }
     }
     for track in root.tracks : TrackRow {
         title: track.title; artist: track.artist; duration: track.duration;
@@ -341,51 +354,51 @@ export component NowPlayingView inherits VerticalLayout {
     HorizontalLayout {
         spacing: 20px; alignment: start;
         Rectangle {
-            width: 140px; height: 140px; border-radius: 8px; background: #242424; clip: true;
+            width: 140px; height: 140px; border-radius: 8px; background: Theme.surface; clip: true;
             if root.has-cover : Image {
                 width: parent.width; height: parent.height;
                 source: root.cover-image;
                 image-fit: contain;
             }
             if !root.has-cover : Text {
-                text: "No Cover"; color: #666666; font-size: 12px;
+                text: "No Cover"; color: Theme.secondary; font-size: 12px;
                 horizontal-alignment: center; vertical-alignment: center;
             }
         }
         VerticalLayout {
             spacing: 6px; alignment: center;
-            Text { text: root.track-title; color: #ffffff; font-size: 20px; font-weight: 700; }
-            Text { text: root.track-artist; color: #b3b3b3; font-size: 14px; }
+            Text { text: root.track-title; color: Theme.text; font-size: 20px; font-weight: 700; }
+            Text { text: root.track-artist; color: Theme.secondary; font-size: 14px; }
             Rectangle { height: 6px; }
             // Progress bar
             Rectangle {
-                height: 6px; border-radius: 3px; background: #333333; clip: true;
-                Rectangle { x: 0; width: parent.width * root.progress; height: parent.height; background: #1db954; border-radius: 3px; }
+                height: 6px; border-radius: 3px; background: Theme.surface; clip: true;
+                Rectangle { x: 0; width: parent.width * root.progress; height: parent.height; background: Theme.accent; border-radius: 3px; }
             }
             HorizontalLayout {
-                Text { text: root.position-text; color: #b3b3b3; font-size: 11px; }
+                Text { text: root.position-text; color: Theme.secondary; font-size: 11px; }
                 Rectangle {}
-                Text { text: root.duration-text; color: #b3b3b3; font-size: 11px; }
+                Text { text: root.duration-text; color: Theme.secondary; font-size: 11px; }
             }
         }
     }
 
     if root.lyrics-lines.length == 0 : Rectangle {
-        height: 140px; border-radius: 8px; background: #181818;
+        height: 140px; border-radius: 8px; background: Theme.panel;
         VerticalLayout {
             alignment: center; spacing: 4px;
-            Text { text: "No Lyrics Available"; color: #666666; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
-            Text { text: "Synced lyrics will appear here during playback"; color: #555555; font-size: 11px; horizontal-alignment: center; }
+            Text { text: "No Lyrics Available"; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
+            Text { text: "Synced lyrics will appear here during playback"; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
         }
     }
 
     if root.lyrics-lines.length > 0 : Rectangle {
-        border-radius: 8px; background: #181818; clip: true;
+        border-radius: 8px; background: Theme.panel; clip: true;
         VerticalLayout {
             padding: 12px; spacing: 8px; alignment: start;
             for line in root.lyrics-lines : Text {
                 text: line.text;
-                color: line.index == root.active-lyric-index ? #1db954 : #888888;
+                color: line.index == root.active-lyric-index ? Theme.accent : Theme.secondary;
                 font-size: line.index == root.active-lyric-index ? 15px : 13px;
                 font-weight: line.index == root.active-lyric-index ? 700 : 400;
             }
@@ -395,16 +408,16 @@ export component NowPlayingView inherits VerticalLayout {
 
 component LibraryItemCard inherits Rectangle {
     in property <string> title; in property <string> subtitle; callback clicked();
-    height: 40px; border-radius: 4px; background: touch.has-hover ? #1f1f1f : #00000000;
+    height: 40px; border-radius: 4px; background: touch.has-hover ? Theme.hover : transparent;
     touch := TouchArea { clicked => { root.clicked(); } }
     HorizontalLayout {
         padding-left: 8px; padding-right: 8px; spacing: 12px;
         // Cover-art placeholder (owned by a later tranche)
-        Rectangle { width: 32px; height: 32px; border-radius: 4px; background: #242424; Text { text: "Art"; color: #555555; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
+        Rectangle { width: 32px; height: 32px; border-radius: 4px; background: Theme.surface; Text { text: "Art"; color: Theme.secondary; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
         VerticalLayout {
             alignment: center; spacing: 2px;
-            Text { text: root.title; color: #ffffff; font-size: 13px; font-weight: 600; vertical-alignment: center; }
-            Text { text: root.subtitle; color: #b3b3b3; font-size: 11px; vertical-alignment: center; }
+            Text { text: root.title; color: Theme.text; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+            Text { text: root.subtitle; color: Theme.secondary; font-size: 11px; vertical-alignment: center; }
         }
     }
 }
@@ -425,7 +438,7 @@ export component LibraryView inherits VerticalLayout {
 
     Rectangle {
         border-radius: 8px;
-        background: #181818;
+        background: Theme.panel;
 
         VerticalLayout {
             padding: 12px;
@@ -436,7 +449,7 @@ export component LibraryView inherits VerticalLayout {
 
                 Text {
                     text: "Anonymous — paste cookies to unlock library";
-                    color: #b3b3b3;
+                    color: Theme.secondary;
                     font-size: 13px;
                 }
 
@@ -454,7 +467,7 @@ export component LibraryView inherits VerticalLayout {
                     Rectangle {
                         width: 90px;
                         border-radius: 4px;
-                        background: sign-in-btn.has-hover ? #1ed760 : #1db954;
+                        background: sign-in-btn.has-hover ? Theme.hover : Theme.accent;
 
                         sign-in-btn := TouchArea {
                             clicked => { root.sign-in-submitted(root.cookie-text); }
@@ -462,7 +475,7 @@ export component LibraryView inherits VerticalLayout {
 
                         Text {
                             text: "Sign in";
-                            color: #000000;
+                            color: sign-in-btn.has-hover ? Theme.text : Theme.window;
                             font-size: 12px;
                             font-weight: 700;
                             horizontal-alignment: center;
@@ -478,7 +491,7 @@ export component LibraryView inherits VerticalLayout {
 
                 Text {
                     text: "Signed in — library unlocked";
-                    color: #1db954;
+                    color: Theme.accent;
                     font-size: 13px;
                     font-weight: 700;
                     vertical-alignment: center;
@@ -488,7 +501,7 @@ export component LibraryView inherits VerticalLayout {
                     width: 90px;
                     height: 28px;
                     border-radius: 4px;
-                    background: sign-out-btn.has-hover ? #333333 : #222222;
+                    background: sign-out-btn.has-hover ? Theme.hover : Theme.surface;
 
                     sign-out-btn := TouchArea {
                         clicked => { root.sign-out(); }
@@ -496,7 +509,7 @@ export component LibraryView inherits VerticalLayout {
 
                     Text {
                         text: "Sign out";
-                        color: #ffffff;
+                        color: Theme.text;
                         font-size: 12px;
                         font-weight: 700;
                         horizontal-alignment: center;
@@ -509,22 +522,22 @@ export component LibraryView inherits VerticalLayout {
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Playlists"; color: #ffffff; font-size: 16px; font-weight: 700; }
-        if root.playlists.length == 0 : Text { text: "No playlists."; color: #b3b3b3; font-size: 13px; }
+        Text { text: "Playlists"; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.playlists.length == 0 : Text { text: "No playlists."; color: Theme.secondary; font-size: 13px; }
         for item in root.playlists : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.playlist-selected(item.index); } }
     }
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Albums"; color: #ffffff; font-size: 16px; font-weight: 700; }
-        if root.albums.length == 0 : Text { text: "No albums."; color: #b3b3b3; font-size: 13px; }
+        Text { text: "Albums"; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.albums.length == 0 : Text { text: "No albums."; color: Theme.secondary; font-size: 13px; }
         for item in root.albums : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.album-selected(item.index); } }
     }
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Artists"; color: #ffffff; font-size: 16px; font-weight: 700; }
-        if root.artists.length == 0 : Text { text: "No artists."; color: #b3b3b3; font-size: 13px; }
+        Text { text: "Artists"; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.artists.length == 0 : Text { text: "No artists."; color: Theme.secondary; font-size: 13px; }
         for item in root.artists : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.artist-selected(item.index); } }
     }
 }
@@ -537,7 +550,7 @@ export component DetailView inherits VerticalLayout {
 
     if !root.has-detail : VerticalLayout {
         padding-top: 24px; alignment: center;
-        Text { text: "No detail available."; color: #b3b3b3; font-size: 14px; horizontal-alignment: center; }
+        Text { text: "No detail available."; color: Theme.secondary; font-size: 14px; horizontal-alignment: center; }
     }
 
     if root.has-detail : VerticalLayout {
@@ -545,18 +558,18 @@ export component DetailView inherits VerticalLayout {
         HorizontalLayout {
             spacing: 16px; alignment: start;
             // Cover-art placeholder (owned by a later tranche)
-            Rectangle { width: 80px; height: 80px; border-radius: 6px; background: #242424; Text { text: "Cover Art\n(Later Tranche)"; color: #666666; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+            Rectangle { width: 80px; height: 80px; border-radius: 6px; background: Theme.surface; Text { text: "Cover Art\n(Later Tranche)"; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
             VerticalLayout {
                 spacing: 4px; alignment: center;
-                Text { text: root.kind-label; color: #1db954; font-size: 12px; font-weight: 700; }
-                Text { text: root.title; color: #ffffff; font-size: 20px; font-weight: 700; }
-                if root.subtitle != "" : Text { text: root.subtitle; color: #b3b3b3; font-size: 13px; }
+                Text { text: root.kind-label; color: Theme.accent; font-size: 12px; font-weight: 700; }
+                Text { text: root.title; color: Theme.text; font-size: 20px; font-weight: 700; }
+                if root.subtitle != "" : Text { text: root.subtitle; color: Theme.secondary; font-size: 13px; }
             }
         }
-        Rectangle { height: 1px; background: #282828; }
+        Rectangle { height: 1px; background: Theme.border; }
         if root.tracks.length == 0 : VerticalLayout {
             padding-top: 16px; alignment: center;
-            Text { text: "No tracks in detail."; color: #b3b3b3; font-size: 13px; horizontal-alignment: center; }
+            Text { text: "No tracks in detail."; color: Theme.secondary; font-size: 13px; horizontal-alignment: center; }
         }
         for track in root.tracks : TrackRow { title: track.title; artist: track.artist; duration: track.duration; clicked => { root.track-selected(track.index); } }
     }
@@ -591,7 +604,7 @@ component ContentArea inherits Rectangle {
     callback sign-in-submitted(string);
     callback sign-out();
 
-    background: #121212;
+    background: Theme.window;
 
     VerticalLayout {
         padding: 24px;
@@ -600,14 +613,14 @@ component ContentArea inherits Rectangle {
 
         Text {
             text: root.header-title;
-            color: #ffffff;
+            color: Theme.text;
             font-size: 24px;
             font-weight: 700;
         }
 
         Rectangle {
             height: 1px;
-            background: #282828;
+            background: Theme.border;
         }
 
         if root.active-page == 0 : SearchView {
@@ -660,7 +673,18 @@ export component MoggytWindow inherits Window {
     min-height: 500px;
     preferred-width: 1024px;
     preferred-height: 640px;
-    background: #121212;
+    background: Theme.window;
+
+    in-out property <color> theme-window <=> Theme.window;
+    in-out property <color> theme-panel <=> Theme.panel;
+    in-out property <color> theme-surface <=> Theme.surface;
+    in-out property <color> theme-text <=> Theme.text;
+    in-out property <color> theme-secondary <=> Theme.secondary;
+    in-out property <color> theme-accent <=> Theme.accent;
+    in-out property <color> theme-border <=> Theme.border;
+    in-out property <color> theme-hover <=> Theme.hover;
+    in-out property <color> theme-overlay <=> Theme.overlay;
+    in-out property <bool> theme-dark <=> Theme.dark;
 
     in-out property <int> active-page: 0;
     in-out property <string> header-title: "Search";
