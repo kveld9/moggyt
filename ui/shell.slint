@@ -1,4 +1,4 @@
-import { LineEdit } from "std-widgets.slint";
+import { LineEdit, Slider } from "std-widgets.slint";
 
 export struct TrackRowData {
     index: int,
@@ -340,77 +340,294 @@ export component PlayerBar inherits Rectangle {
     in property <int> volume: 100;
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
+    in property <image> cover;
+    in property <bool> is-liked: false;
+    in property <bool> is-shuffle: false;
+    in property <int> repeat-mode: 0;
+    in property <float> progress: 0.0;
+    in property <int> position-secs: 0;
+    in property <int> duration-secs: 0;
+    in property <int> queue-count: 0;
+
     callback toggle-play();
     callback prev-track();
     callback next-track();
     callback seek-by(int);
+    callback seek-to(int);
     callback set-volume(int);
+    callback toggle-like();
+    callback toggle-shuffle();
+    callback cycle-repeat();
+    callback open-queue();
 
-    height: 64px;
+    height: 72px;
     background: Theme.panel;
 
-    Rectangle { y: 0; height: 1px; background: Theme.border; }
+    Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.border;
+    }
 
     HorizontalLayout {
-        padding-left: 16px; padding-right: 16px; spacing: 16px; alignment: space-between;
+        padding-left: 16px;
+        padding-right: 16px;
+        spacing: 16px;
+        alignment: space-between;
 
-        VerticalLayout {
-            width: 200px; alignment: center; spacing: 2px;
-            Text { text: root.active-track-title; color: Theme.text; font-size: 13px; font-weight: 700; }
-            Text { text: root.active-track-artist; color: Theme.secondary; font-size: 12px; }
-        }
-
-        VerticalLayout {
-            alignment: center; spacing: 4px;
-            HorizontalLayout {
-                spacing: 10px; alignment: center;
-                Rectangle {
-                    width: 32px; height: 26px; border-radius: 4px; background: sb.has-hover ? Theme.hover : transparent;
-                    sb := TouchArea { clicked => { root.seek-by(-10); } }
-                    Text { text: "-10s"; color: Theme.secondary; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
-                }
-                Rectangle {
-                    width: 32px; height: 26px; border-radius: 4px; background: pt.has-hover ? Theme.hover : transparent;
-                    pt := TouchArea { clicked => { root.prev-track(); } }
-                    Text { text: "Prev"; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
-                }
-                Rectangle {
-                    width: 56px; height: 26px; border-radius: 13px; background: pp.has-hover ? Theme.hover : Theme.accent;
-                    pp := TouchArea { clicked => { root.toggle-play(); } }
-                    Text { text: root.is-playing ? "Pause" : "Play"; color: pp.has-hover ? Theme.text : Theme.window; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
-                }
-                Rectangle {
-                    width: 32px; height: 26px; border-radius: 4px; background: nt.has-hover ? Theme.hover : transparent;
-                    nt := TouchArea { clicked => { root.next-track(); } }
-                    Text { text: "Next"; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
-                }
-                Rectangle {
-                    width: 32px; height: 26px; border-radius: 4px; background: sf.has-hover ? Theme.hover : transparent;
-                    sf := TouchArea { clicked => { root.seek-by(10); } }
-                    Text { text: "+10s"; color: Theme.secondary; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
-                }
-            }
-            HorizontalLayout {
-                spacing: 6px; alignment: center;
-                Text { text: root.position-text; color: Theme.secondary; font-size: 11px; vertical-alignment: center; }
-                Text { text: "/"; color: Theme.secondary; font-size: 11px; vertical-alignment: center; }
-                Text { text: root.duration-text; color: Theme.secondary; font-size: 11px; vertical-alignment: center; }
-            }
-        }
-
+        // LEFT ZONE: Artwork, Title + Artist, Like toggle
         HorizontalLayout {
-            width: 200px; alignment: end; spacing: 6px;
-            Text { text: "Vol:"; color: Theme.secondary; font-size: 12px; vertical-alignment: center; }
+            width: 240px;
+            spacing: 12px;
+            alignment: start;
+
             Rectangle {
-                width: 22px; height: 22px; border-radius: 4px; background: vd.has-hover ? Theme.hover : Theme.surface;
-                vd := TouchArea { clicked => { root.set-volume(max(0, root.volume - 5)); } }
-                Text { text: "-"; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                width: 44px;
+                height: 44px;
+                border-radius: 4px;
+                background: Theme.surface;
+                clip: true;
+
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: contain;
+                }
             }
-            Text { text: "\{root.volume}%"; color: Theme.text; font-size: 12px; width: 34px; horizontal-alignment: center; vertical-alignment: center; }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: 2px;
+
+                Text {
+                    text: root.active-track-title;
+                    color: Theme.text;
+                    font-size: 13px;
+                    font-weight: 700;
+                    overflow: elide;
+                }
+
+                if root.active-track-artist != "" : Text {
+                    text: root.active-track-artist;
+                    color: Theme.secondary;
+                    font-size: 11px;
+                    overflow: elide;
+                }
+            }
+
             Rectangle {
-                width: 22px; height: 22px; border-radius: 4px; background: vu.has-hover ? Theme.hover : Theme.surface;
-                vu := TouchArea { clicked => { root.set-volume(min(100, root.volume + 5)); } }
-                Text { text: "+"; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: root.is-liked ? Theme.surface : (like-touch.has-hover ? Theme.hover : transparent);
+
+                like-touch := TouchArea {
+                    clicked => { root.toggle-like(); }
+                }
+
+                Text {
+                    text: "<3";
+                    color: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
+                    font-size: 12px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        // CENTER ZONE: Shuffle, Prev, Play/Pause, Next, Repeat + Progress row
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 4px;
+
+            HorizontalLayout {
+                spacing: 12px;
+                alignment: center;
+
+                Rectangle {
+                    width: 44px;
+                    height: 26px;
+                    border-radius: 4px;
+                    background: root.is-shuffle ? Theme.surface : (shuf-touch.has-hover ? Theme.hover : transparent);
+
+                    shuf-touch := TouchArea {
+                        clicked => { root.toggle-shuffle(); }
+                    }
+
+                    Text {
+                        text: "Shuf";
+                        color: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
+                        font-size: 11px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    width: 36px;
+                    height: 26px;
+                    border-radius: 4px;
+                    background: pt.has-hover ? Theme.hover : transparent;
+
+                    pt := TouchArea {
+                        clicked => { root.prev-track(); }
+                    }
+
+                    Text {
+                        text: "Prev";
+                        color: pt.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 12px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    width: 60px;
+                    height: 26px;
+                    border-radius: 13px;
+                    background: pp.has-hover ? Theme.hover : Theme.accent;
+
+                    pp := TouchArea {
+                        clicked => { root.toggle-play(); }
+                    }
+
+                    Text {
+                        text: root.is-playing ? "Pause" : "Play";
+                        color: pp.has-hover ? Theme.text : Theme.window;
+                        font-size: 12px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    width: 36px;
+                    height: 26px;
+                    border-radius: 4px;
+                    background: nt.has-hover ? Theme.hover : transparent;
+
+                    nt := TouchArea {
+                        clicked => { root.next-track(); }
+                    }
+
+                    Text {
+                        text: "Next";
+                        color: nt.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 12px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    width: 56px;
+                    height: 26px;
+                    border-radius: 4px;
+                    background: root.repeat-mode != 0 ? Theme.surface : (rep-touch.has-hover ? Theme.hover : transparent);
+
+                    rep-touch := TouchArea {
+                        clicked => { root.cycle-repeat(); }
+                    }
+
+                    Text {
+                        text: root.repeat-mode == 2 ? "Rep 1" : (root.repeat-mode == 1 ? "Rep All" : "Rep");
+                        color: root.repeat-mode != 0 ? Theme.accent : (rep-touch.has-hover ? Theme.text : Theme.secondary);
+                        font-size: 11px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: center;
+
+                Text {
+                    text: root.position-text;
+                    color: Theme.secondary;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                }
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: 0;
+                    maximum: max(1, root.duration-secs);
+                    value: min(root.position-secs, max(1, root.duration-secs));
+                    enabled: root.duration-secs > 0;
+                    changed(val) => {
+                        root.seek-to(round(val));
+                    }
+                }
+
+                Text {
+                    text: root.duration-text;
+                    color: Theme.secondary;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // RIGHT ZONE: Queue button, Volume Slider + percentage
+        HorizontalLayout {
+            width: 240px;
+            alignment: end;
+            spacing: 8px;
+
+            Rectangle {
+                height: 26px;
+                border-radius: 4px;
+                background: q-touch.has-hover ? Theme.hover : Theme.surface;
+
+                q-touch := TouchArea {
+                    clicked => { root.open-queue(); }
+                }
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    alignment: center;
+
+                    Text {
+                        text: root.queue-count > 0 ? "Queue (" + root.queue-count + ")" : "Queue";
+                        color: q-touch.has-hover ? Theme.accent : Theme.text;
+                        font-size: 11px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            Slider {
+                width: 90px;
+                minimum: 0;
+                maximum: 100;
+                value: root.volume;
+                changed(val) => {
+                    root.set-volume(round(val));
+                }
+            }
+
+            Text {
+                text: "\{root.volume}%";
+                color: Theme.secondary;
+                font-size: 11px;
+                width: 34px;
+                horizontal-alignment: right;
+                vertical-alignment: center;
             }
         }
     }
@@ -815,7 +1032,14 @@ export component MoggytWindow inherits Window {
     in-out property <string> duration-text: "0:00";
     in-out property <float> playback-progress: 0.0;
     in-out property <image> cover-image;
+    in-out property <image> now-playing-cover;
     in-out property <bool> has-cover: false;
+    in-out property <bool> is-liked: false;
+    in-out property <bool> is-shuffle: false;
+    in-out property <int> repeat-mode: 0;
+    in-out property <int> position-secs: 0;
+    in-out property <int> duration-secs: 0;
+    in-out property <int> queue-count: 0;
     in-out property <[LyricLineData]> lyrics-lines: [];
     in-out property <int> active-lyric-index: -1;
     in-out property <[LibraryItemData]> library-playlists: []; in-out property <[LibraryItemData]> library-albums: []; in-out property <[LibraryItemData]> library-artists: [];
@@ -834,7 +1058,12 @@ export component MoggytWindow inherits Window {
     callback prev-track();
     callback next-track();
     callback seek-by(int);
+    callback seek-to(int);
     callback set-volume(int);
+    callback toggle-like();
+    callback toggle-shuffle();
+    callback cycle-repeat();
+    callback open-queue();
 
     VerticalLayout {
         padding: 0;
@@ -871,11 +1100,31 @@ export component MoggytWindow inherits Window {
         }
 
         PlayerBar {
-            active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
-            is-playing: root.is-playing; volume: root.volume; position-text: root.position-text; duration-text: root.duration-text;
-            toggle-play => { root.toggle-play(); } prev-track => { root.prev-track(); }
-            next-track => { root.next-track(); } seek-by(delta) => { root.seek-by(delta); }
+            active-track-title: root.active-track-title;
+            active-track-artist: root.active-track-artist;
+            is-playing: root.is-playing;
+            volume: root.volume;
+            position-text: root.position-text;
+            duration-text: root.duration-text;
+            cover: root.now-playing-cover;
+            is-liked: root.is-liked;
+            is-shuffle: root.is-shuffle;
+            repeat-mode: root.repeat-mode;
+            progress: root.playback-progress;
+            position-secs: root.position-secs;
+            duration-secs: root.duration-secs;
+            queue-count: root.queue-count;
+
+            toggle-play => { root.toggle-play(); }
+            prev-track => { root.prev-track(); }
+            next-track => { root.next-track(); }
+            seek-by(delta) => { root.seek-by(delta); }
+            seek-to(secs) => { root.seek-to(secs); }
             set-volume(vol) => { root.set-volume(vol); }
+            toggle-like => { root.toggle-like(); }
+            toggle-shuffle => { root.toggle-shuffle(); }
+            cycle-repeat => { root.cycle-repeat(); }
+            open-queue => { root.open-queue(); }
         }
     }
 }
