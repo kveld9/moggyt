@@ -3,9 +3,11 @@
 //! Hexagonal architecture invariant: this module connects injected port adapters
 //! to [`MoggytWindow`] without containing direct I/O or private domain rules.
 
+use std::any::Any;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use anyhow::Context;
@@ -27,8 +29,12 @@ use crate::infra::{
     should_scrobble,
 };
 use crate::slint_shell::detail::detail_kind_label;
-use crate::slint_shell::platform::rgba_to_image;
+use crate::slint_shell::platform::{dispatch_to_ui, rgba_to_image};
 use crate::slint_shell::playback::{format_position, format_track_duration};
+use crate::slint_shell::playback_worker::{
+    PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters, PlaybackWorkerCommand,
+    execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
+};
 use crate::slint_shell::search::format_duration;
 use crate::slint_shell::theme::apply_theme;
 use crate::slint_shell::{
@@ -141,6 +147,23 @@ pub fn tracing_subscriber_setup() {
 }
 
 /// In-memory state and collaborator wiring for the Slint UI shell.
+///
+/// # Thread-safety and Ownership Model
+///
+/// Slint requires all UI state and windows to remain on the main thread inside
+/// `Rc<RefCell<SlintAppState>>`. To guarantee that blocking I/O (yt-dlp resolution,
+/// stream downloading, Last.fm HTTP scrobbling, and remote lyrics/covers) never
+/// freezes the Slint event loop, collaborators that perform I/O are held in thread-safe
+/// reference-counted containers:
+///
+/// - `audio`: `Arc<Mutex<A>>`. `LiveAudio` (`RodioBackend`) is `Send`. Mutex wrapping
+///   allows background playback resolution while the UI thread uses non-blocking `try_lock()`.
+/// - `catalog`: `Arc<Mutex<C>>`. `LiveCatalog` is `Send + Sync`. Background searches and
+///   detail requests execute without blocking UI interactions.
+/// - `lyrics`: `Arc<L>`. `LrclibClient` is `Send + Sync`. Remote lookup runs on worker.
+/// - `covers`: `Arc<Mutex<K>>`. Remote fetch and CPU decode run on worker; decoded RGBA bytes
+///   cross as owned `CoverArtData` (`Vec<u8>`). Slint `Image` is constructed on UI thread.
+/// - `scrobbler`: `Arc<Mutex<Box<dyn Scrobbler>>>`. `Scrobbler: Send`. HTTP posts run on worker.
 pub struct SlintAppState<
     C: Catalog,
     A: AudioBackend,
@@ -148,17 +171,17 @@ pub struct SlintAppState<
     L: LyricsSource,
     K: CoverCache,
 > {
-    pub catalog: C,
-    pub audio: A,
+    pub catalog: Arc<Mutex<C>>,
+    pub audio: Arc<Mutex<A>>,
     pub session: S,
-    pub lyrics: L,
-    pub covers: K,
+    pub lyrics: Arc<L>,
+    pub covers: Arc<Mutex<K>>,
     pub lyric_overrides: Option<LyricOverrideDir>,
     pub tray: Option<TrayHandle>,
     pub presence: DesktopPresence,
     pub discord: DiscordPresence,
-    pub scrobbler: Box<dyn Scrobbler>,
-    pub secondary_scrobbler: Option<Box<dyn Scrobbler>>,
+    pub scrobbler: Arc<Mutex<Box<dyn Scrobbler>>>,
+    pub secondary_scrobbler: Option<Arc<Mutex<Box<dyn Scrobbler>>>>,
     pub settings_store: Box<dyn SettingsStore>,
     pub queue_store: Box<dyn QueueStore>,
     pub skip_store: Box<dyn SkipStore>,
@@ -178,6 +201,7 @@ pub struct SlintAppState<
     pub lyrics_lines: Vec<LyricLine>,
     pub lyrics_key: Option<(String, String)>,
     pub cover_key: Option<String>,
+    pub current_cover_image: Option<slint::Image>,
     pub last_presence_key: Option<(String, String)>,
     pub started_at: Option<(Instant, u64)>,
     pub last_skip_target: Option<(String, u32)>,
@@ -188,13 +212,60 @@ pub struct SlintAppState<
     pub hi_res_covers: bool,
     pub signed_in: bool,
     pub theme: ThemeId,
+
+    pub play_generation: u64,
+    pub search_generation: u64,
+    pub detail_generation: u64,
+    pub library_generation: u64,
 }
 
 /// Shared reference-counted wrapper for [`SlintAppState`].
 pub type SharedState<C, A, S, L, K> = Rc<RefCell<SlintAppState<C, A, S, L, K>>>;
 
-impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>
-    SlintAppState<C, A, S, L, K>
+thread_local! {
+    static ACTIVE_STATE: RefCell<Option<Box<dyn Any>>> = RefCell::new(None);
+}
+
+fn set_ui_state<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    state_rc: &SharedState<C, A, S, L, K>,
+) {
+    ACTIVE_STATE.with(|cell| {
+        *cell.borrow_mut() = Some(Box::new(Rc::clone(state_rc)));
+    });
+}
+
+fn with_ui_state<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+    R,
+>(
+    f: impl FnOnce(&mut SlintAppState<C, A, S, L, K>) -> R,
+) -> Option<R> {
+    ACTIVE_STATE.with(|cell| {
+        let borrow = cell.borrow();
+        let any = borrow.as_ref()?;
+        let rc = any.downcast_ref::<SharedState<C, A, S, L, K>>()?;
+        let mut st = rc.borrow_mut();
+        Some(f(&mut st))
+    })
+}
+
+impl<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+> SlintAppState<C, A, S, L, K>
 {
     /// Creates the Slint application state with injected collaborators.
     pub fn new(mut catalog: C, audio: A, session: S, lyrics: L, covers: K) -> Self {
@@ -205,16 +276,16 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         }
         let shelves = catalog.home_shelves();
         Self {
-            catalog,
-            audio,
+            catalog: Arc::new(Mutex::new(catalog)),
+            audio: Arc::new(Mutex::new(audio)),
             session,
-            lyrics,
-            covers,
+            lyrics: Arc::new(lyrics),
+            covers: Arc::new(Mutex::new(covers)),
             lyric_overrides: None,
             tray: None,
             presence: DesktopPresence::new(),
             discord: DiscordPresence::new(),
-            scrobbler: Box::new(StubScrobbler::new()),
+            scrobbler: Arc::new(Mutex::new(Box::new(StubScrobbler::new()))),
             secondary_scrobbler: None,
             settings_store: Box::new(MemorySettingsStore::default()),
             queue_store: Box::new(MemoryQueueStore::default()),
@@ -234,6 +305,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             lyrics_lines: Vec::new(),
             lyrics_key: None,
             cover_key: None,
+            current_cover_image: None,
             last_presence_key: None,
             started_at: None,
             last_skip_target: None,
@@ -244,6 +316,10 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             hi_res_covers: false,
             signed_in,
             theme: ThemeId::default(),
+            play_generation: 0,
+            search_generation: 0,
+            detail_generation: 0,
+            library_generation: 0,
         }
     }
 
@@ -257,13 +333,17 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 
     /// Refreshes playlists, saved albums, and followed artists from catalog.
     pub fn refresh_library(&mut self) {
-        self.library_playlists = self.catalog.playlists();
-        self.library_albums = self.catalog.saved_albums();
+        let (playlists, albums) = match self.catalog.lock() {
+            Ok(c) => (c.playlists(), c.saved_albums()),
+            Err(_) => (Vec::new(), Vec::new()),
+        };
+        self.library_playlists = playlists;
+        self.library_albums = albums;
         self.library_artists = Vec::new();
     }
 
-    /// Advances or retreats queue cursor to target index and starts playback quietly.
-    pub fn play_track_at_index(&mut self, index: usize) {
+    /// Advances or retreats queue cursor in-memory to target index without triggering playback.
+    pub fn play_track_at_index_in_memory(&mut self, index: usize) {
         if index >= self.queue.len() {
             return;
         }
@@ -273,6 +353,11 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         while self.queue.cursor() > index {
             self.queue.retreat();
         }
+    }
+
+    /// Advances or retreats queue cursor to target index and starts playback quietly.
+    pub fn play_track_at_index(&mut self, index: usize) {
+        self.play_track_at_index_in_memory(index);
         self.play_current_quiet();
     }
 
@@ -284,11 +369,17 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         let id = track.id.clone();
         let artist = track.artist.clone();
         let title = track.title.clone();
-        self.audio.play(&id);
+        if let Ok(mut a) = self.audio.lock() {
+            a.play(&id);
+        }
         self.started_at = Some((Instant::now(), current_unix_secs()));
-        self.scrobbler.now_playing(&artist, &title);
-        if let Some(sec) = &mut self.secondary_scrobbler {
-            sec.now_playing(&artist, &title);
+        if let Ok(mut s) = self.scrobbler.lock() {
+            s.now_playing(&artist, &title);
+        }
+        if let Some(sec) = &self.secondary_scrobbler {
+            if let Ok(mut s) = sec.lock() {
+                s.now_playing(&artist, &title);
+            }
         }
         self.last_skip_target = None;
         self.sync_presence_track(&artist, &title, true);
@@ -297,11 +388,17 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 
     /// Toggles playback: pauses if playing, resumes if requested, or starts head.
     pub fn toggle_play(&mut self) {
-        if self.audio.is_playing() {
-            self.audio.pause();
+        let is_playing = self.audio.lock().map(|a| a.is_playing()).unwrap_or(false);
+        let has_last = self.audio.lock().map(|a| a.last_requested().is_some()).unwrap_or(false);
+        if is_playing {
+            if let Ok(mut a) = self.audio.lock() {
+                a.pause();
+            }
             self.sync_presence_playing(false);
-        } else if self.audio.last_requested().is_some() {
-            self.audio.resume_play();
+        } else if has_last {
+            if let Ok(mut a) = self.audio.lock() {
+                a.resume_play();
+            }
             self.sync_presence_playing(true);
         } else {
             self.play_current_quiet();
@@ -324,14 +421,18 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 
     /// Adjusts position relative to current playback point, clamped at zero.
     pub fn seek_by(&mut self, delta_secs: i64) {
-        let current = self.audio.position_secs() as i64;
-        let target = current.saturating_add(delta_secs).max(0) as u64;
-        self.audio.seek(target);
+        if let Ok(mut a) = self.audio.lock() {
+            let current = a.position_secs() as i64;
+            let target = current.saturating_add(delta_secs).max(0) as u64;
+            a.seek(target);
+        }
     }
 
     /// Updates playback volume level and persists preference to disk.
     pub fn set_volume(&mut self, volume: u8) {
-        self.audio.set_volume(volume);
+        if let Ok(mut a) = self.audio.lock() {
+            a.set_volume(volume);
+        }
         let mut settings = self.settings_store.load();
         settings.volume = volume;
         let _ = self.settings_store.save(&settings);
@@ -339,9 +440,14 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 
     /// Updates playback speed factor and persists preference to disk.
     pub fn set_playback_speed(&mut self, speed: f32) {
-        self.audio.set_speed(speed);
+        let actual = if let Ok(mut a) = self.audio.lock() {
+            a.set_speed(speed);
+            a.speed()
+        } else {
+            1.0
+        };
         let mut settings = self.settings_store.load();
-        settings.playback_speed = self.audio.speed();
+        settings.playback_speed = actual;
         let _ = self.settings_store.save(&settings);
     }
 
@@ -351,7 +457,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         let Some(parsed) = SearchQuery::parse(query) else {
             return;
         };
-        let hits = self.catalog.search(parsed.text());
+        let hits = self.catalog.lock().map(|c| c.search(parsed.text())).unwrap_or_default();
         self.search_results = hits.clone();
         let items: Vec<SearchResult> = hits.into_iter().map(SearchResult::Track).collect();
         let mut shelf = Shelf::new("Search Results");
@@ -368,7 +474,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         if self.page != SlintPage::Detail {
             self.detail_return = self.page;
         }
-        self.detail = self.catalog.detail(trimmed, kind);
+        self.detail = self.catalog.lock().map(|c| c.detail(trimmed, kind)).unwrap_or(None);
         self.page = SlintPage::Detail;
     }
 
@@ -378,6 +484,8 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             .ok_or_else(|| anyhow::anyhow!("invalid playlist URL: {url}"))?;
         let detail = self
             .catalog
+            .lock()
+            .map_err(|_| anyhow::anyhow!("catalog lock poisoned"))?
             .detail(&playlist_id, DetailKind::Playlist)
             .ok_or_else(|| anyhow::anyhow!("playlist detail not found: {playlist_id}"))?;
         let count = detail.tracks.len();
@@ -413,7 +521,13 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
 
     /// Resolves 0-based active lyric line index for current playback timestamp.
     pub fn active_lyric_index(&self) -> i32 {
-        let pos_ms = self.audio.position_secs() * 1000;
+        let pos_secs = self.audio.try_lock().map(|a| a.position_secs()).unwrap_or(0);
+        self.active_lyric_index_at(pos_secs as u32)
+    }
+
+    /// Resolves active lyric line index for an explicitly passed timestamp in seconds.
+    pub fn active_lyric_index_at(&self, pos_secs: u32) -> i32 {
+        let pos_ms = (pos_secs as u64) * 1000;
         if self.lyrics_lines.is_empty() {
             return -1;
         }
@@ -424,11 +538,13 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Fetches, caches, decodes, and converts active track cover art to Slint Image.
     pub fn resolve_cover_image(&mut self) -> Option<slint::Image> {
         let url = self.queue.current()?.artwork.clone()?;
-        let bytes = if let Some(cached) = self.covers.get(&url) {
+        let bytes = if let Some(cached) = self.covers.lock().ok()?.get(&url) {
             cached
         } else {
             let fetched = fetch_artwork(&url, 8).ok()?;
-            self.covers.put(&url, fetched.clone());
+            if let Ok(mut c) = self.covers.lock() {
+                c.put(&url, fetched.clone());
+            }
             fetched
         };
         let max_px = if self.hi_res_covers { 1024 } else { 512 };
@@ -462,8 +578,10 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
                 MediaKeyAction::Next => self.next_track(),
                 MediaKeyAction::Previous => self.prev_track(),
                 MediaKeyAction::Stop => {
-                    if self.audio.is_playing() {
-                        self.audio.pause();
+                    if let Ok(mut a) = self.audio.try_lock() {
+                        if a.is_playing() {
+                            a.pause();
+                        }
                     }
                 }
             }
@@ -476,7 +594,10 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             self.last_skip_target = None;
             return;
         };
-        let current_pos = u32::try_from(self.audio.position_secs()).unwrap_or(u32::MAX);
+        let Ok(mut audio) = self.audio.try_lock() else {
+            return;
+        };
+        let current_pos = u32::try_from(audio.position_secs()).unwrap_or(u32::MAX);
         if self
             .last_skip_target
             .as_ref()
@@ -495,13 +616,16 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             self.last_skip_target.as_ref().is_some_and(|(id, t)| id == &track.id && *t == target);
         if target > current_pos && !already_skipped {
             self.last_skip_target = Some((track.id.clone(), target));
-            self.audio.seek(target as u64);
+            audio.seek(target as u64);
         }
     }
 
     /// Advances queue or appends radio recommendations when active track ends.
     pub fn continue_autoplay_if_ended(&mut self) {
-        if !self.autoplay || self.queue.is_empty() || self.audio.is_playing() {
+        let Ok(audio) = self.audio.try_lock() else {
+            return;
+        };
+        if !self.autoplay || self.queue.is_empty() || audio.is_playing() {
             return;
         }
         let (Some(current), Some(last)) = (self.queue.current(), self.queue.tracks().last()) else {
@@ -513,11 +637,12 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         let Some(dur) = current.duration_secs else {
             return;
         };
-        if self.audio.position_secs() < dur as u64 {
+        if audio.position_secs() < dur as u64 {
             return;
         }
         let current_id = current.id.clone();
-        let recs = self.catalog.radio(&current_id);
+        drop(audio);
+        let recs = self.catalog.lock().map(|c| c.radio(&current_id)).unwrap_or_default();
         for track in recs {
             if !self.queue.tracks().iter().any(|t| t.id == track.id) {
                 self.queue.push(track);
@@ -538,9 +663,13 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
         };
         let duration = current.duration_secs.map(u64::from);
         if should_scrobble(elapsed, duration) {
-            self.scrobbler.scrobble(&current.artist, &current.title, started_unix);
-            if let Some(sec) = &mut self.secondary_scrobbler {
-                sec.scrobble(&current.artist, &current.title, started_unix);
+            if let Ok(mut s) = self.scrobbler.lock() {
+                s.scrobble(&current.artist, &current.title, started_unix);
+            }
+            if let Some(sec) = &self.secondary_scrobbler {
+                if let Ok(mut s) = sec.lock() {
+                    s.scrobble(&current.artist, &current.title, started_unix);
+                }
             }
         }
         self.started_at = None;
@@ -568,7 +697,9 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             return false;
         };
         self.session.save(&cookies);
-        self.catalog.set_session_cookies(Some(&cookies));
+        if let Ok(mut c) = self.catalog.lock() {
+            c.set_session_cookies(Some(&cookies));
+        }
         self.signed_in = true;
         true
     }
@@ -579,7 +710,9 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             return false;
         };
         self.session.save(&cookies);
-        self.catalog.set_session_cookies(Some(&cookies));
+        if let Ok(mut c) = self.catalog.lock() {
+            c.set_session_cookies(Some(&cookies));
+        }
         self.signed_in = true;
         true
     }
@@ -587,35 +720,51 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
     /// Clears active session and resets catalog client to anonymous browsing.
     pub fn sign_out(&mut self) {
         self.session.clear();
-        self.catalog.set_session_cookies(None);
+        if let Ok(mut c) = self.catalog.lock() {
+            c.set_session_cookies(None);
+        }
         self.signed_in = false;
     }
 
     /// Evaluates sleep timer duration and pauses audio playback on expiration.
     pub fn poll_sleep_timer(&mut self) {
-        if self.sleep_timer.is_armed() && self.audio.is_playing() {
-            let elapsed = self.audio.position_secs();
-            let effective = self
-                .sleep_timer_accumulated
-                .saturating_add(elapsed.saturating_sub(self.sleep_timer_base_offset));
-            if self.sleep_timer.poll_elapsed(effective) {
-                self.audio.pause();
-                self.sync_presence_playing(false);
-            }
+        let audio_arc = Arc::clone(&self.audio);
+        let Ok(mut audio) = audio_arc.try_lock() else {
+            return;
+        };
+        if !self.sleep_timer.is_armed() || !audio.is_playing() {
+            return;
+        }
+        let elapsed = audio.position_secs();
+        let effective = self
+            .sleep_timer_accumulated
+            .saturating_add(elapsed.saturating_sub(self.sleep_timer_base_offset));
+        if self.sleep_timer.poll_elapsed(effective) {
+            audio.pause();
+            drop(audio);
+            self.sync_presence_playing(false);
         }
     }
 }
 
-/// Synchronizes state with Slint window properties.
-fn sync_window<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
+/// Synchronizes state with Slint window properties without performing blocking I/O.
+fn sync_window<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
     window: &MoggytWindow,
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
     apply_theme(window, state.theme);
     window.set_active_page(state.page.to_index());
     window.set_header_title(state.page.title().into());
-    window.set_is_playing(state.audio.is_playing());
-    window.set_volume(state.audio.volume() as i32);
+    let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
+    window.set_is_playing(is_playing);
+    let volume = state.audio.try_lock().map(|a| a.volume()).unwrap_or(100);
+    window.set_volume(volume as i32);
     window.set_signed_in(state.signed_in);
 
     let (title, artist, dur_str, dur_secs) = match state.queue.current() {
@@ -631,7 +780,7 @@ fn sync_window<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K:
     window.set_active_track_artist(artist.into());
     window.set_duration_text(dur_str.into());
 
-    let pos_secs = state.audio.position_secs() as u32;
+    let pos_secs = state.audio.try_lock().map(|a| a.position_secs()).unwrap_or(0) as u32;
     window.set_position_text(format_position(pos_secs).into());
     let progress =
         if dur_secs > 0 { (pos_secs as f32 / dur_secs as f32).clamp(0.0, 1.0) } else { 0.0 };
@@ -642,19 +791,19 @@ fn sync_window<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K:
     sync_library_and_detail(window, state);
 }
 
-/// Synchronizes cover art texture and synced lyrics lines with Slint window.
+/// Synchronizes cover art texture and synced lyrics lines with Slint window from pre-decoded state.
 fn sync_cover_and_lyrics<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
 >(
     window: &MoggytWindow,
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
-    if let Some(img) = state.resolve_cover_image() {
-        window.set_cover_image(img);
+    if let Some(img) = &state.current_cover_image {
+        window.set_cover_image(img.clone());
         window.set_has_cover(true);
     } else {
         window.set_has_cover(false);
@@ -785,64 +934,376 @@ fn sync_library_and_detail<
     }
 }
 
-/// Periodic playback tick syncing elapsed timestamps, progress, and lyrics line.
+/// Periodic playback tick syncing elapsed timestamps, progress, and lyrics line without blocking.
 fn sync_playback_tick<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
 >(
     window: &MoggytWindow,
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
-    let pos_secs = state.audio.position_secs() as u32;
+    let Ok(audio) = state.audio.try_lock() else {
+        return;
+    };
+    let pos_secs = audio.position_secs() as u32;
+    let is_playing = audio.is_playing();
+    drop(audio);
+
     window.set_position_text(format_position(pos_secs).into());
     let dur_secs = state.queue.current().and_then(|t| t.duration_secs).unwrap_or(0);
     let progress =
         if dur_secs > 0 { (pos_secs as f32 / dur_secs as f32).clamp(0.0, 1.0) } else { 0.0 };
     window.set_playback_progress(progress);
+    window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
+    window.set_is_playing(is_playing);
+}
+
+/// Triggers asynchronous track playback on the background worker thread.
+fn trigger_playback<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let Some(track) = state.queue.current().cloned() else {
+        return;
+    };
+    state.play_generation = state.play_generation.wrapping_add(1);
+    let generation = state.play_generation;
+    state.maybe_scrobble_current();
+
+    state.current_cover_image = None;
+    state.lyrics_lines.clear();
+    state.lyrics_key = None;
+
+    window.set_is_playing(true);
+    window.set_active_track_title(track.title.clone().into());
+    window.set_active_track_artist(track.artist.clone().into());
+    window.set_duration_text(format_track_duration(track.duration_secs).into());
+    window.set_position_text("0:00".into());
+    window.set_playback_progress(0.0);
+    window.set_has_cover(false);
+    window.set_lyrics_lines(ModelRc::new(VecModel::default()));
+    window.set_active_lyric_index(-1);
+
+    let req = PlayTrackRequest {
+        generation,
+        track_id: track.id.clone(),
+        title: track.title.clone(),
+        artist: track.artist.clone(),
+        artwork_url: track.artwork.clone(),
+        duration_secs: track.duration_secs,
+        hi_res_covers: state.hi_res_covers,
+        lyric_overrides: state.lyric_overrides.clone(),
+    };
+    let _ = worker_tx.send(PlaybackWorkerCommand::Play(req));
+}
+
+/// Applies completed playback worker results back to the Slint window on the event loop.
+pub fn apply_play_track_completion<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+    res: PlayTrackResult,
+) {
+    if !res.success {
+        window.set_active_track_title("Failed to play track".into());
+        window.set_is_playing(false);
+        return;
+    }
+    window.set_is_playing(true);
+    state.lyrics_lines = res.lyrics_lines;
+    state.lyrics_key = Some((res.artist.clone(), res.title.clone()));
+
+    let line_data: Vec<LyricLineData> = state
+        .lyrics_lines
+        .iter()
+        .enumerate()
+        .map(|(i, l)| LyricLineData { index: i as i32, text: l.text.clone().into() })
+        .collect();
+    window.set_lyrics_lines(ModelRc::new(VecModel::from(line_data)));
     window.set_active_lyric_index(state.active_lyric_index());
-    window.set_is_playing(state.audio.is_playing());
+
+    if let Some(cover) = res.cover_data {
+        if let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) {
+            state.current_cover_image = Some(img.clone());
+            window.set_cover_image(img);
+            window.set_has_cover(true);
+        } else {
+            state.current_cover_image = None;
+            window.set_has_cover(false);
+        }
+    } else {
+        state.current_cover_image = None;
+        window.set_has_cover(false);
+    }
+
+    state.sync_presence_track(&res.artist, &res.title, true);
+    state.started_at = Some((Instant::now(), current_unix_secs()));
+    state.last_skip_target = None;
+}
+
+/// Dispatches asynchronous search query off the UI thread.
+fn submit_search_async<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+    query: &str,
+) {
+    state.search_query = query.to_string();
+    state.search_generation = state.search_generation.wrapping_add(1);
+    let generation = state.search_generation;
+
+    state.home_shelves = vec![Shelf::new("Searching...")];
+    sync_shelves_and_queue(window, state);
+
+    let cat = Arc::clone(&state.catalog);
+    let q = query.to_string();
+    let weak = window.as_weak();
+
+    std::thread::spawn(move || {
+        let (g, q_res, shelves) = execute_search(generation, &q, &cat);
+        let _ = dispatch_to_ui(move || {
+            let Some(win) = weak.upgrade() else { return };
+            with_ui_state::<C, A, S, L, K, _>(|st| {
+                if st.search_generation == g {
+                    st.search_query = q_res;
+                    st.home_shelves = shelves;
+                    sync_shelves_and_queue(&win, st);
+                }
+            });
+        });
+    });
+}
+
+/// Dispatches asynchronous container detail lookup off the UI thread.
+fn open_detail_async<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+    browse_id: &str,
+    kind: DetailKind,
+) {
+    let trimmed = browse_id.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if state.page != SlintPage::Detail {
+        state.detail_return = state.page;
+    }
+    state.page = SlintPage::Detail;
+    state.detail = Some(Detail::new(kind, "Loading...", "", Vec::new()));
+    sync_window(window, state);
+
+    state.detail_generation = state.detail_generation.wrapping_add(1);
+    let generation = state.detail_generation;
+    let id = trimmed.to_string();
+    let cat = Arc::clone(&state.catalog);
+    let weak = window.as_weak();
+
+    std::thread::spawn(move || {
+        let (g, detail) = execute_detail(generation, &id, kind, &cat);
+        let _ = dispatch_to_ui(move || {
+            let Some(win) = weak.upgrade() else { return };
+            with_ui_state::<C, A, S, L, K, _>(|st| {
+                if st.detail_generation == g {
+                    st.detail = detail;
+                    sync_library_and_detail(&win, st);
+                }
+            });
+        });
+    });
+}
+
+/// Dispatches asynchronous library refresh off the UI thread.
+fn refresh_library_async<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+) {
+    state.library_generation = state.library_generation.wrapping_add(1);
+    let generation = state.library_generation;
+    let cat = Arc::clone(&state.catalog);
+    let weak = window.as_weak();
+
+    std::thread::spawn(move || {
+        let (g, playlists, albums) = execute_refresh_library(generation, &cat);
+        let _ = dispatch_to_ui(move || {
+            let Some(win) = weak.upgrade() else { return };
+            with_ui_state::<C, A, S, L, K, _>(|st| {
+                if st.library_generation == g {
+                    st.library_playlists = playlists;
+                    st.library_albums = albums;
+                    st.library_artists = Vec::new();
+                    sync_library_and_detail(&win, st);
+                }
+            });
+        });
+    });
+}
+
+/// Non-blocking handler for playback toggle (pause, resume, or start head track).
+fn handle_toggle_play<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let audio_arc = Arc::clone(&state.audio);
+    let Ok(mut audio) = audio_arc.try_lock() else {
+        return;
+    };
+    if audio.is_playing() {
+        audio.pause();
+        drop(audio);
+        state.sync_presence_playing(false);
+        window.set_is_playing(false);
+        return;
+    }
+    if audio.last_requested().is_some() {
+        audio.resume_play();
+        drop(audio);
+        state.sync_presence_playing(true);
+        window.set_is_playing(true);
+        return;
+    }
+    drop(audio);
+    trigger_playback(window, state, worker_tx);
+}
+
+/// Spawns the dedicated playback worker thread processing play and scrobble commands.
+fn spawn_playback_worker<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    adapters: PlaybackWorkerAdapters<A, L, K>,
+    rx: std::sync::mpsc::Receiver<PlaybackWorkerCommand>,
+) {
+    let weak = window.as_weak();
+
+    std::thread::Builder::new()
+        .name("moggyt-playback".into())
+        .spawn(move || {
+            while let Ok(cmd) = rx.recv() {
+                match cmd {
+                    PlaybackWorkerCommand::Play(req) => {
+                        let res = execute_play_track(req, &adapters);
+                        let w = weak.clone();
+                        let _ = dispatch_to_ui(move || {
+                            let Some(win) = w.upgrade() else { return };
+                            with_ui_state::<C, A, S, L, K, _>(|st| {
+                                if st.play_generation == res.generation {
+                                    apply_play_track_completion(&win, st, res);
+                                }
+                            });
+                        });
+                    }
+                    PlaybackWorkerCommand::Scrobble { artist, title, started_unix } => {
+                        execute_scrobble(
+                            &artist,
+                            &title,
+                            started_unix,
+                            &adapters.scrobbler,
+                            &adapters.secondary_scrobbler,
+                        );
+                    }
+                }
+            }
+        })
+        .expect("failed to spawn playback worker thread");
 }
 
 /// Builds and configures MoggytWindow wired to SlintAppState with callbacks and background timer.
 pub fn build_window<
-    C: Catalog + 'static,
-    A: AudioBackend + 'static,
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
     S: SessionStore + 'static,
-    L: LyricsSource + 'static,
-    K: CoverCache + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
 >(
     state: SlintAppState<C, A, S, L, K>,
 ) -> anyhow::Result<(MoggytWindow, slint::Timer)> {
     let window = MoggytWindow::new().context("failed to instantiate MoggytWindow")?;
     let state_rc = Rc::new(RefCell::new(state));
+    set_ui_state(&state_rc);
+
+    let adapters = PlaybackWorkerAdapters::new(
+        Arc::clone(&state_rc.borrow().audio),
+        Arc::clone(&state_rc.borrow().scrobbler),
+        state_rc.borrow().secondary_scrobbler.clone(),
+        Arc::clone(&state_rc.borrow().lyrics),
+        Arc::clone(&state_rc.borrow().covers),
+    );
+
+    let (worker_tx, worker_rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+    spawn_playback_worker::<C, A, S, L, K>(&window, adapters, worker_rx);
 
     sync_window(&window, &mut state_rc.borrow_mut());
-    wire_window_callbacks(&window, Rc::clone(&state_rc));
+    wire_window_callbacks(&window, Rc::clone(&state_rc), worker_tx);
     let timer = setup_app_timer(&window, Rc::clone(&state_rc));
 
     Ok((window, timer))
 }
 
-/// Wires user event callbacks between MoggytWindow and the application state.
+/// Wires user event callbacks between MoggytWindow and the application state without blocking.
 fn wire_window_callbacks<
-    C: Catalog + 'static,
-    A: AudioBackend + 'static,
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
     S: SessionStore + 'static,
-    L: LyricsSource + 'static,
-    K: CoverCache + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
 >(
     window: &MoggytWindow,
     state_rc: SharedState<C, A, S, L, K>,
+    worker_tx: std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
     window.on_page_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.select_page(SlintPage::from_index(idx));
+        let page = SlintPage::from_index(idx);
+        st.page = page;
+        if page == SlintPage::Library {
+            refresh_library_async(&win, &mut st);
+        }
         sync_window(&win, &mut st);
     });
 
@@ -851,12 +1312,12 @@ fn wire_window_callbacks<
     window.on_query_submitted(move |q| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.submit_search(q.as_str());
-        sync_window(&win, &mut st);
+        submit_search_async(&win, &mut st, q.as_str());
     });
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_track_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
@@ -873,18 +1334,21 @@ fn wire_window_callbacks<
         if let Some(track) = track_opt {
             st.queue.push(track);
             let last_idx = st.queue.len().saturating_sub(1);
-            st.play_track_at_index(last_idx);
+            st.play_track_at_index_in_memory(last_idx);
             st.page = SlintPage::NowPlaying;
+            trigger_playback(&win, &mut st, &tx);
         }
         sync_window(&win, &mut st);
     });
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_queue_track_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.play_track_at_index(idx as usize);
+        st.play_track_at_index_in_memory(idx as usize);
+        trigger_playback(&win, &mut st, &tx);
         sync_window(&win, &mut st);
     });
 
@@ -894,9 +1358,8 @@ fn wire_window_callbacks<
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         if let Some(p) = st.library_playlists.get(idx as usize).cloned() {
-            st.open_detail(&p.id, DetailKind::Playlist);
+            open_detail_async(&win, &mut st, &p.id, DetailKind::Playlist);
         }
-        sync_window(&win, &mut st);
     });
 
     let s = Rc::clone(&state_rc);
@@ -905,9 +1368,8 @@ fn wire_window_callbacks<
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         if let Some(a) = st.library_albums.get(idx as usize).cloned() {
-            st.open_detail(&a.id, DetailKind::Album);
+            open_detail_async(&win, &mut st, &a.id, DetailKind::Album);
         }
-        sync_window(&win, &mut st);
     });
 
     let s = Rc::clone(&state_rc);
@@ -916,13 +1378,13 @@ fn wire_window_callbacks<
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         if let Some(a) = st.library_artists.get(idx as usize).cloned() {
-            st.open_detail(&a.id, DetailKind::Artist);
+            open_detail_async(&win, &mut st, &a.id, DetailKind::Artist);
         }
-        sync_window(&win, &mut st);
     });
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_detail_track_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
@@ -930,7 +1392,8 @@ fn wire_window_callbacks<
             if let Some(track) = detail.tracks.get(idx as usize).cloned() {
                 st.queue.push(track);
                 let last = st.queue.len().saturating_sub(1);
-                st.play_track_at_index(last);
+                st.play_track_at_index_in_memory(last);
+                trigger_playback(&win, &mut st, &tx);
             }
         }
         sync_window(&win, &mut st);
@@ -938,28 +1401,32 @@ fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_toggle_play(move || {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.toggle_play();
-        sync_window(&win, &mut st);
+        handle_toggle_play(&win, &mut st, &tx);
     });
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_prev_track(move || {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.prev_track();
+        st.queue.retreat();
+        trigger_playback(&win, &mut st, &tx);
         sync_window(&win, &mut st);
     });
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx;
     window.on_next_track(move || {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.next_track();
+        st.queue.advance();
+        trigger_playback(&win, &mut st, &tx);
         sync_window(&win, &mut st);
     });
 
@@ -988,7 +1455,7 @@ fn wire_window_callbacks<
         let mut st = s.borrow_mut();
         if st.sign_in_from_input(cookies.as_str()) {
             win.set_cookie_text("".into());
-            st.refresh_library();
+            refresh_library_async(&win, &mut st);
         }
         sync_window(&win, &mut st);
     });
@@ -999,18 +1466,18 @@ fn wire_window_callbacks<
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         st.sign_out();
-        st.refresh_library();
+        refresh_library_async(&win, &mut st);
         sync_window(&win, &mut st);
     });
 }
 
 /// Sets up periodic background timer for tray events, media keys, auto-skip, and tick sync.
 fn setup_app_timer<
-    C: Catalog + 'static,
-    A: AudioBackend + 'static,
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
     S: SessionStore + 'static,
-    L: LyricsSource + 'static,
-    K: CoverCache + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
 >(
     window: &MoggytWindow,
     state_rc: SharedState<C, A, S, L, K>,
@@ -1035,7 +1502,13 @@ fn setup_app_timer<
 }
 
 /// Parses CLI arguments and executes single-instance URL/handoff import commands.
-fn handle_cli_args<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
+fn handle_cli_args<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
     let mut args = std::env::args().skip(1);
@@ -1059,11 +1532,11 @@ fn handle_cli_args<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource
 /// TODO Gap: Update banner badge: GithubUpdater checks for updates against GitHub
 /// Releases on startup, but ui/shell.slint lacks an update banner badge.
 fn check_updater_status<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
 >(
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
@@ -1109,11 +1582,13 @@ pub fn run() -> anyhow::Result<()> {
 
     let settings_store = DiskSettingsStore::new(config_dir.clone());
     let settings = settings_store.load();
-    state.audio.set_volume(settings.volume);
-    state.audio.set_speed(settings.playback_speed);
-    state.audio.set_quality(settings.quality);
-    state.audio.set_skip_silence(settings.skip_silence);
-    state.audio.set_loudness_normalization(settings.loudness_normalization);
+    if let Ok(mut a) = state.audio.lock() {
+        a.set_volume(settings.volume);
+        a.set_speed(settings.playback_speed);
+        a.set_quality(settings.quality);
+        a.set_skip_silence(settings.skip_silence);
+        a.set_loudness_normalization(settings.loudness_normalization);
+    }
     state.hi_res_covers = settings.hi_res_covers;
     state.theme = settings.theme;
     state.settings_store = Box::new(settings_store);
@@ -1132,12 +1607,13 @@ pub fn run() -> anyhow::Result<()> {
 
     let scrobbler = init_lastfm_scrobbler(settings.lastfm_enabled);
     tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
-    state.scrobbler = Box::new(scrobbler);
+    state.scrobbler = Arc::new(Mutex::new(Box::new(scrobbler)));
 
     let secondary_scrobbler = init_secondary_lastfm_scrobbler(settings.secondary_lastfm_enabled);
     let sec_live = secondary_scrobbler.as_ref().is_some_and(LastFmClient::is_live);
     tracing::debug!("secondary last.fm scrobbler live: {sec_live}");
-    state.secondary_scrobbler = secondary_scrobbler.map(|c| Box::new(c) as Box<dyn Scrobbler>);
+    state.secondary_scrobbler =
+        secondary_scrobbler.map(|c| Arc::new(Mutex::new(Box::new(c) as Box<dyn Scrobbler>)));
 
     handle_cli_args(&mut state);
     check_updater_status(&mut state);
@@ -1190,14 +1666,14 @@ mod tests {
         state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
 
         state.play_current_quiet();
-        assert!(state.audio.is_playing());
+        assert!(state.audio.lock().unwrap().is_playing());
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
 
         state.toggle_play();
-        assert!(!state.audio.is_playing());
+        assert!(!state.audio.lock().unwrap().is_playing());
 
         state.toggle_play();
-        assert!(state.audio.is_playing());
+        assert!(state.audio.lock().unwrap().is_playing());
 
         state.next_track();
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
@@ -1210,13 +1686,13 @@ mod tests {
     fn test_seek_and_volume_controls() {
         let mut state = test_wired();
         state.set_volume(75);
-        assert_eq!(state.audio.volume(), 75);
+        assert_eq!(state.audio.lock().unwrap().volume(), 75);
 
         state.seek_by(15);
-        assert_eq!(state.audio.position_secs(), 15);
+        assert_eq!(state.audio.lock().unwrap().position_secs(), 15);
 
         state.seek_by(-50);
-        assert_eq!(state.audio.position_secs(), 0);
+        assert_eq!(state.audio.lock().unwrap().position_secs(), 0);
     }
 
     #[test]
@@ -1274,7 +1750,7 @@ mod tests {
 
         state.seek_by(12);
         state.check_auto_skip();
-        assert_eq!(state.audio.position_secs(), 20);
+        assert_eq!(state.audio.lock().unwrap().position_secs(), 20);
     }
 
     #[test]
@@ -1287,6 +1763,6 @@ mod tests {
 
         state.seek_by(900);
         state.poll_sleep_timer();
-        assert!(!state.audio.is_playing());
+        assert!(!state.audio.lock().unwrap().is_playing());
     }
 }

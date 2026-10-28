@@ -31,6 +31,7 @@ pub mod detail;
 pub mod library;
 pub mod platform;
 pub mod playback;
+pub mod playback_worker;
 pub mod search;
 pub mod theme;
 
@@ -42,6 +43,10 @@ pub use platform::{
     TransportCommand, TransportStub, dispatch_to_ui, lyrics_display_lines, rgba_to_image,
 };
 pub use playback::{PlaybackState, format_position, format_track_duration, queue_track_rows};
+pub use playback_worker::{
+    PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters, PlaybackWorkerCommand,
+    execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
+};
 pub use search::{SearchState, TrackDisplayRow, canned_shelves, format_duration, shelf_tracks};
 pub use theme::{ThemeColors, apply_theme, palette_for, rgb_to_slint};
 
