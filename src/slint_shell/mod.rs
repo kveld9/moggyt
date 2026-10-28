@@ -28,11 +28,16 @@ pub use MoggytWindow as AppWindow;
 
 pub mod detail;
 pub mod library;
+pub mod platform;
 pub mod playback;
 pub mod search;
 
 pub use detail::{DetailState, detail_kind_label, detail_track_rows};
 pub use library::{LibraryItemRow, LibraryState, album_row, artist_row, playlist_row};
+pub use platform::{
+    CoverArtData, LyricDisplayLine, LyricsState, PlatformState, PresenceSnapshot, Transport,
+    TransportCommand, TransportStub, dispatch_to_ui, lyrics_display_lines, rgba_to_image,
+};
 pub use playback::{PlaybackState, format_position, format_track_duration, queue_track_rows};
 pub use search::{SearchState, TrackDisplayRow, canned_shelves, format_duration, shelf_tracks};
 

@@ -18,6 +18,11 @@ export struct LibraryItemData {
     subtitle: string,
 }
 
+export struct LyricLineData {
+    index: int,
+    text: string,
+}
+
 component NavItem inherits Rectangle {
     in property <string> text;
     in property <bool> is-active: false;
@@ -326,15 +331,26 @@ export component NowPlayingView inherits VerticalLayout {
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
     in property <float> progress: 0.0;
+    in property <image> cover-image;
+    in property <bool> has-cover: false;
+    in property <[LyricLineData]> lyrics-lines: [];
+    in property <int> active-lyric-index: -1;
 
     spacing: 16px; alignment: start;
 
     HorizontalLayout {
         spacing: 20px; alignment: start;
-        // Cover-art placeholder (owned by a later tranche)
         Rectangle {
-            width: 140px; height: 140px; border-radius: 8px; background: #242424;
-            Text { text: "Cover Art\n(Later Tranche)"; color: #666666; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+            width: 140px; height: 140px; border-radius: 8px; background: #242424; clip: true;
+            if root.has-cover : Image {
+                width: parent.width; height: parent.height;
+                source: root.cover-image;
+                image-fit: contain;
+            }
+            if !root.has-cover : Text {
+                text: "No Cover"; color: #666666; font-size: 12px;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
         }
         VerticalLayout {
             spacing: 6px; alignment: center;
@@ -354,13 +370,25 @@ export component NowPlayingView inherits VerticalLayout {
         }
     }
 
-    // Lyrics slot placeholder (owned by a later tranche)
-    Rectangle {
+    if root.lyrics-lines.length == 0 : Rectangle {
         height: 140px; border-radius: 8px; background: #181818;
         VerticalLayout {
             alignment: center; spacing: 4px;
-            Text { text: "Lyrics Slot Placeholder"; color: #666666; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
-            Text { text: "Synced lyrics display owned by a later tranche"; color: #555555; font-size: 11px; horizontal-alignment: center; }
+            Text { text: "No Lyrics Available"; color: #666666; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
+            Text { text: "Synced lyrics will appear here during playback"; color: #555555; font-size: 11px; horizontal-alignment: center; }
+        }
+    }
+
+    if root.lyrics-lines.length > 0 : Rectangle {
+        border-radius: 8px; background: #181818; clip: true;
+        VerticalLayout {
+            padding: 12px; spacing: 8px; alignment: start;
+            for line in root.lyrics-lines : Text {
+                text: line.text;
+                color: line.index == root.active-lyric-index ? #1db954 : #888888;
+                font-size: line.index == root.active-lyric-index ? 15px : 13px;
+                font-weight: line.index == root.active-lyric-index ? 700 : 400;
+            }
         }
     }
 }
@@ -453,6 +481,10 @@ component ContentArea inherits Rectangle {
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
     in property <float> playback-progress: 0.0;
+    in property <image> cover-image;
+    in property <bool> has-cover: false;
+    in property <[LyricLineData]> lyrics-lines: [];
+    in property <int> active-lyric-index: -1;
     in property <[LibraryItemData]> library-playlists: []; in property <[LibraryItemData]> library-albums: []; in property <[LibraryItemData]> library-artists: [];
     in property <bool> detail-has-detail: false; in property <string> detail-title: ""; in property <string> detail-subtitle: "";
     in property <string> detail-kind-label: ""; in property <[TrackRowData]> detail-tracks: [];
@@ -500,6 +532,10 @@ component ContentArea inherits Rectangle {
             position-text: root.position-text;
             duration-text: root.duration-text;
             progress: root.playback-progress;
+            cover-image: root.cover-image;
+            has-cover: root.has-cover;
+            lyrics-lines: root.lyrics-lines;
+            active-lyric-index: root.active-lyric-index;
         }
 
         if root.active-page == 3 : LibraryView {
@@ -538,6 +574,10 @@ export component MoggytWindow inherits Window {
     in-out property <string> position-text: "0:00";
     in-out property <string> duration-text: "0:00";
     in-out property <float> playback-progress: 0.0;
+    in-out property <image> cover-image;
+    in-out property <bool> has-cover: false;
+    in-out property <[LyricLineData]> lyrics-lines: [];
+    in-out property <int> active-lyric-index: -1;
     in-out property <[LibraryItemData]> library-playlists: []; in-out property <[LibraryItemData]> library-albums: []; in-out property <[LibraryItemData]> library-artists: [];
     in-out property <bool> detail-has-detail: false; in-out property <string> detail-title: ""; in-out property <string> detail-subtitle: "";
     in-out property <string> detail-kind-label: ""; in-out property <[TrackRowData]> detail-tracks: [];
@@ -571,6 +611,8 @@ export component MoggytWindow inherits Window {
                 queue-tracks: root.queue-tracks; queue-selected-index: root.queue-selected-index;
                 active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
                 position-text: root.position-text; duration-text: root.duration-text; playback-progress: root.playback-progress;
+                cover-image: root.cover-image; has-cover: root.has-cover;
+                lyrics-lines: root.lyrics-lines; active-lyric-index: root.active-lyric-index;
                 library-playlists: root.library-playlists; library-albums: root.library-albums; library-artists: root.library-artists;
                 detail-has-detail: root.detail-has-detail; detail-title: root.detail-title; detail-subtitle: root.detail-subtitle;
                 detail-kind-label: root.detail-kind-label; detail-tracks: root.detail-tracks;
