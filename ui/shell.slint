@@ -1,3 +1,17 @@
+import { LineEdit } from "std-widgets.slint";
+
+export struct TrackRowData {
+    index: int,
+    title: string,
+    artist: string,
+    duration: string,
+}
+
+export struct ShelfData {
+    title: string,
+    tracks: [TrackRowData],
+}
+
 component NavItem inherits Rectangle {
     in property <string> text;
     in property <bool> is-active: false;
@@ -79,9 +93,134 @@ component Sidebar inherits Rectangle {
     }
 }
 
+component TrackRow inherits Rectangle {
+    in property <string> title;
+    in property <string> artist;
+    in property <string> duration;
+    callback clicked();
+
+    height: 36px;
+    border-radius: 4px;
+    background: touch.has-hover ? #282828 : #00000000;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+
+        Text {
+            text: root.title;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.artist;
+            color: #b3b3b3;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+
+        Rectangle {}
+
+        Text {
+            text: root.duration;
+            color: #b3b3b3;
+            font-size: 13px;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+component SearchView inherits VerticalLayout {
+    in-out property <string> query: "";
+    in property <[ShelfData]> shelves: [];
+    callback query-submitted(string);
+    callback track-selected(int);
+
+    spacing: 16px;
+    alignment: start;
+
+    HorizontalLayout {
+        spacing: 8px;
+        height: 36px;
+
+        input := LineEdit {
+            text <=> root.query;
+            placeholder-text: "Search tracks...";
+            accepted(text) => {
+                root.query-submitted(text);
+            }
+        }
+
+        Rectangle {
+            width: 80px;
+            border-radius: 6px;
+            background: btn-touch.has-hover ? #1ed760 : #1db954;
+
+            btn-touch := TouchArea {
+                clicked => { root.query-submitted(root.query); }
+            }
+
+            Text {
+                text: "Search";
+                color: #000000;
+                font-size: 13px;
+                font-weight: 700;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    if root.shelves.length == 0 : VerticalLayout {
+        padding-top: 24px;
+        alignment: center;
+
+        Text {
+            text: "No results found.";
+            color: #b3b3b3;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    for shelf in root.shelves : VerticalLayout {
+        spacing: 8px;
+
+        Text {
+            text: shelf.title;
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        for track in shelf.tracks : TrackRow {
+            title: track.title;
+            artist: track.artist;
+            duration: track.duration;
+            clicked => {
+                root.track-selected(track.index);
+            }
+        }
+    }
+}
+
 component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
     in property <string> header-title: "Search";
+    in-out property <string> query: "";
+    in property <[ShelfData]> shelves: [];
+
+    callback query-submitted(string);
+    callback track-selected(int);
 
     background: #121212;
 
@@ -102,16 +241,21 @@ component ContentArea inherits Rectangle {
             background: #282828;
         }
 
-        VerticalLayout {
+        if root.active-page == 0 : SearchView {
+            query <=> root.query;
+            shelves: root.shelves;
+            query-submitted(q) => {
+                root.query-submitted(q);
+            }
+            track-selected(idx) => {
+                root.track-selected(idx);
+            }
+        }
+
+        if root.active-page != 0 : VerticalLayout {
             alignment: center;
             spacing: 12px;
 
-            if root.active-page == 0 : Text {
-                text: "Search Page Placeholder";
-                color: #b3b3b3;
-                font-size: 16px;
-                horizontal-alignment: center;
-            }
             if root.active-page == 1 : Text {
                 text: "Queue Page Placeholder";
                 color: #b3b3b3;
@@ -150,8 +294,12 @@ export component MoggytWindow inherits Window {
 
     in-out property <int> active-page: 0;
     in-out property <string> header-title: "Search";
+    in-out property <string> query: "";
+    in-out property <[ShelfData]> shelves: [];
 
     callback page-selected(int);
+    callback query-submitted(string);
+    callback track-selected(int);
 
     HorizontalLayout {
         padding: 0;
@@ -167,6 +315,14 @@ export component MoggytWindow inherits Window {
         ContentArea {
             active-page: root.active-page;
             header-title: root.header-title;
+            query <=> root.query;
+            shelves: root.shelves;
+            query-submitted(q) => {
+                root.query-submitted(q);
+            }
+            track-selected(idx) => {
+                root.track-selected(idx);
+            }
         }
     }
 }
