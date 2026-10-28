@@ -14,8 +14,8 @@ use anyhow::Context;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::domain::{
-    Album, Artist, Detail, DetailKind, PlaybackQueue, Playlist, SearchQuery, SearchResult, Shelf,
-    SleepTimer, ThemeId, Track, extract_playlist_id,
+    Album, Artist, Detail, DetailKind, PlaybackQueue, Playlist, SearchFilter, SearchQuery,
+    SearchResult, Shelf, SleepTimer, ThemeId, Track, extract_playlist_id,
 };
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CredentialStore, DesktopPresence, DiscordPresence,
@@ -34,8 +34,9 @@ use crate::slint_shell::playback::{format_position, format_track_duration};
 use crate::slint_shell::playback_worker::{
     PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters, PlaybackWorkerCommand,
     execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
+    fetch_and_decode_cover,
 };
-use crate::slint_shell::search::format_duration;
+use crate::slint_shell::search::{SearchRow, format_duration, iter_shelf_items};
 use crate::slint_shell::theme::apply_theme;
 use crate::slint_shell::{
     LibraryItemData, LyricLineData, MoggytWindow, ShelfData, SlintPage, TrackRowData,
@@ -212,6 +213,8 @@ pub struct SlintAppState<
     pub hi_res_covers: bool,
     pub signed_in: bool,
     pub theme: ThemeId,
+    pub search_filter: SearchFilter,
+    pub search_covers: std::collections::HashMap<String, slint::Image>,
 
     pub play_generation: u64,
     pub search_generation: u64,
@@ -316,6 +319,8 @@ impl<
             hi_res_covers: false,
             signed_in,
             theme: ThemeId::default(),
+            search_filter: SearchFilter::All,
+            search_covers: std::collections::HashMap::new(),
             play_generation: 0,
             search_generation: 0,
             detail_generation: 0,
@@ -454,12 +459,19 @@ impl<
     /// Submits search query to catalog and wraps hits in a shelf.
     pub fn submit_search(&mut self, query: &str) {
         self.search_query = query.to_string();
+        self.search_filter = SearchFilter::All;
+        self.search_covers.clear();
         let Some(parsed) = SearchQuery::parse(query) else {
             return;
         };
-        let hits = self.catalog.lock().map(|c| c.search(parsed.text())).unwrap_or_default();
-        self.search_results = hits.clone();
-        let items: Vec<SearchResult> = hits.into_iter().map(SearchResult::Track).collect();
+        let items = self.catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
+        self.search_results = items
+            .iter()
+            .filter_map(|it| match it {
+                SearchResult::Track(t) => Some(t.clone()),
+                _ => None,
+            })
+            .collect();
         let mut shelf = Shelf::new("Search Results");
         shelf.items = items;
         self.home_shelves = vec![shelf];
@@ -818,6 +830,54 @@ fn sync_cover_and_lyrics<
     window.set_active_lyric_index(state.active_lyric_index());
 }
 
+/// Helper extracting artwork URLs across shelves for pre-fetching.
+fn iter_shelf_artwork_urls(shelves: &[Shelf]) -> impl Iterator<Item = &str> {
+    shelves.iter().flat_map(|s| s.items.iter()).filter_map(|it| match it {
+        SearchResult::Track(t) => t.artwork.as_deref(),
+        _ => None,
+    })
+}
+
+/// Requests background cover decoding for all uncached artwork URLs in shelves.
+fn request_shelf_covers<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    state: &SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let mut seen = std::collections::HashSet::new();
+    for url in iter_shelf_artwork_urls(&state.home_shelves) {
+        if !state.search_covers.contains_key(url) && seen.insert(url.to_string()) {
+            let _ = worker_tx.send(PlaybackWorkerCommand::FetchCover {
+                url: url.to_string(),
+                generation: state.search_generation,
+            });
+        }
+    }
+}
+
+/// Converts a domain track to Slint TrackRowData with cached cover art if available.
+fn track_to_row_data(
+    index: usize,
+    track: &Track,
+    covers: &std::collections::HashMap<String, slint::Image>,
+) -> TrackRowData {
+    let cover = track.artwork.as_ref().and_then(|u| covers.get(u).cloned()).unwrap_or_default();
+    TrackRowData {
+        index: index as i32,
+        title: track.title.clone().into(),
+        artist: track.artist.clone().into(),
+        album: track.album.clone().unwrap_or_default().into(),
+        duration: format_duration(track.duration_secs).into(),
+        kind: "track".into(),
+        cover,
+    }
+}
+
 /// Synchronizes catalog shelves and playback queue rows with Slint window.
 fn sync_shelves_and_queue<
     C: Catalog,
@@ -830,17 +890,29 @@ fn sync_shelves_and_queue<
     state: &SlintAppState<C, A, S, L, K>,
 ) {
     let mut shelf_models = Vec::new();
+    let mut global_idx = 0;
     for shelf in &state.home_shelves {
         let mut tracks = Vec::new();
-        for (i, item) in shelf.items.iter().enumerate() {
-            if let SearchResult::Track(t) = item {
-                tracks.push(TrackRowData {
-                    index: i as i32,
-                    title: t.title.clone().into(),
-                    artist: t.artist.clone().into(),
-                    duration: format_duration(t.duration_secs).into(),
-                });
+        for item in &shelf.items {
+            if state.search_filter != SearchFilter::All && item.kind() != state.search_filter {
+                continue;
             }
+            let row = SearchRow::from(item);
+            let cover_img = row
+                .artwork_url
+                .as_ref()
+                .and_then(|u| state.search_covers.get(u).cloned())
+                .unwrap_or_default();
+            tracks.push(TrackRowData {
+                index: global_idx,
+                title: row.title.into(),
+                artist: row.subtitle.into(),
+                album: row.album.into(),
+                duration: row.duration.into(),
+                kind: row.kind.into(),
+                cover: cover_img,
+            });
+            global_idx += 1;
         }
         shelf_models.push(ShelfData {
             title: shelf.title.clone().into(),
@@ -854,12 +926,7 @@ fn sync_shelves_and_queue<
         .tracks()
         .iter()
         .enumerate()
-        .map(|(i, t)| TrackRowData {
-            index: i as i32,
-            title: t.title.clone().into(),
-            artist: t.artist.clone().into(),
-            duration: format_duration(t.duration_secs).into(),
-        })
+        .map(|(i, t)| track_to_row_data(i, t, &state.search_covers))
         .collect();
     window.set_queue_tracks(ModelRc::new(VecModel::from(q_tracks)));
     window.set_queue_selected_index(state.queue.cursor() as i32);
@@ -921,12 +988,7 @@ fn sync_library_and_detail<
             .tracks
             .iter()
             .enumerate()
-            .map(|(i, t)| TrackRowData {
-                index: i as i32,
-                title: t.title.clone().into(),
-                artist: t.artist.clone().into(),
-                duration: format_duration(t.duration_secs).into(),
-            })
+            .map(|(i, t)| track_to_row_data(i, t, &state.search_covers))
             .collect();
         window.set_detail_tracks(ModelRc::new(VecModel::from(d_tracks)));
     } else {
@@ -1067,17 +1129,22 @@ fn submit_search_async<
     window: &MoggytWindow,
     state: &mut SlintAppState<C, A, S, L, K>,
     query: &str,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     state.search_query = query.to_string();
+    state.search_filter = SearchFilter::All;
+    state.search_covers.clear();
     state.search_generation = state.search_generation.wrapping_add(1);
     let generation = state.search_generation;
 
+    window.set_search_filter(0);
     state.home_shelves = vec![Shelf::new("Searching...")];
     sync_shelves_and_queue(window, state);
 
     let cat = Arc::clone(&state.catalog);
     let q = query.to_string();
     let weak = window.as_weak();
+    let tx = worker_tx.clone();
 
     std::thread::spawn(move || {
         let (g, q_res, shelves) = execute_search(generation, &q, &cat);
@@ -1087,6 +1154,7 @@ fn submit_search_async<
                 if st.search_generation == g {
                     st.search_query = q_res;
                     st.home_shelves = shelves;
+                    request_shelf_covers(st, &tx);
                     sync_shelves_and_queue(&win, st);
                 }
             });
@@ -1204,6 +1272,33 @@ fn handle_toggle_play<
     trigger_playback(window, state, worker_tx);
 }
 
+/// Handles background cover fetch result and injects loaded Image into UI state.
+fn handle_fetch_cover_command<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    url: &str,
+    generation: u64,
+    covers: &Arc<Mutex<K>>,
+    weak: slint::Weak<MoggytWindow>,
+) {
+    let Some(cover) = fetch_and_decode_cover(url, covers, false) else { return };
+    let _ = dispatch_to_ui(move || {
+        let Some(win) = weak.upgrade() else { return };
+        with_ui_state::<C, A, S, L, K, _>(|st| {
+            if st.search_generation == generation {
+                if let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) {
+                    st.search_covers.insert(cover.url, img);
+                    sync_shelves_and_queue(&win, st);
+                }
+            }
+        });
+    });
+}
+
 /// Spawns the dedicated playback worker thread processing play and scrobble commands.
 fn spawn_playback_worker<
     C: Catalog + Send + 'static,
@@ -1244,6 +1339,14 @@ fn spawn_playback_worker<
                             &adapters.secondary_scrobbler,
                         );
                     }
+                    PlaybackWorkerCommand::FetchCover { url, generation } => {
+                        handle_fetch_cover_command::<C, A, S, L, K>(
+                            &url,
+                            generation,
+                            &adapters.covers,
+                            weak.clone(),
+                        );
+                    }
                 }
             }
         })
@@ -1274,12 +1377,47 @@ pub fn build_window<
 
     let (worker_tx, worker_rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
     spawn_playback_worker::<C, A, S, L, K>(&window, adapters, worker_rx);
+    request_shelf_covers(&state_rc.borrow(), &worker_tx);
 
     sync_window(&window, &mut state_rc.borrow_mut());
     wire_window_callbacks(&window, Rc::clone(&state_rc), worker_tx);
     let timer = setup_app_timer(&window, Rc::clone(&state_rc));
 
     Ok((window, timer))
+}
+
+/// Maps a clicked search result item to playback or container detail view.
+fn handle_filtered_item_click<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+    item: SearchResult,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    match item {
+        SearchResult::Track(track) => {
+            state.queue.push(track);
+            let last_idx = state.queue.len().saturating_sub(1);
+            state.play_track_at_index_in_memory(last_idx);
+            state.page = SlintPage::NowPlaying;
+            trigger_playback(window, state, worker_tx);
+            sync_window(window, state);
+        }
+        SearchResult::Album(album) => {
+            open_detail_async(window, state, &album.id, DetailKind::Album);
+        }
+        SearchResult::Artist(artist) => {
+            open_detail_async(window, state, &artist.id, DetailKind::Artist);
+        }
+        SearchResult::Playlist(playlist) => {
+            open_detail_async(window, state, &playlist.id, DetailKind::Playlist);
+        }
+    }
 }
 
 /// Wires user event callbacks between MoggytWindow and the application state without blocking.
@@ -1309,10 +1447,11 @@ fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_query_submitted(move |q| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        submit_search_async(&win, &mut st, q.as_str());
+        submit_search_async(&win, &mut st, q.as_str(), &tx);
     });
 
     let s = Rc::clone(&state_rc);
@@ -1321,24 +1460,27 @@ fn wire_window_callbacks<
     window.on_track_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        let track_opt = st
-            .home_shelves
-            .iter()
-            .flat_map(|sh| {
-                sh.items.iter().filter_map(|it| match it {
-                    SearchResult::Track(t) => Some(t.clone()),
-                    _ => None,
-                })
-            })
-            .nth(idx as usize);
-        if let Some(track) = track_opt {
-            st.queue.push(track);
-            let last_idx = st.queue.len().saturating_sub(1);
-            st.play_track_at_index_in_memory(last_idx);
-            st.page = SlintPage::NowPlaying;
-            trigger_playback(&win, &mut st, &tx);
+        let item_opt =
+            iter_shelf_items(&st.home_shelves, st.search_filter).nth(idx as usize).cloned();
+        if let Some(item) = item_opt {
+            handle_filtered_item_click(&win, &mut st, item, &tx);
         }
-        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_filter_selected(move |filter_idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.search_filter = match filter_idx {
+            1 => SearchFilter::Tracks,
+            2 => SearchFilter::Albums,
+            3 => SearchFilter::Artists,
+            4 => SearchFilter::Playlists,
+            _ => SearchFilter::All,
+        };
+        win.set_search_filter(filter_idx);
+        sync_shelves_and_queue(&win, &st);
     });
 
     let s = Rc::clone(&state_rc);
@@ -1764,5 +1906,18 @@ mod tests {
         state.seek_by(900);
         state.poll_sleep_timer();
         assert!(!state.audio.lock().unwrap().is_playing());
+    }
+
+    #[test]
+    fn test_search_filter_lifecycle_and_reset() {
+        let mut state = test_wired();
+        assert_eq!(state.search_filter, SearchFilter::All);
+
+        state.search_filter = SearchFilter::Albums;
+        assert_eq!(state.search_filter, SearchFilter::Albums);
+
+        state.submit_search("rock");
+        assert_eq!(state.search_filter, SearchFilter::All);
+        assert!(state.search_covers.is_empty());
     }
 }

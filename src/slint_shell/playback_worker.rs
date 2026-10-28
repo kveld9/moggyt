@@ -33,7 +33,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::domain::{Detail, DetailKind, SearchQuery, SearchResult, Shelf};
+use crate::domain::{Detail, DetailKind, SearchQuery, Shelf};
 use crate::infra::{
     AudioBackend, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache, LyricLine,
     LyricOverrideDir, LyricsSource, Scrobbler, decode_cover, fetch_artwork,
@@ -71,6 +71,7 @@ pub struct PlayTrackResult {
 pub enum PlaybackWorkerCommand {
     Play(PlayTrackRequest),
     Scrobble { artist: String, title: String, started_unix: u64 },
+    FetchCover { url: String, generation: u64 },
 }
 
 /// Resolves lyrics from local override files or remote provider off the UI thread.
@@ -84,27 +85,37 @@ pub fn resolve_lyrics<L: LyricsSource>(req: &PlayTrackRequest, lyrics: &Arc<L>) 
     lyrics.lookup(&req.artist, &req.title, duration).map(|s| s.lines).unwrap_or_default()
 }
 
+/// Fetches or retrieves cached artwork bytes for a given URL off the UI thread.
+fn get_or_fetch_artwork<K: CoverCache>(url: &str, covers: &Arc<Mutex<K>>) -> Option<Vec<u8>> {
+    if let Some(data) = covers.lock().ok()?.get(url) {
+        return Some(data);
+    }
+    let fetched = fetch_artwork(url, 8).ok()?;
+    if let Ok(mut cache) = covers.lock() {
+        cache.put(url, fetched.clone());
+    }
+    Some(fetched)
+}
+
+/// Fetches, caches, and decodes cover artwork for an arbitrary URL off the UI thread.
+pub fn fetch_and_decode_cover<K: CoverCache>(
+    url: &str,
+    covers: &Arc<Mutex<K>>,
+    hi_res: bool,
+) -> Option<CoverArtData> {
+    let bytes = get_or_fetch_artwork(url, covers)?;
+    let max_px = if hi_res { COVER_HIRES_MAX_PX } else { COVER_MAX_PX };
+    let rgba = decode_cover(&bytes, max_px)?;
+    Some(CoverArtData::new(url, rgba.as_raw().to_vec(), rgba.width(), rgba.height()))
+}
+
 /// Fetches, caches, and decodes cover artwork into raw RGBA bytes off the UI thread.
 pub fn resolve_cover_art<K: CoverCache>(
     req: &PlayTrackRequest,
     covers: &Arc<Mutex<K>>,
 ) -> Option<CoverArtData> {
     let url = req.artwork_url.as_deref()?;
-    let bytes = {
-        let cached = covers.lock().ok()?.get(url);
-        if let Some(data) = cached {
-            data
-        } else {
-            let fetched = fetch_artwork(url, 8).ok()?;
-            if let Ok(mut cache) = covers.lock() {
-                cache.put(url, fetched.clone());
-            }
-            fetched
-        }
-    };
-    let max_px = if req.hi_res_covers { COVER_HIRES_MAX_PX } else { COVER_MAX_PX };
-    let rgba = decode_cover(&bytes, max_px)?;
-    Some(CoverArtData::new(url, rgba.as_raw().to_vec(), rgba.width(), rgba.height()))
+    fetch_and_decode_cover(url, covers, req.hi_res_covers)
 }
 
 /// Adapter handles bundled for background playback worker execution.
@@ -199,8 +210,7 @@ pub fn execute_search<C: Catalog>(
     let Some(parsed) = SearchQuery::parse(query) else {
         return (generation, query.to_string(), Vec::new());
     };
-    let hits = catalog.lock().map(|c| c.search(parsed.text())).unwrap_or_default();
-    let items: Vec<SearchResult> = hits.into_iter().map(SearchResult::Track).collect();
+    let items = catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
     let mut shelf = Shelf::new("Search Results");
     shelf.items = items;
     (generation, query.to_string(), vec![shelf])
@@ -329,6 +339,9 @@ mod tests {
                         done_tx.send(req.generation).unwrap();
                     }
                     PlaybackWorkerCommand::Scrobble { .. } => {}
+                    PlaybackWorkerCommand::FetchCover { generation, .. } => {
+                        done_tx.send(generation).unwrap();
+                    }
                 }
             }
         });
@@ -348,7 +361,22 @@ mod tests {
         let received = done_rx.recv().unwrap();
         assert_eq!(received, 99);
 
+        tx.send(PlaybackWorkerCommand::FetchCover {
+            url: "https://artwork.local/art".into(),
+            generation: 100,
+        })
+        .unwrap();
+        let cover_gen = done_rx.recv().unwrap();
+        assert_eq!(cover_gen, 100);
+
         drop(tx);
         handle.join().expect("worker terminates on channel disconnect");
+    }
+
+    #[test]
+    fn test_fetch_and_decode_cover_missing_returns_none() {
+        let covers = Arc::new(Mutex::new(MemoryCoverCache::new()));
+        let res = fetch_and_decode_cover("https://invalid.artwork.local/test", &covers, false);
+        assert!(res.is_none());
     }
 }
