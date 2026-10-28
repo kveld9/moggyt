@@ -54,8 +54,8 @@ component IconPlay inherits Rectangle {
         viewbox-height: 24;
         fill: root.tint;
         stroke: root.tint;
-        stroke-width: 1px;
-        commands: "M 8 5 L 19 12 L 8 19 Z";
+        stroke-width: 1.8px;
+        commands: "M 7 6.5 C 7 5.2 8.3 4.5 9.4 5.1 L 18.4 10.6 C 19.5 11.2 19.5 12.8 18.4 13.4 L 9.4 18.9 C 8.3 19.5 7 18.8 7 17.5 Z";
     }
 }
 
@@ -73,7 +73,9 @@ component IconPause inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         fill: root.tint;
-        commands: "M 6 5 L 10 5 L 10 19 L 6 19 Z M 14 5 L 18 5 L 18 19 L 14 19 Z";
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        commands: "M 8 5 C 8.8 5 9.5 5.7 9.5 6.5 L 9.5 17.5 C 9.5 18.3 8.8 19 8 19 C 7.2 19 6.5 18.3 6.5 17.5 L 6.5 6.5 C 6.5 5.7 7.2 5 8 5 Z M 16 5 C 16.8 5 17.5 5.7 17.5 6.5 L 17.5 17.5 C 17.5 18.3 16.8 19 16 19 C 15.2 19 14.5 18.3 14.5 17.5 L 14.5 6.5 C 14.5 5.7 15.2 5 16 5 Z";
     }
 }
 
@@ -92,8 +94,8 @@ component IconPrev inherits Rectangle {
         viewbox-height: 24;
         fill: root.tint;
         stroke: root.tint;
-        stroke-width: 1px;
-        commands: "M 6 5 L 8 5 L 8 19 L 6 19 Z M 18 5 L 8 12 L 18 19 Z";
+        stroke-width: 1.8px;
+        commands: "M 6 5.5 C 6 4.7 6.7 4 7.5 4 C 8.3 4 9 4.7 9 5.5 L 9 18.5 C 9 19.3 8.3 20 7.5 20 C 6.7 20 6 19.3 6 18.5 Z M 17 6 C 17 5 16 4.5 15.2 5 L 8.5 11.2 C 7.8 11.6 7.8 12.4 8.5 12.8 L 15.2 19 C 16 19.5 17 19 17 18 Z";
     }
 }
 
@@ -112,8 +114,8 @@ component IconNext inherits Rectangle {
         viewbox-height: 24;
         fill: root.tint;
         stroke: root.tint;
-        stroke-width: 1px;
-        commands: "M 6 5 L 16 12 L 6 19 Z M 16 5 L 18 5 L 18 19 L 16 19 Z";
+        stroke-width: 1.8px;
+        commands: "M 7 6 C 7 5 8 4.5 8.8 5 L 15.5 11.2 C 16.2 11.6 16.2 12.4 15.5 12.8 L 8.8 19 C 8 19.5 7 19 7 18 Z M 18 5.5 C 18 4.7 17.3 4 16.5 4 C 15.7 4 15 4.7 15 5.5 L 15 18.5 C 15 19.3 15.7 20 16.5 20 C 17.3 20 18 19.3 18 18.5 Z";
     }
 }
 
@@ -131,9 +133,9 @@ component IconShuffle inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 4 18 L 9 18 L 15 6 L 20 6 M 16 3 L 20 6 L 16 9 M 4 6 L 9 6 L 15 18 L 20 18 M 16 15 L 20 18 L 16 21";
+        commands: "M 4 18 L 8 18 L 16 6 L 20 6 M 16.5 3.5 L 20.5 6 L 16.5 8.5 M 4 6 L 8 6 L 16 18 L 20 18 M 16.5 15.5 L 20.5 18 L 16.5 20.5";
     }
 }
 
@@ -151,9 +153,9 @@ component IconRepeat inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 16 4 L 20 7 L 16 10 M 19 7 L 7 7 L 5 9 L 5 12 M 8 20 L 4 17 L 8 14 M 5 17 L 17 17 L 19 15 L 19 12";
+        commands: "M 15.5 3.5 L 19 6 L 15.5 8.5 M 18 6 L 8 6 C 6.9 6 6 6.9 6 8 L 6 11 M 8.5 15.5 L 5 18 L 8.5 20.5 M 6 18 L 16 18 C 17.1 18 18 17.1 18 16 L 18 13";
     }
 }
 
@@ -171,9 +173,9 @@ component IconRepeatOne inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 16 4 L 20 7 L 16 10 M 19 7 L 7 7 L 5 9 L 5 12 M 8 20 L 4 17 L 8 14 M 5 17 L 17 17 L 19 15 L 19 12";
+        commands: "M 15.5 3.5 L 19 6 L 15.5 8.5 M 18 6 L 8 6 C 6.9 6 6 6.9 6 8 L 6 11 M 8.5 15.5 L 5 18 L 8.5 20.5 M 6 18 L 16 18 C 17.1 18 18 17.1 18 16 L 18 13";
     }
 
     Rectangle {
@@ -201,9 +203,9 @@ component IconHeart inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: root.is-filled ? root.tint : transparent;
-        commands: "M 12 21 L 3.5 12 A 4.5 4.5 0 0 1 12 6 A 4.5 4.5 0 0 1 20.5 12 Z";
+        commands: "M 12 20 C 7 15.5 3.5 12 3.5 8.5 C 3.5 5.5 5.8 3.5 8.8 3.5 C 10.5 3.5 11.5 4.3 12 5.2 C 12.5 4.3 13.5 3.5 15.2 3.5 C 18.2 3.5 20.5 5.5 20.5 8.5 C 20.5 12 17 15.5 12 20 Z";
     }
 }
 
@@ -221,7 +223,7 @@ component IconQueue inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
         commands: "M 4 6 L 20 6 M 4 11 L 20 11 M 4 16 L 13 16";
     }
@@ -234,9 +236,9 @@ component IconQueue inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 1px;
+        stroke-width: 1.8px;
         fill: root.tint;
-        commands: "M 16 14 L 21 16.5 L 16 19 Z";
+        commands: "M 16 13.5 L 21 16 L 16 18.5 Z";
     }
 }
 
@@ -254,9 +256,9 @@ component IconSettings inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 9 12 A 3 3 0 1 0 15 12 A 3 3 0 1 0 9 12 M 5 12 A 7 7 0 1 0 19 12 A 7 7 0 1 0 5 12 M 12 2 L 12 5 M 12 19 L 12 22 M 2 12 L 5 12 M 19 12 L 22 12 M 5 5 L 7 7 M 17 17 L 19 19 M 19 5 L 17 7 M 5 19 L 7 17";
+        commands: "M 9 12 A 3 3 0 1 0 15 12 A 3 3 0 1 0 9 12 M 5.5 12 A 6.5 6.5 0 1 0 18.5 12 A 6.5 6.5 0 1 0 5.5 12 M 12 2.5 L 12 5.5 M 12 18.5 L 12 21.5 M 2.5 12 L 5.5 12 M 18.5 12 L 21.5 12 M 5.3 5.3 L 7.4 7.4 M 16.6 16.6 L 18.7 18.7 M 18.7 5.3 L 16.6 7.4 M 7.4 16.6 L 5.3 18.7";
     }
 }
 
@@ -274,9 +276,9 @@ component IconSearch inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 4 10 A 6 6 0 1 0 16 10 A 6 6 0 1 0 4 10 M 14.5 14.5 L 20.5 20.5";
+        commands: "M 4 10.5 A 6.5 6.5 0 1 0 17 10.5 A 6.5 6.5 0 1 0 4 10.5 M 15.5 15.5 L 20.5 20.5";
     }
 }
 
@@ -294,9 +296,9 @@ component IconClose inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 6 6 L 18 18 M 18 6 L 6 18";
+        commands: "M 5.5 5.5 L 18.5 18.5 M 18.5 5.5 L 5.5 18.5";
     }
 }
 
@@ -314,7 +316,7 @@ component IconPlus inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
         commands: "M 12 5 L 12 19 M 5 12 L 19 12";
     }
@@ -334,7 +336,7 @@ component IconMinus inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
         commands: "M 5 12 L 19 12";
     }
@@ -354,9 +356,9 @@ component IconCheck inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 5 13 L 9 17 L 19 7";
+        commands: "M 4.5 12.5 L 9.5 17.5 L 19.5 6.5";
     }
 }
 
@@ -374,9 +376,9 @@ component IconSpeaker inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 1px;
+        stroke-width: 1.8px;
         fill: root.tint;
-        commands: "M 4 9 L 8 9 L 13 5 L 13 19 L 8 15 L 4 15 Z";
+        commands: "M 4 9.5 L 8 9.5 L 13 5.5 L 13 18.5 L 8 14.5 L 4 14.5 Z";
     }
 
     Path {
@@ -387,9 +389,9 @@ component IconSpeaker inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 16 9 A 4.5 4.5 0 0 1 16 15 M 19 6 A 8.5 8.5 0 0 1 19 18";
+        commands: "M 16 9 A 4.5 4.5 0 0 1 16 15 M 19 6.5 A 8 8 0 0 1 19 17.5";
     }
 }
 
@@ -407,9 +409,9 @@ component IconLibrary inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 2px;
+        stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 4 5 L 8 5 L 8 19 L 4 19 Z M 9 5 L 13 5 L 13 19 L 9 19 Z M 15 5 L 19 8 L 16 19 L 14 19 Z";
+        commands: "M 4 5 C 4 4.5 4.5 4 5 4 L 7 4 C 7.5 4 8 4.5 8 5 L 8 19 C 8 19.5 7.5 20 7 20 L 5 20 C 4.5 20 4 19.5 4 19 Z M 10 5 C 10 4.5 10.5 4 11 4 L 13 4 C 13.5 4 14 4.5 14 5 L 14 19 C 14 19.5 13.5 20 13 20 L 11 20 C 10.5 20 10 19.5 10 19 Z M 16 5.5 L 19.5 7 C 20 7.2 20.2 7.8 20 8.3 L 16.5 19.5 C 16.3 20 15.7 20.2 15.2 20 L 13.5 19.2 Z";
     }
 }
 
@@ -427,9 +429,9 @@ component IconMusic inherits Rectangle {
         viewbox-width: 24;
         viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 1px;
+        stroke-width: 1.8px;
         fill: root.tint;
-        commands: "M 9 16 A 3 2.5 0 1 1 6 13.5 A 3 2.5 0 0 1 9 16 Z M 9 16 L 9 6 L 20 3 L 20 13 M 20 13 A 3 2.5 0 1 1 17 10.5 A 3 2.5 0 0 1 20 13 Z";
+        commands: "M 9 17 A 3 2.5 0 1 1 6 14.5 A 3 2.5 0 0 1 9 17 Z M 9 17 L 9 5.5 L 20 3 L 20 14 M 20 14 A 3 2.5 0 1 1 17 11.5 A 3 2.5 0 0 1 20 14 Z";
     }
 }
 
@@ -503,21 +505,21 @@ component Sidebar inherits Rectangle {
         Rectangle { height: 12px; }
 
         NavItem {
-            text: "Search";
+            text: "Buscar";
             icon-name: "search";
             is-active: root.active-page == 0;
             clicked => { root.page-selected(0); }
         }
 
         NavItem {
-            text: "Library";
+            text: "Biblioteca";
             icon-name: "library";
             is-active: root.active-page == 3;
             clicked => { root.page-selected(3); }
         }
 
         NavItem {
-            text: "Now Playing";
+            text: "Sonando";
             icon-name: "music";
             is-active: root.active-page == 2;
             clicked => { root.page-selected(2); }
@@ -667,7 +669,7 @@ component SearchView inherits VerticalLayout {
                 input := LineEdit {
                     horizontal-stretch: 1;
                     text <=> root.query;
-                    placeholder-text: "Search tracks...";
+                    placeholder-text: "Buscar canciones...";
                     accepted(text) => {
                         root.query-submitted(text);
                     }
@@ -711,7 +713,7 @@ component SearchView inherits VerticalLayout {
                 }
 
                 Text {
-                    text: "Search";
+                    text: "Buscar";
                     color: btn-touch.has-hover ? Theme.text : Theme.window;
                     font-size: 13px;
                     font-weight: 700;
@@ -726,27 +728,27 @@ component SearchView inherits VerticalLayout {
         alignment: start;
 
         FilterChip {
-            text: "All";
+            text: "Todo";
             is-active: root.active-filter == 0;
             clicked => { root.filter-selected(0); }
         }
         FilterChip {
-            text: "Songs";
+            text: "Canciones";
             is-active: root.active-filter == 1;
             clicked => { root.filter-selected(1); }
         }
         FilterChip {
-            text: "Albums";
+            text: "Álbumes";
             is-active: root.active-filter == 2;
             clicked => { root.filter-selected(2); }
         }
         FilterChip {
-            text: "Artists";
+            text: "Artistas";
             is-active: root.active-filter == 3;
             clicked => { root.filter-selected(3); }
         }
         FilterChip {
-            text: "Playlists";
+            text: "Listas";
             is-active: root.active-filter == 4;
             clicked => { root.filter-selected(4); }
         }
@@ -757,7 +759,7 @@ component SearchView inherits VerticalLayout {
         alignment: center;
 
         Text {
-            text: "No results found.";
+            text: "No se encontraron resultados.";
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
@@ -790,7 +792,7 @@ component SearchView inherits VerticalLayout {
 }
 
 export component PlayerBar inherits Rectangle {
-    in property <string> active-track-title: "No track playing";
+    in property <string> active-track-title: "Sin reproducción";
     in property <string> active-track-artist: "";
     in property <bool> is-playing: false;
     in property <int> volume: 100;
@@ -858,7 +860,7 @@ export component PlayerBar inherits Rectangle {
                 spacing: 2px;
 
                 Text {
-                    text: root.active-track-title;
+                    text: root.active-track-title == "No track playing" ? "Sin reproducción" : root.active-track-title;
                     color: Theme.text;
                     font-size: 13px;
                     font-weight: 700;
@@ -1107,7 +1109,7 @@ export component PlayerBar inherits Rectangle {
                     }
 
                     Text {
-                        text: root.queue-count > 0 ? "Queue (" + root.queue-count + ")" : "Queue";
+                        text: root.queue-count > 0 ? "Cola (" + root.queue-count + ")" : "Cola";
                         color: q-touch.has-hover ? Theme.accent : Theme.text;
                         font-size: 11px;
                         font-weight: 700;
@@ -1186,7 +1188,7 @@ export component QueueView inherits VerticalLayout {
     spacing: 8px; alignment: start;
     if root.tracks.length == 0 : VerticalLayout {
         padding-top: 24px; alignment: center;
-        Text { text: "Queue is empty."; color: Theme.secondary; font-size: 14px; horizontal-alignment: center; }
+        Text { text: "La cola está vacía."; color: Theme.secondary; font-size: 14px; horizontal-alignment: center; }
     }
     for track in root.tracks : TrackRow {
         title: track.title;
@@ -1201,7 +1203,7 @@ export component QueueView inherits VerticalLayout {
 }
 
 export component NowPlayingView inherits VerticalLayout {
-    in property <string> track-title: "No track playing";
+    in property <string> track-title: "Sin reproducción";
     in property <string> track-artist: "";
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
@@ -1223,13 +1225,13 @@ export component NowPlayingView inherits VerticalLayout {
                 image-fit: cover;
             }
             if !root.has-cover : Text {
-                text: "No Cover"; color: Theme.secondary; font-size: 12px;
+                text: "Sin portada"; color: Theme.secondary; font-size: 12px;
                 horizontal-alignment: center; vertical-alignment: center;
             }
         }
         VerticalLayout {
             spacing: 6px; alignment: center;
-            Text { text: root.track-title; color: Theme.text; font-size: 20px; font-weight: 700; }
+            Text { text: root.track-title == "No track playing" ? "Sin reproducción" : root.track-title; color: Theme.text; font-size: 20px; font-weight: 700; }
             Text { text: root.track-artist; color: Theme.secondary; font-size: 14px; }
             Rectangle { height: 6px; }
             // Progress bar
@@ -1249,8 +1251,8 @@ export component NowPlayingView inherits VerticalLayout {
         height: 140px; border-radius: 8px; background: Theme.panel;
         VerticalLayout {
             alignment: center; spacing: 4px;
-            Text { text: "No Lyrics Available"; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
-            Text { text: "Synced lyrics will appear here during playback"; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
+            Text { text: "Letras no disponibles"; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
+            Text { text: "Las letras sincronizadas aparecerán durante la reproducción"; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
         }
     }
 
@@ -1293,7 +1295,7 @@ component LibraryItemCard inherits Rectangle {
             background: Theme.surface;
 
             Text {
-                text: "Art";
+                text: "Portada";
                 color: Theme.secondary;
                 font-size: 10px;
                 horizontal-alignment: center;
@@ -1349,7 +1351,7 @@ export component LibraryView inherits VerticalLayout {
                 spacing: 8px;
 
                 Text {
-                    text: "Anonymous - paste cookies to unlock library";
+                    text: "Sesión anónima: pegar cookies para desbloquear la biblioteca";
                     color: Theme.secondary;
                     font-size: 13px;
                 }
@@ -1360,7 +1362,7 @@ export component LibraryView inherits VerticalLayout {
 
                     LineEdit {
                         text <=> root.cookie-text;
-                        placeholder-text: "Paste session cookies...";
+                        placeholder-text: "Pegar cookies de sesión...";
                         input-type: password;
                         accepted(t) => { root.sign-in-submitted(t); }
                     }
@@ -1376,7 +1378,7 @@ export component LibraryView inherits VerticalLayout {
                         }
 
                         Text {
-                            text: "Sign in";
+                            text: "Iniciar sesión";
                             color: sign-in-btn.has-hover ? Theme.text : Theme.window;
                             font-size: 12px;
                             font-weight: 700;
@@ -1392,7 +1394,7 @@ export component LibraryView inherits VerticalLayout {
                 alignment: space-between;
 
                 Text {
-                    text: "Signed in - library unlocked";
+                    text: "Sesión iniciada: biblioteca desbloqueada";
                     color: Theme.accent;
                     font-size: 13px;
                     font-weight: 700;
@@ -1411,7 +1413,7 @@ export component LibraryView inherits VerticalLayout {
                     }
 
                     Text {
-                        text: "Sign out";
+                        text: "Cerrar sesión";
                         color: Theme.text;
                         font-size: 12px;
                         font-weight: 700;
@@ -1425,22 +1427,22 @@ export component LibraryView inherits VerticalLayout {
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Playlists"; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.playlists.length == 0 : Text { text: "No playlists."; color: Theme.secondary; font-size: 13px; }
+        Text { text: "Listas de reproducción"; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.playlists.length == 0 : Text { text: "No hay listas de reproducción."; color: Theme.secondary; font-size: 13px; }
         for item in root.playlists : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.playlist-selected(item.index); } }
     }
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Albums"; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.albums.length == 0 : Text { text: "No albums."; color: Theme.secondary; font-size: 13px; }
+        Text { text: "Álbumes"; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.albums.length == 0 : Text { text: "No hay álbumes."; color: Theme.secondary; font-size: 13px; }
         for item in root.albums : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.album-selected(item.index); } }
     }
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Artists"; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.artists.length == 0 : Text { text: "No artists."; color: Theme.secondary; font-size: 13px; }
+        Text { text: "Artistas"; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.artists.length == 0 : Text { text: "No hay artistas."; color: Theme.secondary; font-size: 13px; }
         for item in root.artists : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.artist-selected(item.index); } }
     }
 }
@@ -1462,7 +1464,7 @@ export component DetailView inherits VerticalLayout {
         padding-top: 24px;
         alignment: center;
         Text {
-            text: "No detail available.";
+            text: "No hay detalles disponibles.";
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
@@ -1496,7 +1498,7 @@ export component DetailView inherits VerticalLayout {
                     image-fit: ImageFit.cover;
                 }
                 if root.cover.width == 0 && (root.tracks.length == 0 || root.tracks[0].cover.width == 0) : Text {
-                    text: root.kind-label != "" ? (root.kind-label == "Album" ? "ALBUM" : (root.kind-label == "Artist" ? "ARTIST" : (root.kind-label == "Playlist" ? "PLAYLIST" : root.kind-label))) : "No Cover";
+                    text: root.kind-label != "" ? (root.kind-label == "Album" ? "ÁLBUM" : (root.kind-label == "Artist" ? "ARTISTA" : (root.kind-label == "Playlist" ? "LISTA" : root.kind-label))) : "Sin portada";
                     color: Theme.secondary;
                     font-size: 12px;
                     font-weight: 700;
@@ -1511,7 +1513,7 @@ export component DetailView inherits VerticalLayout {
                 horizontal-stretch: 1;
 
                 Text {
-                    text: root.kind-label == "Album" ? "ALBUM" : (root.kind-label == "Artist" ? "ARTIST" : (root.kind-label == "Playlist" ? "PLAYLIST" : root.kind-label));
+                    text: root.kind-label == "Album" ? "ÁLBUM" : (root.kind-label == "Artist" ? "ARTISTA" : (root.kind-label == "Playlist" ? "LISTA" : root.kind-label));
                     color: Theme.accent;
                     font-size: 11px;
                     font-weight: 700;
@@ -1560,7 +1562,7 @@ export component DetailView inherits VerticalLayout {
                             }
 
                             Text {
-                                text: "Play";
+                                text: "Reproducir";
                                 color: play-touch.has-hover ? Theme.text : Theme.window;
                                 font-size: 13px;
                                 font-weight: 700;
@@ -1591,7 +1593,7 @@ export component DetailView inherits VerticalLayout {
                             }
 
                             Text {
-                                text: "Shuffle";
+                                text: "Aleatorio";
                                 color: shuf-touch.has-hover ? Theme.accent : Theme.text;
                                 font-size: 13px;
                                 font-weight: 700;
@@ -1612,7 +1614,7 @@ export component DetailView inherits VerticalLayout {
             padding-top: 16px;
             alignment: center;
             Text {
-                text: "No tracks in detail.";
+                text: "No hay canciones disponibles.";
                 color: Theme.secondary;
                 font-size: 13px;
                 horizontal-alignment: center;
@@ -1637,7 +1639,7 @@ export component SettingsView inherits VerticalLayout {
     in property <bool> signed-in: false;
     in-out property <string> cookie-text: "";
     in property <string> app-version: "0.1.0";
-    in property <string> update-status-text: "Up to date";
+    in property <string> update-status-text: "Actualizado";
     in property <bool> has-update: false;
 
     callback theme-selected(int);
@@ -1653,7 +1655,7 @@ export component SettingsView inherits VerticalLayout {
         spacing: 10px;
 
         Text {
-            text: "Theme";
+            text: "Tema";
             color: Theme.text;
             font-size: 16px;
             font-weight: 700;
@@ -1683,7 +1685,7 @@ export component SettingsView inherits VerticalLayout {
                     }
 
                     Text {
-                        text: "White";
+                        text: "Blanco";
                         color: root.active-theme-index == 0 ? Theme.window : Theme.text;
                         font-size: 13px;
                         font-weight: 600;
@@ -1714,7 +1716,7 @@ export component SettingsView inherits VerticalLayout {
                     }
 
                     Text {
-                        text: "Black OLED";
+                        text: "Negro OLED";
                         color: root.active-theme-index == 1 ? Theme.window : Theme.text;
                         font-size: 13px;
                         font-weight: 600;
@@ -1745,7 +1747,7 @@ export component SettingsView inherits VerticalLayout {
                     }
 
                     Text {
-                        text: "Monochrome";
+                        text: "Monocromo";
                         color: root.active-theme-index == 2 ? Theme.window : Theme.text;
                         font-size: 13px;
                         font-weight: 600;
@@ -1762,7 +1764,7 @@ export component SettingsView inherits VerticalLayout {
         spacing: 10px;
 
         Text {
-            text: "Playback";
+            text: "Reproducción";
             color: Theme.text;
             font-size: 16px;
             font-weight: 700;
@@ -1777,7 +1779,7 @@ export component SettingsView inherits VerticalLayout {
                 alignment: space-between;
 
                 Text {
-                    text: "Playback Speed";
+                    text: "Velocidad de reproducción";
                     color: Theme.text;
                     font-size: 14px;
                     vertical-alignment: center;
@@ -1812,7 +1814,7 @@ export component SettingsView inherits VerticalLayout {
         spacing: 10px;
 
         Text {
-            text: "Session";
+            text: "Sesión";
             color: Theme.text;
             font-size: 16px;
             font-weight: 700;
@@ -1830,7 +1832,7 @@ export component SettingsView inherits VerticalLayout {
                     alignment: space-between;
 
                     Text {
-                        text: "Status: Signed in";
+                        text: "Estado: Sesión iniciada";
                         color: Theme.accent;
                         font-size: 14px;
                         font-weight: 600;
@@ -1849,7 +1851,7 @@ export component SettingsView inherits VerticalLayout {
                         }
 
                         Text {
-                            text: "Sign out";
+                            text: "Cerrar sesión";
                             color: Theme.text;
                             font-size: 12px;
                             font-weight: 700;
@@ -1863,7 +1865,7 @@ export component SettingsView inherits VerticalLayout {
                     spacing: 10px;
 
                     Text {
-                        text: "Status: Anonymous";
+                        text: "Estado: Anónimo";
                         color: Theme.secondary;
                         font-size: 14px;
                     }
@@ -1874,7 +1876,7 @@ export component SettingsView inherits VerticalLayout {
 
                         LineEdit {
                             text <=> root.cookie-text;
-                            placeholder-text: "Paste session cookies...";
+                            placeholder-text: "Pegar cookies de sesión...";
                             input-type: password;
                             accepted(t) => { root.sign-in-submitted(t); }
                         }
@@ -1890,7 +1892,7 @@ export component SettingsView inherits VerticalLayout {
                             }
 
                             Text {
-                                text: "Sign in";
+                                text: "Iniciar sesión";
                                 color: sign-in-touch.has-hover ? Theme.text : Theme.window;
                                 font-size: 12px;
                                 font-weight: 700;
@@ -1909,7 +1911,7 @@ export component SettingsView inherits VerticalLayout {
         spacing: 10px;
 
         Text {
-            text: "About";
+            text: "Acerca de";
             color: Theme.text;
             font-size: 16px;
             font-weight: 700;
@@ -1927,7 +1929,7 @@ export component SettingsView inherits VerticalLayout {
                     alignment: space-between;
 
                     Text {
-                        text: "App Version";
+                        text: "Versión de la app";
                         color: Theme.secondary;
                         font-size: 13px;
                     }
@@ -1944,13 +1946,15 @@ export component SettingsView inherits VerticalLayout {
                     alignment: space-between;
 
                     Text {
-                        text: "Update Status";
+                        text: "Estado de actualización";
                         color: Theme.secondary;
                         font-size: 13px;
                     }
 
                     Text {
-                        text: root.update-status-text;
+                        text: root.update-status-text == "Up to date" ? "Actualizado" : (
+                            root.update-status-text == "Update available" ? "Actualización disponible" : root.update-status-text
+                        );
                         color: root.has-update ? Theme.accent : Theme.secondary;
                         font-size: 13px;
                         font-weight: 600;
@@ -1967,7 +1971,7 @@ export component SettingsDialog inherits Rectangle {
     in property <bool> signed-in: false;
     in-out property <string> cookie-text: "";
     in property <string> app-version: "0.1.0";
-    in property <string> update-status-text: "Up to date";
+    in property <string> update-status-text: "Actualizado";
     in property <bool> has-update: false;
 
     callback close();
@@ -1993,7 +1997,7 @@ export component SettingsDialog inherits Rectangle {
             alignment: space-between;
 
             Text {
-                text: "Settings";
+                text: "Ajustes";
                 color: Theme.text;
                 font-size: 18px;
                 font-weight: 700;
@@ -2012,7 +2016,7 @@ export component SettingsDialog inherits Rectangle {
                 }
 
                 IconClose {
-                    size: 14px;
+                    size: 16px;
                     tint: close-touch.has-hover ? Theme.accent : Theme.secondary;
                 }
             }
@@ -2028,7 +2032,7 @@ export component SettingsDialog inherits Rectangle {
             spacing: 8px;
 
             Text {
-                text: "Theme";
+                text: "Tema";
                 color: Theme.text;
                 font-size: 14px;
                 font-weight: 700;
@@ -2049,7 +2053,7 @@ export component SettingsDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: "White";
+                        text: "Blanco";
                         color: root.active-theme-index == 0 ? Theme.window : Theme.text;
                         font-size: 12px;
                         font-weight: 600;
@@ -2070,7 +2074,7 @@ export component SettingsDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: "Black OLED";
+                        text: "Negro OLED";
                         color: root.active-theme-index == 1 ? Theme.window : Theme.text;
                         font-size: 12px;
                         font-weight: 600;
@@ -2091,7 +2095,7 @@ export component SettingsDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: "Monochrome";
+                        text: "Monocromo";
                         color: root.active-theme-index == 2 ? Theme.window : Theme.text;
                         font-size: 12px;
                         font-weight: 600;
@@ -2107,7 +2111,7 @@ export component SettingsDialog inherits Rectangle {
             spacing: 8px;
 
             Text {
-                text: "Playback";
+                text: "Reproducción";
                 color: Theme.text;
                 font-size: 14px;
                 font-weight: 700;
@@ -2117,7 +2121,7 @@ export component SettingsDialog inherits Rectangle {
                 alignment: space-between;
 
                 Text {
-                    text: "Playback Speed";
+                    text: "Velocidad de reproducción";
                     color: Theme.secondary;
                     font-size: 13px;
                     vertical-alignment: center;
@@ -2151,7 +2155,7 @@ export component SettingsDialog inherits Rectangle {
             spacing: 8px;
 
             Text {
-                text: "Session";
+                text: "Sesión";
                 color: Theme.text;
                 font-size: 14px;
                 font-weight: 700;
@@ -2161,7 +2165,7 @@ export component SettingsDialog inherits Rectangle {
                 alignment: space-between;
 
                 Text {
-                    text: "Status: Signed in";
+                    text: "Estado: Sesión iniciada";
                     color: Theme.accent;
                     font-size: 13px;
                     font-weight: 600;
@@ -2180,7 +2184,7 @@ export component SettingsDialog inherits Rectangle {
                     }
 
                     Text {
-                        text: "Sign out";
+                        text: "Cerrar sesión";
                         color: Theme.text;
                         font-size: 12px;
                         font-weight: 700;
@@ -2194,7 +2198,7 @@ export component SettingsDialog inherits Rectangle {
                 spacing: 8px;
 
                 Text {
-                    text: "Status: Anonymous";
+                    text: "Estado: Anónimo";
                     color: Theme.secondary;
                     font-size: 13px;
                 }
@@ -2205,7 +2209,7 @@ export component SettingsDialog inherits Rectangle {
 
                     LineEdit {
                         text <=> root.cookie-text;
-                        placeholder-text: "Paste session cookies...";
+                        placeholder-text: "Pegar cookies de sesión...";
                         input-type: password;
                         accepted(t) => { root.sign-in-submitted(t); }
                     }
@@ -2221,7 +2225,7 @@ export component SettingsDialog inherits Rectangle {
                         }
 
                         Text {
-                            text: "Sign in";
+                            text: "Iniciar sesión";
                             color: sign-in-touch.has-hover ? Theme.text : Theme.window;
                             font-size: 12px;
                             font-weight: 700;
@@ -2238,7 +2242,7 @@ export component SettingsDialog inherits Rectangle {
             spacing: 6px;
 
             Text {
-                text: "About";
+                text: "Acerca de";
                 color: Theme.text;
                 font-size: 14px;
                 font-weight: 700;
@@ -2248,7 +2252,7 @@ export component SettingsDialog inherits Rectangle {
                 alignment: space-between;
 
                 Text {
-                    text: "App Version";
+                    text: "Versión de la app";
                     color: Theme.secondary;
                     font-size: 12px;
                 }
@@ -2265,13 +2269,15 @@ export component SettingsDialog inherits Rectangle {
                 alignment: space-between;
 
                 Text {
-                    text: "Update Status";
+                    text: "Estado de actualización";
                     color: Theme.secondary;
                     font-size: 12px;
                 }
 
                 Text {
-                    text: root.update-status-text;
+                    text: root.update-status-text == "Up to date" ? "Actualizado" : (
+                        root.update-status-text == "Update available" ? "Actualización disponible" : root.update-status-text
+                    );
                     color: root.has-update ? Theme.accent : Theme.secondary;
                     font-size: 12px;
                     font-weight: 600;
@@ -2283,7 +2289,7 @@ export component SettingsDialog inherits Rectangle {
 
 component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
-    in property <string> header-title: "Search";
+    in property <string> header-title: "Buscar";
     in property <bool> has-update: false;
     in-out property <string> query: "";
     in-out property <string> cookie-text: "";
@@ -2292,7 +2298,7 @@ component ContentArea inherits Rectangle {
     in property <int> search-filter: 0;
     in property <[TrackRowData]> queue-tracks: [];
     in property <int> queue-selected-index: -1;
-    in property <string> active-track-title: "No track playing";
+    in property <string> active-track-title: "Sin reproducción";
     in property <string> active-track-artist: "";
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
@@ -2309,7 +2315,7 @@ component ContentArea inherits Rectangle {
     in property <string> playback-speed-text: "1.00x";
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
-    in property <string> update-status-text: "Up to date";
+    in property <string> update-status-text: "Actualizado";
 
     callback query-submitted(string);
     callback track-selected(int);
@@ -2325,22 +2331,30 @@ component ContentArea inherits Rectangle {
     callback cycle-playback-speed();
 
     background: Theme.window;
+    clip: true;
 
-    VerticalLayout {
-        padding: 24px;
-        spacing: 16px;
-        alignment: start;
+    Flickable {
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+            alignment: start;
 
-        HorizontalLayout {
-            alignment: space-between;
+            HorizontalLayout {
+                alignment: space-between;
 
-            Text {
-                text: root.header-title;
-                color: Theme.text;
-                font-size: 24px;
-                font-weight: 700;
-                vertical-alignment: center;
-            }
+                Text {
+                    text: root.header-title == "Search" ? "Buscar" : (
+                        root.header-title == "Queue" ? "Cola" : (
+                        root.header-title == "Now Playing" ? "Sonando" : (
+                        root.header-title == "Library" ? "Biblioteca" : (
+                        root.header-title == "Detail" ? "Detalle" : (
+                        root.header-title == "Settings" ? "Ajustes" : root.header-title
+                    )))));
+                    color: Theme.text;
+                    font-size: 24px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
 
             if root.active-page != 5 : Rectangle {
                 width: 32px;
@@ -2438,6 +2452,7 @@ component ContentArea inherits Rectangle {
             sign-out => { root.sign-out(); }
         }
     }
+    }
 }
 
 export component MoggytWindow inherits Window {
@@ -2461,13 +2476,13 @@ export component MoggytWindow inherits Window {
     in-out property <bool> theme-dark <=> Theme.dark;
 
     in-out property <int> active-page: 0;
-    in-out property <string> header-title: "Search";
+    in-out property <string> header-title: "Buscar";
     in-out property <bool> show-settings: false;
     in-out property <int> active-theme-index: 0;
     in-out property <string> playback-speed-text: "1.00x";
     in-out property <string> settings-cookie-text: "";
     in-out property <string> app-version: "0.1.0";
-    in-out property <string> update-status-text: "Up to date";
+    in-out property <string> update-status-text: "Actualizado";
     in-out property <bool> has-update: false;
     in-out property <string> query: "";
     in-out property <string> cookie-text: "";
@@ -2476,7 +2491,7 @@ export component MoggytWindow inherits Window {
     in-out property <int> search-filter: 0;
     in-out property <[TrackRowData]> queue-tracks: [];
     in-out property <int> queue-selected-index: -1;
-    in-out property <string> active-track-title: "No track playing";
+    in-out property <string> active-track-title: "Sin reproducción";
     in-out property <string> active-track-artist: "";
     in-out property <bool> is-playing: false;
     in-out property <int> volume: 100;
@@ -2527,15 +2542,18 @@ export component MoggytWindow inherits Window {
         spacing: 0;
 
         HorizontalLayout {
+            vertical-stretch: 1;
             padding: 0;
             spacing: 0;
 
             Sidebar {
+                width: 200px;
                 active-page: root.active-page;
                 page-selected(idx) => { root.page-selected(idx); }
             }
 
             ContentArea {
+                horizontal-stretch: 1;
                 active-page: root.active-page; header-title: root.header-title; query <=> root.query; shelves: root.shelves;
                 search-filter: root.search-filter;
                 cookie-text <=> root.cookie-text; signed-in: root.signed-in;
@@ -2568,6 +2586,8 @@ export component MoggytWindow inherits Window {
         }
 
         PlayerBar {
+            vertical-stretch: 0;
+            height: 72px;
             active-track-title: root.active-track-title;
             active-track-artist: root.active-track-artist;
             is-playing: root.is-playing;
