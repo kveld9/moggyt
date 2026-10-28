@@ -13,7 +13,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::domain::{
     Album, Artist, Detail, DetailKind, PlaybackQueue, Playlist, SearchQuery, SearchResult, Shelf,
-    SleepTimer, Track, extract_playlist_id,
+    SleepTimer, ThemeId, Track, extract_playlist_id,
 };
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CredentialStore, DesktopPresence, DiscordPresence,
@@ -30,6 +30,7 @@ use crate::slint_shell::detail::detail_kind_label;
 use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback::{format_position, format_track_duration};
 use crate::slint_shell::search::format_duration;
+use crate::slint_shell::theme::apply_theme;
 use crate::slint_shell::{
     LibraryItemData, LyricLineData, MoggytWindow, ShelfData, SlintPage, TrackRowData,
 };
@@ -186,6 +187,7 @@ pub struct SlintAppState<
     pub autoplay: bool,
     pub hi_res_covers: bool,
     pub signed_in: bool,
+    pub theme: ThemeId,
 }
 
 /// Shared reference-counted wrapper for [`SlintAppState`].
@@ -241,6 +243,7 @@ impl<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCach
             autoplay: false,
             hi_res_covers: false,
             signed_in,
+            theme: ThemeId::default(),
         }
     }
 
@@ -608,6 +611,7 @@ fn sync_window<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K:
     window: &MoggytWindow,
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
+    apply_theme(window, state.theme);
     window.set_active_page(state.page.to_index());
     window.set_header_title(state.page.title().into());
     window.set_is_playing(state.audio.is_playing());
@@ -1111,6 +1115,7 @@ pub fn run() -> anyhow::Result<()> {
     state.audio.set_skip_silence(settings.skip_silence);
     state.audio.set_loudness_normalization(settings.loudness_normalization);
     state.hi_res_covers = settings.hi_res_covers;
+    state.theme = settings.theme;
     state.settings_store = Box::new(settings_store);
 
     let queue_store = DiskQueueStore::new(config_dir.clone());
