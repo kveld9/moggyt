@@ -1,0 +1,172 @@
+component NavItem inherits Rectangle {
+    in property <string> text;
+    in property <bool> is-active: false;
+    callback clicked();
+
+    height: 40px;
+    border-radius: 6px;
+    background: root.is-active ? #282828 : (touch.has-hover ? #1a1a1a : #00000000);
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        alignment: start;
+
+        Text {
+            text: root.text;
+            color: root.is-active ? #ffffff : #b3b3b3;
+            font-size: 14px;
+            font-weight: 700;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component Sidebar inherits Rectangle {
+    in property <int> active-page: 0;
+    callback page-selected(int);
+
+    width: 200px;
+    background: #000000;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        alignment: start;
+
+        Text {
+            text: "Moggyt";
+            color: #1db954;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        Rectangle { height: 12px; }
+
+        NavItem {
+            text: "Search";
+            is-active: root.active-page == 0;
+            clicked => { root.page-selected(0); }
+        }
+
+        NavItem {
+            text: "Queue";
+            is-active: root.active-page == 1;
+            clicked => { root.page-selected(1); }
+        }
+
+        NavItem {
+            text: "Now Playing";
+            is-active: root.active-page == 2;
+            clicked => { root.page-selected(2); }
+        }
+
+        NavItem {
+            text: "Library";
+            is-active: root.active-page == 3;
+            clicked => { root.page-selected(3); }
+        }
+
+        NavItem {
+            text: "Detail";
+            is-active: root.active-page == 4;
+            clicked => { root.page-selected(4); }
+        }
+    }
+}
+
+component ContentArea inherits Rectangle {
+    in property <int> active-page: 0;
+    in property <string> header-title: "Search";
+
+    background: #121212;
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 16px;
+        alignment: start;
+
+        Text {
+            text: root.header-title;
+            color: #ffffff;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        Rectangle {
+            height: 1px;
+            background: #282828;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 12px;
+
+            if root.active-page == 0 : Text {
+                text: "Search Page Placeholder";
+                color: #b3b3b3;
+                font-size: 16px;
+                horizontal-alignment: center;
+            }
+            if root.active-page == 1 : Text {
+                text: "Queue Page Placeholder";
+                color: #b3b3b3;
+                font-size: 16px;
+                horizontal-alignment: center;
+            }
+            if root.active-page == 2 : Text {
+                text: "Now Playing Page Placeholder";
+                color: #b3b3b3;
+                font-size: 16px;
+                horizontal-alignment: center;
+            }
+            if root.active-page == 3 : Text {
+                text: "Library Page Placeholder";
+                color: #b3b3b3;
+                font-size: 16px;
+                horizontal-alignment: center;
+            }
+            if root.active-page == 4 : Text {
+                text: "Detail Page Placeholder";
+                color: #b3b3b3;
+                font-size: 16px;
+                horizontal-alignment: center;
+            }
+        }
+    }
+}
+
+export component MoggytWindow inherits Window {
+    title: "Moggyt";
+    min-width: 800px;
+    min-height: 500px;
+    preferred-width: 1024px;
+    preferred-height: 640px;
+    background: #121212;
+
+    in-out property <int> active-page: 0;
+    in-out property <string> header-title: "Search";
+
+    callback page-selected(int);
+
+    HorizontalLayout {
+        padding: 0;
+        spacing: 0;
+
+        Sidebar {
+            active-page: root.active-page;
+            page-selected(idx) => {
+                root.page-selected(idx);
+            }
+        }
+
+        ContentArea {
+            active-page: root.active-page;
+            header-title: root.header-title;
+        }
+    }
+}
