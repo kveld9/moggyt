@@ -39,29 +39,439 @@ global Theme {
     in-out property <bool> dark;
 }
 
+component IconPlay inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        fill: root.tint;
+        stroke: root.tint;
+        stroke-width: 1px;
+        commands: "M 8 5 L 19 12 L 8 19 Z";
+    }
+}
+
+component IconPause inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        fill: root.tint;
+        commands: "M 6 5 L 10 5 L 10 19 L 6 19 Z M 14 5 L 18 5 L 18 19 L 14 19 Z";
+    }
+}
+
+component IconPrev inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        fill: root.tint;
+        stroke: root.tint;
+        stroke-width: 1px;
+        commands: "M 6 5 L 8 5 L 8 19 L 6 19 Z M 18 5 L 8 12 L 18 19 Z";
+    }
+}
+
+component IconNext inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        fill: root.tint;
+        stroke: root.tint;
+        stroke-width: 1px;
+        commands: "M 6 5 L 16 12 L 6 19 Z M 16 5 L 18 5 L 18 19 L 16 19 Z";
+    }
+}
+
+component IconShuffle inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 4 18 L 9 18 L 15 6 L 20 6 M 16 3 L 20 6 L 16 9 M 4 6 L 9 6 L 15 18 L 20 18 M 16 15 L 20 18 L 16 21";
+    }
+}
+
+component IconRepeat inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 16 4 L 20 7 L 16 10 M 19 7 L 7 7 L 5 9 L 5 12 M 8 20 L 4 17 L 8 14 M 5 17 L 17 17 L 19 15 L 19 12";
+    }
+}
+
+component IconRepeatOne inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 16 4 L 20 7 L 16 10 M 19 7 L 7 7 L 5 9 L 5 12 M 8 20 L 4 17 L 8 14 M 5 17 L 17 17 L 19 15 L 19 12";
+    }
+
+    Rectangle {
+        x: (parent.width - 4px) / 2;
+        y: (parent.height - 4px) / 2;
+        width: 4px;
+        height: 4px;
+        border-radius: 2px;
+        background: root.tint;
+    }
+}
+
+component IconHeart inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    in property <bool> is-filled: false;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: root.is-filled ? root.tint : transparent;
+        commands: "M 12 21 L 3.5 12 A 4.5 4.5 0 0 1 12 6 A 4.5 4.5 0 0 1 20.5 12 Z";
+    }
+}
+
+component IconQueue inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 4 6 L 20 6 M 4 11 L 20 11 M 4 16 L 13 16";
+    }
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1px;
+        fill: root.tint;
+        commands: "M 16 14 L 21 16.5 L 16 19 Z";
+    }
+}
+
+component IconSettings inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 9 12 A 3 3 0 1 0 15 12 A 3 3 0 1 0 9 12 M 5 12 A 7 7 0 1 0 19 12 A 7 7 0 1 0 5 12 M 12 2 L 12 5 M 12 19 L 12 22 M 2 12 L 5 12 M 19 12 L 22 12 M 5 5 L 7 7 M 17 17 L 19 19 M 19 5 L 17 7 M 5 19 L 7 17";
+    }
+}
+
+component IconSearch inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 4 10 A 6 6 0 1 0 16 10 A 6 6 0 1 0 4 10 M 14.5 14.5 L 20.5 20.5";
+    }
+}
+
+component IconClose inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 6 6 L 18 18 M 18 6 L 6 18";
+    }
+}
+
+component IconPlus inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 12 5 L 12 19 M 5 12 L 19 12";
+    }
+}
+
+component IconMinus inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 5 12 L 19 12";
+    }
+}
+
+component IconCheck inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 5 13 L 9 17 L 19 7";
+    }
+}
+
+component IconSpeaker inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1px;
+        fill: root.tint;
+        commands: "M 4 9 L 8 9 L 13 5 L 13 19 L 8 15 L 4 15 Z";
+    }
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 16 9 A 4.5 4.5 0 0 1 16 15 M 19 6 A 8.5 8.5 0 0 1 19 18";
+    }
+}
+
+component IconLibrary inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 2px;
+        fill: transparent;
+        commands: "M 4 5 L 8 5 L 8 19 L 4 19 Z M 9 5 L 13 5 L 13 19 L 9 19 Z M 15 5 L 19 8 L 16 19 L 14 19 Z";
+    }
+}
+
+component IconMusic inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1px;
+        fill: root.tint;
+        commands: "M 9 16 A 3 2.5 0 1 1 6 13.5 A 3 2.5 0 0 1 9 16 Z M 9 16 L 9 6 L 20 3 L 20 13 M 20 13 A 3 2.5 0 1 1 17 10.5 A 3 2.5 0 0 1 20 13 Z";
+    }
+}
+
 component NavItem inherits Rectangle {
     in property <string> text;
+    in property <string> icon-name: "";
     in property <bool> is-active: false;
     callback clicked();
 
     height: 40px;
-    border-radius: 6px;
-    background: root.is-active ? Theme.surface : (touch.has-hover ? Theme.hover : transparent);
+    border-radius: 8px;
+    background: root.is-active ? Theme.surface : (touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent));
+    animate background { duration: 150ms; easing: ease-in-out; }
 
     touch := TouchArea {
         clicked => { root.clicked(); }
     }
 
     HorizontalLayout {
-        padding-left: 12px;
-        padding-right: 12px;
+        padding-left: 20px;
+        padding-right: 16px;
+        spacing: 12px;
         alignment: start;
+
+        if root.icon-name == "search" : IconSearch {
+            size: 18px;
+            tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+        }
+        if root.icon-name == "library" : IconLibrary {
+            size: 18px;
+            tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+        }
+        if root.icon-name == "music" : IconMusic {
+            size: 18px;
+            tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+        }
 
         Text {
             text: root.text;
-            color: root.is-active ? Theme.text : Theme.secondary;
+            color: root.is-active ? Theme.text : (touch.has-hover ? Theme.text : Theme.secondary);
             font-size: 14px;
-            font-weight: 700;
+            font-weight: root.is-active ? 700 : 500;
             vertical-alignment: center;
         }
     }
@@ -90,18 +500,21 @@ component Sidebar inherits Rectangle {
 
         NavItem {
             text: "Search";
+            icon-name: "search";
             is-active: root.active-page == 0;
             clicked => { root.page-selected(0); }
         }
 
         NavItem {
             text: "Library";
+            icon-name: "library";
             is-active: root.active-page == 3;
             clicked => { root.page-selected(3); }
         }
 
         NavItem {
             text: "Now Playing";
+            icon-name: "music";
             is-active: root.active-page == 2;
             clicked => { root.page-selected(2); }
         }
@@ -115,7 +528,8 @@ component FilterChip inherits Rectangle {
 
     height: 28px;
     border-radius: 14px;
-    background: root.is-active ? Theme.accent : (touch.has-hover ? Theme.hover : Theme.surface);
+    background: root.is-active ? (touch.pressed ? Theme.overlay : Theme.accent) : (touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : Theme.surface));
+    animate background { duration: 150ms; easing: ease-in-out; }
 
     touch := TouchArea {
         clicked => { root.clicked(); }
@@ -152,8 +566,9 @@ component TrackRow inherits Rectangle {
     );
 
     height: 56px;
-    border-radius: 6px;
-    background: root.is-active ? Theme.surface : (touch.has-hover ? Theme.hover : transparent);
+    border-radius: 8px;
+    background: root.is-active ? (touch.pressed ? Theme.overlay : Theme.surface) : (touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent));
+    animate background { duration: 150ms; easing: ease-in-out; }
 
     touch := TouchArea {
         clicked => { root.clicked(); }
@@ -167,7 +582,7 @@ component TrackRow inherits Rectangle {
         Rectangle {
             width: 40px;
             height: 40px;
-            border-radius: 4px;
+            border-radius: 6px;
             background: Theme.surface;
             clip: true;
 
@@ -203,7 +618,8 @@ component TrackRow inherits Rectangle {
         if root.duration != "" : Text {
             text: root.duration;
             color: Theme.secondary;
-            font-size: 13px;
+            font-size: 12px;
+            font-weight: 500;
             vertical-alignment: center;
             horizontal-alignment: right;
         }
@@ -225,30 +641,78 @@ component SearchView inherits VerticalLayout {
         spacing: 8px;
         height: 36px;
 
-        input := LineEdit {
-            text <=> root.query;
-            placeholder-text: "Search tracks...";
-            accepted(text) => {
-                root.query-submitted(text);
+        search-box := Rectangle {
+            horizontal-stretch: 1;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: input.has-focus ? Theme.accent : Theme.border;
+            background: Theme.surface;
+            animate border-color { duration: 150ms; easing: ease-in-out; }
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 8px;
+                spacing: 8px;
+                alignment: center;
+
+                IconSearch {
+                    size: 16px;
+                    tint: input.has-focus ? Theme.accent : Theme.secondary;
+                }
+
+                input := LineEdit {
+                    horizontal-stretch: 1;
+                    text <=> root.query;
+                    placeholder-text: "Search tracks...";
+                    accepted(text) => {
+                        root.query-submitted(text);
+                    }
+                }
+
+                if root.query != "" : Rectangle {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 10px;
+                    background: clear-touch.has-hover ? Theme.hover : transparent;
+
+                    clear-touch := TouchArea {
+                        clicked => { root.query = ""; }
+                    }
+
+                    IconClose {
+                        size: 10px;
+                        tint: clear-touch.has-hover ? Theme.text : Theme.secondary;
+                    }
+                }
             }
         }
 
         Rectangle {
-            width: 80px;
-            border-radius: 6px;
-            background: btn-touch.has-hover ? Theme.hover : Theme.accent;
+            width: 92px;
+            border-radius: 8px;
+            background: btn-touch.pressed ? Theme.overlay : (btn-touch.has-hover ? Theme.hover : Theme.accent);
+            animate background { duration: 150ms; easing: ease-in-out; }
 
             btn-touch := TouchArea {
                 clicked => { root.query-submitted(root.query); }
             }
 
-            Text {
-                text: "Search";
-                color: btn-touch.has-hover ? Theme.text : Theme.window;
-                font-size: 13px;
-                font-weight: 700;
-                vertical-alignment: center;
-                horizontal-alignment: center;
+            HorizontalLayout {
+                alignment: center;
+                spacing: 6px;
+
+                IconSearch {
+                    size: 14px;
+                    tint: btn-touch.has-hover ? Theme.text : Theme.window;
+                }
+
+                Text {
+                    text: "Search";
+                    color: btn-touch.has-hover ? Theme.text : Theme.window;
+                    font-size: 13px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
             }
         }
     }
@@ -372,7 +836,7 @@ export component PlayerBar inherits Rectangle {
             Rectangle {
                 width: 44px;
                 height: 44px;
-                border-radius: 4px;
+                border-radius: 6px;
                 background: Theme.surface;
                 clip: true;
 
@@ -406,133 +870,176 @@ export component PlayerBar inherits Rectangle {
             }
 
             Rectangle {
-                width: 32px;
-                height: 32px;
-                border-radius: 16px;
-                background: root.is-liked ? Theme.surface : (like-touch.has-hover ? Theme.hover : transparent);
+                width: 36px;
+                height: 36px;
+                border-radius: 18px;
+                background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (root.is-liked ? Theme.surface : transparent));
+                animate background { duration: 150ms; easing: ease-in-out; }
 
                 like-touch := TouchArea {
                     clicked => { root.toggle-like(); }
                 }
 
-                Text {
-                    text: "<3";
-                    color: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
-                    font-size: 12px;
-                    font-weight: 700;
-                    vertical-alignment: center;
-                    horizontal-alignment: center;
+                IconHeart {
+                    tint: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
+                    size: 18px;
+                    is-filled: root.is-liked;
                 }
             }
         }
 
-        // CENTER ZONE: Shuffle, Prev, Play/Pause, Next, Repeat + Progress row
+        // CENTER ZONE: Shuffle, Prev, -10s, Play/Pause, +10s, Next, Repeat + Progress row
         VerticalLayout {
             horizontal-stretch: 1;
             alignment: center;
             spacing: 4px;
 
             HorizontalLayout {
-                spacing: 12px;
+                spacing: 8px;
                 alignment: center;
 
                 Rectangle {
-                    width: 44px;
-                    height: 26px;
-                    border-radius: 4px;
-                    background: root.is-shuffle ? Theme.surface : (shuf-touch.has-hover ? Theme.hover : transparent);
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 18px;
+                    background: shuf-touch.pressed ? Theme.overlay : (root.is-shuffle ? Theme.surface : (shuf-touch.has-hover ? Theme.hover : transparent));
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     shuf-touch := TouchArea {
                         clicked => { root.toggle-shuffle(); }
                     }
 
-                    Text {
-                        text: "Shuf";
-                        color: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
-                        font-size: 11px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
+                    IconShuffle {
+                        tint: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
+                        size: 18px;
                     }
                 }
 
                 Rectangle {
                     width: 36px;
-                    height: 26px;
-                    border-radius: 4px;
-                    background: pt.has-hover ? Theme.hover : transparent;
+                    height: 36px;
+                    border-radius: 18px;
+                    background: pt.pressed ? Theme.overlay : (pt.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     pt := TouchArea {
                         clicked => { root.prev-track(); }
                     }
 
-                    Text {
-                        text: "Prev";
-                        color: pt.has-hover ? Theme.text : Theme.secondary;
-                        font-size: 12px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
+                    IconPrev {
+                        tint: pt.has-hover ? Theme.text : Theme.secondary;
+                        size: 18px;
                     }
                 }
 
                 Rectangle {
-                    width: 60px;
-                    height: 26px;
-                    border-radius: 13px;
-                    background: pp.has-hover ? Theme.hover : Theme.accent;
+                    height: 28px;
+                    border-radius: 14px;
+                    background: s10m-touch.pressed ? Theme.overlay : (s10m-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    s10m-touch := TouchArea {
+                        clicked => { root.seek-by(-10); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        alignment: center;
+
+                        Text {
+                            text: "-10s";
+                            color: s10m-touch.has-hover ? Theme.text : Theme.secondary;
+                            font-size: 11px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 20px;
+                    background: pp.pressed ? Theme.overlay : (pp.has-hover ? Theme.hover : Theme.accent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     pp := TouchArea {
                         clicked => { root.toggle-play(); }
                     }
 
-                    Text {
-                        text: root.is-playing ? "Pause" : "Play";
-                        color: pp.has-hover ? Theme.text : Theme.window;
-                        font-size: 12px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
+                    if root.is-playing : IconPause {
+                        tint: pp.has-hover ? Theme.text : Theme.window;
+                        size: 20px;
+                    }
+                    if !root.is-playing : IconPlay {
+                        tint: pp.has-hover ? Theme.text : Theme.window;
+                        size: 20px;
+                    }
+                }
+
+                Rectangle {
+                    height: 28px;
+                    border-radius: 14px;
+                    background: s10p-touch.pressed ? Theme.overlay : (s10p-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    s10p-touch := TouchArea {
+                        clicked => { root.seek-by(10); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        alignment: center;
+
+                        Text {
+                            text: "+10s";
+                            color: s10p-touch.has-hover ? Theme.text : Theme.secondary;
+                            font-size: 11px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
                     }
                 }
 
                 Rectangle {
                     width: 36px;
-                    height: 26px;
-                    border-radius: 4px;
-                    background: nt.has-hover ? Theme.hover : transparent;
+                    height: 36px;
+                    border-radius: 18px;
+                    background: nt.pressed ? Theme.overlay : (nt.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     nt := TouchArea {
                         clicked => { root.next-track(); }
                     }
 
-                    Text {
-                        text: "Next";
-                        color: nt.has-hover ? Theme.text : Theme.secondary;
-                        font-size: 12px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
+                    IconNext {
+                        tint: nt.has-hover ? Theme.text : Theme.secondary;
+                        size: 18px;
                     }
                 }
 
                 Rectangle {
-                    width: 56px;
-                    height: 26px;
-                    border-radius: 4px;
-                    background: root.repeat-mode != 0 ? Theme.surface : (rep-touch.has-hover ? Theme.hover : transparent);
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 18px;
+                    background: rep-touch.pressed ? Theme.overlay : (root.repeat-mode != 0 ? Theme.surface : (rep-touch.has-hover ? Theme.hover : transparent));
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     rep-touch := TouchArea {
                         clicked => { root.cycle-repeat(); }
                     }
 
-                    Text {
-                        text: root.repeat-mode == 2 ? "Rep 1" : (root.repeat-mode == 1 ? "Rep All" : "Rep");
-                        color: root.repeat-mode != 0 ? Theme.accent : (rep-touch.has-hover ? Theme.text : Theme.secondary);
-                        font-size: 11px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
+                    if root.repeat-mode == 2 : IconRepeatOne {
+                        tint: Theme.accent;
+                        size: 18px;
+                    }
+                    if root.repeat-mode != 2 : IconRepeat {
+                        tint: root.repeat-mode != 0 ? Theme.accent : (rep-touch.has-hover ? Theme.text : Theme.secondary);
+                        size: 18px;
                     }
                 }
             }
@@ -572,12 +1079,13 @@ export component PlayerBar inherits Rectangle {
         HorizontalLayout {
             width: 240px;
             alignment: end;
-            spacing: 8px;
+            spacing: 10px;
 
             Rectangle {
-                height: 26px;
-                border-radius: 4px;
-                background: q-touch.has-hover ? Theme.hover : Theme.surface;
+                height: 32px;
+                border-radius: 16px;
+                background: q-touch.pressed ? Theme.overlay : (q-touch.has-hover ? Theme.hover : Theme.surface);
+                animate background { duration: 150ms; easing: ease-in-out; }
 
                 q-touch := TouchArea {
                     clicked => { root.open-queue(); }
@@ -585,8 +1093,14 @@ export component PlayerBar inherits Rectangle {
 
                 HorizontalLayout {
                     padding-left: 10px;
-                    padding-right: 10px;
+                    padding-right: 12px;
+                    spacing: 6px;
                     alignment: center;
+
+                    IconQueue {
+                        size: 16px;
+                        tint: q-touch.has-hover ? Theme.accent : Theme.text;
+                    }
 
                     Text {
                         text: root.queue-count > 0 ? "Queue (" + root.queue-count + ")" : "Queue";
@@ -597,6 +1111,11 @@ export component PlayerBar inherits Rectangle {
                         horizontal-alignment: center;
                     }
                 }
+            }
+
+            IconSpeaker {
+                size: 16px;
+                tint: Theme.secondary;
             }
 
             Slider {
@@ -712,17 +1231,56 @@ export component NowPlayingView inherits VerticalLayout {
 }
 
 component LibraryItemCard inherits Rectangle {
-    in property <string> title; in property <string> subtitle; callback clicked();
-    height: 40px; border-radius: 4px; background: touch.has-hover ? Theme.hover : transparent;
+    in property <string> title;
+    in property <string> subtitle;
+    callback clicked();
+
+    height: 48px;
+    border-radius: 8px;
+    background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent);
+    animate background { duration: 150ms; easing: ease-in-out; }
+
     touch := TouchArea { clicked => { root.clicked(); } }
+
     HorizontalLayout {
-        padding-left: 8px; padding-right: 8px; spacing: 12px;
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 12px;
+
         // Cover-art placeholder (owned by a later tranche)
-        Rectangle { width: 32px; height: 32px; border-radius: 4px; background: Theme.surface; Text { text: "Art"; color: Theme.secondary; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            background: Theme.surface;
+
+            Text {
+                text: "Art";
+                color: Theme.secondary;
+                font-size: 10px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
         VerticalLayout {
-            alignment: center; spacing: 2px;
-            Text { text: root.title; color: Theme.text; font-size: 13px; font-weight: 600; vertical-alignment: center; }
-            Text { text: root.subtitle; color: Theme.secondary; font-size: 11px; vertical-alignment: center; }
+            alignment: center;
+            spacing: 2px;
+
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: 13px;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: root.subtitle;
+                color: Theme.secondary;
+                font-size: 11px;
+                vertical-alignment: center;
+            }
         }
     }
 }
@@ -753,7 +1311,7 @@ export component LibraryView inherits VerticalLayout {
                 spacing: 8px;
 
                 Text {
-                    text: "Anonymous — paste cookies to unlock library";
+                    text: "Anonymous - paste cookies to unlock library";
                     color: Theme.secondary;
                     font-size: 13px;
                 }
@@ -771,8 +1329,9 @@ export component LibraryView inherits VerticalLayout {
 
                     Rectangle {
                         width: 90px;
-                        border-radius: 4px;
-                        background: sign-in-btn.has-hover ? Theme.hover : Theme.accent;
+                        border-radius: 8px;
+                        background: sign-in-btn.pressed ? Theme.overlay : (sign-in-btn.has-hover ? Theme.hover : Theme.accent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
 
                         sign-in-btn := TouchArea {
                             clicked => { root.sign-in-submitted(root.cookie-text); }
@@ -795,7 +1354,7 @@ export component LibraryView inherits VerticalLayout {
                 alignment: space-between;
 
                 Text {
-                    text: "Signed in — library unlocked";
+                    text: "Signed in - library unlocked";
                     color: Theme.accent;
                     font-size: 13px;
                     font-weight: 700;
@@ -804,9 +1363,10 @@ export component LibraryView inherits VerticalLayout {
 
                 Rectangle {
                     width: 90px;
-                    height: 28px;
-                    border-radius: 4px;
-                    background: sign-out-btn.has-hover ? Theme.hover : Theme.surface;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: sign-out-btn.pressed ? Theme.overlay : (sign-out-btn.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     sign-out-btn := TouchArea {
                         clicked => { root.sign-out(); }
@@ -863,7 +1423,7 @@ export component DetailView inherits VerticalLayout {
         HorizontalLayout {
             spacing: 16px; alignment: start;
             // Cover-art placeholder (owned by a later tranche)
-            Rectangle { width: 80px; height: 80px; border-radius: 6px; background: Theme.surface; Text { text: "Cover Art\n(Later Tranche)"; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+            Rectangle { width: 80px; height: 80px; border-radius: 8px; background: Theme.surface; Text { text: "Cover Art\n(Later Tranche)"; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
             VerticalLayout {
                 spacing: 4px; alignment: center;
                 Text { text: root.kind-label; color: Theme.accent; font-size: 12px; font-weight: 700; }
@@ -906,7 +1466,7 @@ export component SettingsDialog inherits Rectangle {
     TouchArea {}
 
     width: 480px;
-    border-radius: 8px;
+    border-radius: 12px;
     background: Theme.panel;
     border-width: 1px;
     border-color: Theme.border;
@@ -928,22 +1488,19 @@ export component SettingsDialog inherits Rectangle {
             }
 
             Rectangle {
-                width: 28px;
-                height: 28px;
-                border-radius: 4px;
-                background: close-touch.has-hover ? Theme.hover : transparent;
+                width: 32px;
+                height: 32px;
+                border-radius: 8px;
+                background: close-touch.pressed ? Theme.overlay : (close-touch.has-hover ? Theme.hover : transparent);
+                animate background { duration: 150ms; easing: ease-in-out; }
 
                 close-touch := TouchArea {
                     clicked => { root.close(); }
                 }
 
-                Text {
-                    text: "X";
-                    color: close-touch.has-hover ? Theme.accent : Theme.secondary;
-                    font-size: 13px;
-                    font-weight: 700;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+                IconClose {
+                    size: 14px;
+                    tint: close-touch.has-hover ? Theme.accent : Theme.secondary;
                 }
             }
         }
@@ -968,10 +1525,11 @@ export component SettingsDialog inherits Rectangle {
                 spacing: 8px;
 
                 Rectangle {
-                    height: 32px;
+                    height: 36px;
                     horizontal-stretch: 1;
-                    border-radius: 4px;
-                    background: root.active-theme-index == 0 ? Theme.accent : (th0-touch.has-hover ? Theme.hover : Theme.surface);
+                    border-radius: 8px;
+                    background: root.active-theme-index == 0 ? Theme.accent : (th0-touch.pressed ? Theme.overlay : (th0-touch.has-hover ? Theme.hover : Theme.surface));
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     th0-touch := TouchArea {
                         clicked => { root.theme-selected(0); }
@@ -988,10 +1546,11 @@ export component SettingsDialog inherits Rectangle {
                 }
 
                 Rectangle {
-                    height: 32px;
+                    height: 36px;
                     horizontal-stretch: 1;
-                    border-radius: 4px;
-                    background: root.active-theme-index == 1 ? Theme.accent : (th1-touch.has-hover ? Theme.hover : Theme.surface);
+                    border-radius: 8px;
+                    background: root.active-theme-index == 1 ? Theme.accent : (th1-touch.pressed ? Theme.overlay : (th1-touch.has-hover ? Theme.hover : Theme.surface));
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     th1-touch := TouchArea {
                         clicked => { root.theme-selected(1); }
@@ -1008,10 +1567,11 @@ export component SettingsDialog inherits Rectangle {
                 }
 
                 Rectangle {
-                    height: 32px;
+                    height: 36px;
                     horizontal-stretch: 1;
-                    border-radius: 4px;
-                    background: root.active-theme-index == 2 ? Theme.accent : (th2-touch.has-hover ? Theme.hover : Theme.surface);
+                    border-radius: 8px;
+                    background: root.active-theme-index == 2 ? Theme.accent : (th2-touch.pressed ? Theme.overlay : (th2-touch.has-hover ? Theme.hover : Theme.surface));
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     th2-touch := TouchArea {
                         clicked => { root.theme-selected(2); }
@@ -1052,9 +1612,10 @@ export component SettingsDialog inherits Rectangle {
 
                 Rectangle {
                     width: 90px;
-                    height: 30px;
-                    border-radius: 4px;
-                    background: speed-touch.has-hover ? Theme.hover : Theme.surface;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: speed-touch.pressed ? Theme.overlay : (speed-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     speed-touch := TouchArea {
                         clicked => { root.cycle-playback-speed(); }
@@ -1096,9 +1657,10 @@ export component SettingsDialog inherits Rectangle {
 
                 Rectangle {
                     width: 90px;
-                    height: 30px;
-                    border-radius: 4px;
-                    background: sign-out-touch.has-hover ? Theme.hover : Theme.surface;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: sign-out-touch.pressed ? Theme.overlay : (sign-out-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
                     sign-out-touch := TouchArea {
                         clicked => { root.sign-out(); }
@@ -1137,8 +1699,9 @@ export component SettingsDialog inherits Rectangle {
 
                     Rectangle {
                         width: 90px;
-                        border-radius: 4px;
-                        background: sign-in-touch.has-hover ? Theme.hover : Theme.accent;
+                        border-radius: 8px;
+                        background: sign-in-touch.pressed ? Theme.overlay : (sign-in-touch.has-hover ? Theme.hover : Theme.accent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
 
                         sign-in-touch := TouchArea {
                             clicked => { root.sign-in-submitted(root.cookie-text); }
@@ -1257,10 +1820,11 @@ component ContentArea inherits Rectangle {
             }
 
             Rectangle {
-                width: 96px;
+                width: 104px;
                 height: 32px;
-                border-radius: 6px;
-                background: settings-btn.has-hover ? Theme.hover : Theme.surface;
+                border-radius: 8px;
+                background: settings-btn.pressed ? Theme.overlay : (settings-btn.has-hover ? Theme.hover : Theme.surface);
+                animate background { duration: 150ms; easing: ease-in-out; }
 
                 settings-btn := TouchArea {
                     clicked => { root.open-settings(); }
@@ -1268,7 +1832,12 @@ component ContentArea inherits Rectangle {
 
                 HorizontalLayout {
                     alignment: center;
-                    spacing: 6px;
+                    spacing: 8px;
+
+                    IconSettings {
+                        size: 16px;
+                        tint: settings-btn.has-hover ? Theme.accent : Theme.text;
+                    }
 
                     Text {
                         text: "Settings";
@@ -1346,6 +1915,7 @@ export component MoggytWindow inherits Window {
     preferred-width: 1024px;
     preferred-height: 640px;
     background: Theme.window;
+    default-font-family: "Inter";
 
     in-out property <color> theme-window <=> Theme.window;
     in-out property <color> theme-panel <=> Theme.panel;
@@ -1486,6 +2056,8 @@ export component MoggytWindow inherits Window {
         width: 100%;
         height: 100%;
         background: #00000088;
+        opacity: 1.0;
+        animate opacity { duration: 150ms; easing: ease-in-out; }
 
         TouchArea {
             clicked => { root.show-settings = false; }
