@@ -522,13 +522,6 @@ component Sidebar inherits Rectangle {
             is-active: root.active-page == 2;
             clicked => { root.page-selected(2); }
         }
-
-        NavItem {
-            text: "Settings";
-            icon-name: "settings";
-            is-active: root.active-page == 5;
-            clicked => { root.page-selected(5); }
-        }
     }
 }
 
@@ -2350,7 +2343,7 @@ component ContentArea inherits Rectangle {
             }
 
             if root.active-page != 5 : Rectangle {
-                width: 104px;
+                width: 32px;
                 height: 32px;
                 border-radius: 8px;
                 background: settings-btn.pressed ? Theme.overlay : (settings-btn.has-hover ? Theme.hover : Theme.surface);
@@ -2360,29 +2353,18 @@ component ContentArea inherits Rectangle {
                     clicked => { root.open-settings(); }
                 }
 
-                HorizontalLayout {
-                    alignment: center;
-                    spacing: 8px;
+                IconSettings {
+                    size: 16px;
+                    tint: settings-btn.has-hover ? Theme.accent : Theme.text;
+                }
 
-                    IconSettings {
-                        size: 16px;
-                        tint: settings-btn.has-hover ? Theme.accent : Theme.text;
-                    }
-
-                    Text {
-                        text: "Settings";
-                        color: settings-btn.has-hover ? Theme.accent : Theme.text;
-                        font-size: 13px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                    }
-
-                    if root.has-update : Rectangle {
-                        width: 8px;
-                        height: 8px;
-                        border-radius: 4px;
-                        background: Theme.accent;
-                    }
+                if root.has-update : Rectangle {
+                    x: parent.width - 6px;
+                    y: 2px;
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background: Theme.accent;
                 }
             }
         }
