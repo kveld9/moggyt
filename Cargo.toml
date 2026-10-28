@@ -24,6 +24,10 @@ tray-icon = { version = "0.20", default-features = false }
 discord-rich-presence = "0.2"
 md-5 = "0.10"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+slint = "1.13"
+
+[build-dependencies]
+slint-build = "1.13"
 
 [package.metadata.deb]
 maintainer = "kveld9 <179108235+kveld9@users.noreply.github.com>"
