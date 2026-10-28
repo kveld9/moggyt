@@ -26,8 +26,8 @@ use crate::infra::{
     MemoryQueueStore, MemorySettingsStore, MemorySkipStore, MetaStore, Presence, QueueStore,
     RodioBackend, Scrobbler, SessionStore, SettingsStore, SingleInstanceGuard, SkipStore,
     StubScrobbler, TrayAction, TrayHandle, Updater, client_from_credentials, decode_cover,
-    decode_handoff, default_config_dir, ensure_sidecar, fetch_artwork, sanitize_cookie_input,
-    should_scrobble,
+    decode_handoff, default_config_dir, ensure_sidecar, fetch_artwork, is_newer,
+    sanitize_cookie_input, should_scrobble,
 };
 use crate::slint_shell::detail::detail_kind_label;
 use crate::slint_shell::platform::{dispatch_to_ui, rgba_to_image};
@@ -41,7 +41,7 @@ use crate::slint_shell::playback_worker::{
     execute_seek, fetch_and_decode_cover,
 };
 use crate::slint_shell::search::{SearchRow, format_duration, iter_shelf_items};
-use crate::slint_shell::theme::apply_theme;
+use crate::slint_shell::theme::{apply_theme, theme_from_index, theme_to_index};
 use crate::slint_shell::{
     LibraryItemData, LyricLineData, MoggytWindow, ShelfData, SlintPage, TrackRowData,
 };
@@ -52,6 +52,39 @@ pub fn current_unix_secs() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0)
+}
+
+/// Standard playback speed presets for the settings cycle button.
+pub const PLAYBACK_SPEED_PRESETS: [f32; 6] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+/// Cycles to the next playback speed preset in the sequence:
+/// 0.5 -> 0.75 -> 1.0 -> 1.25 -> 1.5 -> 2.0 -> 0.5.
+pub fn cycle_playback_speed_preset(current: f32) -> f32 {
+    let presets = PLAYBACK_SPEED_PRESETS;
+    for (i, &preset) in presets.iter().enumerate() {
+        if (current - preset).abs() < 0.05 {
+            return presets[(i + 1) % presets.len()];
+        }
+    }
+    1.0
+}
+
+/// Formats playback speed factor for UI display (e.g., "1.00x", "1.25x").
+pub fn format_playback_speed(speed: f32) -> String {
+    format!("{:.2}x", speed)
+}
+
+/// Formats update status string for the About settings section.
+pub fn format_update_status(has_update: bool, latest_version: Option<&str>) -> String {
+    if has_update {
+        if let Some(ver) = latest_version {
+            format!("Update available: {ver}")
+        } else {
+            "Update available".to_string()
+        }
+    } else {
+        "Up to date".to_string()
+    }
 }
 
 /// Resolves the application data directory using standard platform conventions.
@@ -222,6 +255,8 @@ pub struct SlintAppState<
     pub liked_ids: HashSet<String>,
     pub now_playing_cover: Option<slint::Image>,
     pub is_shuffle: bool,
+    pub update_available: bool,
+    pub latest_version: Option<String>,
 
     pub play_generation: u64,
     pub search_generation: u64,
@@ -331,11 +366,29 @@ impl<
             liked_ids: HashSet::new(),
             now_playing_cover: None,
             is_shuffle: false,
+            update_available: false,
+            latest_version: None,
             play_generation: 0,
             search_generation: 0,
             detail_generation: 0,
             library_generation: 0,
         }
+    }
+
+    /// Updates active UI theme and persists preference to disk settings store.
+    pub fn set_theme(&mut self, theme: ThemeId) {
+        self.theme = theme;
+        let mut settings = self.settings_store.load();
+        settings.theme = theme;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Cycles to the next playback speed preset and persists preference.
+    pub fn cycle_playback_speed(&mut self) -> f32 {
+        let current = self.audio.lock().map(|a| a.speed()).unwrap_or(1.0);
+        let next = cycle_playback_speed_preset(current);
+        self.set_playback_speed(next);
+        next
     }
 
     /// Selects active navigation page and refreshes content when entering Library view.
@@ -781,13 +834,21 @@ fn sync_window<
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
     apply_theme(window, state.theme);
+    window.set_active_theme_index(theme_to_index(state.theme));
     window.set_active_page(state.page.to_index());
     window.set_header_title(state.page.title().into());
     let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
     window.set_is_playing(is_playing);
     let volume = state.audio.try_lock().map(|a| a.volume()).unwrap_or(100);
     window.set_volume(volume as i32);
+    let speed = state.audio.try_lock().map(|a| a.speed()).unwrap_or(1.0);
+    window.set_playback_speed_text(format_playback_speed(speed).into());
     window.set_signed_in(state.signed_in);
+    window.set_has_update(state.update_available);
+    window.set_app_version(GithubUpdater::current_version().into());
+    let update_status =
+        format_update_status(state.update_available, state.latest_version.as_deref());
+    window.set_update_status_text(update_status.into());
 
     window.set_is_shuffle(state.is_shuffle);
     window.set_repeat_mode(repeat_mode_to_int(state.queue.repeat()));
@@ -1715,6 +1776,7 @@ fn wire_window_callbacks<
         let mut st = s.borrow_mut();
         if st.sign_in_from_input(cookies.as_str()) {
             win.set_cookie_text("".into());
+            win.set_settings_cookie_text("".into());
             refresh_library_async(&win, &mut st);
         }
         sync_window(&win, &mut st);
@@ -1728,6 +1790,26 @@ fn wire_window_callbacks<
         st.sign_out();
         refresh_library_async(&win, &mut st);
         sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_theme_selected(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        let theme = theme_from_index(idx);
+        st.set_theme(theme);
+        apply_theme(&win, theme);
+        win.set_active_theme_index(idx);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_cycle_playback_speed(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        let speed = st.cycle_playback_speed();
+        win.set_playback_speed_text(format_playback_speed(speed).into());
     });
 }
 
@@ -1788,9 +1870,6 @@ fn handle_cli_args<
 }
 
 /// Checks GitHub Releases for newer version tags and records update availability.
-///
-/// TODO Gap: Update banner badge: GithubUpdater checks for updates against GitHub
-/// Releases on startup, but ui/shell.slint lacks an update banner badge.
 fn check_updater_status<
     C: Catalog + Send + 'static,
     A: AudioBackend + Send + 'static,
@@ -1801,7 +1880,12 @@ fn check_updater_status<
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
     if let Some(info) = state.updater.latest() {
-        tracing::info!(version = %info.version, url = %info.url, "update available");
+        let current = GithubUpdater::current_version();
+        if is_newer(current, &info.version) {
+            tracing::info!(version = %info.version, url = %info.url, "update available");
+            state.update_available = true;
+            state.latest_version = Some(info.version);
+        }
     }
 }
 
@@ -2105,5 +2189,63 @@ mod tests {
         assert!(should_seek(52, current));
         assert!(should_seek(48, current));
         assert!(should_seek(0, current));
+    }
+
+    #[test]
+    fn test_cycle_playback_speed_preset_sequence() {
+        assert_eq!(cycle_playback_speed_preset(0.5), 0.75);
+        assert_eq!(cycle_playback_speed_preset(0.75), 1.0);
+        assert_eq!(cycle_playback_speed_preset(1.0), 1.25);
+        assert_eq!(cycle_playback_speed_preset(1.25), 1.5);
+        assert_eq!(cycle_playback_speed_preset(1.5), 2.0);
+        assert_eq!(cycle_playback_speed_preset(2.0), 0.5);
+        assert_eq!(cycle_playback_speed_preset(3.5), 1.0);
+    }
+
+    #[test]
+    fn test_format_playback_speed() {
+        assert_eq!(format_playback_speed(1.0), "1.00x");
+        assert_eq!(format_playback_speed(0.75), "0.75x");
+        assert_eq!(format_playback_speed(1.25), "1.25x");
+        assert_eq!(format_playback_speed(2.0), "2.00x");
+    }
+
+    #[test]
+    fn test_format_update_status() {
+        assert_eq!(format_update_status(false, None), "Up to date");
+        assert_eq!(format_update_status(false, Some("v2.0.0")), "Up to date");
+        assert_eq!(format_update_status(true, Some("v2.0.0")), "Update available: v2.0.0");
+        assert_eq!(format_update_status(true, None), "Update available");
+    }
+
+    #[test]
+    fn test_set_theme_persists_to_settings_store() {
+        let mut state = test_wired();
+        assert_eq!(state.theme, ThemeId::White);
+
+        state.set_theme(ThemeId::BlackOled);
+        assert_eq!(state.theme, ThemeId::BlackOled);
+        let loaded = state.settings_store.load();
+        assert_eq!(loaded.theme, ThemeId::BlackOled);
+
+        state.set_theme(ThemeId::Mono);
+        assert_eq!(state.theme, ThemeId::Mono);
+        let loaded2 = state.settings_store.load();
+        assert_eq!(loaded2.theme, ThemeId::Mono);
+    }
+
+    #[test]
+    fn test_cycle_playback_speed_in_state() {
+        let mut state = test_wired();
+        assert_eq!(state.audio.lock().unwrap().speed(), 1.0);
+
+        let next = state.cycle_playback_speed();
+        assert_eq!(next, 1.25);
+        assert_eq!(state.audio.lock().unwrap().speed(), 1.25);
+        assert_eq!(state.settings_store.load().playback_speed, 1.25);
+
+        let next2 = state.cycle_playback_speed();
+        assert_eq!(next2, 1.5);
+        assert_eq!(state.audio.lock().unwrap().speed(), 1.5);
     }
 }
