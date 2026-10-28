@@ -88,7 +88,11 @@ impl From<&SearchResult> for SearchRow {
                 id: playlist.id.clone(),
                 kind: "playlist".to_string(),
                 title: playlist.title.clone(),
-                subtitle: format!("{} tracks", playlist.track_count),
+                subtitle: if playlist.track_count == 0 {
+                    String::new()
+                } else {
+                    format!("{} tracks", playlist.track_count)
+                },
                 album: String::new(),
                 duration: String::new(),
                 artwork_url: None,
@@ -534,7 +538,7 @@ mod tests {
 
         let playlist = Playlist::new("p0", "Empty Playlist", 0);
         let pl_row = SearchRow::from(&SearchResult::Playlist(playlist));
-        assert_eq!(pl_row.subtitle, "0 tracks");
+        assert_eq!(pl_row.subtitle, "");
     }
 
     #[test]
