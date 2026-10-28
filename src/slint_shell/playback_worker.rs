@@ -72,6 +72,7 @@ pub enum PlaybackWorkerCommand {
     Play(PlayTrackRequest),
     Scrobble { artist: String, title: String, started_unix: u64 },
     FetchCover { url: String, generation: u64 },
+    Seek { position_secs: u64 },
 }
 
 /// Resolves lyrics from local override files or remote provider off the UI thread.
@@ -198,6 +199,13 @@ pub fn execute_scrobble(
         if let Ok(mut scrob) = sec.lock() {
             scrob.scrobble(artist, title, started_unix);
         }
+    }
+}
+
+/// Executes audio seek on backend off the UI thread.
+pub fn execute_seek<A: AudioBackend>(position_secs: u64, audio: &Arc<Mutex<A>>) {
+    if let Ok(mut a) = audio.lock() {
+        a.seek(position_secs);
     }
 }
 
@@ -342,6 +350,9 @@ mod tests {
                     PlaybackWorkerCommand::FetchCover { generation, .. } => {
                         done_tx.send(generation).unwrap();
                     }
+                    PlaybackWorkerCommand::Seek { position_secs } => {
+                        done_tx.send(position_secs).unwrap();
+                    }
                 }
             }
         });
@@ -369,8 +380,20 @@ mod tests {
         let cover_gen = done_rx.recv().unwrap();
         assert_eq!(cover_gen, 100);
 
+        tx.send(PlaybackWorkerCommand::Seek { position_secs: 42 }).unwrap();
+        let seek_pos = done_rx.recv().unwrap();
+        assert_eq!(seek_pos, 42);
+
         drop(tx);
         handle.join().expect("worker terminates on channel disconnect");
+    }
+
+    #[test]
+    fn test_execute_seek_in_worker_thread() {
+        let audio = Arc::new(Mutex::new(AudioStub::new()));
+        audio.lock().unwrap().play("track-1");
+        execute_seek(35, &audio);
+        assert_eq!(audio.lock().unwrap().position_secs(), 35);
     }
 
     #[test]
