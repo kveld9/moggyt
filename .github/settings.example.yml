@@ -12,7 +12,7 @@
 repository:
   # General repository configuration
   name: moggyt
-  description: "Native YouTube Music client in Rust (eframe/egui)"
+  description: "Native YouTube Music client in Rust (Slint)"
   homepage: ""
   topics: "git, github, standards, devops, engineering-best-practices"
   private: true # secure default: flip to false only as a conscious decision

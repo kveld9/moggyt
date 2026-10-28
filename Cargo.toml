@@ -8,10 +8,6 @@ repository = "https://github.com/kveld9/moggyt"
 rust-version = "1.85"
 autoexamples = false
 
-[[example]]
-name = "ui_preview"
-required-features = ["legacy-eframe"]
-
 [dependencies]
 anyhow = "1.0.104"
 keyring = "3"
