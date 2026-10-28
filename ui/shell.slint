@@ -97,11 +97,12 @@ component TrackRow inherits Rectangle {
     in property <string> title;
     in property <string> artist;
     in property <string> duration;
+    in property <bool> is-active: false;
     callback clicked();
 
     height: 36px;
     border-radius: 4px;
-    background: touch.has-hover ? #282828 : #00000000;
+    background: root.is-active ? #282828 : (touch.has-hover ? #1f1f1f : #00000000);
 
     touch := TouchArea {
         clicked => { root.clicked(); }
@@ -114,7 +115,7 @@ component TrackRow inherits Rectangle {
 
         Text {
             text: root.title;
-            color: #ffffff;
+            color: root.is-active ? #1db954 : #ffffff;
             font-size: 14px;
             font-weight: 500;
             vertical-alignment: center;
@@ -213,14 +214,167 @@ component SearchView inherits VerticalLayout {
     }
 }
 
+export component PlayerBar inherits Rectangle {
+    in property <string> active-track-title: "No track playing";
+    in property <string> active-track-artist: "";
+    in property <bool> is-playing: false;
+    in property <int> volume: 100;
+    in property <string> position-text: "0:00";
+    in property <string> duration-text: "0:00";
+    callback toggle-play();
+    callback prev-track();
+    callback next-track();
+    callback seek-by(int);
+    callback set-volume(int);
+
+    height: 64px;
+    background: #181818;
+
+    Rectangle { y: 0; height: 1px; background: #282828; }
+
+    HorizontalLayout {
+        padding-left: 16px; padding-right: 16px; spacing: 16px; alignment: space-between;
+
+        VerticalLayout {
+            width: 200px; alignment: center; spacing: 2px;
+            Text { text: root.active-track-title; color: #ffffff; font-size: 13px; font-weight: 700; }
+            Text { text: root.active-track-artist; color: #b3b3b3; font-size: 12px; }
+        }
+
+        VerticalLayout {
+            alignment: center; spacing: 4px;
+            HorizontalLayout {
+                spacing: 10px; alignment: center;
+                Rectangle {
+                    width: 32px; height: 26px; border-radius: 4px; background: sb.has-hover ? #282828 : #00000000;
+                    sb := TouchArea { clicked => { root.seek-by(-10); } }
+                    Text { text: "-10s"; color: #b3b3b3; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                }
+                Rectangle {
+                    width: 32px; height: 26px; border-radius: 4px; background: pt.has-hover ? #282828 : #00000000;
+                    pt := TouchArea { clicked => { root.prev-track(); } }
+                    Text { text: "Prev"; color: #ffffff; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                }
+                Rectangle {
+                    width: 56px; height: 26px; border-radius: 13px; background: pp.has-hover ? #1ed760 : #1db954;
+                    pp := TouchArea { clicked => { root.toggle-play(); } }
+                    Text { text: root.is-playing ? "Pause" : "Play"; color: #000000; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                }
+                Rectangle {
+                    width: 32px; height: 26px; border-radius: 4px; background: nt.has-hover ? #282828 : #00000000;
+                    nt := TouchArea { clicked => { root.next-track(); } }
+                    Text { text: "Next"; color: #ffffff; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                }
+                Rectangle {
+                    width: 32px; height: 26px; border-radius: 4px; background: sf.has-hover ? #282828 : #00000000;
+                    sf := TouchArea { clicked => { root.seek-by(10); } }
+                    Text { text: "+10s"; color: #b3b3b3; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                }
+            }
+            HorizontalLayout {
+                spacing: 6px; alignment: center;
+                Text { text: root.position-text; color: #b3b3b3; font-size: 11px; vertical-alignment: center; }
+                Text { text: "/"; color: #555555; font-size: 11px; vertical-alignment: center; }
+                Text { text: root.duration-text; color: #b3b3b3; font-size: 11px; vertical-alignment: center; }
+            }
+        }
+
+        HorizontalLayout {
+            width: 200px; alignment: end; spacing: 6px;
+            Text { text: "Vol:"; color: #b3b3b3; font-size: 12px; vertical-alignment: center; }
+            Rectangle {
+                width: 22px; height: 22px; border-radius: 4px; background: vd.has-hover ? #333333 : #222222;
+                vd := TouchArea { clicked => { root.set-volume(max(0, root.volume - 5)); } }
+                Text { text: "-"; color: #ffffff; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+            }
+            Text { text: "\{root.volume}%"; color: #ffffff; font-size: 12px; width: 34px; horizontal-alignment: center; vertical-alignment: center; }
+            Rectangle {
+                width: 22px; height: 22px; border-radius: 4px; background: vu.has-hover ? #333333 : #222222;
+                vu := TouchArea { clicked => { root.set-volume(min(100, root.volume + 5)); } }
+                Text { text: "+"; color: #ffffff; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+            }
+        }
+    }
+}
+
+export component QueueView inherits VerticalLayout {
+    in property <[TrackRowData]> tracks: [];
+    in property <int> selected-index: -1;
+    callback track-selected(int);
+
+    spacing: 8px; alignment: start;
+    if root.tracks.length == 0 : VerticalLayout {
+        padding-top: 24px; alignment: center;
+        Text { text: "Queue is empty."; color: #b3b3b3; font-size: 14px; horizontal-alignment: center; }
+    }
+    for track in root.tracks : TrackRow {
+        title: track.title; artist: track.artist; duration: track.duration;
+        is-active: track.index == root.selected-index;
+        clicked => { root.track-selected(track.index); }
+    }
+}
+
+export component NowPlayingView inherits VerticalLayout {
+    in property <string> track-title: "No track playing";
+    in property <string> track-artist: "";
+    in property <string> position-text: "0:00";
+    in property <string> duration-text: "0:00";
+    in property <float> progress: 0.0;
+
+    spacing: 16px; alignment: start;
+
+    HorizontalLayout {
+        spacing: 20px; alignment: start;
+        // Cover-art placeholder (owned by a later tranche)
+        Rectangle {
+            width: 140px; height: 140px; border-radius: 8px; background: #242424;
+            Text { text: "Cover Art\n(Later Tranche)"; color: #666666; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+        }
+        VerticalLayout {
+            spacing: 6px; alignment: center;
+            Text { text: root.track-title; color: #ffffff; font-size: 20px; font-weight: 700; }
+            Text { text: root.track-artist; color: #b3b3b3; font-size: 14px; }
+            Rectangle { height: 6px; }
+            // Progress bar
+            Rectangle {
+                height: 6px; border-radius: 3px; background: #333333; clip: true;
+                Rectangle { x: 0; width: parent.width * root.progress; height: parent.height; background: #1db954; border-radius: 3px; }
+            }
+            HorizontalLayout {
+                Text { text: root.position-text; color: #b3b3b3; font-size: 11px; }
+                Rectangle {}
+                Text { text: root.duration-text; color: #b3b3b3; font-size: 11px; }
+            }
+        }
+    }
+
+    // Lyrics slot placeholder (owned by a later tranche)
+    Rectangle {
+        height: 140px; border-radius: 8px; background: #181818;
+        VerticalLayout {
+            alignment: center; spacing: 4px;
+            Text { text: "Lyrics Slot Placeholder"; color: #666666; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
+            Text { text: "Synced lyrics display owned by a later tranche"; color: #555555; font-size: 11px; horizontal-alignment: center; }
+        }
+    }
+}
+
 component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
     in property <string> header-title: "Search";
     in-out property <string> query: "";
     in property <[ShelfData]> shelves: [];
+    in property <[TrackRowData]> queue-tracks: [];
+    in property <int> queue-selected-index: -1;
+    in property <string> active-track-title: "No track playing";
+    in property <string> active-track-artist: "";
+    in property <string> position-text: "0:00";
+    in property <string> duration-text: "0:00";
+    in property <float> playback-progress: 0.0;
 
     callback query-submitted(string);
     callback track-selected(int);
+    callback queue-track-selected(int);
 
     background: #121212;
 
@@ -244,42 +398,28 @@ component ContentArea inherits Rectangle {
         if root.active-page == 0 : SearchView {
             query <=> root.query;
             shelves: root.shelves;
-            query-submitted(q) => {
-                root.query-submitted(q);
-            }
-            track-selected(idx) => {
-                root.track-selected(idx);
-            }
+            query-submitted(q) => { root.query-submitted(q); }
+            track-selected(idx) => { root.track-selected(idx); }
         }
 
-        if root.active-page != 0 : VerticalLayout {
-            alignment: center;
-            spacing: 12px;
+        if root.active-page == 1 : QueueView {
+            tracks: root.queue-tracks;
+            selected-index: root.queue-selected-index;
+            track-selected(idx) => { root.queue-track-selected(idx); }
+        }
 
-            if root.active-page == 1 : Text {
-                text: "Queue Page Placeholder";
-                color: #b3b3b3;
-                font-size: 16px;
-                horizontal-alignment: center;
-            }
-            if root.active-page == 2 : Text {
-                text: "Now Playing Page Placeholder";
-                color: #b3b3b3;
-                font-size: 16px;
-                horizontal-alignment: center;
-            }
-            if root.active-page == 3 : Text {
-                text: "Library Page Placeholder";
-                color: #b3b3b3;
-                font-size: 16px;
-                horizontal-alignment: center;
-            }
-            if root.active-page == 4 : Text {
-                text: "Detail Page Placeholder";
-                color: #b3b3b3;
-                font-size: 16px;
-                horizontal-alignment: center;
-            }
+        if root.active-page == 2 : NowPlayingView {
+            track-title: root.active-track-title;
+            track-artist: root.active-track-artist;
+            position-text: root.position-text;
+            duration-text: root.duration-text;
+            progress: root.playback-progress;
+        }
+
+        if root.active-page > 2 : VerticalLayout {
+            alignment: center; spacing: 12px;
+            if root.active-page == 3 : Text { text: "Library Page Placeholder"; color: #b3b3b3; font-size: 16px; horizontal-alignment: center; }
+            if root.active-page == 4 : Text { text: "Detail Page Placeholder"; color: #b3b3b3; font-size: 16px; horizontal-alignment: center; }
         }
     }
 }
@@ -296,33 +436,55 @@ export component MoggytWindow inherits Window {
     in-out property <string> header-title: "Search";
     in-out property <string> query: "";
     in-out property <[ShelfData]> shelves: [];
+    in-out property <[TrackRowData]> queue-tracks: [];
+    in-out property <int> queue-selected-index: -1;
+    in-out property <string> active-track-title: "No track playing";
+    in-out property <string> active-track-artist: "";
+    in-out property <bool> is-playing: false;
+    in-out property <int> volume: 100;
+    in-out property <string> position-text: "0:00";
+    in-out property <string> duration-text: "0:00";
+    in-out property <float> playback-progress: 0.0;
 
     callback page-selected(int);
     callback query-submitted(string);
     callback track-selected(int);
+    callback queue-track-selected(int);
+    callback toggle-play();
+    callback prev-track();
+    callback next-track();
+    callback seek-by(int);
+    callback set-volume(int);
 
-    HorizontalLayout {
+    VerticalLayout {
         padding: 0;
         spacing: 0;
 
-        Sidebar {
-            active-page: root.active-page;
-            page-selected(idx) => {
-                root.page-selected(idx);
+        HorizontalLayout {
+            padding: 0;
+            spacing: 0;
+
+            Sidebar {
+                active-page: root.active-page;
+                page-selected(idx) => { root.page-selected(idx); }
+            }
+
+            ContentArea {
+                active-page: root.active-page; header-title: root.header-title; query <=> root.query; shelves: root.shelves;
+                queue-tracks: root.queue-tracks; queue-selected-index: root.queue-selected-index;
+                active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
+                position-text: root.position-text; duration-text: root.duration-text; playback-progress: root.playback-progress;
+                query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
+                queue-track-selected(idx) => { root.queue-track-selected(idx); }
             }
         }
 
-        ContentArea {
-            active-page: root.active-page;
-            header-title: root.header-title;
-            query <=> root.query;
-            shelves: root.shelves;
-            query-submitted(q) => {
-                root.query-submitted(q);
-            }
-            track-selected(idx) => {
-                root.track-selected(idx);
-            }
+        PlayerBar {
+            active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
+            is-playing: root.is-playing; volume: root.volume; position-text: root.position-text; duration-text: root.duration-text;
+            toggle-play => { root.toggle-play(); } prev-track => { root.prev-track(); }
+            next-track => { root.next-track(); } seek-by(delta) => { root.seek-by(delta); }
+            set-volume(vol) => { root.set-volume(vol); }
         }
     }
 }

@@ -26,8 +26,10 @@ slint::include_modules!();
 
 pub use MoggytWindow as AppWindow;
 
+pub mod playback;
 pub mod search;
 
+pub use playback::{PlaybackState, format_position, format_track_duration, queue_track_rows};
 pub use search::{SearchState, TrackDisplayRow, canned_shelves, format_duration, shelf_tracks};
 
 /// Navigation pages of the Slint UI shell, matching domain Page order.
