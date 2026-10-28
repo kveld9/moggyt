@@ -12,6 +12,12 @@ export struct ShelfData {
     tracks: [TrackRowData],
 }
 
+export struct LibraryItemData {
+    index: int,
+    title: string,
+    subtitle: string,
+}
+
 component NavItem inherits Rectangle {
     in property <string> text;
     in property <bool> is-active: false;
@@ -359,6 +365,82 @@ export component NowPlayingView inherits VerticalLayout {
     }
 }
 
+component LibraryItemCard inherits Rectangle {
+    in property <string> title; in property <string> subtitle; callback clicked();
+    height: 40px; border-radius: 4px; background: touch.has-hover ? #1f1f1f : #00000000;
+    touch := TouchArea { clicked => { root.clicked(); } }
+    HorizontalLayout {
+        padding-left: 8px; padding-right: 8px; spacing: 12px;
+        // Cover-art placeholder (owned by a later tranche)
+        Rectangle { width: 32px; height: 32px; border-radius: 4px; background: #242424; Text { text: "Art"; color: #555555; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
+        VerticalLayout {
+            alignment: center; spacing: 2px;
+            Text { text: root.title; color: #ffffff; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+            Text { text: root.subtitle; color: #b3b3b3; font-size: 11px; vertical-alignment: center; }
+        }
+    }
+}
+
+export component LibraryView inherits VerticalLayout {
+    in property <[LibraryItemData]> playlists: []; in property <[LibraryItemData]> albums: []; in property <[LibraryItemData]> artists: [];
+    callback playlist-selected(int); callback album-selected(int); callback artist-selected(int);
+    spacing: 16px; alignment: start;
+
+    VerticalLayout {
+        spacing: 6px;
+        Text { text: "Playlists"; color: #ffffff; font-size: 16px; font-weight: 700; }
+        if root.playlists.length == 0 : Text { text: "No playlists."; color: #b3b3b3; font-size: 13px; }
+        for item in root.playlists : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.playlist-selected(item.index); } }
+    }
+
+    VerticalLayout {
+        spacing: 6px;
+        Text { text: "Albums"; color: #ffffff; font-size: 16px; font-weight: 700; }
+        if root.albums.length == 0 : Text { text: "No albums."; color: #b3b3b3; font-size: 13px; }
+        for item in root.albums : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.album-selected(item.index); } }
+    }
+
+    VerticalLayout {
+        spacing: 6px;
+        Text { text: "Artists"; color: #ffffff; font-size: 16px; font-weight: 700; }
+        if root.artists.length == 0 : Text { text: "No artists."; color: #b3b3b3; font-size: 13px; }
+        for item in root.artists : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.artist-selected(item.index); } }
+    }
+}
+
+export component DetailView inherits VerticalLayout {
+    in property <bool> has-detail: false; in property <string> title: ""; in property <string> subtitle: "";
+    in property <string> kind-label: ""; in property <[TrackRowData]> tracks: [];
+    callback track-selected(int);
+    spacing: 12px; alignment: start;
+
+    if !root.has-detail : VerticalLayout {
+        padding-top: 24px; alignment: center;
+        Text { text: "No detail available."; color: #b3b3b3; font-size: 14px; horizontal-alignment: center; }
+    }
+
+    if root.has-detail : VerticalLayout {
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 16px; alignment: start;
+            // Cover-art placeholder (owned by a later tranche)
+            Rectangle { width: 80px; height: 80px; border-radius: 6px; background: #242424; Text { text: "Cover Art\n(Later Tranche)"; color: #666666; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+            VerticalLayout {
+                spacing: 4px; alignment: center;
+                Text { text: root.kind-label; color: #1db954; font-size: 12px; font-weight: 700; }
+                Text { text: root.title; color: #ffffff; font-size: 20px; font-weight: 700; }
+                if root.subtitle != "" : Text { text: root.subtitle; color: #b3b3b3; font-size: 13px; }
+            }
+        }
+        Rectangle { height: 1px; background: #282828; }
+        if root.tracks.length == 0 : VerticalLayout {
+            padding-top: 16px; alignment: center;
+            Text { text: "No tracks in detail."; color: #b3b3b3; font-size: 13px; horizontal-alignment: center; }
+        }
+        for track in root.tracks : TrackRow { title: track.title; artist: track.artist; duration: track.duration; clicked => { root.track-selected(track.index); } }
+    }
+}
+
 component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
     in property <string> header-title: "Search";
@@ -371,10 +453,14 @@ component ContentArea inherits Rectangle {
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
     in property <float> playback-progress: 0.0;
+    in property <[LibraryItemData]> library-playlists: []; in property <[LibraryItemData]> library-albums: []; in property <[LibraryItemData]> library-artists: [];
+    in property <bool> detail-has-detail: false; in property <string> detail-title: ""; in property <string> detail-subtitle: "";
+    in property <string> detail-kind-label: ""; in property <[TrackRowData]> detail-tracks: [];
 
     callback query-submitted(string);
     callback track-selected(int);
     callback queue-track-selected(int);
+    callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
 
     background: #121212;
 
@@ -416,10 +502,17 @@ component ContentArea inherits Rectangle {
             progress: root.playback-progress;
         }
 
-        if root.active-page > 2 : VerticalLayout {
-            alignment: center; spacing: 12px;
-            if root.active-page == 3 : Text { text: "Library Page Placeholder"; color: #b3b3b3; font-size: 16px; horizontal-alignment: center; }
-            if root.active-page == 4 : Text { text: "Detail Page Placeholder"; color: #b3b3b3; font-size: 16px; horizontal-alignment: center; }
+        if root.active-page == 3 : LibraryView {
+            playlists: root.library-playlists; albums: root.library-albums; artists: root.library-artists;
+            playlist-selected(idx) => { root.playlist-selected(idx); }
+            album-selected(idx) => { root.album-selected(idx); }
+            artist-selected(idx) => { root.artist-selected(idx); }
+        }
+
+        if root.active-page == 4 : DetailView {
+            has-detail: root.detail-has-detail; title: root.detail-title; subtitle: root.detail-subtitle;
+            kind-label: root.detail-kind-label; tracks: root.detail-tracks;
+            track-selected(idx) => { root.detail-track-selected(idx); }
         }
     }
 }
@@ -445,11 +538,15 @@ export component MoggytWindow inherits Window {
     in-out property <string> position-text: "0:00";
     in-out property <string> duration-text: "0:00";
     in-out property <float> playback-progress: 0.0;
+    in-out property <[LibraryItemData]> library-playlists: []; in-out property <[LibraryItemData]> library-albums: []; in-out property <[LibraryItemData]> library-artists: [];
+    in-out property <bool> detail-has-detail: false; in-out property <string> detail-title: ""; in-out property <string> detail-subtitle: "";
+    in-out property <string> detail-kind-label: ""; in-out property <[TrackRowData]> detail-tracks: [];
 
     callback page-selected(int);
     callback query-submitted(string);
     callback track-selected(int);
     callback queue-track-selected(int);
+    callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
     callback toggle-play();
     callback prev-track();
     callback next-track();
@@ -474,8 +571,13 @@ export component MoggytWindow inherits Window {
                 queue-tracks: root.queue-tracks; queue-selected-index: root.queue-selected-index;
                 active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
                 position-text: root.position-text; duration-text: root.duration-text; playback-progress: root.playback-progress;
+                library-playlists: root.library-playlists; library-albums: root.library-albums; library-artists: root.library-artists;
+                detail-has-detail: root.detail-has-detail; detail-title: root.detail-title; detail-subtitle: root.detail-subtitle;
+                detail-kind-label: root.detail-kind-label; detail-tracks: root.detail-tracks;
                 query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
                 queue-track-selected(idx) => { root.queue-track-selected(idx); }
+                playlist-selected(idx) => { root.playlist-selected(idx); } album-selected(idx) => { root.album-selected(idx); }
+                artist-selected(idx) => { root.artist-selected(idx); } detail-track-selected(idx) => { root.detail-track-selected(idx); }
             }
         }
 
