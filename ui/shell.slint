@@ -175,7 +175,6 @@ component TrackRow inherits Rectangle {
         padding-left: 12px;
         padding-right: 12px;
         spacing: 12px;
-        alignment: center;
 
         Rectangle {
             width: 40px;
@@ -311,6 +310,7 @@ component SearchView inherits VerticalLayout {
 
     for shelf in root.shelves : VerticalLayout {
         spacing: 8px;
+        alignment: start;
 
         Text {
             text: shelf.title;
