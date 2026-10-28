@@ -33,6 +33,8 @@
 
 use std::sync::{Arc, Mutex};
 
+use tracing::{debug, warn};
+
 use crate::domain::{Detail, DetailKind, SearchQuery, Shelf};
 use crate::infra::{
     AudioBackend, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache, LyricLine,
@@ -89,12 +91,20 @@ pub fn resolve_lyrics<L: LyricsSource>(req: &PlayTrackRequest, lyrics: &Arc<L>) 
 /// Fetches or retrieves cached artwork bytes for a given URL off the UI thread.
 fn get_or_fetch_artwork<K: CoverCache>(url: &str, covers: &Arc<Mutex<K>>) -> Option<Vec<u8>> {
     if let Some(data) = covers.lock().ok()?.get(url) {
+        debug!(url = %url, bytes = data.len(), "cover cache hit");
         return Some(data);
     }
-    let fetched = fetch_artwork(url, 8).ok()?;
+    let fetched = match fetch_artwork(url, 8) {
+        Ok(data) => data,
+        Err(err) => {
+            warn!(url = %url, error = %err, "failed to fetch cover artwork");
+            return None;
+        }
+    };
     if let Ok(mut cache) = covers.lock() {
         cache.put(url, fetched.clone());
     }
+    debug!(url = %url, bytes = fetched.len(), "fetched and cached cover artwork");
     Some(fetched)
 }
 
@@ -106,7 +116,13 @@ pub fn fetch_and_decode_cover<K: CoverCache>(
 ) -> Option<CoverArtData> {
     let bytes = get_or_fetch_artwork(url, covers)?;
     let max_px = if hi_res { COVER_HIRES_MAX_PX } else { COVER_MAX_PX };
-    let rgba = decode_cover(&bytes, max_px)?;
+    let rgba = match decode_cover(&bytes, max_px) {
+        Some(img) => img,
+        None => {
+            warn!(url = %url, bytes = bytes.len(), "failed to decode cover artwork payload");
+            return None;
+        }
+    };
     Some(CoverArtData::new(url, rgba.as_raw().to_vec(), rgba.width(), rgba.height()))
 }
 
@@ -115,7 +131,10 @@ pub fn resolve_cover_art<K: CoverCache>(
     req: &PlayTrackRequest,
     covers: &Arc<Mutex<K>>,
 ) -> Option<CoverArtData> {
-    let url = req.artwork_url.as_deref()?;
+    let Some(url) = req.artwork_url.as_deref() else {
+        debug!(track_id = %req.track_id, "track request has no artwork url; skipping cover resolution");
+        return None;
+    };
     fetch_and_decode_cover(url, covers, req.hi_res_covers)
 }
 
