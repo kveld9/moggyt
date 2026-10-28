@@ -1,5 +1,5 @@
 pkgbase = moggyt-bin
-	pkgdesc = Native YouTube Music client (eframe/egui)
+	pkgdesc = Native YouTube Music client (Slint)
 	pkgver = 1.0.0
 	pkgrel = 1
 	url = https://github.com/kveld9/moggyt

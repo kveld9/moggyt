@@ -1,6 +1,6 @@
 # moggyt
 
-Native YouTube Music desktop client written in Rust, featuring a lightweight `eframe`/`egui` user interface.
+Native YouTube Music desktop client written in Rust, featuring a lightweight Slint user interface.
 
 `moggyt` is an unofficial desktop client with no affiliation with Google or YouTube. It provides a fast, standalone
 desktop listening experience without bundling a web browser or Electron runtime. The project is currently at the v0.1
@@ -86,10 +86,10 @@ For in-depth configuration and directory layouts, see [Configuration](docs/07-co
 The codebase enforces a strict hexagonal architecture:
 
 ```text
-UI Shell (src/app.rs, eframe) --> Pure Domain (src/domain/) <-- Ports <-- Adapters (src/infra/)
+UI Shell (src/slint_shell/, Slint) --> Pure Domain (src/domain/) <-- Ports <-- Adapters (src/infra/)
 ```
 
-`src/main.rs` is the sole composition root, assembling dependencies and bootstrapping the `eframe` window. Pure
+`src/main.rs` is the sole composition root, assembling dependencies and bootstrapping the Slint window. Pure
 business logic in `domain/` contains zero I/O or wall-clock dependencies.
 
 For architectural invariants and design documents, see [Architecture](docs/02-architecture.md) and the

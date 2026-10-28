@@ -7,7 +7,7 @@ Web-based YouTube Music clients consume too much memory and depend on the browse
 
 ## Scope v0.1 (current scaffold evolving to v1)
 
-- Native `eframe`/`egui` window with navigation (search, queue, now playing, library).
+- Native Slint window with navigation (search, queue, now playing, library).
 - Pure domain core: playback queue, search models, and library entities without I/O.
 - Ports (`trait`) for the YouTube Music catalog, audio backend, stream resolver, lyrics, cover cache, presence, and updater.
 - Initial working adapters for playback via `rodio` and a `yt-dlp` sidecar, LRCLIB lyrics, cover cache, and keyring auth.

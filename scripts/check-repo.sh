@@ -113,7 +113,7 @@ check_file "rustfmt.toml" true
 check_file "clippy.toml" true
 check_file "src/main.rs" true
 check_file "src/lib.rs" true
-check_file "src/app.rs" true
+check_file "src/slint_shell/mod.rs" true
 check_file "src/domain/mod.rs" true
 check_file "src/domain/queue.rs" true
 check_file "src/domain/search.rs" true
