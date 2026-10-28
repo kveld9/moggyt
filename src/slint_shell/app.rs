@@ -1052,7 +1052,7 @@ fn handle_cli_args<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource
 
 /// Checks GitHub Releases for newer version tags and records update availability.
 ///
-/// TODO: [Gap] Update banner badge: GithubUpdater checks for updates against GitHub
+/// TODO Gap: Update banner badge: GithubUpdater checks for updates against GitHub
 /// Releases on startup, but ui/shell.slint lacks an update banner badge.
 fn check_updater_status<
     C: Catalog,
@@ -1070,7 +1070,7 @@ fn check_updater_status<
 
 /// Composition function launching the Slint desktop UI wired to live platform adapters.
 ///
-/// TODO: [Gap] Settings modal: DiskSettingsStore persists volume, speed, quality, DSP
+/// TODO Gap: Settings modal: DiskSettingsStore persists volume, speed, quality, DSP
 /// toggles, and Last.fm credentials; playback speed and volume are fully wired, but
 /// ui/shell.slint lacks an interactive settings dialog for DSP and credential management.
 pub fn run() -> anyhow::Result<()> {
