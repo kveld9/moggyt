@@ -1,6 +1,5 @@
 //! Real rodio playback backend implementing the [`AudioBackend`] port.
 
-use std::io::Cursor;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -9,24 +8,12 @@ use rodio::{Decoder, OutputStream, Sink};
 
 use super::audio::{AudioBackend, AudioStub, clamp_speed};
 use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
-use super::stream::AudioQuality;
+use super::stream::{AudioQuality, open_audio_stream};
 use super::ytdlp::YtDlpResolver;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
 pub fn volume_to_amplitude(volume: u8) -> f32 {
     volume.min(100) as f32 / 100.0
-}
-
-/// Downloads raw audio payload bytes via blocking HTTP GET.
-fn fetch_audio_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
-    let response = reqwest::blocking::get(url)
-        .with_context(|| format!("failed to fetch audio stream from '{url}'"))?
-        .error_for_status()
-        .with_context(|| format!("http error response downloading audio stream from '{url}'"))?;
-    let bytes = response
-        .bytes()
-        .with_context(|| format!("failed to read audio stream payload from '{url}'"))?;
-    Ok(bytes.to_vec())
 }
 
 /// Real rodio playback backend maintaining an active sink and position tracking.
@@ -69,7 +56,10 @@ impl RodioBackend {
         })
     }
 
-    fn append_dsp_source(&self, source: Decoder<Cursor<Vec<u8>>>) {
+    fn append_dsp_source<R>(&self, source: Decoder<R>)
+    where
+        R: std::io::Read + std::io::Seek + Send + Sync + 'static,
+    {
         match (self.skip_silence, self.loudness_normalization) {
             (true, true) => {
                 let dsp = LoudnessNormalizer::new(SkipSilence::new(source));
@@ -89,15 +79,10 @@ impl RodioBackend {
         }
     }
 
-    /// Downloads and decodes audio from `url`, immediately starting playback.
-    ///
-    /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
-    pub fn play_url(&mut self, track_id: &str, url: &str) -> anyhow::Result<()> {
-        let bytes = fetch_audio_bytes(url)?;
-        let cursor = Cursor::new(bytes);
-        let source = Decoder::new(cursor)
-            .with_context(|| format!("failed to decode audio stream for track '{track_id}'"))?;
-
+    fn apply_playback_source<R>(&mut self, track_id: &str, source: Decoder<R>)
+    where
+        R: std::io::Read + std::io::Seek + Send + Sync + 'static,
+    {
         self.sink.stop();
         self.append_dsp_source(source);
         self.sink.play();
@@ -106,7 +91,30 @@ impl RodioBackend {
         self.last_requested = Some(track_id.to_owned());
         self.sink.set_volume(volume_to_amplitude(self.volume));
         self.sink.set_speed(self.speed);
+    }
 
+    /// Downloads and decodes audio from `url`, immediately starting playback.
+    ///
+    /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
+    pub fn play_url(&mut self, track_id: &str, url: &str) -> anyhow::Result<()> {
+        let stream = match open_audio_stream(url) {
+            Ok(stream) => stream,
+            Err(err) => {
+                tracing::warn!(track_id = %track_id, error = ?err, "failed to open audio stream");
+                return Err(err);
+            }
+        };
+        let source = match Decoder::new(stream) {
+            Ok(source) => source,
+            Err(err) => {
+                let anyhow_err = anyhow::Error::new(err)
+                    .context(format!("failed to decode audio stream for track '{track_id}'"));
+                tracing::warn!(track_id = %track_id, error = ?anyhow_err, "failed to decode audio stream");
+                return Err(anyhow_err);
+            }
+        };
+
+        self.apply_playback_source(track_id, source);
         Ok(())
     }
 
@@ -157,9 +165,12 @@ impl AudioBackend for RodioBackend {
     /// Records `last_requested` strictly upon successful playback start.
     fn play(&mut self, track_id: &str) {
         let Some(url) = self.resolver.resolve(track_id) else {
+            tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL");
             return;
         };
-        let _ = self.play_url(track_id, &url);
+        if let Err(err) = self.play_url(track_id, &url) {
+            tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream");
+        }
     }
 
     fn pause(&mut self) {
