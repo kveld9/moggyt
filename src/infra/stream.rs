@@ -70,9 +70,8 @@ impl<R: Read + Send> SyncReader<R> {
 
 impl<R: Read + Send> Read for SyncReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let mut guard = self.0.lock().map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::Other, "sync reader mutex poisoned")
-        })?;
+        let mut guard =
+            self.0.lock().map_err(|_| std::io::Error::other("sync reader mutex poisoned"))?;
         guard.read(buf)
     }
 }
@@ -119,10 +118,7 @@ impl ReqwestRangeTransport {
             .and_then(|h| h.to_str().ok())
             .and_then(parse_content_range_total);
 
-        let data = response
-            .bytes()
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?
-            .to_vec();
+        let data = response.bytes().map_err(std::io::Error::other)?.to_vec();
 
         Ok(RangeResponse::Partial { data, total_len })
     }
@@ -144,7 +140,7 @@ impl ReqwestRangeTransport {
             }
             _ => {
                 let err = response.error_for_status().unwrap_err();
-                Err(std::io::Error::new(std::io::ErrorKind::Other, err))
+                Err(std::io::Error::other(err))
             }
         }
     }
@@ -158,7 +154,7 @@ impl RangeTransport for ReqwestRangeTransport {
             .get(&self.url)
             .header(RANGE, format!("bytes={start}-{end}"))
             .send()
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+            .map_err(std::io::Error::other)?;
 
         self.handle_response(response)
     }
@@ -209,6 +205,11 @@ impl<T: RangeTransport> RangeReader<T> {
     pub fn with_chunk_size(mut self, size: usize) -> Self {
         self.chunk_size = size.max(1);
         self
+    }
+
+    /// Returns the current logical read position in the stream.
+    pub const fn position(&self) -> u64 {
+        self.logical_pos
     }
 
     fn read_buffered(&mut self, buf: &mut [u8]) -> usize {
@@ -339,7 +340,7 @@ impl<T: RangeTransport> RangeReader<T> {
             std::io::copy(&mut limited, &mut sink)?;
         }
         self.logical_pos = new_pos;
-        Ok(new_pos)
+        Ok(self.position())
     }
 
     fn seek_ranged(&mut self, new_pos: u64) -> std::io::Result<u64> {
@@ -347,7 +348,7 @@ impl<T: RangeTransport> RangeReader<T> {
         self.buffer_offset = 0;
         self.chunk_start = new_pos;
         self.logical_pos = new_pos;
-        Ok(new_pos)
+        Ok(self.position())
     }
 }
 
@@ -377,7 +378,7 @@ impl<T: RangeTransport> Seek for RangeReader<T> {
 /// Opens a streaming audio source from a remote URL.
 pub fn open_audio_stream(url: &str) -> anyhow::Result<RangeReader<ReqwestRangeTransport>> {
     let transport = ReqwestRangeTransport::new(url)?;
-    Ok(RangeReader::new(transport))
+    Ok(RangeReader::new(transport).with_chunk_size(DEFAULT_STREAM_CHUNK_SIZE))
 }
 
 #[cfg(test)]
@@ -423,10 +424,7 @@ mod tests {
             }
             if let Some(err_start) = self.error_at_start {
                 if start >= err_start {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "simulated transport failure",
-                    ));
+                    return Err(std::io::Error::other("simulated transport failure"));
                 }
             }
             let total = self.payload.len() as u64;
@@ -594,7 +592,7 @@ mod tests {
         reader.read_exact(&mut buf).expect("reads last 2 bytes");
         assert_eq!(&buf, b"yz");
 
-        let pos = reader.seek(SeekFrom::Current(0)).expect("current pos query");
+        let pos = reader.position();
         assert_eq!(pos, 26);
     }
 }
