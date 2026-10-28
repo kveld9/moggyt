@@ -5,6 +5,7 @@
 
 use std::any::Any;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -30,11 +31,14 @@ use crate::infra::{
 };
 use crate::slint_shell::detail::detail_kind_label;
 use crate::slint_shell::platform::{dispatch_to_ui, rgba_to_image};
-use crate::slint_shell::playback::{format_position, format_track_duration};
+use crate::slint_shell::playback::{
+    cycle_repeat_mode, format_position, format_track_duration, is_track_liked, progress_fraction,
+    repeat_mode_to_int, should_seek, toggle_like,
+};
 use crate::slint_shell::playback_worker::{
     PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters, PlaybackWorkerCommand,
     execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
-    fetch_and_decode_cover,
+    execute_seek, fetch_and_decode_cover,
 };
 use crate::slint_shell::search::{SearchRow, format_duration, iter_shelf_items};
 use crate::slint_shell::theme::apply_theme;
@@ -215,6 +219,9 @@ pub struct SlintAppState<
     pub theme: ThemeId,
     pub search_filter: SearchFilter,
     pub search_covers: std::collections::HashMap<String, slint::Image>,
+    pub liked_ids: HashSet<String>,
+    pub now_playing_cover: Option<slint::Image>,
+    pub is_shuffle: bool,
 
     pub play_generation: u64,
     pub search_generation: u64,
@@ -321,6 +328,9 @@ impl<
             theme: ThemeId::default(),
             search_filter: SearchFilter::All,
             search_covers: std::collections::HashMap::new(),
+            liked_ids: HashSet::new(),
+            now_playing_cover: None,
+            is_shuffle: false,
             play_generation: 0,
             search_generation: 0,
             detail_generation: 0,
@@ -779,6 +789,13 @@ fn sync_window<
     window.set_volume(volume as i32);
     window.set_signed_in(state.signed_in);
 
+    window.set_is_shuffle(state.is_shuffle);
+    window.set_repeat_mode(repeat_mode_to_int(state.queue.repeat()));
+    window.set_queue_count(state.queue.len() as i32);
+    let is_liked =
+        state.queue.current().map(|t| is_track_liked(&state.liked_ids, &t.id)).unwrap_or(false);
+    window.set_is_liked(is_liked);
+
     let (title, artist, dur_str, dur_secs) = match state.queue.current() {
         Some(t) => (
             t.title.clone(),
@@ -791,12 +808,12 @@ fn sync_window<
     window.set_active_track_title(title.into());
     window.set_active_track_artist(artist.into());
     window.set_duration_text(dur_str.into());
+    window.set_duration_secs(dur_secs as i32);
 
     let pos_secs = state.audio.try_lock().map(|a| a.position_secs()).unwrap_or(0) as u32;
+    window.set_position_secs(pos_secs as i32);
     window.set_position_text(format_position(pos_secs).into());
-    let progress =
-        if dur_secs > 0 { (pos_secs as f32 / dur_secs as f32).clamp(0.0, 1.0) } else { 0.0 };
-    window.set_playback_progress(progress);
+    window.set_playback_progress(progress_fraction(pos_secs, dur_secs));
 
     sync_cover_and_lyrics(window, state);
     sync_shelves_and_queue(window, state);
@@ -814,6 +831,20 @@ fn sync_cover_and_lyrics<
     window: &MoggytWindow,
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
+    if let Some(img) = &state.now_playing_cover {
+        window.set_now_playing_cover(img.clone());
+    } else if let Some(img) = state
+        .queue
+        .current()
+        .and_then(|t| t.artwork.as_ref())
+        .and_then(|u| state.search_covers.get(u))
+    {
+        state.now_playing_cover = Some(img.clone());
+        window.set_now_playing_cover(img.clone());
+    } else {
+        window.set_now_playing_cover(slint::Image::default());
+    }
+
     if let Some(img) = &state.current_cover_image {
         window.set_cover_image(img.clone());
         window.set_has_cover(true);
@@ -1014,11 +1045,11 @@ fn sync_playback_tick<
     let is_playing = audio.is_playing();
     drop(audio);
 
-    window.set_position_text(format_position(pos_secs).into());
     let dur_secs = state.queue.current().and_then(|t| t.duration_secs).unwrap_or(0);
-    let progress =
-        if dur_secs > 0 { (pos_secs as f32 / dur_secs as f32).clamp(0.0, 1.0) } else { 0.0 };
-    window.set_playback_progress(progress);
+    window.set_position_secs(pos_secs as i32);
+    window.set_duration_secs(dur_secs as i32);
+    window.set_position_text(format_position(pos_secs).into());
+    window.set_playback_progress(progress_fraction(pos_secs, dur_secs));
     window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
     window.set_is_playing(is_playing);
 }
@@ -1043,15 +1074,27 @@ fn trigger_playback<
     state.maybe_scrobble_current();
 
     state.current_cover_image = None;
+    state.now_playing_cover =
+        track.artwork.as_ref().and_then(|u| state.search_covers.get(u).cloned());
+    if let Some(ref img) = state.now_playing_cover {
+        window.set_now_playing_cover(img.clone());
+    } else {
+        window.set_now_playing_cover(slint::Image::default());
+    }
     state.lyrics_lines.clear();
     state.lyrics_key = None;
 
     window.set_is_playing(true);
     window.set_active_track_title(track.title.clone().into());
     window.set_active_track_artist(track.artist.clone().into());
+    let dur_secs = track.duration_secs.unwrap_or(0);
     window.set_duration_text(format_track_duration(track.duration_secs).into());
+    window.set_duration_secs(dur_secs as i32);
     window.set_position_text("0:00".into());
+    window.set_position_secs(0);
     window.set_playback_progress(0.0);
+    window.set_is_liked(is_track_liked(&state.liked_ids, &track.id));
+    window.set_queue_count(state.queue.len() as i32);
     window.set_has_cover(false);
     window.set_lyrics_lines(ModelRc::new(VecModel::default()));
     window.set_active_lyric_index(-1);
@@ -1102,15 +1145,22 @@ pub fn apply_play_track_completion<
     if let Some(cover) = res.cover_data {
         if let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) {
             state.current_cover_image = Some(img.clone());
-            window.set_cover_image(img);
+            state.now_playing_cover = Some(img.clone());
+            state.search_covers.insert(cover.url, img.clone());
+            window.set_cover_image(img.clone());
+            window.set_now_playing_cover(img);
             window.set_has_cover(true);
         } else {
             state.current_cover_image = None;
+            state.now_playing_cover = None;
             window.set_has_cover(false);
+            window.set_now_playing_cover(slint::Image::default());
         }
     } else {
         state.current_cover_image = None;
+        state.now_playing_cover = None;
         window.set_has_cover(false);
+        window.set_now_playing_cover(slint::Image::default());
     }
 
     state.sync_presence_track(&res.artist, &res.title, true);
@@ -1289,10 +1339,16 @@ fn handle_fetch_cover_command<
     let _ = dispatch_to_ui(move || {
         let Some(win) = weak.upgrade() else { return };
         with_ui_state::<C, A, S, L, K, _>(|st| {
-            if st.search_generation == generation {
-                if let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) {
-                    st.search_covers.insert(cover.url, img);
+            if let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) {
+                if st.search_generation == generation {
+                    st.search_covers.insert(cover.url.clone(), img.clone());
                     sync_shelves_and_queue(&win, st);
+                }
+                if let Some(track) = st.queue.current() {
+                    if track.artwork.as_deref() == Some(&cover.url) {
+                        st.now_playing_cover = Some(img.clone());
+                        win.set_now_playing_cover(img);
+                    }
                 }
             }
         });
@@ -1346,6 +1402,9 @@ fn spawn_playback_worker<
                             &adapters.covers,
                             weak.clone(),
                         );
+                    }
+                    PlaybackWorkerCommand::Seek { position_secs } => {
+                        execute_seek(position_secs, &adapters.audio);
                     }
                 }
             }
@@ -1563,7 +1622,7 @@ fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
-    let tx = worker_tx;
+    let tx = worker_tx.clone();
     window.on_next_track(move || {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
@@ -1583,10 +1642,69 @@ fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx;
+    window.on_seek_to(move |secs| {
+        let Some(win) = w.upgrade() else { return };
+        let st = s.borrow();
+        let target = secs.max(0) as u64;
+        if let Ok(current) = st.audio.try_lock().map(|a| a.position_secs()) {
+            if !should_seek(target, current) {
+                return;
+            }
+        }
+        let _ = tx.send(PlaybackWorkerCommand::Seek { position_secs: target });
+        win.set_position_secs(target as i32);
+        win.set_position_text(format_position(target as u32).into());
+        let dur = st.queue.current().and_then(|t| t.duration_secs).unwrap_or(0);
+        win.set_playback_progress(progress_fraction(target as u32, dur));
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
     window.on_set_volume(move |vol| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         st.set_volume(vol.clamp(0, 100) as u8);
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_toggle_like(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        if let Some(track) = st.queue.current() {
+            let id = track.id.clone();
+            let is_liked = toggle_like(&mut st.liked_ids, &id);
+            win.set_is_liked(is_liked);
+        }
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_toggle_shuffle(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.is_shuffle = !st.is_shuffle;
+        win.set_is_shuffle(st.is_shuffle);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_cycle_repeat(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        let next = cycle_repeat_mode(st.queue.repeat());
+        st.queue.set_repeat(next);
+        win.set_repeat_mode(repeat_mode_to_int(next));
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_open_queue(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.select_page(SlintPage::Queue);
         sync_window(&win, &mut st);
     });
 
@@ -1626,7 +1744,7 @@ fn setup_app_timer<
 ) -> slint::Timer {
     let weak = window.as_weak();
     let timer = slint::Timer::default();
-    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(250), move || {
+    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
         let Some(win) = weak.upgrade() else { return };
         let mut state = state_rc.borrow_mut();
         if state.drain_tray_actions() {
@@ -1789,6 +1907,9 @@ mod tests {
         assert!(state.queue.is_empty());
         assert!(!state.home_shelves.is_empty());
         assert_eq!(state.active_lyric_index(), -1);
+        assert!(state.liked_ids.is_empty());
+        assert!(state.now_playing_cover.is_none());
+        assert!(!state.is_shuffle);
     }
 
     #[test]
@@ -1919,5 +2040,70 @@ mod tests {
         state.submit_search("rock");
         assert_eq!(state.search_filter, SearchFilter::All);
         assert!(state.search_covers.is_empty());
+    }
+
+    #[test]
+    fn test_like_toggle_and_state_persistence() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        assert!(!is_track_liked(&state.liked_ids, "t1"));
+
+        toggle_like(&mut state.liked_ids, "t1");
+        assert!(is_track_liked(&state.liked_ids, "t1"));
+
+        toggle_like(&mut state.liked_ids, "t1");
+        assert!(!is_track_liked(&state.liked_ids, "t1"));
+    }
+
+    #[test]
+    fn test_repeat_mode_cycling_in_state() {
+        let mut state = test_wired();
+        assert_eq!(state.queue.repeat(), crate::domain::RepeatMode::Off);
+
+        let m1 = cycle_repeat_mode(state.queue.repeat());
+        state.queue.set_repeat(m1);
+        assert_eq!(state.queue.repeat(), crate::domain::RepeatMode::All);
+
+        let m2 = cycle_repeat_mode(state.queue.repeat());
+        state.queue.set_repeat(m2);
+        assert_eq!(state.queue.repeat(), crate::domain::RepeatMode::One);
+
+        let m3 = cycle_repeat_mode(state.queue.repeat());
+        state.queue.set_repeat(m3);
+        assert_eq!(state.queue.repeat(), crate::domain::RepeatMode::Off);
+    }
+
+    #[test]
+    fn test_cover_pipeline_store_and_lookup_key_roundtrip() {
+        let cache = Arc::new(Mutex::new(MemoryCoverCache::new()));
+        let url = "https://example.com/artwork.jpg";
+        cache.lock().unwrap().put(url, vec![1, 2, 3]);
+
+        // Key stored in cache
+        assert_eq!(cache.lock().unwrap().get(url), Some(vec![1, 2, 3]));
+
+        // Key lookup expression used in track_to_row_data
+        let track = Track::new("t1", "Title", "Artist").with_artwork(url);
+        let lookup_key = track.artwork.as_ref();
+        assert_eq!(lookup_key.map(String::as_str), Some(url));
+        assert_eq!(lookup_key.and_then(|u| cache.lock().unwrap().get(u)), Some(vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn test_seek_feedback_guard_condition() {
+        let state = test_wired();
+        state.audio.lock().unwrap().seek(50);
+        let current = state.audio.try_lock().map(|a| a.position_secs()).unwrap();
+        assert_eq!(current, 50);
+
+        // Within 1 second: guard suppresses seek
+        assert!(!should_seek(50, current));
+        assert!(!should_seek(51, current));
+        assert!(!should_seek(49, current));
+
+        // Beyond 1 second: guard allows seek
+        assert!(should_seek(52, current));
+        assert!(should_seek(48, current));
+        assert!(should_seek(0, current));
     }
 }
