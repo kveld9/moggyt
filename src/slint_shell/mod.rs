@@ -26,6 +26,10 @@ slint::include_modules!();
 
 pub use MoggytWindow as AppWindow;
 
+pub mod search;
+
+pub use search::{SearchState, TrackDisplayRow, canned_shelves, format_duration, shelf_tracks};
+
 /// Navigation pages of the Slint UI shell, matching domain Page order.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum SlintPage {
