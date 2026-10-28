@@ -44,8 +44,65 @@ use crate::slint_shell::playback_worker::{
 use crate::slint_shell::search::{SearchRow, format_duration, iter_shelf_items};
 use crate::slint_shell::theme::{apply_theme, theme_from_index, theme_to_index};
 use crate::slint_shell::{
-    CoverArtData, LibraryItemData, LyricLineData, MoggytWindow, ShelfData, SlintPage, TrackRowData,
+    CoverArtData, LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData,
 };
+
+/// Navigation pages of the Slint UI shell, matching domain Page order.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum SlintPage {
+    /// Search catalog and browse home shelves.
+    #[default]
+    Search,
+    /// Inspect and manage playback queue.
+    Queue,
+    /// Active playback and lyrics display.
+    NowPlaying,
+    /// User library containing playlists, albums, and tracks.
+    Library,
+    /// Detailed album, artist, or playlist view.
+    Detail,
+    /// Application settings for theme, playback, session, and about.
+    Settings,
+}
+
+impl SlintPage {
+    /// Resolves page from index, falling back to Search for out-of-bounds values.
+    pub fn from_index(index: i32) -> Self {
+        match index {
+            0 => Self::Search,
+            1 => Self::Queue,
+            2 => Self::NowPlaying,
+            3 => Self::Library,
+            4 => Self::Detail,
+            5 => Self::Settings,
+            _ => Self::Search,
+        }
+    }
+
+    /// Converts page variant to its 0-based integer index.
+    pub fn to_index(self) -> i32 {
+        match self {
+            Self::Search => 0,
+            Self::Queue => 1,
+            Self::NowPlaying => 2,
+            Self::Library => 3,
+            Self::Detail => 4,
+            Self::Settings => 5,
+        }
+    }
+
+    /// Returns human-readable page title for display in the shell header.
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Search => "Search",
+            Self::Queue => "Queue",
+            Self::NowPlaying => "Now Playing",
+            Self::Library => "Library",
+            Self::Detail => "Detail",
+            Self::Settings => "Settings",
+        }
+    }
+}
 
 /// Returns current UTC timestamp in seconds since UNIX epoch, or 0 on clock failure.
 pub fn current_unix_secs() -> u64 {
@@ -1111,8 +1168,16 @@ fn sync_library_and_detail<
             .map(|(i, t)| track_to_row_data(i, t, &state.search_covers))
             .collect();
         window.set_detail_tracks(ModelRc::new(VecModel::from(d_tracks)));
+        let cover_img = detail
+            .tracks
+            .first()
+            .and_then(|t| t.artwork.as_deref())
+            .map(|url| resolve_row_cover_image(Some(url), &state.search_covers))
+            .unwrap_or_default();
+        window.set_detail_cover(cover_img);
     } else {
         window.set_detail_has_detail(false);
+        window.set_detail_cover(slint::Image::default());
     }
 }
 
@@ -1771,6 +1836,45 @@ fn wire_window_callbacks<
                 st.queue.push(track);
                 let last = st.queue.len().saturating_sub(1);
                 st.play_track_at_index_in_memory(last);
+                trigger_playback(&win, &mut st, &tx);
+            }
+        }
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
+    window.on_detail_play(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        if let Some(detail) = st.detail.clone() {
+            if !detail.tracks.is_empty() {
+                let start_idx = st.queue.len();
+                for track in detail.tracks {
+                    st.queue.push(track);
+                }
+                st.play_track_at_index_in_memory(start_idx);
+                trigger_playback(&win, &mut st, &tx);
+            }
+        }
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
+    window.on_detail_shuffle(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        if let Some(detail) = st.detail.clone() {
+            if !detail.tracks.is_empty() {
+                st.is_shuffle = true;
+                let start_idx = st.queue.len();
+                for track in detail.tracks {
+                    st.queue.push(track);
+                }
+                st.play_track_at_index_in_memory(start_idx);
                 trigger_playback(&win, &mut st, &tx);
             }
         }
@@ -2461,5 +2565,34 @@ mod tests {
             received += 1;
         }
         assert_eq!(received, COVER_FETCH_CONCURRENCY_LIMIT);
+    }
+
+    #[test]
+    fn test_settings_page_navigation() {
+        let mut state = test_wired();
+        assert_eq!(state.page, SlintPage::Search);
+        state.select_page(SlintPage::Settings);
+        assert_eq!(state.page, SlintPage::Settings);
+        assert_eq!(state.page.to_index(), 5);
+        assert_eq!(state.page.title(), "Settings");
+        assert_eq!(SlintPage::from_index(5), SlintPage::Settings);
+    }
+
+    #[test]
+    fn test_detail_hero_enqueue_tracks() {
+        let mut state = test_wired();
+        let track1 = Track::new("t1", "Track 1", "Artist 1").with_duration(180);
+        let track2 = Track::new("t2", "Track 2", "Artist 2").with_duration(200);
+        let detail =
+            Detail::new(DetailKind::Album, "Album Title", "Album Subtitle", vec![track1, track2]);
+        state.detail = Some(detail);
+
+        let tracks = state.detail.as_ref().unwrap().tracks.clone();
+        for t in tracks {
+            state.queue.push(t);
+        }
+        state.play_track_at_index_in_memory(0);
+        assert_eq!(state.queue.len(), 2);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
     }
 }
