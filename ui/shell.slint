@@ -4,7 +4,10 @@ export struct TrackRowData {
     index: int,
     title: string,
     artist: string,
+    album: string,
     duration: string,
+    kind: string,
+    cover: image,
 }
 
 export struct ShelfData {
@@ -117,15 +120,51 @@ component Sidebar inherits Rectangle {
     }
 }
 
-component TrackRow inherits Rectangle {
-    in property <string> title;
-    in property <string> artist;
-    in property <string> duration;
+component FilterChip inherits Rectangle {
+    in property <string> text;
     in property <bool> is-active: false;
     callback clicked();
 
-    height: 36px;
-    border-radius: 4px;
+    height: 28px;
+    border-radius: 14px;
+    background: root.is-active ? Theme.accent : (touch.has-hover ? Theme.hover : Theme.surface);
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        alignment: center;
+
+        Text {
+            text: root.text;
+            color: root.is-active ? Theme.window : (touch.has-hover ? Theme.text : Theme.secondary);
+            font-size: 12px;
+            font-weight: 600;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+component TrackRow inherits Rectangle {
+    in property <string> title;
+    in property <string> artist;
+    in property <string> album;
+    in property <string> duration;
+    in property <string> kind;
+    in property <image> cover;
+    in property <bool> is-active: false;
+    callback clicked();
+
+    property <string> subtitle-text: root.album != "" && root.artist != "" ? root.artist + " - " + root.album : (
+        root.artist != "" ? root.artist : root.album
+    );
+
+    height: 56px;
+    border-radius: 6px;
     background: root.is-active ? Theme.surface : (touch.has-hover ? Theme.hover : transparent);
 
     touch := TouchArea {
@@ -136,25 +175,45 @@ component TrackRow inherits Rectangle {
         padding-left: 12px;
         padding-right: 12px;
         spacing: 12px;
+        alignment: center;
 
-        Text {
-            text: root.title;
-            color: root.is-active ? Theme.accent : Theme.text;
-            font-size: 14px;
-            font-weight: 500;
-            vertical-alignment: center;
+        Rectangle {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            background: Theme.surface;
+            clip: true;
+
+            Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.cover;
+                image-fit: contain;
+            }
         }
 
-        Text {
-            text: root.artist;
-            color: Theme.secondary;
-            font-size: 13px;
-            vertical-alignment: center;
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.title;
+                color: root.is-active ? Theme.accent : Theme.text;
+                font-size: 14px;
+                font-weight: 600;
+                overflow: elide;
+            }
+
+            if root.subtitle-text != "" : Text {
+                text: root.subtitle-text;
+                color: Theme.secondary;
+                font-size: 12px;
+                overflow: elide;
+            }
         }
 
-        Rectangle {}
-
-        Text {
+        if root.duration != "" : Text {
             text: root.duration;
             color: Theme.secondary;
             font-size: 13px;
@@ -167,8 +226,10 @@ component TrackRow inherits Rectangle {
 component SearchView inherits VerticalLayout {
     in-out property <string> query: "";
     in property <[ShelfData]> shelves: [];
+    in property <int> active-filter: 0;
     callback query-submitted(string);
     callback track-selected(int);
+    callback filter-selected(int);
 
     spacing: 16px;
     alignment: start;
@@ -205,6 +266,37 @@ component SearchView inherits VerticalLayout {
         }
     }
 
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+
+        FilterChip {
+            text: "All";
+            is-active: root.active-filter == 0;
+            clicked => { root.filter-selected(0); }
+        }
+        FilterChip {
+            text: "Songs";
+            is-active: root.active-filter == 1;
+            clicked => { root.filter-selected(1); }
+        }
+        FilterChip {
+            text: "Albums";
+            is-active: root.active-filter == 2;
+            clicked => { root.filter-selected(2); }
+        }
+        FilterChip {
+            text: "Artists";
+            is-active: root.active-filter == 3;
+            clicked => { root.filter-selected(3); }
+        }
+        FilterChip {
+            text: "Playlists";
+            is-active: root.active-filter == 4;
+            clicked => { root.filter-selected(4); }
+        }
+    }
+
     if root.shelves.length == 0 : VerticalLayout {
         padding-top: 24px;
         alignment: center;
@@ -230,7 +322,10 @@ component SearchView inherits VerticalLayout {
         for track in shelf.tracks : TrackRow {
             title: track.title;
             artist: track.artist;
+            album: track.album;
             duration: track.duration;
+            kind: track.kind;
+            cover: track.cover;
             clicked => {
                 root.track-selected(track.index);
             }
@@ -332,7 +427,12 @@ export component QueueView inherits VerticalLayout {
         Text { text: "Queue is empty."; color: Theme.secondary; font-size: 14px; horizontal-alignment: center; }
     }
     for track in root.tracks : TrackRow {
-        title: track.title; artist: track.artist; duration: track.duration;
+        title: track.title;
+        artist: track.artist;
+        album: track.album;
+        duration: track.duration;
+        kind: track.kind;
+        cover: track.cover;
         is-active: track.index == root.selected-index;
         clicked => { root.track-selected(track.index); }
     }
@@ -571,7 +671,15 @@ export component DetailView inherits VerticalLayout {
             padding-top: 16px; alignment: center;
             Text { text: "No tracks in detail."; color: Theme.secondary; font-size: 13px; horizontal-alignment: center; }
         }
-        for track in root.tracks : TrackRow { title: track.title; artist: track.artist; duration: track.duration; clicked => { root.track-selected(track.index); } }
+        for track in root.tracks : TrackRow {
+            title: track.title;
+            artist: track.artist;
+            album: track.album;
+            duration: track.duration;
+            kind: track.kind;
+            cover: track.cover;
+            clicked => { root.track-selected(track.index); }
+        }
     }
 }
 
@@ -582,6 +690,7 @@ component ContentArea inherits Rectangle {
     in-out property <string> cookie-text: "";
     in property <bool> signed-in: false;
     in property <[ShelfData]> shelves: [];
+    in property <int> search-filter: 0;
     in property <[TrackRowData]> queue-tracks: [];
     in property <int> queue-selected-index: -1;
     in property <string> active-track-title: "No track playing";
@@ -599,6 +708,7 @@ component ContentArea inherits Rectangle {
 
     callback query-submitted(string);
     callback track-selected(int);
+    callback filter-selected(int);
     callback queue-track-selected(int);
     callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
     callback sign-in-submitted(string);
@@ -626,8 +736,10 @@ component ContentArea inherits Rectangle {
         if root.active-page == 0 : SearchView {
             query <=> root.query;
             shelves: root.shelves;
+            active-filter: root.search-filter;
             query-submitted(q) => { root.query-submitted(q); }
             track-selected(idx) => { root.track-selected(idx); }
+            filter-selected(idx) => { root.filter-selected(idx); }
         }
 
         if root.active-page == 1 : QueueView {
@@ -692,6 +804,7 @@ export component MoggytWindow inherits Window {
     in-out property <string> cookie-text: "";
     in-out property <bool> signed-in: false;
     in-out property <[ShelfData]> shelves: [];
+    in-out property <int> search-filter: 0;
     in-out property <[TrackRowData]> queue-tracks: [];
     in-out property <int> queue-selected-index: -1;
     in-out property <string> active-track-title: "No track playing";
@@ -712,6 +825,7 @@ export component MoggytWindow inherits Window {
     callback page-selected(int);
     callback query-submitted(string);
     callback track-selected(int);
+    callback filter-selected(int);
     callback queue-track-selected(int);
     callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
     callback sign-in-submitted(string);
@@ -737,6 +851,7 @@ export component MoggytWindow inherits Window {
 
             ContentArea {
                 active-page: root.active-page; header-title: root.header-title; query <=> root.query; shelves: root.shelves;
+                search-filter: root.search-filter;
                 cookie-text <=> root.cookie-text; signed-in: root.signed-in;
                 queue-tracks: root.queue-tracks; queue-selected-index: root.queue-selected-index;
                 active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
@@ -747,6 +862,7 @@ export component MoggytWindow inherits Window {
                 detail-has-detail: root.detail-has-detail; detail-title: root.detail-title; detail-subtitle: root.detail-subtitle;
                 detail-kind-label: root.detail-kind-label; detail-tracks: root.detail-tracks;
                 query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
+                filter-selected(idx) => { root.filter-selected(idx); }
                 queue-track-selected(idx) => { root.queue-track-selected(idx); }
                 playlist-selected(idx) => { root.playlist-selected(idx); } album-selected(idx) => { root.album-selected(idx); }
                 artist-selected(idx) => { root.artist-selected(idx); } detail-track-selected(idx) => { root.detail-track-selected(idx); }
