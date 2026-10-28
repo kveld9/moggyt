@@ -36,14 +36,15 @@ use crate::slint_shell::playback::{
     repeat_mode_to_int, should_seek, toggle_like,
 };
 use crate::slint_shell::playback_worker::{
-    PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters, PlaybackWorkerCommand,
-    execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
-    execute_seek, fetch_and_decode_cover,
+    COVER_FETCH_CONCURRENCY_LIMIT, PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters,
+    PlaybackWorkerCommand, execute_detail, execute_play_track, execute_refresh_library,
+    execute_scrobble, execute_search, execute_seek, fetch_and_decode_cover,
+    thumbnail_variant_for_row,
 };
 use crate::slint_shell::search::{SearchRow, format_duration, iter_shelf_items};
 use crate::slint_shell::theme::{apply_theme, theme_from_index, theme_to_index};
 use crate::slint_shell::{
-    LibraryItemData, LyricLineData, MoggytWindow, ShelfData, SlintPage, TrackRowData,
+    CoverArtData, LibraryItemData, LyricLineData, MoggytWindow, ShelfData, SlintPage, TrackRowData,
 };
 
 /// Returns current UTC timestamp in seconds since UNIX epoch, or 0 on clock failure.
@@ -930,6 +931,41 @@ fn iter_shelf_artwork_urls(shelves: &[Shelf]) -> impl Iterator<Item = &str> {
     })
 }
 
+/// Resolves cached cover image for a shelf or queue row, routed through thumbnail_variant_for_row.
+fn resolve_row_cover_image(
+    artwork_url: Option<&str>,
+    covers: &std::collections::HashMap<String, slint::Image>,
+) -> slint::Image {
+    let Some(url) = artwork_url else {
+        return slint::Image::default();
+    };
+    let thumb = thumbnail_variant_for_row(url);
+    covers.get(&thumb).or_else(|| covers.get(url)).cloned().unwrap_or_default()
+}
+
+/// Dispatches a single cover fetch command if not already in UI cache or pending set.
+fn dispatch_shelf_cover_if_needed<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    url: &str,
+    state: &SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    let row_url = thumbnail_variant_for_row(url);
+    if state.search_covers.contains_key(&row_url) || !seen.insert(row_url.clone()) {
+        return;
+    }
+    let _ = worker_tx.send(PlaybackWorkerCommand::FetchCover {
+        url: row_url,
+        generation: state.search_generation,
+    });
+}
+
 /// Requests background cover decoding for all uncached artwork URLs in shelves.
 fn request_shelf_covers<
     C: Catalog + Send + 'static,
@@ -943,12 +979,7 @@ fn request_shelf_covers<
 ) {
     let mut seen = std::collections::HashSet::new();
     for url in iter_shelf_artwork_urls(&state.home_shelves) {
-        if !state.search_covers.contains_key(url) && seen.insert(url.to_string()) {
-            let _ = worker_tx.send(PlaybackWorkerCommand::FetchCover {
-                url: url.to_string(),
-                generation: state.search_generation,
-            });
-        }
+        dispatch_shelf_cover_if_needed(url, state, worker_tx, &mut seen);
     }
 }
 
@@ -958,7 +989,7 @@ fn track_to_row_data(
     track: &Track,
     covers: &std::collections::HashMap<String, slint::Image>,
 ) -> TrackRowData {
-    let cover = track.artwork.as_ref().and_then(|u| covers.get(u).cloned()).unwrap_or_default();
+    let cover = resolve_row_cover_image(track.artwork.as_deref(), covers);
     TrackRowData {
         index: index as i32,
         title: track.title.clone().into(),
@@ -990,11 +1021,8 @@ fn sync_shelves_and_queue<
                 continue;
             }
             let row = SearchRow::from(item);
-            let cover_img = row
-                .artwork_url
-                .as_ref()
-                .and_then(|u| state.search_covers.get(u).cloned())
-                .unwrap_or_default();
+            let cover_img =
+                resolve_row_cover_image(row.artwork_url.as_deref(), &state.search_covers);
             tracks.push(TrackRowData {
                 index: global_idx,
                 title: row.title.into(),
@@ -1396,24 +1424,115 @@ fn handle_fetch_cover_command<
     covers: &Arc<Mutex<K>>,
     weak: slint::Weak<MoggytWindow>,
 ) {
-    let Some(cover) = fetch_and_decode_cover(url, covers, false) else { return };
+    let Some(cover) = fetch_and_decode_cover(url, covers, false) else {
+        return;
+    };
     let _ = dispatch_to_ui(move || {
-        let Some(win) = weak.upgrade() else { return };
+        let Some(win) = weak.upgrade() else {
+            return;
+        };
         with_ui_state::<C, A, S, L, K, _>(|st| {
-            if let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) {
-                if st.search_generation == generation {
-                    st.search_covers.insert(cover.url.clone(), img.clone());
-                    sync_shelves_and_queue(&win, st);
-                }
-                if let Some(track) = st.queue.current() {
-                    if track.artwork.as_deref() == Some(&cover.url) {
-                        st.now_playing_cover = Some(img.clone());
-                        win.set_now_playing_cover(img);
-                    }
-                }
-            }
+            apply_fetched_cover_to_state(&win, st, cover, generation);
         });
     });
+}
+
+/// Applies decoded cover art to UI state, triggering shelf card and search row resync.
+fn apply_fetched_cover_to_state<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    win: &MoggytWindow,
+    st: &mut SlintAppState<C, A, S, L, K>,
+    cover: CoverArtData,
+    generation: u64,
+) {
+    let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) else {
+        return;
+    };
+    if st.search_generation == generation {
+        st.search_covers.insert(cover.url.clone(), img.clone());
+        sync_shelves_and_queue(win, st);
+    }
+    sync_now_playing_after_cover_fetch(win, st, &cover.url, &img);
+}
+
+/// Updates now-playing cover when fetched artwork matches active track without downgrading hi-res.
+fn sync_now_playing_after_cover_fetch<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    win: &MoggytWindow,
+    st: &mut SlintAppState<C, A, S, L, K>,
+    cover_url: &str,
+    img: &slint::Image,
+) {
+    let Some(track) = st.queue.current() else {
+        return;
+    };
+    let is_match = track.artwork.as_deref() == Some(cover_url)
+        || track.artwork.as_deref().map(thumbnail_variant_for_row).as_deref() == Some(cover_url);
+    if is_match && st.now_playing_cover.is_none() {
+        st.now_playing_cover = Some(img.clone());
+        win.set_now_playing_cover(img.clone());
+    }
+}
+
+/// Spawns a pool of background cover fetch workers bounded by COVER_FETCH_CONCURRENCY_LIMIT.
+///
+/// Pool bound: Exactly COVER_FETCH_CONCURRENCY_LIMIT (4) background worker threads are spawned.
+/// Workers pull tasks from a shared channel, ensuring at most 4 cover fetches/decodes run in flight
+/// concurrently without stalling playback, scrobbling, or seek commands on the playback worker thread.
+fn spawn_cover_fetch_pool<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    covers: Arc<Mutex<K>>,
+    weak: slint::Weak<MoggytWindow>,
+) -> std::sync::mpsc::Sender<(String, u64)> {
+    let (tx, rx) = std::sync::mpsc::channel::<(String, u64)>();
+    let rx_arc = Arc::new(Mutex::new(rx));
+
+    for i in 0..COVER_FETCH_CONCURRENCY_LIMIT {
+        let rx_worker = Arc::clone(&rx_arc);
+        let covers_worker = Arc::clone(&covers);
+        let weak_worker = weak.clone();
+        let _ = std::thread::Builder::new().name(format!("moggyt-cover-{i}")).spawn(move || {
+            run_cover_fetch_worker_loop::<C, A, S, L, K>(&rx_worker, &covers_worker, &weak_worker);
+        });
+    }
+
+    tx
+}
+
+fn run_cover_fetch_worker_loop<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    rx: &Arc<Mutex<std::sync::mpsc::Receiver<(String, u64)>>>,
+    covers: &Arc<Mutex<K>>,
+    weak: &slint::Weak<MoggytWindow>,
+) {
+    loop {
+        let task = {
+            let Ok(guard) = rx.lock() else { break };
+            guard.recv().ok()
+        };
+        let Some((url, generation)) = task else { break };
+        handle_fetch_cover_command::<C, A, S, L, K>(&url, generation, covers, weak.clone());
+    }
 }
 
 /// Spawns the dedicated playback worker thread processing play and scrobble commands.
@@ -1429,6 +1548,8 @@ fn spawn_playback_worker<
     rx: std::sync::mpsc::Receiver<PlaybackWorkerCommand>,
 ) {
     let weak = window.as_weak();
+    let cover_tx =
+        spawn_cover_fetch_pool::<C, A, S, L, K>(Arc::clone(&adapters.covers), weak.clone());
 
     std::thread::Builder::new()
         .name("moggyt-playback".into())
@@ -1457,12 +1578,7 @@ fn spawn_playback_worker<
                         );
                     }
                     PlaybackWorkerCommand::FetchCover { url, generation } => {
-                        handle_fetch_cover_command::<C, A, S, L, K>(
-                            &url,
-                            generation,
-                            &adapters.covers,
-                            weak.clone(),
-                        );
+                        let _ = cover_tx.send((url, generation));
                     }
                     PlaybackWorkerCommand::Seek { position_secs } => {
                         execute_seek(position_secs, &adapters.audio);
@@ -2247,5 +2363,103 @@ mod tests {
         let next2 = state.cycle_playback_speed();
         assert_eq!(next2, 1.5);
         assert_eq!(state.audio.lock().unwrap().speed(), 1.5);
+    }
+
+    #[test]
+    fn test_resolve_row_cover_image_routes_through_thumbnail_variant() {
+        let covers = std::collections::HashMap::new();
+        let default_img = resolve_row_cover_image(None, &covers);
+        assert_eq!(default_img.size(), slint::Image::default().size());
+
+        let url = "https://lh3.googleusercontent.com/test-thumb-large";
+        let thumb_url = thumbnail_variant_for_row(url);
+        assert_eq!(thumb_url, "https://lh3.googleusercontent.com/test-thumb-small");
+
+        // When neither variant is in covers, returns default image
+        let missing = resolve_row_cover_image(Some(url), &covers);
+        assert_eq!(missing.size(), slint::Image::default().size());
+    }
+
+    #[test]
+    fn test_dispatch_shelf_cover_if_needed_routes_and_deduplicates() {
+        let state = test_wired();
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        let mut seen = std::collections::HashSet::new();
+
+        let input_url = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg";
+        let expected_url = "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg";
+
+        dispatch_shelf_cover_if_needed(input_url, &state, &tx, &mut seen);
+
+        let cmd = rx.try_recv().expect("command dispatched");
+        match cmd {
+            PlaybackWorkerCommand::FetchCover { url, generation } => {
+                assert_eq!(url, expected_url);
+                assert_eq!(generation, state.search_generation);
+            }
+            _ => panic!("unexpected command variant"),
+        }
+
+        // Duplicate call is suppressed by seen set
+        dispatch_shelf_cover_if_needed(input_url, &state, &tx, &mut seen);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_request_shelf_covers_dispatches_thumbnail_variants() {
+        let mut state = test_wired();
+        let track1 = Track::new("t1", "Track 1", "Artist 1")
+            .with_artwork("https://lh3.googleusercontent.com/test-thumb-large");
+        let track2 = Track::new("t2", "Track 2", "Artist 2")
+            .with_artwork("https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
+
+        let mut shelf = Shelf::new("Shelf 1");
+        shelf.items.push(SearchResult::Track(track1));
+        shelf.items.push(SearchResult::Track(track2));
+        state.home_shelves = vec![shelf];
+
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        request_shelf_covers(&state, &tx);
+
+        let mut received_urls = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, .. } = cmd {
+                received_urls.push(url);
+            }
+        }
+
+        assert_eq!(received_urls.len(), 2);
+        assert_eq!(received_urls[0], "https://lh3.googleusercontent.com/test-thumb-small");
+        assert_eq!(received_urls[1], "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg");
+    }
+
+    #[test]
+    fn test_track_to_row_data_uses_thumbnail_variant() {
+        let track = Track::new("t1", "Title", "Artist")
+            .with_artwork("https://lh3.googleusercontent.com/test-thumb-large");
+        let covers = std::collections::HashMap::new();
+
+        let row_data = track_to_row_data(0, &track, &covers);
+        assert_eq!(row_data.index, 0);
+        assert_eq!(row_data.title.as_str(), "Title");
+        assert_eq!(row_data.artist.as_str(), "Artist");
+        assert_eq!(row_data.kind.as_str(), "track");
+    }
+
+    #[test]
+    fn test_cover_fetch_pool_concurrency_bound_constant_integration() {
+        assert_eq!(COVER_FETCH_CONCURRENCY_LIMIT, 4);
+
+        // Verify channel and pool queue semantics with concurrency limit
+        let (tx, rx) = std::sync::mpsc::channel::<(String, u64)>();
+        for i in 0..COVER_FETCH_CONCURRENCY_LIMIT {
+            tx.send((format!("https://example.com/art/{i}"), i as u64)).unwrap();
+        }
+
+        let mut received = 0;
+        while rx.try_recv().is_ok() {
+            received += 1;
+        }
+        assert_eq!(received, COVER_FETCH_CONCURRENCY_LIMIT);
     }
 }

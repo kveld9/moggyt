@@ -66,6 +66,9 @@ pub struct PlayTrackResult {
     pub presence: PresenceSnapshot,
 }
 
+/// Maximum number of concurrent background cover fetch workers.
+pub const COVER_FETCH_CONCURRENCY_LIMIT: usize = 4;
+
 /// Commands accepted by the dedicated playback worker thread.
 #[derive(Debug)]
 pub enum PlaybackWorkerCommand {
@@ -117,6 +120,25 @@ pub fn resolve_cover_art<K: CoverCache>(
 ) -> Option<CoverArtData> {
     let url = req.artwork_url.as_deref()?;
     fetch_and_decode_cover(url, covers, req.hi_res_covers)
+}
+
+/// Returns a smaller thumbnail variant URL for row/shelf display if available.
+///
+/// Keeps high-resolution source for now-playing while reducing row bandwidth:
+/// - Replaces `hqdefault` with `mqdefault`
+/// - Replaces `-large` suffix with `-small`
+/// - Replaces `-thumb-large` with `-thumb-small`
+pub fn thumbnail_variant_for_row(url: &str) -> String {
+    if url.contains("hqdefault") {
+        return url.replace("hqdefault", "mqdefault");
+    }
+    if let Some(prefix) = url.strip_suffix("-large") {
+        return format!("{prefix}-small");
+    }
+    if url.contains("-thumb-large") {
+        return url.replace("-thumb-large", "-thumb-small");
+    }
+    url.to_string()
 }
 
 /// Adapter handles bundled for background playback worker execution.
@@ -401,5 +423,122 @@ mod tests {
         let covers = Arc::new(Mutex::new(MemoryCoverCache::new()));
         let res = fetch_and_decode_cover("https://invalid.artwork.local/test", &covers, false);
         assert!(res.is_none());
+    }
+
+    #[test]
+    fn test_cover_fetch_concurrency_limit_constant() {
+        assert_eq!(COVER_FETCH_CONCURRENCY_LIMIT, 4);
+    }
+
+    #[test]
+    fn test_thumbnail_variant_for_row_replaces_hqdefault_with_mqdefault() {
+        let input = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg";
+        let expected = "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg";
+        assert_eq!(thumbnail_variant_for_row(input), expected);
+    }
+
+    #[test]
+    fn test_thumbnail_variant_for_row_replaces_large_suffix() {
+        let input = "https://lh3.googleusercontent.com/test-thumb-large";
+        let expected = "https://lh3.googleusercontent.com/test-thumb-small";
+        assert_eq!(thumbnail_variant_for_row(input), expected);
+
+        let input_alt = "https://img.local/cover-large";
+        let expected_alt = "https://img.local/cover-small";
+        assert_eq!(thumbnail_variant_for_row(input_alt), expected_alt);
+    }
+
+    #[test]
+    fn test_thumbnail_variant_for_row_leaves_other_urls_untouched() {
+        let input = "https://lh3.googleusercontent.com/artist-thumb";
+        assert_eq!(thumbnail_variant_for_row(input), input);
+    }
+
+    #[test]
+    fn test_search_results_sections_resolve_art_from_golden_fixture() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let fixture_path = std::path::Path::new(manifest_dir)
+            .join("tests")
+            .join("fixtures")
+            .join("catalog_search_badges.json");
+        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
+        let payload: serde_json::Value = serde_json::from_str(&raw).expect("valid fixture json");
+
+        let items = payload
+            .pointer(
+                "/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/itemSectionRenderer/contents",
+            )
+            .and_then(serde_json::Value::as_array)
+            .expect("fixture contents array");
+
+        let mut section_art: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+
+        for item in items {
+            let Some(renderer) = item.get("musicResponsiveListItemRenderer") else { continue };
+            let Some(runs) = renderer
+                .pointer("/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs")
+                .and_then(serde_json::Value::as_array)
+            else {
+                continue;
+            };
+            let Some(badge) =
+                runs.first().and_then(|r| r.get("text")).and_then(serde_json::Value::as_str)
+            else {
+                continue;
+            };
+            let Some(thumbs) = renderer
+                .pointer("/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails")
+                .and_then(serde_json::Value::as_array)
+            else {
+                continue;
+            };
+            let Some(url) =
+                thumbs.last().and_then(|t| t.get("url")).and_then(serde_json::Value::as_str)
+            else {
+                continue;
+            };
+            section_art.insert(badge.trim().to_ascii_lowercase(), url.trim().to_string());
+        }
+
+        // 1. Songs section
+        let song_art = section_art.get("song").expect("song section art");
+        assert_eq!(song_art, "https://lh3.googleusercontent.com/test-thumb-large");
+        assert_eq!(
+            thumbnail_variant_for_row(song_art),
+            "https://lh3.googleusercontent.com/test-thumb-small"
+        );
+
+        // 2. Videos section
+        let video_art = section_art.get("video").expect("video section art");
+        assert_eq!(video_art, "https://lh3.googleusercontent.com/video-thumb-large");
+        assert_eq!(
+            thumbnail_variant_for_row(video_art),
+            "https://lh3.googleusercontent.com/video-thumb-small"
+        );
+
+        // 3. Artists section
+        let artist_art = section_art.get("artist").expect("artist section art");
+        assert_eq!(artist_art, "https://lh3.googleusercontent.com/artist-thumb");
+        assert_eq!(
+            thumbnail_variant_for_row(artist_art),
+            "https://lh3.googleusercontent.com/artist-thumb"
+        );
+
+        // 4. Albums section (represented as Single in badge fixture)
+        let album_art = section_art.get("single").expect("album section art");
+        assert_eq!(album_art, "https://lh3.googleusercontent.com/single-thumb");
+        assert_eq!(
+            thumbnail_variant_for_row(album_art),
+            "https://lh3.googleusercontent.com/single-thumb"
+        );
+
+        // 5. Playlists section
+        let playlist_art = section_art.get("playlist").expect("playlist section art");
+        assert_eq!(playlist_art, "https://lh3.googleusercontent.com/playlist-thumb");
+        assert_eq!(
+            thumbnail_variant_for_row(playlist_art),
+            "https://lh3.googleusercontent.com/playlist-thumb"
+        );
     }
 }
