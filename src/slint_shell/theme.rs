@@ -21,6 +21,40 @@ pub fn palette_for(id: ThemeId) -> Palette {
     }
 }
 
+/// Available themes with their domain identifier and human-readable display name.
+pub const ALL_THEMES: [(ThemeId, &str); 3] =
+    [(ThemeId::White, "White"), (ThemeId::BlackOled, "Black OLED"), (ThemeId::Mono, "Monochrome")];
+
+/// Maps a 0-based integer index to its corresponding [`ThemeId`].
+///
+/// Returns [`ThemeId::White`] for 0 or unknown values,
+/// [`ThemeId::BlackOled`] for 1, and [`ThemeId::Mono`] for 2.
+pub fn theme_from_index(index: i32) -> ThemeId {
+    match index {
+        1 => ThemeId::BlackOled,
+        2 => ThemeId::Mono,
+        _ => ThemeId::White,
+    }
+}
+
+/// Maps a [`ThemeId`] to its canonical 0-based integer index.
+pub fn theme_to_index(id: ThemeId) -> i32 {
+    match id {
+        ThemeId::White => 0,
+        ThemeId::BlackOled => 1,
+        ThemeId::Mono => 2,
+    }
+}
+
+/// Returns the human-readable display name for the given [`ThemeId`].
+pub fn theme_display_name(id: ThemeId) -> &'static str {
+    match id {
+        ThemeId::White => "White",
+        ThemeId::BlackOled => "Black OLED",
+        ThemeId::Mono => "Monochrome",
+    }
+}
+
 /// Slint-native color representations for all nine Palette slots plus dark mode flag.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThemeColors {
@@ -171,5 +205,37 @@ mod tests {
             [255, 60, 60]
         );
         assert!(oled_colors.dark);
+    }
+
+    #[test]
+    fn test_theme_from_index_mappings() {
+        assert_eq!(theme_from_index(0), ThemeId::White);
+        assert_eq!(theme_from_index(1), ThemeId::BlackOled);
+        assert_eq!(theme_from_index(2), ThemeId::Mono);
+        assert_eq!(theme_from_index(-1), ThemeId::White);
+        assert_eq!(theme_from_index(99), ThemeId::White);
+    }
+
+    #[test]
+    fn test_theme_to_index_mappings() {
+        assert_eq!(theme_to_index(ThemeId::White), 0);
+        assert_eq!(theme_to_index(ThemeId::BlackOled), 1);
+        assert_eq!(theme_to_index(ThemeId::Mono), 2);
+    }
+
+    #[test]
+    fn test_theme_display_names() {
+        assert_eq!(theme_display_name(ThemeId::White), "White");
+        assert_eq!(theme_display_name(ThemeId::BlackOled), "Black OLED");
+        assert_eq!(theme_display_name(ThemeId::Mono), "Monochrome");
+    }
+
+    #[test]
+    fn test_theme_roundtrip_index() {
+        for (theme, name) in ALL_THEMES {
+            let idx = theme_to_index(theme);
+            assert_eq!(theme_from_index(idx), theme);
+            assert_eq!(theme_display_name(theme), name);
+        }
     }
 }
