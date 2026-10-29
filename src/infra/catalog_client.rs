@@ -294,6 +294,8 @@ pub fn shelf_category(title: &str) -> Option<SearchFilter> {
 
 fn thumbnail_candidates(value: &Value) -> Option<&[Value]> {
     const CANDIDATES: &[&str] = &[
+        "/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbnails",
+        "/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbs",
         "/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails",
         "/thumbnail/musicThumbnailRenderer/thumbnail/thumbs",
         "/thumbnail/thumbnails",
@@ -1850,6 +1852,49 @@ mod tests {
         assert_eq!(
             shelves[1].items[1],
             SearchResult::Playlist(Playlist::new("RD_radio_2", "Energy Radio", 0, None))
+        );
+    }
+
+    #[test]
+    fn parse_home_carousel_item_with_thumbnail_renderer_real_shape() {
+        let payload = serde_json::json!({
+            "musicTwoRowItemRenderer": {
+                "title": { "runs": [{ "text": "Home Album Title" }] },
+                "subtitle": { "runs": [{ "text": "Home Artist" }] },
+                "navigationEndpoint": {
+                    "browseEndpoint": { "browseId": "MPREb_home_1" }
+                },
+                "thumbnail": null,
+                "thumbnailRenderer": {
+                    "musicThumbnailRenderer": {
+                        "thumbnail": {
+                            "thumbnails": [
+                                {
+                                    "url": "https://yt3.googleusercontent.com/home-small.jpg",
+                                    "width": 60,
+                                    "height": 60
+                                },
+                                {
+                                    "url": "https://yt3.googleusercontent.com/home-large.jpg",
+                                    "width": 544,
+                                    "height": 544
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        });
+
+        let item = parse_carousel_item(&payload).expect("carousel item parsed");
+        assert_eq!(
+            item,
+            SearchResult::Album(Album::new(
+                "MPREb_home_1",
+                "Home Album Title",
+                "Home Artist",
+                Some("https://yt3.googleusercontent.com/home-large.jpg".to_owned())
+            ))
         );
     }
 
