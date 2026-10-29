@@ -144,6 +144,7 @@ pub struct RawAlbum {
     pub browse_id: String,
     pub title: String,
     pub artist: String,
+    pub thumb_url: Option<String>,
 }
 
 /// Parsed artist hit from catalog API search.
@@ -151,6 +152,7 @@ pub struct RawAlbum {
 pub struct RawArtist {
     pub browse_id: String,
     pub name: String,
+    pub thumb_url: Option<String>,
 }
 
 /// Parsed playlist hit from catalog API search.
@@ -158,6 +160,7 @@ pub struct RawArtist {
 pub struct RawPlaylist {
     pub browse_id: String,
     pub title: String,
+    pub thumb_url: Option<String>,
 }
 
 /// Grouped search hits across catalog item categories.
@@ -370,12 +373,17 @@ fn dispatch_two_row(category: SearchFilter, renderer: &Value, hits: &mut SearchH
         return;
     };
     let id = browse_id.unwrap_or_default();
+    let thumb_url = best_thumbnail(renderer);
     match category {
         SearchFilter::Albums => {
-            hits.albums.push(RawAlbum { browse_id: id, title, artist: subtitle })
+            hits.albums.push(RawAlbum { browse_id: id, title, artist: subtitle, thumb_url })
         }
-        SearchFilter::Artists => hits.artists.push(RawArtist { browse_id: id, name: title }),
-        SearchFilter::Playlists => hits.playlists.push(RawPlaylist { browse_id: id, title }),
+        SearchFilter::Artists => {
+            hits.artists.push(RawArtist { browse_id: id, name: title, thumb_url })
+        }
+        SearchFilter::Playlists => {
+            hits.playlists.push(RawPlaylist { browse_id: id, title, thumb_url })
+        }
         _ => {}
     }
 }
@@ -472,16 +480,18 @@ fn dispatch_bare_browse(
     hits: &mut SearchHits,
 ) {
     let Some(browse_id) = browse_of(renderer) else { return };
+    let thumb_url = best_thumbnail(renderer);
     match badge {
-        "album" | "ep" => hits.albums.push(RawAlbum { browse_id, title, artist }),
-        "artist" => hits.artists.push(RawArtist { browse_id, name: title }),
-        _ => hits.playlists.push(RawPlaylist { browse_id, title }),
+        "album" | "ep" => hits.albums.push(RawAlbum { browse_id, title, artist, thumb_url }),
+        "artist" => hits.artists.push(RawArtist { browse_id, name: title, thumb_url }),
+        _ => hits.playlists.push(RawPlaylist { browse_id, title, thumb_url }),
     }
 }
 
 fn dispatch_bare_single(renderer: &Value, title: String, artist: String, hits: &mut SearchHits) {
     if let Some(browse_id) = browse_of(renderer) {
-        hits.albums.push(RawAlbum { browse_id, title, artist });
+        let thumb_url = best_thumbnail(renderer);
+        hits.albums.push(RawAlbum { browse_id, title, artist, thumb_url });
     } else {
         dispatch_bare_track(renderer, title, artist, hits);
     }
@@ -663,22 +673,27 @@ fn carousel_shelf_title(shelf: &Value) -> Option<String> {
     None
 }
 
-fn classify_home_item(id: &str, title: &str, subtitle: &str) -> SearchResult {
+fn classify_home_item(
+    id: &str,
+    title: &str,
+    subtitle: &str,
+    artwork: Option<String>,
+) -> SearchResult {
     if id.starts_with("UC") {
-        return SearchResult::Artist(Artist::new(id, title));
+        return SearchResult::Artist(Artist::new(id, title, artwork));
     }
     if id.starts_with("VL") || id.starts_with("RD") {
-        return SearchResult::Playlist(Playlist::new(id, title, 0));
+        return SearchResult::Playlist(Playlist::new(id, title, 0, artwork));
     }
-    SearchResult::Album(Album::new(id, title, subtitle))
+    SearchResult::Album(Album::new(id, title, subtitle, artwork))
 }
 
 fn parse_carousel_item(item: &Value) -> Option<SearchResult> {
     let renderer = item.get("musicTwoRowItemRenderer")?;
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let id = browse_id?;
-    let _thumb = best_thumbnail(renderer);
-    Some(classify_home_item(&id, &title, &subtitle))
+    let thumb = best_thumbnail(renderer);
+    Some(classify_home_item(&id, &title, &subtitle, thumb))
 }
 
 fn parse_carousel_shelf(shelf: &Value) -> Option<Shelf> {
@@ -911,7 +926,8 @@ fn parse_library_playlist_item(item: &Value) -> Option<Playlist> {
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let id = browse_id?;
     let count = parse_track_count(&subtitle);
-    Some(Playlist::new(&id, &title, count))
+    let thumb_url = best_thumbnail(renderer);
+    Some(Playlist::new(&id, &title, count, thumb_url))
 }
 
 /// Parses saved or owned playlists from catalog API browse response payload.
@@ -923,7 +939,8 @@ fn parse_library_album_item(item: &Value) -> Option<Album> {
     let renderer = item.get("musicTwoRowItemRenderer").unwrap_or(item);
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let id = browse_id?;
-    Some(Album::new(&id, &title, &subtitle))
+    let thumb_url = best_thumbnail(renderer);
+    Some(Album::new(&id, &title, &subtitle, thumb_url))
 }
 
 /// Parses saved albums from catalog API browse response payload.
@@ -1466,14 +1483,26 @@ mod tests {
         assert_eq!(first.albums[0].browse_id, "MPREb_single_1");
         assert_eq!(first.albums[0].title, "Eres Mia");
         assert_eq!(first.albums[0].artist, "Romeo Santos \u{2022} 2014");
+        assert_eq!(
+            first.albums[0].thumb_url,
+            Some("https://lh3.googleusercontent.com/single-thumb".to_owned())
+        );
 
         // Artist item with browseId routed
         assert_eq!(first.artists[0].browse_id, "UC_romeo_1");
         assert_eq!(first.artists[0].name, "Romeo Santos");
+        assert_eq!(
+            first.artists[0].thumb_url,
+            Some("https://lh3.googleusercontent.com/artist-thumb".to_owned())
+        );
 
         // Playlist item with browseId routed
         assert_eq!(first.playlists[0].browse_id, "VL_playlist_1");
         assert_eq!(first.playlists[0].title, "Bachata Essentials");
+        assert_eq!(
+            first.playlists[0].thumb_url,
+            Some("https://lh3.googleusercontent.com/playlist-thumb".to_owned())
+        );
     }
 
     #[test]
@@ -1800,19 +1829,27 @@ mod tests {
         assert_eq!(shelves[0].items.len(), 2);
         assert_eq!(
             shelves[0].items[0],
-            SearchResult::Album(Album::new("MPREb_album_1", "Midnight City", "M83"))
+            SearchResult::Album(Album::new(
+                "MPREb_album_1",
+                "Midnight City",
+                "M83",
+                Some("https://img.test/album1.jpg".to_owned())
+            ))
         );
-        assert_eq!(shelves[0].items[1], SearchResult::Artist(Artist::new("UC_artist_1", "M83")));
+        assert_eq!(
+            shelves[0].items[1],
+            SearchResult::Artist(Artist::new("UC_artist_1", "M83", None))
+        );
 
         assert_eq!(shelves[1].title, "Recommended mixes");
         assert_eq!(shelves[1].items.len(), 2);
         assert_eq!(
             shelves[1].items[0],
-            SearchResult::Playlist(Playlist::new("VL_mix_1", "Chill Mix", 0))
+            SearchResult::Playlist(Playlist::new("VL_mix_1", "Chill Mix", 0, None))
         );
         assert_eq!(
             shelves[1].items[1],
-            SearchResult::Playlist(Playlist::new("RD_radio_2", "Energy Radio", 0))
+            SearchResult::Playlist(Playlist::new("RD_radio_2", "Energy Radio", 0, None))
         );
     }
 
@@ -1858,8 +1895,8 @@ mod tests {
         let second = parse_library_playlists(&payload);
         assert_eq!(first, second, "parsing must be deterministic");
         assert_eq!(first.len(), 2);
-        assert_eq!(first[0], Playlist::new("VL_fav_mix", "Favorites Mix", 25));
-        assert_eq!(first[1], Playlist::new("VL_workout", "Workout Beats", 10));
+        assert_eq!(first[0], Playlist::new("VL_fav_mix", "Favorites Mix", 25, None));
+        assert_eq!(first[1], Playlist::new("VL_workout", "Workout Beats", 10, None));
     }
 
     #[test]
@@ -1899,8 +1936,8 @@ mod tests {
         let second = parse_library_albums(&payload);
         assert_eq!(first, second, "parsing must be deterministic");
         assert_eq!(first.len(), 2);
-        assert_eq!(first[0], Album::new("MPREb_saved_1", "Saved Album 1", "Album Artist 1"));
-        assert_eq!(first[1], Album::new("MPREb_saved_2", "Saved Album 2", "Album Artist 2"));
+        assert_eq!(first[0], Album::new("MPREb_saved_1", "Saved Album 1", "Album Artist 1", None));
+        assert_eq!(first[1], Album::new("MPREb_saved_2", "Saved Album 2", "Album Artist 2", None));
     }
 
     #[test]

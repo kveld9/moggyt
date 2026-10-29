@@ -98,9 +98,9 @@ mod tests {
         assert_eq!(state.selected_album(0), None);
         assert_eq!(state.selected_artist(0), None);
 
-        state.set_playlists(vec![Playlist::new("p1", "Favs", 5)]);
-        state.set_albums(vec![Album::new("a1", "Discovery", "Daft Punk")]);
-        state.set_artists(vec![Artist::new("ar1", "Daft Punk")]);
+        state.set_playlists(vec![Playlist::new("p1", "Favs", 5, None)]);
+        state.set_albums(vec![Album::new("a1", "Discovery", "Daft Punk", None)]);
+        state.set_artists(vec![Artist::new("ar1", "Daft Punk", None)]);
         assert_eq!(state.selected_playlist(0).map(|p| p.id.as_str()), Some("p1"));
         assert_eq!(state.selected_playlist(1), None);
         assert_eq!(state.selected_album(0).map(|a| a.id.as_str()), Some("a1"));
@@ -114,9 +114,9 @@ mod tests {
 
     #[test]
     fn test_library_display_rows_match_domain_data() {
-        let p = Playlist::new("p1", "Favorites", 25);
-        let a = Album::new("a1", "Discovery", "Daft Punk");
-        let ar = Artist::new("ar1", "Daft Punk");
+        let p = Playlist::new("p1", "Favorites", 25, None);
+        let a = Album::new("a1", "Discovery", "Daft Punk", None);
+        let ar = Artist::new("ar1", "Daft Punk", None);
         let state = LibraryState::with_data(vec![p.clone()], vec![a.clone()], vec![ar.clone()]);
 
         assert_eq!(playlist_row(&p), LibraryItemRow::new("Favorites", "25 tracks"));

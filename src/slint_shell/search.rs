@@ -73,7 +73,7 @@ impl From<&SearchResult> for SearchRow {
                 subtitle: album.artist.clone(),
                 album: String::new(),
                 duration: String::new(),
-                artwork_url: None,
+                artwork_url: album.artwork.clone(),
             },
             SearchResult::Artist(artist) => SearchRow {
                 id: artist.id.clone(),
@@ -82,7 +82,7 @@ impl From<&SearchResult> for SearchRow {
                 subtitle: String::new(),
                 album: String::new(),
                 duration: String::new(),
-                artwork_url: None,
+                artwork_url: artist.artwork.clone(),
             },
             SearchResult::Playlist(playlist) => SearchRow {
                 id: playlist.id.clone(),
@@ -95,7 +95,7 @@ impl From<&SearchResult> for SearchRow {
                 },
                 album: String::new(),
                 duration: String::new(),
-                artwork_url: None,
+                artwork_url: playlist.artwork.clone(),
             },
         }
     }
@@ -375,12 +375,12 @@ mod tests {
         let shelves = vec![Shelf {
             title: "Mixed Items".to_owned(),
             items: vec![
-                SearchResult::Album(Album::new("a1", "Album 1", "Artist 1")),
+                SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", None)),
                 SearchResult::Track(
                     Track::new("t1", "Only Track", "Solo Artist").with_duration(120),
                 ),
-                SearchResult::Artist(Artist::new("ar1", "Artist Name")),
-                SearchResult::Playlist(Playlist::new("p1", "Playlist 1", 10)),
+                SearchResult::Artist(Artist::new("ar1", "Artist Name", None)),
+                SearchResult::Playlist(Playlist::new("p1", "Playlist 1", 10, None)),
             ],
         }];
 
@@ -452,7 +452,12 @@ mod tests {
         assert_eq!(row_track.duration, "3:20");
         assert_eq!(row_track.artwork_url.as_deref(), Some("https://artwork.local/t1"));
 
-        let album = Album::new("a1", "Album Title", "Album Artist");
+        let album = Album::new(
+            "a1",
+            "Album Title",
+            "Album Artist",
+            Some("https://artwork.local/a1".into()),
+        );
         let row_album = SearchRow::from(&SearchResult::Album(album));
         assert_eq!(row_album.id, "a1");
         assert_eq!(row_album.kind, "album");
@@ -460,9 +465,9 @@ mod tests {
         assert_eq!(row_album.subtitle, "Album Artist");
         assert_eq!(row_album.album, "");
         assert_eq!(row_album.duration, "");
-        assert_eq!(row_album.artwork_url, None);
+        assert_eq!(row_album.artwork_url.as_deref(), Some("https://artwork.local/a1"));
 
-        let artist = Artist::new("ar1", "Artist Name");
+        let artist = Artist::new("ar1", "Artist Name", Some("https://artwork.local/ar1".into()));
         let row_artist = SearchRow::from(&SearchResult::Artist(artist));
         assert_eq!(row_artist.id, "ar1");
         assert_eq!(row_artist.kind, "artist");
@@ -470,9 +475,10 @@ mod tests {
         assert_eq!(row_artist.subtitle, "");
         assert_eq!(row_artist.album, "");
         assert_eq!(row_artist.duration, "");
-        assert_eq!(row_artist.artwork_url, None);
+        assert_eq!(row_artist.artwork_url.as_deref(), Some("https://artwork.local/ar1"));
 
-        let playlist = Playlist::new("p1", "My Playlist", 15);
+        let playlist =
+            Playlist::new("p1", "My Playlist", 15, Some("https://artwork.local/p1".into()));
         let row_playlist = SearchRow::from(&SearchResult::Playlist(playlist));
         assert_eq!(row_playlist.id, "p1");
         assert_eq!(row_playlist.kind, "playlist");
@@ -480,7 +486,7 @@ mod tests {
         assert_eq!(row_playlist.subtitle, "15 tracks");
         assert_eq!(row_playlist.album, "");
         assert_eq!(row_playlist.duration, "");
-        assert_eq!(row_playlist.artwork_url, None);
+        assert_eq!(row_playlist.artwork_url.as_deref(), Some("https://artwork.local/p1"));
     }
 
     #[test]
@@ -489,9 +495,9 @@ mod tests {
             title: "Mixed Results".to_owned(),
             items: vec![
                 SearchResult::Track(Track::new("t1", "Track 1", "Artist 1")),
-                SearchResult::Album(Album::new("a1", "Album 1", "Artist 1")),
-                SearchResult::Artist(Artist::new("ar1", "Artist 1")),
-                SearchResult::Playlist(Playlist::new("p1", "Playlist 1", 5)),
+                SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", None)),
+                SearchResult::Artist(Artist::new("ar1", "Artist 1", None)),
+                SearchResult::Playlist(Playlist::new("p1", "Playlist 1", 5, None)),
             ],
         }];
 
@@ -528,7 +534,7 @@ mod tests {
 
     #[test]
     fn test_search_row_empty_subtitle_handling() {
-        let artist = Artist::new("ar1", "Solo");
+        let artist = Artist::new("ar1", "Solo", None);
         let row = SearchRow::from(&SearchResult::Artist(artist));
         assert_eq!(row.subtitle, "");
 
@@ -536,7 +542,7 @@ mod tests {
         let track_row = SearchRow::from(&SearchResult::Track(track));
         assert_eq!(track_row.subtitle, "");
 
-        let playlist = Playlist::new("p0", "Empty Playlist", 0);
+        let playlist = Playlist::new("p0", "Empty Playlist", 0, None);
         let pl_row = SearchRow::from(&SearchResult::Playlist(playlist));
         assert_eq!(pl_row.subtitle, "");
     }
@@ -547,7 +553,7 @@ mod tests {
             title: "Mixed".to_owned(),
             items: vec![
                 SearchResult::Track(Track::new("t1", "Track 1", "Artist 1")),
-                SearchResult::Album(Album::new("a1", "Album 1", "Artist 1")),
+                SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", None)),
                 SearchResult::Track(Track::new("t2", "Track 2", "Artist 2")),
             ],
         }];

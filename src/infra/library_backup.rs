@@ -217,14 +217,14 @@ mod tests {
             version: CURRENT_BACKUP_VERSION,
             exported_at_unix: 1700000000,
             playlists: vec![
-                Playlist::new("p1", "Playlist 1", 5),
-                Playlist::new("p2", "Playlist 2", 10),
+                Playlist::new("p1", "Playlist 1", 5, None),
+                Playlist::new("p2", "Playlist 2", 10, None),
             ],
             liked_tracks: vec![
                 Track::new("stub-1", "Liked Song", "Stub Artist"),
                 Track::new("stub-2", "B-side", "Stub Artist"),
             ],
-            saved_albums: vec![Album::new("a1", "Album 1", "Artist 1")],
+            saved_albums: vec![Album::new("a1", "Album 1", "Artist 1", None)],
         };
 
         let summary = apply_backup(&mut catalog, &backup);
