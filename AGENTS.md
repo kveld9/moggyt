@@ -29,8 +29,10 @@ Run all five before finishing. `cargo run` launches the window.
 
 ## Code rules (see `docs/03-development.md`)
 
-- TDD for `domain/` and `slint_shell/`: red test on public behavior first, then minimal
-  code, refactor on green. Fakes in memory; no network/audio in tests; no `sleep`.
+- TDD for all production code: every implementation or behavior change ships with its unit tests in the same PR
+  (red test on public behavior first, then minimal code, refactor on green). Tests live alongside the code
+  (`#[cfg(test)] mod tests` for Rust units; golden fixtures under `tests/fixtures` for parser behavior).
+  Fakes in memory; no network/audio in tests; no `sleep`. No implementation PR without tests.
 - CC <= 5 per function (hard limit 10); guard clauses first; DRY from 3rd repetition.
 - English identifiers (verbs for functions, nouns for types); boolean predicates
   (`is_`, `has_`, `can_`); fail-loud errors (`anyhow`), no silent swallowing.
