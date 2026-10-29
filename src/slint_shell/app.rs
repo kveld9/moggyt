@@ -1337,12 +1337,17 @@ fn submit_search_async<
     query: &str,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return;
+    }
     state.search_query = query.to_string();
     state.search_filter = SearchFilter::All;
     state.search_covers.clear();
     state.search_generation = state.search_generation.wrapping_add(1);
     let generation = state.search_generation;
 
+    window.set_query(query.into());
     window.set_search_filter(0);
     state.home_shelves = vec![Shelf::new("Searching...")];
     sync_shelves_and_queue(window, state);
@@ -1360,7 +1365,17 @@ fn submit_search_async<
                 if st.search_generation == g {
                     st.search_query = q_res;
                     st.home_shelves = shelves;
+                    st.search_results = st
+                        .home_shelves
+                        .iter()
+                        .flat_map(|s| s.items.iter())
+                        .filter_map(|it| match it {
+                            SearchResult::Track(t) => Some(t.clone()),
+                            _ => None,
+                        })
+                        .collect();
                     request_shelf_covers(st, &tx);
+                    win.set_query(st.search_query.as_str().into());
                     sync_shelves_and_queue(&win, st);
                 }
             });
@@ -1683,6 +1698,7 @@ pub fn build_window<
     request_shelf_covers(&state_rc.borrow(), &worker_tx);
 
     sync_window(&window, &mut state_rc.borrow_mut());
+    window.set_query(state_rc.borrow().search_query.as_str().into());
     wire_window_callbacks(&window, Rc::clone(&state_rc), worker_tx);
     let timer = setup_app_timer(&window, Rc::clone(&state_rc));
 
@@ -2216,6 +2232,7 @@ mod tests {
         assert!(state.liked_ids.is_empty());
         assert!(state.now_playing_cover.is_none());
         assert!(!state.is_shuffle);
+        assert_eq!(state.search_query, "");
     }
 
     #[test]
@@ -2271,6 +2288,25 @@ mod tests {
         assert_eq!(state.search_query, "midnight");
         assert_eq!(state.home_shelves.len(), 1);
         assert_eq!(state.home_shelves[0].title, "Search Results");
+    }
+
+    #[test]
+    fn test_search_submission_empty_query_preserves_shelves() {
+        let mut state = test_wired();
+        let initial_shelves = state.home_shelves.clone();
+        assert!(!initial_shelves.is_empty());
+        state.submit_search("   ");
+        assert_eq!(state.search_query, "   ");
+        assert_eq!(state.home_shelves, initial_shelves);
+    }
+
+    #[test]
+    fn test_search_query_explicit_clear() {
+        let mut state = test_wired();
+        state.submit_search("midnight");
+        assert_eq!(state.search_query, "midnight");
+        state.search_query.clear();
+        assert_eq!(state.search_query, "");
     }
 
     #[test]
