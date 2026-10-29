@@ -2766,6 +2766,15 @@ pub fn run() -> anyhow::Result<()> {
     state.locale = settings.locale;
     if let Ok(mut c) = state.catalog.lock() {
         c.set_locale(settings.locale);
+        let refreshed = c.home_shelves();
+        if refreshed.is_empty() {
+            tracing::warn!(
+                "failed to re-fetch home shelves for locale {:?}; retaining fallback shelves",
+                settings.locale
+            );
+        } else {
+            state.home_shelves = refreshed;
+        }
     }
     state.settings_store = Box::new(settings_store);
 
@@ -2804,7 +2813,9 @@ pub fn run() -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use crate::domain::SkipSegment;
-    use crate::infra::{AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, MemorySessionStore};
+    use crate::infra::{
+        AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, MemorySessionStore, Settings,
+    };
 
     fn test_wired()
     -> SlintAppState<CatalogStub, AudioStub, MemorySessionStore, LrclibStub, MemoryCoverCache> {
@@ -3682,5 +3693,193 @@ mod tests {
         assert_eq!(en.update_status, "Update status");
         assert_eq!(en.explore_loading, "Loading explore...");
         assert_eq!(en.explore_empty, "No sections found in Explore.");
+    }
+
+    type LocaleLog = Arc<Mutex<Vec<Locale>>>;
+
+    #[derive(Debug, Clone)]
+    struct LocaleTrackingCatalog {
+        locales: LocaleLog,
+        fetch_locales: LocaleLog,
+        current: Arc<Mutex<Locale>>,
+    }
+
+    impl LocaleTrackingCatalog {
+        fn new() -> (Self, LocaleLog, LocaleLog) {
+            let locales = Arc::new(Mutex::new(Vec::new()));
+            let fetch_locales = Arc::new(Mutex::new(Vec::new()));
+            let current = Arc::new(Mutex::new(Locale::default()));
+            (
+                Self {
+                    locales: Arc::clone(&locales),
+                    fetch_locales: Arc::clone(&fetch_locales),
+                    current,
+                },
+                locales,
+                fetch_locales,
+            )
+        }
+    }
+
+    impl Catalog for LocaleTrackingCatalog {
+        fn search(&self, _query: &str) -> Vec<Track> {
+            Vec::new()
+        }
+
+        fn search_filtered(&self, _query: &SearchQuery) -> Vec<SearchResult> {
+            Vec::new()
+        }
+
+        fn radio(&self, _track_id: &str) -> Vec<Track> {
+            Vec::new()
+        }
+
+        fn home_shelves(&self) -> Vec<Shelf> {
+            let loc = *self.current.lock().unwrap();
+            self.fetch_locales.lock().unwrap().push(loc);
+            let title = match loc {
+                Locale::English => "Home English",
+                Locale::Spanish => "Home Spanish",
+            };
+            vec![Shelf::new(title)]
+        }
+
+        fn playlists(&self) -> Vec<Playlist> {
+            Vec::new()
+        }
+
+        fn liked_tracks(&self) -> Vec<Track> {
+            Vec::new()
+        }
+
+        fn saved_albums(&self) -> Vec<Album> {
+            Vec::new()
+        }
+
+        fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+
+        fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
+            None
+        }
+
+        fn set_locale(&mut self, locale: Locale) {
+            self.locales.lock().unwrap().push(locale);
+            *self.current.lock().unwrap() = locale;
+        }
+    }
+
+    #[test]
+    fn test_slint_app_state_new_fetches_home_shelves_with_default_locale() {
+        let (catalog, locales, fetch_locales) = LocaleTrackingCatalog::new();
+        let audio = AudioStub::new();
+        let session = MemorySessionStore::new();
+        let lyrics = LrclibStub::new();
+        let covers = MemoryCoverCache::new();
+
+        let state = SlintAppState::new(catalog, audio, session, lyrics, covers);
+
+        assert_eq!(*locales.lock().unwrap(), vec![Locale::English]);
+        assert_eq!(*fetch_locales.lock().unwrap(), vec![Locale::English]);
+        assert_eq!(state.home_shelves.len(), 1);
+        assert_eq!(state.home_shelves[0].title, "Home English");
+    }
+
+    #[test]
+    fn test_startup_settings_refetches_home_shelves_with_settings_locale() {
+        let (catalog, locales, fetch_locales) = LocaleTrackingCatalog::new();
+        let audio = AudioStub::new();
+        let session = MemorySessionStore::new();
+        let lyrics = LrclibStub::new();
+        let covers = MemoryCoverCache::new();
+
+        let mut state = SlintAppState::new(catalog, audio, session, lyrics, covers);
+        assert_eq!(state.home_shelves[0].title, "Home English");
+
+        let settings = Settings { locale: Locale::Spanish, ..Settings::default() };
+
+        state.locale = settings.locale;
+        if let Ok(mut c) = state.catalog.lock() {
+            c.set_locale(settings.locale);
+            let refreshed = c.home_shelves();
+            if refreshed.is_empty() {
+                tracing::warn!(
+                    "failed to re-fetch home shelves for locale {:?}; retaining fallback shelves",
+                    settings.locale
+                );
+            } else {
+                state.home_shelves = refreshed;
+            }
+        }
+
+        assert_eq!(*locales.lock().unwrap(), vec![Locale::English, Locale::Spanish]);
+        assert_eq!(*fetch_locales.lock().unwrap(), vec![Locale::English, Locale::Spanish]);
+        assert_eq!(state.home_shelves.len(), 1);
+        assert_eq!(state.home_shelves[0].title, "Home Spanish");
+    }
+
+    #[test]
+    fn test_startup_settings_refetch_preserves_old_shelves_on_empty_or_failure() {
+        #[derive(Debug, Clone)]
+        struct FailingCatalog {
+            call_count: Arc<Mutex<usize>>,
+        }
+
+        impl Catalog for FailingCatalog {
+            fn search(&self, _query: &str) -> Vec<Track> {
+                Vec::new()
+            }
+            fn search_filtered(&self, _query: &SearchQuery) -> Vec<SearchResult> {
+                Vec::new()
+            }
+            fn radio(&self, _track_id: &str) -> Vec<Track> {
+                Vec::new()
+            }
+            fn home_shelves(&self) -> Vec<Shelf> {
+                let mut count = self.call_count.lock().unwrap();
+                *count += 1;
+                if *count == 1 { vec![Shelf::new("Fallback Placeholder")] } else { Vec::new() }
+            }
+            fn playlists(&self) -> Vec<Playlist> {
+                Vec::new()
+            }
+            fn liked_tracks(&self) -> Vec<Track> {
+                Vec::new()
+            }
+            fn saved_albums(&self) -> Vec<Album> {
+                Vec::new()
+            }
+            fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
+            fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
+                None
+            }
+        }
+
+        let count = Arc::new(Mutex::new(0));
+        let catalog = FailingCatalog { call_count: Arc::clone(&count) };
+        let audio = AudioStub::new();
+        let session = MemorySessionStore::new();
+        let lyrics = LrclibStub::new();
+        let covers = MemoryCoverCache::new();
+
+        let mut state = SlintAppState::new(catalog, audio, session, lyrics, covers);
+        assert_eq!(state.home_shelves[0].title, "Fallback Placeholder");
+
+        let settings = Settings { locale: Locale::Spanish, ..Settings::default() };
+        state.locale = settings.locale;
+        if let Ok(mut c) = state.catalog.lock() {
+            c.set_locale(settings.locale);
+            let refreshed = c.home_shelves();
+            if refreshed.is_empty() {
+                tracing::warn!(
+                    "failed to re-fetch home shelves for locale {:?}; retaining fallback shelves",
+                    settings.locale
+                );
+            } else {
+                state.home_shelves = refreshed;
+            }
+        }
+
+        assert_eq!(state.home_shelves.len(), 1);
+        assert_eq!(state.home_shelves[0].title, "Fallback Placeholder");
     }
 }
