@@ -30,7 +30,7 @@ use crate::infra::{
     decode_handoff, default_config_dir, ensure_sidecar, fetch_artwork, is_newer,
     sanitize_cookie_input, should_scrobble,
 };
-use crate::slint_shell::detail::{detail_kind_label, resolve_detail_cover_url};
+use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::platform::{dispatch_to_ui, rgba_to_image};
 use crate::slint_shell::playback::{
     cycle_repeat_mode, format_position, format_track_duration, is_track_liked, progress_fraction,
@@ -1544,6 +1544,7 @@ fn sync_library_and_detail<
 
     if let Some(detail) = &state.detail {
         window.set_detail_has_detail(true);
+        window.set_detail_has_artwork(detail_has_artwork(detail));
         window.set_detail_title(detail.title.clone().into());
         window.set_detail_subtitle(detail.subtitle.clone().into());
         window.set_detail_description(detail.description.as_deref().unwrap_or("").into());
@@ -1561,6 +1562,7 @@ fn sync_library_and_detail<
         window.set_detail_cover(cover_img);
     } else {
         window.set_detail_has_detail(false);
+        window.set_detail_has_artwork(false);
         window.set_detail_description("".into());
         window.set_detail_cover(slint::Image::default());
     }
@@ -3166,6 +3168,51 @@ mod tests {
         // When neither variant is in covers, returns default image
         let missing = resolve_row_cover_image(Some(url), &covers);
         assert_eq!(missing.size(), slint::Image::default().size());
+    }
+
+    #[test]
+    fn test_detail_cover_sync_resolution_matrix() {
+        let dummy_img = rgba_to_image(&[255, 0, 0, 255], 1, 1).unwrap();
+        let header_url = "https://img.local/header.jpg";
+        let track_url = "https://img.local/track.jpg";
+
+        // Case 1: Artwork present & uncached -> resolve_detail_cover_url picks header,
+        // but resolve_row_cover_image returns empty image (triggering empty placeholder).
+        let t1 = Track::new("t1", "Track 1", "Artist 1").with_artwork(track_url);
+        let detail_with_art = Detail::new(DetailKind::Playlist, "Title", "Sub", vec![t1.clone()])
+            .with_artwork(header_url);
+        assert!(detail_has_artwork(&detail_with_art));
+
+        let mut covers = std::collections::HashMap::new();
+        // Even if track cover is already cached:
+        covers.insert(track_url.to_string(), dummy_img.clone());
+        let cover_uncached = resolve_detail_cover_url(&detail_with_art)
+            .map(|url| resolve_row_cover_image(Some(url), &covers))
+            .unwrap_or_default();
+        assert_eq!(cover_uncached.size(), slint::Image::default().size());
+
+        // Case 2: Artwork present & cached -> resolve_row_cover_image returns the header image.
+        covers.insert(header_url.to_string(), dummy_img.clone());
+        let cover_cached = resolve_detail_cover_url(&detail_with_art)
+            .map(|url| resolve_row_cover_image(Some(url), &covers))
+            .unwrap_or_default();
+        assert_eq!(cover_cached.size(), dummy_img.size());
+
+        // Case 3: Artwork absent & track cached -> resolve_detail_cover_url picks track,
+        // and resolve_row_cover_image resolves it.
+        let detail_no_art = Detail::new(DetailKind::Playlist, "Title", "Sub", vec![t1]);
+        assert!(!detail_has_artwork(&detail_no_art));
+        let cover_fallback = resolve_detail_cover_url(&detail_no_art)
+            .map(|url| resolve_row_cover_image(Some(url), &covers))
+            .unwrap_or_default();
+        assert_eq!(cover_fallback.size(), dummy_img.size());
+
+        // Case 4: Artwork absent & track uncached -> returns empty image.
+        let empty_covers = std::collections::HashMap::new();
+        let cover_fallback_uncached = resolve_detail_cover_url(&detail_no_art)
+            .map(|url| resolve_row_cover_image(Some(url), &empty_covers))
+            .unwrap_or_default();
+        assert_eq!(cover_fallback_uncached.size(), slint::Image::default().size());
     }
 
     #[test]
