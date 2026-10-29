@@ -1,8 +1,8 @@
 import { Theme } from "../theme.slint";
 import { ThemedSlider } from "./controls.slint";
+import { PlayerCenterControls } from "./player_controls.slint";
 import {
-    IconHeart, IconMinus, IconNext, IconPause, IconPlay, IconPlus,
-    IconPrev, IconQueue, IconRepeat, IconRepeatOne, IconShuffle, IconSpeaker,
+    IconHeart, IconMinus, IconPlus, IconQueue, IconSpeaker,
 } from "../icons.slint";
 
 export component PlayerBar inherits Rectangle {
@@ -115,190 +115,22 @@ export component PlayerBar inherits Rectangle {
         }
 
         // CENTER ZONE: Shuffle, Prev, -10s, Play/Pause, +10s, Next, Repeat + Progress row
-        VerticalLayout {
-            horizontal-stretch: 1;
-            alignment: center;
-            spacing: 4px;
+        PlayerCenterControls {
+            is-playing: root.is-playing;
+            is-shuffle: root.is-shuffle;
+            repeat-mode: root.repeat-mode;
+            position-secs: root.position-secs;
+            duration-secs: root.duration-secs;
+            position-text: root.position-text;
+            duration-text: root.duration-text;
 
-            HorizontalLayout {
-                spacing: 8px;
-                alignment: center;
-
-                Rectangle {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 18px;
-                    background: shuf-touch.pressed ? Theme.overlay : (root.is-shuffle ? Theme.surface : (shuf-touch.has-hover ? Theme.hover : transparent));
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    shuf-touch := TouchArea {
-                        clicked => { root.toggle-shuffle(); }
-                    }
-
-                    IconShuffle {
-                        tint: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
-                        size: 18px;
-                    }
-                }
-
-                Rectangle {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 18px;
-                    background: pt.pressed ? Theme.overlay : (pt.has-hover ? Theme.hover : transparent);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    pt := TouchArea {
-                        clicked => { root.prev-track(); }
-                    }
-
-                    IconPrev {
-                        tint: pt.has-hover ? Theme.text : Theme.secondary;
-                        size: 18px;
-                    }
-                }
-
-                Rectangle {
-                    height: 28px;
-                    border-radius: 14px;
-                    background: s10m-touch.pressed ? Theme.overlay : (s10m-touch.has-hover ? Theme.hover : transparent);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    s10m-touch := TouchArea {
-                        clicked => { root.seek-by(-10); }
-                    }
-
-                    HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        alignment: center;
-
-                        Text {
-                            text: "-10s";
-                            color: s10m-touch.has-hover ? Theme.text : Theme.secondary;
-                            font-size: 11px;
-                            font-weight: 600;
-                            vertical-alignment: center;
-                            horizontal-alignment: center;
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 20px;
-                    background: pp.pressed ? Theme.overlay : (pp.has-hover ? Theme.hover : Theme.accent);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    pp := TouchArea {
-                        clicked => { root.toggle-play(); }
-                    }
-
-                    if root.is-playing : IconPause {
-                        tint: pp.has-hover ? Theme.text : Theme.window;
-                        size: 20px;
-                    }
-                    if !root.is-playing : IconPlay {
-                        tint: pp.has-hover ? Theme.text : Theme.window;
-                        size: 20px;
-                    }
-                }
-
-                Rectangle {
-                    height: 28px;
-                    border-radius: 14px;
-                    background: s10p-touch.pressed ? Theme.overlay : (s10p-touch.has-hover ? Theme.hover : transparent);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    s10p-touch := TouchArea {
-                        clicked => { root.seek-by(10); }
-                    }
-
-                    HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        alignment: center;
-
-                        Text {
-                            text: "+10s";
-                            color: s10p-touch.has-hover ? Theme.text : Theme.secondary;
-                            font-size: 11px;
-                            font-weight: 600;
-                            vertical-alignment: center;
-                            horizontal-alignment: center;
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 18px;
-                    background: nt.pressed ? Theme.overlay : (nt.has-hover ? Theme.hover : transparent);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    nt := TouchArea {
-                        clicked => { root.next-track(); }
-                    }
-
-                    IconNext {
-                        tint: nt.has-hover ? Theme.text : Theme.secondary;
-                        size: 18px;
-                    }
-                }
-
-                Rectangle {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 18px;
-                    background: rep-touch.pressed ? Theme.overlay : (root.repeat-mode != 0 ? Theme.surface : (rep-touch.has-hover ? Theme.hover : transparent));
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    rep-touch := TouchArea {
-                        clicked => { root.cycle-repeat(); }
-                    }
-
-                    if root.repeat-mode == 2 : IconRepeatOne {
-                        tint: Theme.accent;
-                        size: 18px;
-                    }
-                    if root.repeat-mode != 2 : IconRepeat {
-                        tint: root.repeat-mode != 0 ? Theme.accent : (rep-touch.has-hover ? Theme.text : Theme.secondary);
-                        size: 18px;
-                    }
-                }
-            }
-
-            HorizontalLayout {
-                spacing: 8px;
-                alignment: center;
-
-                Text {
-                    text: root.position-text;
-                    color: Theme.secondary;
-                    font-size: 11px;
-                    vertical-alignment: center;
-                }
-
-                ThemedSlider {
-                    horizontal-stretch: 1;
-                    minimum: 0;
-                    maximum: max(1, root.duration-secs);
-                    value: min(root.position-secs, max(1, root.duration-secs));
-                    enabled: root.duration-secs > 0;
-                    changed(val) => {
-                        root.seek-to(round(val));
-                    }
-                }
-
-                Text {
-                    text: root.duration-text;
-                    color: Theme.secondary;
-                    font-size: 11px;
-                    vertical-alignment: center;
-                }
-            }
+            toggle-play => { root.toggle-play(); }
+            prev-track => { root.prev-track(); }
+            next-track => { root.next-track(); }
+            seek-by(delta) => { root.seek-by(delta); }
+            seek-to(secs) => { root.seek-to(secs); }
+            toggle-shuffle => { root.toggle-shuffle(); }
+            cycle-repeat => { root.cycle-repeat(); }
         }
 
         // RIGHT ZONE: Queue button, Volume Slider + percentage
