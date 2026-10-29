@@ -35,6 +35,10 @@ Run all five before finishing. `cargo run` launches the window.
   non-English text; translate instead.
 - No emojis in code, scripts, configs, CI, or commits — docs/releases only.
 - `Cargo.lock` is committed; never add dependencies without justification.
+- Slint unknowns go to the source first: when Slint language, layout, binding,
+  or compiler behavior is unclear, consult the official Slint documentation
+  (<https://docs.slint.dev/>) before guessing (covers enums, layouts, callbacks,
+  and property semantics). Do not invent Slint syntax from memory.
 
 ## Workflow (PR-only, no exceptions)
 
