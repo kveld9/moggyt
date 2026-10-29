@@ -48,6 +48,13 @@ Enforced automatically by `./scripts/check-repo.sh`:
 Tests use in-memory fakes (fake queues and catalogs), never the real network or audio.
 Time and randomness are injected; `sleep` and clock flakiness are forbidden.
 
+## Test policy
+
+Tests are written alongside the implementation, not after; every new public behavior needs a unit test
+in the same PR. Tests use in-memory fakes, never the real network or audio. Time and randomness are injected;
+`sleep` and clock flakiness are forbidden. The only test-exempt files are the designated logic-free roots
+(`src/domain/mod.rs`, `src/infra/mod.rs`, `src/lib.rs`, and `src/main.rs`).
+
 ## Local pre-commit (recommended)
 
 ```bash

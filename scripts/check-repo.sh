@@ -9,8 +9,8 @@
 #   ./scripts/check-repo.sh [target_directory]
 #
 # Exit codes:
-#   0 - All required files exist, are non-empty, and satisfy modularity caps.
-#   1 - One or more files are missing/empty or exceed modularity caps.
+#   0 - All required files exist, are non-empty, satisfy modularity caps, and comply with test policy.
+#   1 - One or more files are missing/empty, exceed modularity caps, or fail test policy.
 # ==============================================================================
 
 set -euo pipefail
@@ -217,11 +217,77 @@ while IFS= read -r file; do
   fi
 done < <(git -C "${TARGET_DIR}" ls-files)
 
+echo -e "\n${BOLD}8. Unit Test Policy Enforcement (src/**/*.rs)${RESET}"
+
+# Logic-free re-export and composition roots exempt from unit tests:
+# - src/domain/mod.rs: logic-free re-export root for domain modules
+# - src/infra/mod.rs: logic-free re-export root for infra adapters
+# - src/lib.rs: logic-free library entry and public API re-export root
+# - src/main.rs: logic-free binary entry and composition root
+is_test_exempt() {
+  local target="$1"
+  case "${target}" in
+    src/domain/mod.rs)
+      # Logic-free re-export/composition root
+      return 0
+      ;;
+    src/infra/mod.rs)
+      # Logic-free re-export/composition root
+      return 0
+      ;;
+    src/lib.rs)
+      # Logic-free re-export/composition root
+      return 0
+      ;;
+    src/main.rs)
+      # Logic-free re-export/composition root
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+while IFS= read -r file; do
+  file="${file%$'\r'}"
+  clean_file="${file#./}"
+  [[ -z "${clean_file}" ]] && continue
+
+  # Exclude generated files
+  case "${clean_file}" in
+    *-generated*|*.generated.*)
+      continue
+      ;;
+  esac
+
+  # Inspect only tracked Rust files under src/
+  [[ "${clean_file}" == src/* && "${clean_file}" == *.rs ]] || continue
+
+  full_path="${TARGET_DIR}/${clean_file}"
+  if [[ ! -f "${full_path}" ]]; then
+    continue
+  fi
+
+  TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+
+  if is_test_exempt "${clean_file}"; then
+    echo -e "  [${GREEN}OK${RESET}] ${clean_file} (exempt: logic-free re-export/composition root)"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+  elif grep -q 'mod tests' "${full_path}"; then
+    echo -e "  [${GREEN}OK${RESET}] ${clean_file} (contains mod tests)"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+  else
+    echo -e "  [${RED}FAIL${RESET}] ${clean_file} (missing mod tests: unit test module required)"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+  fi
+done < <(git -C "${TARGET_DIR}" ls-files)
+
 echo -e "\n--------------------------------------------------"
 echo -e "Audit Summary: ${TOTAL_CHECKS} checked | ${GREEN}${PASSED_CHECKS} passed${RESET} | ${RED}${FAILED_CHECKS} failed${RESET}"
 
 if [[ ${FAILED_CHECKS} -gt 0 ]]; then
-  echo -e "${RED}${BOLD}Result: FAILED - Required standards not met (missing files or size limits exceeded).${RESET}\n"
+  echo -e "${RED}${BOLD}Result: FAILED - Required standards not met (missing files, size limits exceeded, or missing tests).${RESET}\n"
   exit 1
 else
   echo -e "${GREEN}${BOLD}Result: PASSED - Repository satisfies all structural standards.${RESET}\n"
