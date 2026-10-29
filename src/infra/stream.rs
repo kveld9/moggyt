@@ -21,9 +21,9 @@ pub enum AudioQuality {
 /// Maps an [`AudioQuality`] preference to yt-dlp format selector (SDD Q-3).
 pub const fn audio_quality_format(quality: AudioQuality) -> &'static str {
     match quality {
-        AudioQuality::Compact => "bestaudio[abr<=64]/bestaudio/best",
-        AudioQuality::Standard => "bestaudio/best",
-        AudioQuality::High => "bestaudio[abr>=192]/bestaudio/best",
+        AudioQuality::Compact => "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
+        AudioQuality::Standard => "bestaudio[ext=m4a]/bestaudio/best",
+        AudioQuality::High => "bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best",
     }
 }
 
@@ -452,12 +452,33 @@ mod tests {
     #[test]
     fn audio_quality_format_mapping_table() {
         let cases = [
-            (AudioQuality::Compact, "bestaudio[abr<=64]/bestaudio/best"),
-            (AudioQuality::Standard, "bestaudio/best"),
-            (AudioQuality::High, "bestaudio[abr>=192]/bestaudio/best"),
+            (
+                AudioQuality::Compact,
+                "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
+            ),
+            (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
+            (AudioQuality::High, "bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best"),
         ];
         for (quality, expected) in cases {
             assert_eq!(audio_quality_format(quality), expected);
+        }
+    }
+
+    #[test]
+    fn audio_quality_prefers_m4a_before_unconstrained_fallback() {
+        for quality in [AudioQuality::Compact, AudioQuality::Standard, AudioQuality::High] {
+            let format = audio_quality_format(quality);
+            let selectors: Vec<&str> = format.split('/').collect();
+            let first_unconstrained = selectors
+                .iter()
+                .position(|&s| !s.contains("ext=m4a"))
+                .expect("must contain at least one unconstrained fallback");
+            let first_m4a = selectors
+                .iter()
+                .position(|&s| s.contains("ext=m4a"))
+                .expect("must prefer m4a format");
+            assert!(first_m4a < first_unconstrained);
+            assert!(format.ends_with("/bestaudio/best"));
         }
     }
 

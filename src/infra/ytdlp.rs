@@ -282,7 +282,7 @@ mod tests {
         let args = format_args("dQw4w9WgXcQ");
         let expected = vec![
             "-f".to_string(),
-            "bestaudio/best".to_string(),
+            "bestaudio[ext=m4a]/bestaudio/best".to_string(),
             "-g".to_string(),
             "https://www.youtube.com/watch?v=dQw4w9WgXcQ".to_string(),
         ];
@@ -314,9 +314,12 @@ mod tests {
     #[test]
     fn format_args_with_quality_table() {
         for (q, expected_fmt) in [
-            (AudioQuality::Compact, "bestaudio[abr<=64]/bestaudio/best"),
-            (AudioQuality::Standard, "bestaudio/best"),
-            (AudioQuality::High, "bestaudio[abr>=192]/bestaudio/best"),
+            (
+                AudioQuality::Compact,
+                "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
+            ),
+            (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
+            (AudioQuality::High, "bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best"),
         ] {
             let args = format_args_with_quality("v123", q);
             assert_eq!(
