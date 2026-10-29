@@ -5,8 +5,9 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::domain::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
-use crate::infra::should_scrobble;
+use crate::infra::{
+    AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore, should_scrobble,
+};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::current_unix_secs;
 use crate::slint_shell::state::SlintAppState;

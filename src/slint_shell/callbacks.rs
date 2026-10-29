@@ -7,18 +7,16 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::domain::{
-    AudioBackend, Catalog, CoverCache, DetailKind, LyricsSource, SearchFilter, SearchResult,
-    SessionStore,
-};
+use crate::domain::{DetailKind, SearchFilter, SearchResult};
+use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 use crate::slint_shell::MoggytWindow;
-use crate::slint_shell::covers::{request_queue_track_cover, resolve_row_cover_image};
+use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::explore::{explore_item_at, load_explore_async};
-use crate::slint_shell::format::{format_playback_speed, format_queue_label};
+use crate::slint_shell::format::format_playback_speed;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
-    cycle_repeat_mode, format_position, is_track_liked, progress_fraction, repeat_mode_to_int,
-    should_seek, toggle_like,
+    cycle_repeat_mode, format_position, progress_fraction, repeat_mode_to_int, should_seek,
+    toggle_like,
 };
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::iter_shelf_items;

@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 
-use crate::domain::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 use crate::infra::{
-    DiskCoverCache, GithubUpdater, KeyringCredentialStore, LastFmClient, LiveAudio, RodioBackend,
-    client_from_credentials, ensure_sidecar, is_newer,
+    AudioBackend, Catalog, CoverCache, DiskCoverCache, GithubUpdater, KeyringCredentialStore,
+    LastFmClient, LiveAudio, LyricsSource, RodioBackend, SessionStore, client_from_credentials,
+    ensure_sidecar, is_newer,
 };
 use crate::slint_shell::state::SlintAppState;
 

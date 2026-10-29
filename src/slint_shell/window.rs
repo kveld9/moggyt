@@ -6,21 +6,19 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use anyhow::Context;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::{
-    AudioBackend, Catalog, CoverCache, Detail, DetailKind, LyricsSource, SearchResult,
-    SessionStore, Shelf,
-};
+use crate::domain::{Detail, DetailKind, SearchResult, Shelf};
 use crate::i18n::tr;
+use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::callbacks::wire_window_callbacks;
 use crate::slint_shell::covers::{
-    apply_play_track_completion, request_detail_covers, request_shelf_covers,
-    resolve_row_cover_image, spawn_cover_fetch_pool,
+    apply_play_track_completion, request_detail_covers, request_library_covers,
+    request_shelf_covers, resolve_row_cover_image, spawn_cover_fetch_pool,
 };
 use crate::slint_shell::format::format_queue_label;
 use crate::slint_shell::platform::dispatch_to_ui;

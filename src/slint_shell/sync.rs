@@ -4,9 +4,9 @@
 
 use slint::{ModelRc, VecModel};
 
-use crate::domain::{AudioBackend, Catalog, CoverCache, LyricsSource, SearchFilter, SessionStore};
+use crate::domain::SearchFilter;
 use crate::i18n::tr;
-use crate::infra::GithubUpdater;
+use crate::infra::{AudioBackend, Catalog, CoverCache, GithubUpdater, LyricsSource, SessionStore};
 use crate::slint_shell::covers::{resolve_row_cover_image, track_to_row_data};
 use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::format::{format_playback_speed, format_queue_label, format_update_status};

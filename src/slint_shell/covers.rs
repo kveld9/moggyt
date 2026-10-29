@@ -9,10 +9,9 @@ use std::time::Instant;
 
 use slint::{ModelRc, VecModel};
 
-use crate::domain::{
-    AudioBackend, Catalog, CoverCache, LyricsSource, SearchResult, SessionStore, Shelf, Track,
-};
+use crate::domain::{SearchResult, Shelf, Track};
 use crate::i18n::tr;
+use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 use crate::slint_shell::format::current_unix_secs;
 use crate::slint_shell::platform::{dispatch_to_ui, rgba_to_image};
 use crate::slint_shell::playback_worker::{

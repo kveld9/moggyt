@@ -5,11 +5,11 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::domain::{
-    Album, Catalog, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
-};
+use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
 use crate::i18n::Locale;
-use crate::infra::{AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, MemorySessionStore};
+use crate::infra::{
+    AudioStub, Catalog, CatalogStub, LrclibStub, MemoryCoverCache, MemorySessionStore,
+};
 use crate::slint_shell::state::SlintAppState;
 
 /// Constructs a SlintAppState wired with memory-only test stub adapters.

@@ -10,16 +10,16 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::domain::{
-    Album, Artist, AudioBackend, Catalog, CoverCache, Detail, DetailKind, LyricsSource,
-    PlaybackQueue, Playlist, SearchFilter, SearchQuery, SearchResult, SessionStore, Shelf,
-    SleepTimer, ThemeId, Track, extract_playlist_id,
+    Album, Artist, Detail, DetailKind, PlaybackQueue, Playlist, SearchFilter, SearchQuery,
+    SearchResult, Shelf, SleepTimer, ThemeId, Track, extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    DesktopPresence, DiscordPresence, GithubUpdater, LyricLine, LyricOverrideDir, MediaKeyAction,
-    MemoryMetaStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore, MetaStore, QueueStore,
-    Scrobbler, SettingsStore, SkipStore, StubScrobbler, TrayAction, TrayHandle, decode_cover,
-    decode_handoff, fetch_artwork, sanitize_cookie_input,
+    AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, GithubUpdater, LyricLine,
+    LyricOverrideDir, LyricsSource, MediaKeyAction, MemoryMetaStore, MemoryQueueStore,
+    MemorySettingsStore, MemorySkipStore, MetaStore, QueueStore, Scrobbler, SessionStore,
+    SettingsStore, SkipStore, StubScrobbler, TrayAction, TrayHandle, decode_cover, decode_handoff,
+    fetch_artwork, sanitize_cookie_input,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
