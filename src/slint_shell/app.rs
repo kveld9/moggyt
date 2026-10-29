@@ -63,6 +63,8 @@ pub enum SlintPage {
     Detail,
     /// Application settings for theme, playback, session, and about.
     Settings,
+    /// Explore section with charts, genres, moods, and new releases.
+    Explore,
 }
 
 impl SlintPage {
@@ -75,6 +77,7 @@ impl SlintPage {
             3 => Self::Library,
             4 => Self::Detail,
             5 => Self::Settings,
+            6 => Self::Explore,
             _ => Self::Search,
         }
     }
@@ -88,6 +91,7 @@ impl SlintPage {
             Self::Library => 3,
             Self::Detail => 4,
             Self::Settings => 5,
+            Self::Explore => 6,
         }
     }
 
@@ -100,8 +104,41 @@ impl SlintPage {
             Self::Library => "Library",
             Self::Detail => "Detail",
             Self::Settings => "Settings",
+            Self::Explore => "Explore",
         }
     }
+}
+
+/// Static UI chrome labels translated before being passed to Slint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaticLabels {
+    pub nav_explore: String,
+    pub explore_loading: String,
+    pub explore_empty: String,
+}
+
+impl StaticLabels {
+    /// Resolves static UI chrome labels for `locale`.
+    pub fn resolve(locale: crate::i18n::Locale) -> Self {
+        Self {
+            nav_explore: crate::i18n::tr(locale, "Explore").to_owned(),
+            explore_loading: crate::i18n::tr(locale, "Loading explore...").to_owned(),
+            explore_empty: crate::i18n::tr(locale, "No sections found in Explore.").to_owned(),
+        }
+    }
+}
+
+impl Default for StaticLabels {
+    fn default() -> Self {
+        Self::resolve(crate::i18n::Locale::default())
+    }
+}
+
+/// Synchronizes static localized labels with the Slint window.
+pub fn sync_static_labels(window: &MoggytWindow, labels: &StaticLabels) {
+    window.set_nav_explore_label(labels.nav_explore.as_str().into());
+    window.set_explore_loading_text(labels.explore_loading.as_str().into());
+    window.set_explore_empty_text(labels.explore_empty.as_str().into());
 }
 
 /// Returns current UTC timestamp in seconds since UNIX epoch, or 0 on clock failure.
@@ -320,6 +357,11 @@ pub struct SlintAppState<
     pub search_generation: u64,
     pub detail_generation: u64,
     pub library_generation: u64,
+    pub explore_generation: u64,
+    pub explore_shelves: Vec<Shelf>,
+    pub explore_loaded: bool,
+    pub explore_loading: bool,
+    pub static_labels: StaticLabels,
 
     pub worker_tx: Option<std::sync::mpsc::Sender<PlaybackWorkerCommand>>,
 }
@@ -432,6 +474,11 @@ impl<
             search_generation: 0,
             detail_generation: 0,
             library_generation: 0,
+            explore_generation: 0,
+            explore_shelves: Vec::new(),
+            explore_loaded: false,
+            explore_loading: false,
+            static_labels: StaticLabels::resolve(crate::i18n::Locale::detect()),
             worker_tx: None,
         }
     }
@@ -452,12 +499,24 @@ impl<
         next
     }
 
-    /// Selects active navigation page and refreshes content when entering Library view.
+    /// Selects active navigation page and refreshes content when entering Library or Explore view.
     pub fn select_page(&mut self, page: SlintPage) {
         self.page = page;
         if page == SlintPage::Library {
             self.refresh_library();
+        } else if page == SlintPage::Explore && !self.explore_loaded {
+            self.refresh_explore();
         }
+    }
+
+    /// Refreshes explore shelves from the injected catalog port.
+    pub fn refresh_explore(&mut self) {
+        let shelves = match self.catalog.lock() {
+            Ok(c) => c.explore_shelves(),
+            Err(_) => Vec::new(),
+        };
+        self.explore_shelves = shelves;
+        self.explore_loaded = true;
     }
 
     /// Refreshes playlists, saved albums, and followed artists from catalog.
@@ -917,7 +976,9 @@ fn sync_window<
     apply_theme(window, state.theme);
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_active_page(state.page.to_index());
-    window.set_header_title(state.page.title().into());
+    let locale = crate::i18n::Locale::detect();
+    window.set_header_title(crate::i18n::tr(locale, state.page.title()).into());
+    sync_static_labels(window, &state.static_labels);
     let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
     window.set_is_playing(is_playing);
     let volume = state.audio.try_lock().map(|a| a.volume()).unwrap_or(100);
@@ -960,6 +1021,7 @@ fn sync_window<
     sync_cover_and_lyrics(window, state);
     sync_shelves_and_queue(window, state);
     sync_library_and_detail(window, state);
+    sync_explore_shelves(window, state);
 }
 
 /// Synchronizes cover art texture and synced lyrics lines with Slint window from pre-decoded state.
@@ -1154,6 +1216,29 @@ pub fn request_library_covers<
     }
 }
 
+/// Requests background cover decoding for all uncached artwork URLs in explore shelves.
+pub fn request_explore_covers<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    state: &SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let mut seen = std::collections::HashSet::new();
+    for url in iter_shelf_artwork_urls(&state.explore_shelves) {
+        dispatch_cover_with_generation_if_needed(
+            url,
+            state.explore_generation,
+            &state.search_covers,
+            worker_tx,
+            &mut seen,
+        );
+    }
+}
+
 /// Requests background cover decoding for a track being enqueued if uncached.
 pub fn request_queue_track_cover(
     artwork_url: Option<&str>,
@@ -1310,6 +1395,44 @@ fn sync_library_and_detail<
         window.set_detail_has_detail(false);
         window.set_detail_cover(slint::Image::default());
     }
+}
+
+/// Synchronizes explore shelves with Slint window models.
+fn sync_explore_shelves<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    window: &MoggytWindow,
+    state: &SlintAppState<C, A, S, L, K>,
+) {
+    let mut shelf_models = Vec::new();
+    let mut global_idx = 0;
+    for shelf in &state.explore_shelves {
+        let mut tracks = Vec::new();
+        for item in &shelf.items {
+            let row = SearchRow::from(item);
+            let cover_img =
+                resolve_row_cover_image(row.artwork_url.as_deref(), &state.search_covers);
+            tracks.push(TrackRowData {
+                index: global_idx,
+                title: row.title.into(),
+                artist: row.subtitle.into(),
+                album: row.album.into(),
+                duration: row.duration.into(),
+                kind: row.kind.into(),
+                cover: cover_img,
+            });
+            global_idx += 1;
+        }
+        shelf_models.push(ShelfData {
+            title: shelf.title.clone().into(),
+            tracks: ModelRc::new(VecModel::from(tracks)),
+        });
+    }
+    window.set_explore_shelves(ModelRc::new(VecModel::from(shelf_models)));
 }
 
 /// Periodic playback tick syncing elapsed timestamps, progress, and lyrics line without blocking.
@@ -1604,6 +1727,75 @@ fn refresh_library_async<
     });
 }
 
+/// Queries catalog for explore shelves asynchronously off the UI thread.
+pub fn execute_explore<C: Catalog>(
+    generation: u64,
+    catalog: &Arc<Mutex<C>>,
+) -> (u64, Vec<Shelf>) {
+    let shelves = match catalog.lock() {
+        Ok(guard) => guard.explore_shelves(),
+        Err(_) => Vec::new(),
+    };
+    (generation, shelves)
+}
+
+/// Applies completed explore shelves fetch to state and UI on main thread.
+fn apply_explore_completion<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    win: &MoggytWindow,
+    st: &mut SlintAppState<C, A, S, L, K>,
+    generation: u64,
+    shelves: Vec<Shelf>,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    if st.explore_generation != generation {
+        return;
+    }
+    st.explore_shelves = shelves;
+    st.explore_loaded = true;
+    st.explore_loading = false;
+    win.set_explore_loading(false);
+    request_explore_covers(st, tx);
+    sync_explore_shelves(win, st);
+}
+
+/// Dispatches asynchronous explore shelves loading off the UI thread.
+fn load_explore_async<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    state.explore_generation = state.explore_generation.wrapping_add(1);
+    let generation = state.explore_generation;
+    state.explore_loading = true;
+    window.set_explore_loading(true);
+
+    let cat = Arc::clone(&state.catalog);
+    let weak = window.as_weak();
+    let tx = worker_tx.clone();
+
+    std::thread::spawn(move || {
+        let (g, shelves) = execute_explore(generation, &cat);
+        let _ = dispatch_to_ui(move || {
+            let Some(win) = weak.upgrade() else { return };
+            with_ui_state::<C, A, S, L, K, _>(|st| {
+                apply_explore_completion(&win, st, g, shelves, &tx);
+            });
+        });
+    });
+}
+
 /// Non-blocking handler for playback toggle (pause, resume, or start head track).
 fn handle_toggle_play<
     C: Catalog + Send + 'static,
@@ -1685,14 +1877,18 @@ fn apply_fetched_cover_to_state<
     let is_detail = st.detail_generation == generation;
     let is_library = st.library_generation == generation;
     let is_play = st.play_generation == generation;
+    let is_explore = st.explore_generation == generation;
 
-    if is_search || is_detail || is_library || is_play {
+    if is_search || is_detail || is_library || is_play || is_explore {
         st.search_covers.insert(cover.url.clone(), img.clone());
         if is_search || is_play {
             sync_shelves_and_queue(win, st);
         }
         if is_detail || is_library {
             sync_library_and_detail(win, st);
+        }
+        if is_explore {
+            sync_explore_shelves(win, st);
         }
     }
     sync_now_playing_after_cover_fetch(win, st, &cover.url, &img);
@@ -1862,6 +2058,7 @@ pub fn build_window<
 
     state_rc.borrow_mut().worker_tx = Some(worker_tx.clone());
     sync_window(&window, &mut state_rc.borrow_mut());
+    sync_static_labels(&window, &state_rc.borrow().static_labels);
     window.set_query(state_rc.borrow().search_query.as_str().into());
     wire_window_callbacks(&window, Rc::clone(&state_rc), worker_tx);
     let timer = setup_app_timer(&window, Rc::clone(&state_rc));
@@ -1909,6 +2106,11 @@ fn handle_filtered_item_click<
     }
 }
 
+/// Helper resolving an item in explore shelves by linear index.
+fn explore_item_at(shelves: &[Shelf], index: usize) -> Option<&SearchResult> {
+    shelves.iter().flat_map(|s| s.items.iter()).nth(index)
+}
+
 /// Wires user event callbacks between MoggytWindow and the application state without blocking.
 fn wire_window_callbacks<
     C: Catalog + Send + 'static,
@@ -1931,6 +2133,8 @@ fn wire_window_callbacks<
         st.page = page;
         if page == SlintPage::Library {
             refresh_library_async(&win, &mut st, &tx);
+        } else if page == SlintPage::Explore && !st.explore_loaded && !st.explore_loading {
+            load_explore_async(&win, &mut st, &tx);
         }
         sync_window(&win, &mut st);
     });
@@ -1952,6 +2156,18 @@ fn wire_window_callbacks<
         let mut st = s.borrow_mut();
         let item_opt =
             iter_shelf_items(&st.home_shelves, st.search_filter).nth(idx as usize).cloned();
+        if let Some(item) = item_opt {
+            handle_filtered_item_click(&win, &mut st, item, &tx);
+        }
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
+    window.on_explore_track_selected(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        let item_opt = explore_item_at(&st.explore_shelves, idx as usize).cloned();
         if let Some(item) = item_opt {
             handle_filtered_item_click(&win, &mut st, item, &tx);
         }
@@ -2974,5 +3190,141 @@ mod tests {
             }
             _ => panic!("unexpected command variant"),
         }
+    }
+
+    #[test]
+    fn test_explore_page_indexing_and_titles() {
+        assert_eq!(SlintPage::from_index(6), SlintPage::Explore);
+        assert_eq!(SlintPage::Explore.to_index(), 6);
+        assert_eq!(SlintPage::Explore.title(), "Explore");
+    }
+
+    #[test]
+    fn test_slint_page_all_variants_round_trip() {
+        let pages = [
+            (0, SlintPage::Search, "Search"),
+            (1, SlintPage::Queue, "Queue"),
+            (2, SlintPage::NowPlaying, "Now Playing"),
+            (3, SlintPage::Library, "Library"),
+            (4, SlintPage::Detail, "Detail"),
+            (5, SlintPage::Settings, "Settings"),
+            (6, SlintPage::Explore, "Explore"),
+        ];
+        for (idx, page, title) in pages {
+            assert_eq!(SlintPage::from_index(idx), page);
+            assert_eq!(page.to_index(), idx);
+            assert_eq!(page.title(), title);
+        }
+        assert_eq!(SlintPage::from_index(999), SlintPage::Search);
+    }
+
+    #[test]
+    fn test_static_labels_resolution_and_sync() {
+        let en_labels = StaticLabels::resolve(crate::i18n::Locale::English);
+        assert_eq!(en_labels.nav_explore, "Explore");
+        assert_eq!(en_labels.explore_loading, "Loading explore...");
+        assert_eq!(en_labels.explore_empty, "No sections found in Explore.");
+
+        let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
+        assert_eq!(es_labels.nav_explore, "Explorar");
+        assert_eq!(es_labels.explore_loading, "Cargando exploracion...");
+        assert_eq!(es_labels.explore_empty, "No se encontraron secciones en Explorar.");
+    }
+
+    #[test]
+    fn test_explore_state_initialization_and_selection() {
+        let mut state = test_wired();
+        assert!(state.explore_shelves.is_empty());
+        assert!(!state.explore_loaded);
+        state.select_page(SlintPage::Explore);
+        assert_eq!(state.page, SlintPage::Explore);
+        assert!(state.explore_loaded);
+        assert_eq!(state.explore_shelves.len(), 2);
+        assert_eq!(state.explore_shelves[0].title, "Charts");
+        assert_eq!(state.explore_shelves[1].title, "Moods & genres");
+    }
+
+    #[test]
+    fn test_execute_explore_uses_catalog_port_and_generation() {
+        let cat = Arc::new(Mutex::new(CatalogStub::new()));
+        let (generation, shelves) = execute_explore(42, &cat);
+        assert_eq!(generation, 42);
+        assert_eq!(shelves.len(), 2);
+        assert_eq!(shelves[0].title, "Charts");
+        assert_eq!(shelves[1].title, "Moods & genres");
+    }
+
+    #[test]
+    fn test_explore_item_at_indexing() {
+        let shelves = vec![
+            Shelf {
+                title: "Charts".to_owned(),
+                items: vec![
+                    SearchResult::Track(Track::new("c1", "Track 1", "Artist 1")),
+                    SearchResult::Track(Track::new("c2", "Track 2", "Artist 2")),
+                ],
+            },
+            Shelf {
+                title: "New Releases".to_owned(),
+                items: vec![
+                    SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", None)),
+                ],
+            },
+        ];
+        assert_eq!(
+            explore_item_at(&shelves, 0),
+            Some(&SearchResult::Track(Track::new("c1", "Track 1", "Artist 1")))
+        );
+        assert_eq!(
+            explore_item_at(&shelves, 1),
+            Some(&SearchResult::Track(Track::new("c2", "Track 2", "Artist 2")))
+        );
+        assert_eq!(
+            explore_item_at(&shelves, 2),
+            Some(&SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", None)))
+        );
+        assert_eq!(explore_item_at(&shelves, 3), None);
+    }
+
+    #[test]
+    fn test_request_explore_covers_dispatches_with_generation() {
+        let mut state = test_wired();
+        state.explore_generation = 15;
+        let shelf = Shelf {
+            title: "Charts".to_owned(),
+            items: vec![
+                SearchResult::Track(
+                    Track::new("t1", "Track 1", "Artist 1")
+                        .with_artwork("https://lh3.googleusercontent.com/track-large"),
+                ),
+                SearchResult::Album(Album::new(
+                    "a1",
+                    "Album 1",
+                    "Artist 1",
+                    Some("https://lh3.googleusercontent.com/album-large".to_owned()),
+                )),
+            ],
+        };
+        state.explore_shelves = vec![shelf];
+
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        request_explore_covers(&state, &tx);
+
+        let mut received = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, generation } = cmd {
+                received.push((url, generation));
+            }
+        }
+
+        assert_eq!(received.len(), 2);
+        assert_eq!(
+            received[0],
+            ("https://lh3.googleusercontent.com/track-small".to_string(), 15)
+        );
+        assert_eq!(
+            received[1],
+            ("https://lh3.googleusercontent.com/album-small".to_string(), 15)
+        );
     }
 }

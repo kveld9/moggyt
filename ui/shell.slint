@@ -282,6 +282,26 @@ component IconSearch inherits Rectangle {
     }
 }
 
+component IconCompass inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 12 2.5 A 9.5 9.5 0 1 0 12 21.5 A 9.5 9.5 0 1 0 12 2.5 Z M 16.2 7.8 L 11 11 L 7.8 16.2 L 13 13 Z";
+    }
+}
+
 component IconClose inherits Rectangle {
     in property <color> tint: Theme.text;
     in property <length> size: 20px;
@@ -516,6 +536,10 @@ component NavItem inherits Rectangle {
                 size: 18px;
                 tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
             }
+            if root.icon-name == "explore" : IconCompass {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
             if root.icon-name == "library" : IconLibrary {
                 size: 18px;
                 tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
@@ -542,6 +566,7 @@ component NavItem inherits Rectangle {
 
 component Sidebar inherits Rectangle {
     in property <int> active-page: 0;
+    in property <string> nav-explore-label: "Explore";
     callback page-selected(int);
 
     width: 200px;
@@ -566,6 +591,13 @@ component Sidebar inherits Rectangle {
             icon-name: "search";
             is-active: root.active-page == 0;
             clicked => { root.page-selected(0); }
+        }
+
+        NavItem {
+            text: root.nav-explore-label;
+            icon-name: "explore";
+            is-active: root.active-page == 6;
+            clicked => { root.page-selected(6); }
         }
 
         NavItem {
@@ -892,6 +924,65 @@ component SearchView inherits VerticalLayout {
 
         Text {
             text: "No se encontraron resultados.";
+            color: Theme.secondary;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    for shelf in root.shelves : VerticalLayout {
+        spacing: 8px;
+        alignment: start;
+
+        Text {
+            text: shelf.title;
+            color: Theme.text;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        for track in shelf.tracks : TrackRow {
+            title: track.title;
+            artist: track.artist;
+            album: track.album;
+            duration: track.duration;
+            kind: track.kind;
+            cover: track.cover;
+            clicked => {
+                root.track-selected(track.index);
+            }
+        }
+    }
+}
+
+component ExploreView inherits VerticalLayout {
+    in property <[ShelfData]> shelves: [];
+    in property <bool> is-loading: false;
+    in property <string> loading-text: "Loading explore...";
+    in property <string> empty-text: "No sections found in Explore.";
+    callback track-selected(int);
+
+    spacing: 16px;
+    alignment: start;
+
+    if root.is-loading : VerticalLayout {
+        padding-top: 32px;
+        alignment: center;
+
+        Text {
+            text: root.loading-text;
+            color: Theme.secondary;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    if !root.is-loading && root.shelves.length == 0 : VerticalLayout {
+        padding-top: 32px;
+        alignment: center;
+
+        Text {
+            text: root.empty-text;
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
@@ -2424,7 +2515,9 @@ export component SettingsDialog inherits Rectangle {
 
 component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
-    in property <string> header-title: "Buscar";
+    in property <string> header-title: "Search";
+    in property <string> explore-loading-text: "Loading explore...";
+    in property <string> explore-empty-text: "No sections found in Explore.";
     in property <bool> has-update: false;
     in-out property <string> query: "";
     in-out property <string> cookie-text: "";
@@ -2451,10 +2544,13 @@ component ContentArea inherits Rectangle {
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Actualizado";
+    in property <[ShelfData]> explore-shelves: [];
+    in property <bool> explore-loading: false;
 
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
+    callback explore-track-selected(int);
     callback queue-track-selected(int);
     callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
     callback detail-play();
@@ -2491,13 +2587,7 @@ component ContentArea inherits Rectangle {
                 alignment: space-between;
 
                 Text {
-                    text: root.header-title == "Search" ? "Buscar" : (
-                        root.header-title == "Queue" ? "Cola" : (
-                        root.header-title == "Now Playing" ? "Sonando" : (
-                        root.header-title == "Library" ? "Biblioteca" : (
-                        root.header-title == "Detail" ? "Detalle" : (
-                        root.header-title == "Settings" ? "Ajustes" : root.header-title
-                    )))));
+                    text: root.header-title;
                     color: Theme.text;
                     font-size: 24px;
                     font-weight: 700;
@@ -2599,6 +2689,14 @@ component ContentArea inherits Rectangle {
             sign-in-submitted(t) => { root.sign-in-submitted(t); }
             sign-out => { root.sign-out(); }
         }
+
+        if root.active-page == 6 : ExploreView {
+            shelves: root.explore-shelves;
+            is-loading: root.explore-loading;
+            loading-text: root.explore-loading-text;
+            empty-text: root.explore-empty-text;
+            track-selected(idx) => { root.explore-track-selected(idx); }
+        }
     }
     }
 }
@@ -2624,7 +2722,10 @@ export component MoggytWindow inherits Window {
     in-out property <bool> theme-dark <=> Theme.dark;
 
     in-out property <int> active-page: 0;
-    in-out property <string> header-title: "Buscar";
+    in-out property <string> header-title: "Search";
+    in-out property <string> nav-explore-label: "Explore";
+    in-out property <string> explore-loading-text: "Loading explore...";
+    in-out property <string> explore-empty-text: "No sections found in Explore.";
     in-out property <bool> show-settings: false;
     in-out property <int> active-theme-index: 0;
     in-out property <string> playback-speed-text: "1.00x";
@@ -2661,6 +2762,8 @@ export component MoggytWindow inherits Window {
     in-out property <bool> detail-has-detail: false; in-out property <string> detail-title: ""; in-out property <string> detail-subtitle: "";
     in-out property <string> detail-kind-label: ""; in-out property <[TrackRowData]> detail-tracks: [];
     in-out property <image> detail-cover;
+    in-out property <[ShelfData]> explore-shelves: [];
+    in-out property <bool> explore-loading: false;
 
     callback page-selected(int);
     callback theme-selected(int);
@@ -2668,6 +2771,7 @@ export component MoggytWindow inherits Window {
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
+    callback explore-track-selected(int);
     callback queue-track-selected(int);
     callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
     callback detail-play();
@@ -2697,6 +2801,7 @@ export component MoggytWindow inherits Window {
             Sidebar {
                 width: 200px;
                 active-page: root.active-page;
+                nav-explore-label: root.nav-explore-label;
                 page-selected(idx) => { root.page-selected(idx); }
             }
 
@@ -2713,6 +2818,10 @@ export component MoggytWindow inherits Window {
                 library-playlists: root.library-playlists; library-albums: root.library-albums; library-artists: root.library-artists;
                 detail-has-detail: root.detail-has-detail; detail-title: root.detail-title; detail-subtitle: root.detail-subtitle;
                 detail-kind-label: root.detail-kind-label; detail-cover: root.detail-cover; detail-tracks: root.detail-tracks;
+                explore-shelves: root.explore-shelves;
+                explore-loading: root.explore-loading;
+                explore-loading-text: root.explore-loading-text;
+                explore-empty-text: root.explore-empty-text;
                 has-update: root.has-update;
                 active-theme-index: root.active-theme-index;
                 playback-speed-text: root.playback-speed-text;
@@ -2722,6 +2831,7 @@ export component MoggytWindow inherits Window {
                 open-settings => { root.page-selected(5); }
                 query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
+                explore-track-selected(idx) => { root.explore-track-selected(idx); }
                 queue-track-selected(idx) => { root.queue-track-selected(idx); }
                 playlist-selected(idx) => { root.playlist-selected(idx); } album-selected(idx) => { root.album-selected(idx); }
                 artist-selected(idx) => { root.artist-selected(idx); } detail-track-selected(idx) => { root.detail-track-selected(idx); }

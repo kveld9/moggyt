@@ -85,19 +85,27 @@ pub fn tr(locale: Locale, key: &str) -> &str {
     }
 }
 
+/// Permitted exception: In-memory Spanish translation table for UI strings.
+pub const SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
+    ("Theme", "Tema"),
+    ("White", "Blanco"),
+    ("Black OLED", "Negro OLED"),
+    ("Mono", "Monocromo"),
+    ("Language", "Idioma"),
+    ("English", "Inglés"),
+    ("Spanish", "Español"),
+    ("Explore", "Explorar"),
+    ("Loading explore...", "Cargando exploracion..."),
+    ("No sections found in Explore.", "No se encontraron secciones en Explorar."),
+];
+
 fn translate_spanish(key: &str) -> &str {
-    match key {
-        // Permitted exception: Spanish UI string literals for tranche 1 selectors.
-        "Theme" => "Tema",
-        "White" => "Blanco",
-        "Black OLED" => "Negro OLED",
-        "Mono" => "Monocromo",
-        "Language" => "Idioma",
-        "English" => "Inglés",
-        "Spanish" => "Español",
-        // Fallback extension point: returns English source key.
-        other => other,
+    for &(src, dst) in SPANISH_TRANSLATIONS {
+        if src == key {
+            return dst;
+        }
     }
+    key
 }
 
 #[cfg(test)]
@@ -114,6 +122,9 @@ mod tests {
             ("Language", "Idioma"),
             ("English", "Inglés"),
             ("Spanish", "Español"),
+            ("Explore", "Explorar"),
+            ("Loading explore...", "Cargando exploracion..."),
+            ("No sections found in Explore.", "No se encontraron secciones en Explorar."),
         ];
 
         // 1. Spanish translations match expected strings
