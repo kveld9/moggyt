@@ -1,7 +1,7 @@
 //! Home carousel shelf response parser for browse payloads.
 
 use super::catalog_parse_common::{best_thumbnail, classify_home_item, parse_two_row};
-use crate::domain::{Album, Artist, Playlist, SearchResult, Shelf};
+use crate::domain::{SearchResult, Shelf};
 use serde_json::Value;
 
 fn home_sections(value: &Value) -> Option<&Vec<Value>> {

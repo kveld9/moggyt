@@ -4,7 +4,7 @@ use super::catalog_parse_common::{
     best_thumbnail, browse_of, classify_home_item, parse_two_row, watch_video_id,
 };
 use super::catalog_parse_detail::{build_detail_track, detail_artist, detail_title};
-use crate::domain::{Album, Playlist, SearchResult, Shelf, Track};
+use crate::domain::{Playlist, SearchResult, Shelf, Track};
 use serde_json::Value;
 
 fn explore_sections(value: &Value) -> Option<&Vec<Value>> {

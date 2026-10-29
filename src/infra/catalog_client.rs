@@ -10,7 +10,7 @@ pub use super::catalog_requests::{search_body, search_url};
 
 #[cfg(test)]
 mod tests {
-    use super::super::catalog_parse_common::{parse_duration_secs, shelf_category};
+    use super::super::catalog_parse_common::parse_duration_secs;
     use super::super::catalog_parse_detail::parse_detail_all;
     use super::super::catalog_parse_explore::parse_explore_all;
     use super::super::catalog_parse_home::parse_home_all;
@@ -18,13 +18,13 @@ mod tests {
         parse_library_albums, parse_library_liked_tracks, parse_library_playlists,
     };
     use super::super::catalog_parse_radio::parse_radio_all;
-    use super::super::catalog_parse_search::parse_search_tracks;
+    use super::super::catalog_parse_search::{parse_search_tracks, shelf_category};
     use super::super::catalog_requests::{
         CATALOG_API_KEY, CATALOG_CLIENT_GL, CATALOG_CLIENT_VERSION, EXPLORE_BROWSE_ID,
         HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_LIKED_BROWSE_ID,
         LIBRARY_PLAYLISTS_BROWSE_ID, browse_url, like_url, next_url,
     };
-    use super::{CatalogClient, SearchHits, parse_search_all, search_body, search_url};
+    use super::{CatalogClient, SearchHits, search_url};
     use crate::domain::{DetailKind, SearchFilter};
     use crate::i18n::Locale;
 
