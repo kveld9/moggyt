@@ -1,4 +1,4 @@
-import { LineEdit, Slider } from "std-widgets.slint";
+import { Slider } from "std-widgets.slint";
 
 export struct TrackRowData {
     index: int,
@@ -527,6 +527,46 @@ component Sidebar inherits Rectangle {
     }
 }
 
+component StyledInputField inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder-text: "";
+    in property <InputType> input-type: InputType.text;
+    out property <bool> has-focus: input.has-focus;
+    callback accepted(string);
+
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.border;
+    background: Theme.surface;
+    animate border-color { duration: 150ms; easing: ease-in-out; }
+    forward-focus: input;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        alignment: center;
+
+        input := TextInput {
+            horizontal-stretch: 1;
+            text <=> root.text;
+            input-type: root.input-type;
+            color: Theme.text;
+            vertical-alignment: center;
+            accepted => { root.accepted(self.text); }
+        }
+    }
+
+    if root.text == "" && !input.has-focus : Text {
+        x: 10px;
+        y: 0;
+        width: parent.width - 20px;
+        height: parent.height;
+        text: root.placeholder-text;
+        color: Theme.secondary;
+        vertical-alignment: center;
+    }
+}
+
 component FilterChip inherits Rectangle {
     in property <string> text;
     in property <bool> is-active: false;
@@ -666,12 +706,26 @@ component SearchView inherits VerticalLayout {
                     tint: input.has-focus ? Theme.accent : Theme.secondary;
                 }
 
-                input := LineEdit {
+                Rectangle {
                     horizontal-stretch: 1;
-                    text <=> root.query;
-                    placeholder-text: "Buscar canciones...";
-                    accepted(text) => {
-                        root.query-submitted(text);
+
+                    input := TextInput {
+                        width: parent.width;
+                        height: parent.height;
+                        text <=> root.query;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                        accepted => {
+                            root.query-submitted(self.text);
+                        }
+                    }
+
+                    if root.query == "" && !input.has-focus : Text {
+                        width: parent.width;
+                        height: parent.height;
+                        text: "Buscar canciones...";
+                        color: Theme.secondary;
+                        vertical-alignment: center;
                     }
                 }
 
@@ -1360,10 +1414,10 @@ export component LibraryView inherits VerticalLayout {
                     spacing: 8px;
                     height: 32px;
 
-                    LineEdit {
+                    StyledInputField {
                         text <=> root.cookie-text;
                         placeholder-text: "Pegar cookies de sesión...";
-                        input-type: password;
+                        input-type: InputType.password;
                         accepted(t) => { root.sign-in-submitted(t); }
                     }
 
@@ -1874,10 +1928,10 @@ export component SettingsView inherits VerticalLayout {
                         spacing: 8px;
                         height: 32px;
 
-                        LineEdit {
+                        StyledInputField {
                             text <=> root.cookie-text;
                             placeholder-text: "Pegar cookies de sesión...";
-                            input-type: password;
+                            input-type: InputType.password;
                             accepted(t) => { root.sign-in-submitted(t); }
                         }
 
@@ -2207,10 +2261,10 @@ export component SettingsDialog inherits Rectangle {
                     spacing: 8px;
                     height: 32px;
 
-                    LineEdit {
+                    StyledInputField {
                         text <=> root.cookie-text;
                         placeholder-text: "Pegar cookies de sesión...";
-                        input-type: password;
+                        input-type: InputType.password;
                         accepted(t) => { root.sign-in-submitted(t); }
                     }
 
