@@ -105,6 +105,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Failed to play track", "Error al reproducir la canción"),
     ("Language", "Idioma"),
     ("Library", "Biblioteca"),
+    ("Loading...", "Cargando..."),
     ("Lyrics unavailable", "Letras no disponibles"),
     ("Mono", "Monocromo"),
     ("No albums found.", "No hay álbumes."),
@@ -124,9 +125,11 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Playlist", "LISTA"),
     ("Playlists", "Listas de reproducción"),
     ("Queue", "Cola"),
+    ("Queue ({count})", "Cola ({count})"),
     ("Search", "Buscar"),
     ("Search Results", "Resultados de búsqueda"),
     ("Search songs...", "Buscar canciones..."),
+    ("Searching...", "Buscando..."),
     ("Session", "Sesión"),
     ("Settings", "Ajustes"),
     ("Shuffle", "Aleatorio"),
@@ -209,6 +212,14 @@ mod tests {
         assert_eq!(tr(Locale::Spanish, "Album"), "ÁLBUM");
         assert_eq!(tr(Locale::Spanish, "Artist"), "ARTISTA");
         assert_eq!(tr(Locale::Spanish, "Playlist"), "LISTA");
+
+        // Dynamic labels & transient status
+        assert_eq!(tr(Locale::Spanish, "Queue ({count})").replace("{count}", "3"), "Cola (3)");
+        assert_eq!(tr(Locale::English, "Queue ({count})").replace("{count}", "3"), "Queue (3)");
+        assert_eq!(tr(Locale::Spanish, "Searching..."), "Buscando...");
+        assert_eq!(tr(Locale::English, "Searching..."), "Searching...");
+        assert_eq!(tr(Locale::Spanish, "Loading..."), "Cargando...");
+        assert_eq!(tr(Locale::English, "Loading..."), "Loading...");
     }
 
     #[test]
