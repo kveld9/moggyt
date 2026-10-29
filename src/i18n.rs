@@ -102,10 +102,12 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Black OLED", "Negro OLED"),
     ("Detail", "Detalle"),
     ("English", "Inglés"),
+    ("Explore", "Explorar"),
     ("Failed to play track", "Error al reproducir la canción"),
     ("Language", "Idioma"),
     ("Library", "Biblioteca"),
     ("Loading...", "Cargando..."),
+    ("Loading explore...", "Cargando exploracion..."),
     ("Lyrics unavailable", "Letras no disponibles"),
     ("Mono", "Monocromo"),
     ("No albums found.", "No hay álbumes."),
@@ -114,6 +116,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No details available.", "No hay detalles disponibles."),
     ("No playlists found.", "No hay listas de reproducción."),
     ("No results found.", "No se encontraron resultados."),
+    ("No sections found in Explore.", "No se encontraron secciones en Explorar."),
     ("No songs available.", "No hay canciones disponibles."),
     ("No track playing", "Sin reproducción"),
     ("No tracks available.", "No hay canciones disponibles."),
@@ -191,10 +194,15 @@ mod tests {
         assert_eq!(tr(Locale::Spanish, "Library"), "Biblioteca");
         assert_eq!(tr(Locale::Spanish, "Detail"), "Detalle");
         assert_eq!(tr(Locale::Spanish, "Settings"), "Ajustes");
+        assert_eq!(tr(Locale::Spanish, "Explore"), "Explorar");
 
         // Sentinels
         assert_eq!(tr(Locale::Spanish, "No track playing"), "Sin reproducción");
         assert_eq!(tr(Locale::Spanish, "Search Results"), "Resultados de búsqueda");
+        assert_eq!(
+            tr(Locale::Spanish, "No sections found in Explore."),
+            "No se encontraron secciones en Explorar."
+        );
 
         // Update status & parameterized pattern
         assert_eq!(tr(Locale::Spanish, "Up to date"), "Actualizado");
@@ -220,6 +228,8 @@ mod tests {
         assert_eq!(tr(Locale::English, "Searching..."), "Searching...");
         assert_eq!(tr(Locale::Spanish, "Loading..."), "Cargando...");
         assert_eq!(tr(Locale::English, "Loading..."), "Loading...");
+        assert_eq!(tr(Locale::Spanish, "Loading explore..."), "Cargando exploracion...");
+        assert_eq!(tr(Locale::English, "Loading explore..."), "Loading explore...");
     }
 
     #[test]

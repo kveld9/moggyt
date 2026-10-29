@@ -29,6 +29,11 @@ pub trait Catalog {
     /// Returns home shelves (empty on failure).
     fn home_shelves(&self) -> Vec<Shelf>;
 
+    /// Returns explore shelves (empty on failure).
+    fn explore_shelves(&self) -> Vec<Shelf> {
+        Vec::new()
+    }
+
     /// Returns saved or owned playlists.
     fn playlists(&self) -> Vec<Playlist>;
 
@@ -145,6 +150,28 @@ impl CatalogStub {
             },
         ]
     }
+
+    fn stub_explore_shelves() -> Vec<Shelf> {
+        vec![
+            Shelf {
+                title: "Charts".to_owned(),
+                items: vec![SearchResult::Track(Track::new(
+                    "stub-chart-1",
+                    "Top Chart Track",
+                    "Stub Artist",
+                ))],
+            },
+            Shelf {
+                title: "Moods & genres".to_owned(),
+                items: vec![SearchResult::Playlist(Playlist::new(
+                    "FEmusic_moods_and_genres_category",
+                    "Chill",
+                    0,
+                    None,
+                ))],
+            },
+        ]
+    }
 }
 
 impl Catalog for CatalogStub {
@@ -191,6 +218,10 @@ impl Catalog for CatalogStub {
 
     fn home_shelves(&self) -> Vec<Shelf> {
         Self::stub_home_shelves()
+    }
+
+    fn explore_shelves(&self) -> Vec<Shelf> {
+        Self::stub_explore_shelves()
     }
 
     fn playlists(&self) -> Vec<Playlist> {
@@ -356,6 +387,11 @@ impl Catalog for LiveCatalog {
     /// Returns home shelves. Network failures map to an empty vector.
     fn home_shelves(&self) -> Vec<Shelf> {
         self.client.home_shelves()
+    }
+
+    /// Returns explore shelves. Network failures map to an empty vector.
+    fn explore_shelves(&self) -> Vec<Shelf> {
+        self.client.explore_shelves()
     }
 
     /// Returns saved or owned playlists. Returns empty when unauthenticated or on failure.
@@ -674,6 +710,19 @@ mod tests {
     }
 
     #[test]
+    fn stub_explore_shelves_determinism_and_content() {
+        let catalog = CatalogStub::new();
+        let first = catalog.explore_shelves();
+        let second = catalog.explore_shelves();
+        assert_eq!(first, second, "stub explore shelves must be deterministic");
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0].title, "Charts");
+        assert_eq!(first[0].items.len(), 1);
+        assert_eq!(first[1].title, "Moods & genres");
+        assert_eq!(first[1].items.len(), 1);
+    }
+
+    #[test]
     fn stub_detail_determinism_per_kind_and_blank_none() {
         let catalog = CatalogStub::new();
         for kind in [DetailKind::Album, DetailKind::Artist, DetailKind::Playlist] {
@@ -801,5 +850,11 @@ mod tests {
         assert_eq!(hits[0].title, "running through the night");
         let recorded = pass_through.last_query.lock().unwrap().clone();
         assert_eq!(recorded.as_deref(), Some("running through the night"));
+    }
+
+    #[test]
+    fn default_explore_shelves_returns_empty_vec() {
+        let pass_through = PassThroughCatalog::default();
+        assert!(pass_through.explore_shelves().is_empty());
     }
 }
