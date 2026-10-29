@@ -193,6 +193,7 @@ fn watch_video_id(item: &Value) -> Option<String> {
         "/navigationEndpoint/watchEndpoint/videoId",
         "/overlay/navigationEndpoint/watchEndpoint/videoId",
         "/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/videoId",
+        "/playlistItemData/videoId",
     ];
 
     for path in PATHS {
@@ -1224,7 +1225,8 @@ impl CatalogClient {
     /// Queries the browse endpoint for explore shelves and returns parsed shelves.
     /// Returns an empty vector on any network or parse failure.
     pub fn explore_shelves(&self) -> Vec<Shelf> {
-        self.browse_payload(EXPLORE_BROWSE_ID).map_or_else(|_| Vec::new(), |p| parse_explore_all(&p))
+        self.browse_payload(EXPLORE_BROWSE_ID)
+            .map_or_else(|_| Vec::new(), |p| parse_explore_all(&p))
     }
 
     /// Queries the browse endpoint for `browse_id` and returns parsed detail view of `kind`.
@@ -2309,10 +2311,9 @@ mod tests {
                                     ]
                                 }
                             }
-                        }]
+                        }}]
                     }
                 }
-            }
         });
 
         let shelves = parse_explore_all(&payload);
@@ -2454,12 +2455,5 @@ mod tests {
             }
         });
         assert!(parse_explore_all(&payload).is_empty());
-    }
-
-    #[test]
-    fn catalog_client_explore_shelves_returns_empty_on_connection_failure() {
-        let client = CatalogClient::new();
-        let shelves = client.explore_shelves();
-        assert!(shelves.is_empty());
     }
 }

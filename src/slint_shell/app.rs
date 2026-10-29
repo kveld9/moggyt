@@ -1890,10 +1890,7 @@ fn refresh_library_async<
 }
 
 /// Queries catalog for explore shelves asynchronously off the UI thread.
-pub fn execute_explore<C: Catalog>(
-    generation: u64,
-    catalog: &Arc<Mutex<C>>,
-) -> (u64, Vec<Shelf>) {
+pub fn execute_explore<C: Catalog>(generation: u64, catalog: &Arc<Mutex<C>>) -> (u64, Vec<Shelf>) {
     let shelves = match catalog.lock() {
         Ok(guard) => guard.explore_shelves(),
         Err(_) => Vec::new(),
@@ -3479,9 +3476,7 @@ mod tests {
             },
             Shelf {
                 title: "New Releases".to_owned(),
-                items: vec![
-                    SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", None)),
-                ],
+                items: vec![SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", None))],
             },
         ];
         assert_eq!(
@@ -3531,14 +3526,8 @@ mod tests {
         }
 
         assert_eq!(received.len(), 2);
-        assert_eq!(
-            received[0],
-            ("https://lh3.googleusercontent.com/track-small".to_string(), 15)
-        );
-        assert_eq!(
-            received[1],
-            ("https://lh3.googleusercontent.com/album-small".to_string(), 15)
-        );
+        assert_eq!(received[0], ("https://lh3.googleusercontent.com/track-small".to_string(), 15));
+        assert_eq!(received[1], ("https://lh3.googleusercontent.com/album-small".to_string(), 15));
     }
 
     #[test]

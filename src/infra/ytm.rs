@@ -155,9 +155,11 @@ impl CatalogStub {
         vec![
             Shelf {
                 title: "Charts".to_owned(),
-                items: vec![
-                    SearchResult::Track(Track::new("stub-chart-1", "Top Chart Track", "Stub Artist")),
-                ],
+                items: vec![SearchResult::Track(Track::new(
+                    "stub-chart-1",
+                    "Top Chart Track",
+                    "Stub Artist",
+                ))],
             },
             Shelf {
                 title: "Moods & genres".to_owned(),
