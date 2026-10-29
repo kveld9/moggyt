@@ -318,11 +318,5 @@ pub(crate) fn sync_playback_tick<
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::domain::Track;
-    use crate::i18n::Locale;
-    use crate::slint_shell::page::SlintPage;
-    use crate::slint_shell::test_support::test_wired;
-
     // Window-property sync has no headless tests: MoggytWindow::new() aborts without a display backend; behavior is covered indirectly by state-level tests.
 }
