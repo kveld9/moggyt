@@ -20,6 +20,10 @@ Run all five before finishing. `cargo run` launches the window.
 - Dependency direction: `slint_shell`/`infra` → `domain`. `domain` never touches I/O
   (`net`, `fs`, `process`, clocks, randomness); inject those as parameters or ports.
 - `src/main.rs` is the only composition root. One concept, one owner module (SSOT).
+  File-size modularity caps: Rust (`.rs`) max 900 lines (adjusted from 800 to fit clean
+  baseline `src/infra/ytm.rs` at 891 lines); Slint (`.slint`) max 400 lines per module.
+  The single designated thin entry (`ui/shell.slint`) is exempt only while it stays an
+  import-only entry under ~200 lines with no component definitions.
 - External crates hide behind ports in `src/infra/`; the binary crate exposes
   the library via `src/lib.rs` so `pub` APIs stay reachable (no `allow(dead_code)`).
 

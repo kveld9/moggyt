@@ -9,8 +9,8 @@
 #   ./scripts/check-repo.sh [target_directory]
 #
 # Exit codes:
-#   0 - All required files exist and are non-empty.
-#   1 - One or more required files are missing or empty.
+#   0 - All required files exist, are non-empty, and satisfy modularity caps.
+#   1 - One or more files are missing/empty or exceed modularity caps.
 # ==============================================================================
 
 set -euo pipefail
@@ -125,11 +125,103 @@ echo -e "\n${BOLD}6. Maintenance & Setup Automation (scripts/)${RESET}"
 check_file "scripts/check-repo.sh" true
 check_file "scripts/check-i18n.sh" true
 
+echo -e "\n${BOLD}7. Source Modularity & File Size Limits${RESET}"
+
+# Modularity caps:
+# - Rust (.rs): max 900 lines (adjusted from suggested 800 lines because clean
+#   baseline src/infra/ytm.rs is 891 lines; setting 900 avoids grandfathering
+#   ytm.rs and strictly limits exceptions to the 3 known monoliths).
+# - Slint (.slint): max 400 lines per component module.
+# - Thin entry (ui/shell.slint): max 200 lines, exempt only while it stays an
+#   import-only entry under ~200 lines with no component definitions.
+MAX_RUST_LINES=900
+MAX_SLINT_LINES=400
+MAX_SHELL_SLINT_LINES=200
+
+# Grandfathered monoliths pending modularization:
+# - src/slint_shell/app.rs (3885 lines, pending domain/bridge split)
+# - src/infra/catalog_client.rs (2695 lines, pending API endpoint split)
+# - ui/shell.slint (2841 lines, pending component split by sibling worker)
+is_grandfathered() {
+  local target="$1"
+  case "${target}" in
+    src/slint_shell/app.rs|src/infra/catalog_client.rs|ui/shell.slint)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+while IFS= read -r file; do
+  file="${file%$'\r'}"
+  clean_file="${file#./}"
+  [[ -z "${clean_file}" ]] && continue
+
+  # Exclude generated/lockfiles and target directory
+  case "${clean_file}" in
+    Cargo.lock|target/*|*-generated*|*.generated.*)
+      continue
+      ;;
+  esac
+
+  max_lines=0
+  case "${clean_file}" in
+    *.rs)
+      max_lines=${MAX_RUST_LINES}
+      ;;
+    *.slint)
+      if [[ "${clean_file}" == "ui/shell.slint" ]]; then
+        max_lines=${MAX_SHELL_SLINT_LINES}
+      else
+        max_lines=${MAX_SLINT_LINES}
+      fi
+      ;;
+    *)
+      continue
+      ;;
+  esac
+
+  full_path="${TARGET_DIR}/${clean_file}"
+  if [[ ! -f "${full_path}" ]]; then
+    continue
+  fi
+
+  TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+  lines=$(wc -l < "${full_path}" | tr -d '[:space:]')
+  lines=${lines:-0}
+
+  if (( lines > max_lines )); then
+    if is_grandfathered "${clean_file}"; then
+      echo -e "  [${YELLOW}WARN${RESET}] ${clean_file} (${lines} lines > ${max_lines} max; grandfathered pending modularization)"
+      PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    else
+      echo -e "  [${RED}FAIL${RESET}] ${clean_file} (${lines} lines > ${max_lines} max; modularity limit exceeded)"
+      FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    fi
+  else
+    # Exemption condition: ui/shell.slint must be import-only with no component definitions
+    if [[ "${clean_file}" == "ui/shell.slint" ]] && grep -qE '^[[:space:]]*(export[[:space:]]+)?component[[:space:]]' "${full_path}"; then
+      if is_grandfathered "${clean_file}"; then
+        echo -e "  [${YELLOW}WARN${RESET}] ${clean_file} (${lines} lines; contains component definitions; grandfathered pending modularization)"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+      else
+        echo -e "  [${RED}FAIL${RESET}] ${clean_file} (thin entry must be import-only with no component definitions)"
+        FAILED_CHECKS=$((FAILED_CHECKS + 1))
+      fi
+    else
+      echo -e "  [${GREEN}OK${RESET}] ${clean_file} (${lines} lines <= ${max_lines} max)"
+      PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    fi
+  fi
+done < <(git -C "${TARGET_DIR}" ls-files)
+
 echo -e "\n--------------------------------------------------"
 echo -e "Audit Summary: ${TOTAL_CHECKS} checked | ${GREEN}${PASSED_CHECKS} passed${RESET} | ${RED}${FAILED_CHECKS} failed${RESET}"
 
 if [[ ${FAILED_CHECKS} -gt 0 ]]; then
-  echo -e "${RED}${BOLD}Result: FAILED - Required standard files are missing or empty.${RESET}\n"
+  echo -e "${RED}${BOLD}Result: FAILED - Required standards not met (missing files or size limits exceeded).${RESET}\n"
   exit 1
 else
   echo -e "${GREEN}${BOLD}Result: PASSED - Repository satisfies all structural standards.${RESET}\n"

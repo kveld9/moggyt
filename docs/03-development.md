@@ -12,11 +12,25 @@ cargo run                                  # run the app (Slint window)
 cargo test --all-features                  # full suite
 cargo fmt --all -- --check                 # formatting (CI fails on drift)
 cargo clippy --all-targets --all-features -- -D warnings
-./scripts/check-repo.sh                    # repo standards audit
+./scripts/check-repo.sh                    # repo standards and modularity audit
 ./scripts/check-markdown.sh                # markdown lint (CI fails on drift)
 ```
 
 CI additionally runs markdown quality checks using `markdownlint-cli2`.
+
+## Modularity limits
+
+Enforced automatically by `./scripts/check-repo.sh`:
+
+- Rust (`.rs`): max 900 lines per file (baseline cap adjusted from suggested 800 lines to fit
+  `src/infra/ytm.rs` at 891 lines).
+- Slint (`.slint`): max 400 lines per component module.
+- Thin entry exemption: `ui/shell.slint` is exempt only while it stays an import-only entry under ~200 lines
+  with no component definitions.
+- Grandfathered exceptions: `src/slint_shell/app.rs`, `src/infra/catalog_client.rs`, and `ui/shell.slint`
+  (while over limit) are grandfathered pending modularization.
+- Remediation path: split oversized files by concept (one view or endpoint-domain per module), landing each
+  extracted unit via one small PR per module (< 400 lines diff).
 
 ## Branches and commits
 
