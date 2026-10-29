@@ -1,0 +1,209 @@
+import { Theme, TrackRowData } from "../theme.slint";
+import { TrackRow } from "../components/rows.slint";
+import { IconPlay, IconShuffle } from "../icons.slint";
+
+export component DetailView inherits VerticalLayout {
+    in property <bool> has-detail: false;
+    in property <bool> detail-has-artwork: false;
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <string> description: "";
+    in property <string> kind-label: "";
+    in property <image> cover;
+    in property <[TrackRowData]> tracks: [];
+    in property <string> empty-text: "No details available.";
+    in property <string> no-cover-text: "No cover";
+    in property <string> play-button-label: "Play";
+    in property <string> shuffle-button-label: "Shuffle";
+    in property <string> empty-songs-text: "No songs available.";
+    callback track-selected(int);
+    callback play();
+    callback shuffle();
+    spacing: 16px;
+    alignment: start;
+
+    if !root.has-detail : VerticalLayout {
+        padding-top: 24px;
+        alignment: center;
+        Text {
+            text: root.empty-text;
+            color: Theme.secondary;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    if root.has-detail : VerticalLayout {
+        spacing: 16px;
+
+        HorizontalLayout {
+            spacing: 20px;
+            alignment: start;
+
+            Rectangle {
+                width: 140px;
+                height: 140px;
+                border-radius: 12px;
+                background: Theme.surface;
+                clip: true;
+
+                if root.cover.width > 0 : Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: ImageFit.cover;
+                }
+                if root.cover.width == 0 && !root.detail-has-artwork && root.tracks.length > 0 && root.tracks[0].cover.width > 0 : Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.tracks[0].cover;
+                    image-fit: ImageFit.cover;
+                }
+                if root.cover.width == 0 && (root.detail-has-artwork || root.tracks.length == 0 || root.tracks[0].cover.width == 0) : Text {
+                    text: root.kind-label != "" ? root.kind-label : root.no-cover-text;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            VerticalLayout {
+                spacing: 6px;
+                alignment: center;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: root.kind-label;
+                    color: Theme.accent;
+                    font-size: 11px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: root.title;
+                    color: Theme.text;
+                    font-size: 24px;
+                    font-weight: 800;
+                    overflow: elide;
+                }
+
+                if root.subtitle != "" : Text {
+                    text: root.subtitle;
+                    color: Theme.secondary;
+                    font-size: 13px;
+                    overflow: elide;
+                }
+
+                if root.description != "" : Text {
+                    text: root.description;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    overflow: elide;
+                }
+
+                Rectangle { height: 4px; }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    Rectangle {
+                        height: 36px;
+                        border-radius: 18px;
+                        background: play-touch.pressed ? Theme.overlay : (play-touch.has-hover ? Theme.hover : Theme.accent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        play-touch := TouchArea {
+                            clicked => { root.play(); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 16px;
+                            padding-right: 20px;
+                            spacing: 8px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                IconPlay {
+                                    size: 16px;
+                                    tint: play-touch.has-hover ? Theme.text : Theme.window;
+                                }
+                            }
+
+                            Text {
+                                text: root.play-button-label;
+                                color: play-touch.has-hover ? Theme.text : Theme.window;
+                                font-size: 13px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 36px;
+                        border-radius: 18px;
+                        background: shuf-touch.pressed ? Theme.overlay : (shuf-touch.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        shuf-touch := TouchArea {
+                            clicked => { root.shuffle(); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 16px;
+                            padding-right: 20px;
+                            spacing: 8px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                IconShuffle {
+                                    size: 16px;
+                                    tint: shuf-touch.has-hover ? Theme.accent : Theme.text;
+                                }
+                            }
+
+                            Text {
+                                text: root.shuffle-button-label;
+                                color: shuf-touch.has-hover ? Theme.accent : Theme.text;
+                                font-size: 13px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+
+        if root.tracks.length == 0 : VerticalLayout {
+            padding-top: 16px;
+            alignment: center;
+            Text {
+                text: root.empty-songs-text;
+                color: Theme.secondary;
+                font-size: 13px;
+                horizontal-alignment: center;
+            }
+        }
+
+        for track in root.tracks : TrackRow {
+            title: track.title;
+            artist: track.artist;
+            album: track.album;
+            duration: track.duration;
+            kind: track.kind;
+            cover: track.cover;
+            clicked => { root.track-selected(track.index); }
+        }
+    }
+}

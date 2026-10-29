@@ -1,0 +1,249 @@
+import { Theme } from "../theme.slint";
+import { ThemedSlider } from "./controls.slint";
+import { PlayerCenterControls } from "./player_controls.slint";
+import {
+    IconHeart, IconMinus, IconPlus, IconQueue, IconSpeaker,
+} from "../icons.slint";
+
+export component PlayerBar inherits Rectangle {
+    in property <string> active-track-title: "No track playing";
+    in property <string> active-track-artist: "";
+    in property <bool> is-playing: false;
+    in property <int> volume: 100;
+    in property <string> position-text: "0:00";
+    in property <string> duration-text: "0:00";
+    in property <image> cover;
+    in property <bool> is-liked: false;
+    in property <bool> is-shuffle: false;
+    in property <int> repeat-mode: 0;
+    in property <float> progress: 0.0;
+    in property <int> position-secs: 0;
+    in property <int> duration-secs: 0;
+    in property <int> queue-count: 0;
+    in property <string> queue-button-text: "Queue";
+
+    callback toggle-play();
+    callback prev-track();
+    callback next-track();
+    callback seek-by(int);
+    callback seek-to(int);
+    callback set-volume(int);
+    callback toggle-like();
+    callback toggle-shuffle();
+    callback cycle-repeat();
+    callback open-queue();
+
+    height: 72px;
+    background: Theme.panel;
+
+    Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.border;
+    }
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        spacing: 16px;
+        alignment: space-between;
+
+        // LEFT ZONE: Artwork, Title + Artist, Like toggle
+        HorizontalLayout {
+            width: 240px;
+            spacing: 12px;
+            alignment: start;
+
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                border-radius: 6px;
+                background: Theme.surface;
+                clip: true;
+
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: ImageFit.cover;
+                }
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: 2px;
+
+                Text {
+                    text: root.active-track-title;
+                    color: Theme.text;
+                    font-size: 13px;
+                    font-weight: 700;
+                    overflow: elide;
+                }
+
+                if root.active-track-artist != "" : Text {
+                    text: root.active-track-artist;
+                    color: Theme.secondary;
+                    font-size: 11px;
+                    overflow: elide;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 18px;
+                    background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (root.is-liked ? Theme.surface : transparent));
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    like-touch := TouchArea {
+                        clicked => { root.toggle-like(); }
+                    }
+
+                    IconHeart {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        tint: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
+                        size: 18px;
+                        is-filled: root.is-liked;
+                    }
+                }
+            }
+        }
+
+        // CENTER ZONE: Shuffle, Prev, -10s, Play/Pause, +10s, Next, Repeat + Progress row
+        PlayerCenterControls {
+            is-playing: root.is-playing;
+            is-shuffle: root.is-shuffle;
+            repeat-mode: root.repeat-mode;
+            position-secs: root.position-secs;
+            duration-secs: root.duration-secs;
+            position-text: root.position-text;
+            duration-text: root.duration-text;
+
+            toggle-play => { root.toggle-play(); }
+            prev-track => { root.prev-track(); }
+            next-track => { root.next-track(); }
+            seek-by(delta) => { root.seek-by(delta); }
+            seek-to(secs) => { root.seek-to(secs); }
+            toggle-shuffle => { root.toggle-shuffle(); }
+            cycle-repeat => { root.cycle-repeat(); }
+        }
+
+        // RIGHT ZONE: Queue button, Volume Slider + percentage
+        HorizontalLayout {
+            width: 240px;
+            alignment: end;
+            spacing: 10px;
+
+            Rectangle {
+                height: 32px;
+                border-radius: 16px;
+                background: q-touch.pressed ? Theme.overlay : (q-touch.has-hover ? Theme.hover : Theme.surface);
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                q-touch := TouchArea {
+                    clicked => { root.open-queue(); }
+                }
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 12px;
+                    spacing: 6px;
+                    alignment: center;
+
+                    VerticalLayout {
+                        alignment: center;
+                        IconQueue {
+                            size: 16px;
+                            tint: q-touch.has-hover ? Theme.accent : Theme.text;
+                        }
+                    }
+
+                    Text {
+                        text: root.queue-button-text;
+                        color: q-touch.has-hover ? Theme.accent : Theme.text;
+                        font-size: 11px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                IconSpeaker {
+                    size: 16px;
+                    tint: Theme.secondary;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: vm-touch.pressed ? Theme.overlay : (vm-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    vm-touch := TouchArea {
+                        clicked => { root.set-volume(max(0, root.volume - 5)); }
+                    }
+
+                    IconMinus {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 14px;
+                        tint: vm-touch.has-hover ? Theme.text : Theme.secondary;
+                    }
+                }
+            }
+
+            ThemedSlider {
+                width: 80px;
+                minimum: 0;
+                maximum: 100;
+                value: root.volume;
+                changed(val) => {
+                    root.set-volume(round(val));
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: vp-touch.pressed ? Theme.overlay : (vp-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    vp-touch := TouchArea {
+                        clicked => { root.set-volume(min(100, root.volume + 5)); }
+                    }
+
+                    IconPlus {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 14px;
+                        tint: vp-touch.has-hover ? Theme.text : Theme.secondary;
+                    }
+                }
+            }
+
+            Text {
+                text: "\{root.volume}%";
+                color: Theme.secondary;
+                font-size: 11px;
+                width: 34px;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

@@ -1,0 +1,144 @@
+import { Theme } from "../theme.slint";
+
+export component ThemedSlider inherits Rectangle {
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in-out property <float> value: 0;
+    in property <bool> enabled: true;
+    callback changed(float);
+
+    min-height: 20px;
+    vertical-stretch: 0;
+    horizontal-stretch: 1;
+
+    property <float> clamped-val: max(root.minimum, min(root.maximum, root.value));
+    property <float> range: max(1, root.maximum - root.minimum);
+    property <float> ratio: (root.clamped-val - root.minimum) / root.range;
+
+    // Track background
+    Rectangle {
+        y: (parent.height - 4px) / 2;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.surface;
+    }
+
+    // Active fill
+    Rectangle {
+        x: 0;
+        y: (parent.height - 4px) / 2;
+        width: parent.width * root.ratio;
+        height: 4px;
+        border-radius: 2px;
+        background: touch.has-hover ? Theme.accent : (touch.pressed ? Theme.accent : Theme.accent);
+    }
+
+    // Thumb
+    Rectangle {
+        x: clamp(parent.width * root.ratio - 6px, 0px, parent.width - 12px);
+        y: (parent.height - 12px) / 2;
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        background: Theme.text;
+        border-width: 1px;
+        border-color: Theme.border;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        property <bool> is-dragging: false;
+
+        pointer-event(event) => {
+            if (!root.enabled || event.button != PointerEventButton.left) {
+                return;
+            }
+            if (event.kind == PointerEventKind.down) {
+                self.is-dragging = true;
+                let r = clamp(self.mouse-x / parent.width, 0.0, 1.0);
+                root.value = root.minimum + r * root.range;
+                root.changed(root.value);
+            } else if (event.kind == PointerEventKind.up) {
+                self.is-dragging = false;
+            }
+        }
+
+        moved => {
+            if (self.is-dragging && root.enabled) {
+                let r = clamp(self.mouse-x / parent.width, 0.0, 1.0);
+                root.value = root.minimum + r * root.range;
+                root.changed(root.value);
+            }
+        }
+    }
+}
+
+export component StyledInputField inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder-text: "";
+    in property <InputType> input-type: InputType.text;
+    out property <bool> has-focus: input.has-focus;
+    callback accepted(string);
+
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.border;
+    background: Theme.surface;
+    animate border-color { duration: 150ms; easing: ease-in-out; }
+    forward-focus: input;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        alignment: start;
+
+        input := TextInput {
+            horizontal-stretch: 1;
+            text <=> root.text;
+            input-type: root.input-type;
+            color: Theme.text;
+            vertical-alignment: center;
+            accepted => { root.accepted(self.text); }
+        }
+    }
+
+    if root.text == "" && !input.has-focus : Text {
+        x: 10px;
+        y: 0;
+        width: parent.width - 20px;
+        height: parent.height;
+        text: root.placeholder-text;
+        color: Theme.secondary;
+        vertical-alignment: center;
+    }
+}
+
+export component FilterChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> is-active: false;
+    callback clicked();
+
+    height: 28px;
+    border-radius: 14px;
+    background: root.is-active ? (touch.pressed ? Theme.overlay : Theme.accent) : (touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : Theme.surface));
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        alignment: center;
+
+        Text {
+            text: root.text;
+            color: root.is-active ? Theme.window : (touch.has-hover ? Theme.text : Theme.secondary);
+            font-size: 12px;
+            font-weight: 600;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+}

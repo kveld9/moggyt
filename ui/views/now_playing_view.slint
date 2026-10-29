@@ -1,0 +1,72 @@
+import { Theme, LyricLineData } from "../theme.slint";
+
+export component NowPlayingView inherits VerticalLayout {
+    in property <string> track-title: "No track playing";
+    in property <string> track-artist: "";
+    in property <string> position-text: "0:00";
+    in property <string> duration-text: "0:00";
+    in property <float> progress: 0.0;
+    in property <image> cover-image;
+    in property <bool> has-cover: false;
+    in property <[LyricLineData]> lyrics-lines: [];
+    in property <int> active-lyric-index: -1;
+    in property <string> no-cover-text: "No cover";
+    in property <string> lyrics-unavailable-text: "Lyrics unavailable";
+    in property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
+
+    spacing: 16px; alignment: start;
+
+    HorizontalLayout {
+        spacing: 20px; alignment: start;
+        Rectangle {
+            width: 140px; height: 140px; border-radius: 8px; background: Theme.surface; clip: true;
+            if root.has-cover : Image {
+                width: parent.width; height: parent.height;
+                source: root.cover-image;
+                image-fit: cover;
+            }
+            if !root.has-cover : Text {
+                text: root.no-cover-text; color: Theme.secondary; font-size: 12px;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
+        }
+        VerticalLayout {
+            spacing: 6px; alignment: center;
+            Text { text: root.track-title; color: Theme.text; font-size: 20px; font-weight: 700; }
+            Text { text: root.track-artist; color: Theme.secondary; font-size: 14px; }
+            Rectangle { height: 6px; }
+            // Progress bar
+            Rectangle {
+                height: 6px; border-radius: 3px; background: Theme.surface; clip: true;
+                Rectangle { x: 0; width: parent.width * root.progress; height: parent.height; background: Theme.accent; border-radius: 3px; }
+            }
+            HorizontalLayout {
+                Text { text: root.position-text; color: Theme.secondary; font-size: 11px; }
+                Rectangle {}
+                Text { text: root.duration-text; color: Theme.secondary; font-size: 11px; }
+            }
+        }
+    }
+
+    if root.lyrics-lines.length == 0 : Rectangle {
+        height: 140px; border-radius: 8px; background: Theme.panel;
+        VerticalLayout {
+            alignment: center; spacing: 4px;
+            Text { text: root.lyrics-unavailable-text; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
+            Text { text: root.lyrics-hint-text; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
+        }
+    }
+
+    if root.lyrics-lines.length > 0 : Rectangle {
+        border-radius: 8px; background: Theme.panel; clip: true;
+        VerticalLayout {
+            padding: 12px; spacing: 8px; alignment: start;
+            for line in root.lyrics-lines : Text {
+                text: line.text;
+                color: line.index == root.active-lyric-index ? Theme.accent : Theme.secondary;
+                font-size: line.index == root.active-lyric-index ? 15px : 13px;
+                font-weight: line.index == root.active-lyric-index ? 700 : 400;
+            }
+        }
+    }
+}

@@ -1,0 +1,208 @@
+import { Theme } from "../theme.slint";
+import { ThemedSlider } from "./controls.slint";
+import {
+    IconMinus, IconNext, IconPause, IconPlay, IconPlus,
+    IconPrev, IconRepeat, IconRepeatOne, IconShuffle,
+} from "../icons.slint";
+
+export component PlayerCenterControls inherits VerticalLayout {
+    in property <bool> is-playing: false;
+    in property <bool> is-shuffle: false;
+    in property <int> repeat-mode: 0;
+    in property <int> position-secs: 0;
+    in property <int> duration-secs: 0;
+    in property <string> position-text: "0:00";
+    in property <string> duration-text: "0:00";
+
+    callback toggle-play();
+    callback prev-track();
+    callback next-track();
+    callback seek-by(int);
+    callback seek-to(int);
+    callback toggle-shuffle();
+    callback cycle-repeat();
+
+    horizontal-stretch: 1;
+    alignment: center;
+    spacing: 4px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: center;
+
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: shuf-touch.pressed ? Theme.overlay : (root.is-shuffle ? Theme.surface : (shuf-touch.has-hover ? Theme.hover : transparent));
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            shuf-touch := TouchArea {
+                clicked => { root.toggle-shuffle(); }
+            }
+
+            IconShuffle {
+                tint: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
+                size: 18px;
+            }
+        }
+
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: pt.pressed ? Theme.overlay : (pt.has-hover ? Theme.hover : transparent);
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            pt := TouchArea {
+                clicked => { root.prev-track(); }
+            }
+
+            IconPrev {
+                tint: pt.has-hover ? Theme.text : Theme.secondary;
+                size: 18px;
+            }
+        }
+
+        Rectangle {
+            height: 28px;
+            border-radius: 14px;
+            background: s10m-touch.pressed ? Theme.overlay : (s10m-touch.has-hover ? Theme.hover : transparent);
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            s10m-touch := TouchArea {
+                clicked => { root.seek-by(-10); }
+            }
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                alignment: center;
+
+                Text {
+                    text: "-10s";
+                    color: s10m-touch.has-hover ? Theme.text : Theme.secondary;
+                    font-size: 11px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        Rectangle {
+            width: 40px;
+            height: 40px;
+            border-radius: 20px;
+            background: pp.pressed ? Theme.overlay : (pp.has-hover ? Theme.hover : Theme.accent);
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            pp := TouchArea {
+                clicked => { root.toggle-play(); }
+            }
+
+            if root.is-playing : IconPause {
+                tint: pp.has-hover ? Theme.text : Theme.window;
+                size: 20px;
+            }
+            if !root.is-playing : IconPlay {
+                tint: pp.has-hover ? Theme.text : Theme.window;
+                size: 20px;
+            }
+        }
+
+        Rectangle {
+            height: 28px;
+            border-radius: 14px;
+            background: s10p-touch.pressed ? Theme.overlay : (s10p-touch.has-hover ? Theme.hover : transparent);
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            s10p-touch := TouchArea {
+                clicked => { root.seek-by(10); }
+            }
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                alignment: center;
+
+                Text {
+                    text: "+10s";
+                    color: s10p-touch.has-hover ? Theme.text : Theme.secondary;
+                    font-size: 11px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: nt.pressed ? Theme.overlay : (nt.has-hover ? Theme.hover : transparent);
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            nt := TouchArea {
+                clicked => { root.next-track(); }
+            }
+
+            IconNext {
+                tint: nt.has-hover ? Theme.text : Theme.secondary;
+                size: 18px;
+            }
+        }
+
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: rep-touch.pressed ? Theme.overlay : (root.repeat-mode != 0 ? Theme.surface : (rep-touch.has-hover ? Theme.hover : transparent));
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            rep-touch := TouchArea {
+                clicked => { root.cycle-repeat(); }
+            }
+
+            if root.repeat-mode == 2 : IconRepeatOne {
+                tint: Theme.accent;
+                size: 18px;
+            }
+            if root.repeat-mode != 2 : IconRepeat {
+                tint: root.repeat-mode != 0 ? Theme.accent : (rep-touch.has-hover ? Theme.text : Theme.secondary);
+                size: 18px;
+            }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: center;
+
+        Text {
+            text: root.position-text;
+            color: Theme.secondary;
+            font-size: 11px;
+            vertical-alignment: center;
+        }
+
+        ThemedSlider {
+            horizontal-stretch: 1;
+            minimum: 0;
+            maximum: max(1, root.duration-secs);
+            value: min(root.position-secs, max(1, root.duration-secs));
+            enabled: root.duration-secs > 0;
+            changed(val) => {
+                root.seek-to(round(val));
+            }
+        }
+
+        Text {
+            text: root.duration-text;
+            color: Theme.secondary;
+            font-size: 11px;
+            vertical-alignment: center;
+        }
+    }
+}

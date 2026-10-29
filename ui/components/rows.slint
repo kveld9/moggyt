@@ -1,0 +1,139 @@
+import { Theme } from "../theme.slint";
+
+export component TrackRow inherits Rectangle {
+    in property <string> title;
+    in property <string> artist;
+    in property <string> album;
+    in property <string> duration;
+    in property <string> kind;
+    in property <image> cover;
+    in property <bool> is-active: false;
+    callback clicked();
+
+    property <string> subtitle-text: root.album != "" && root.artist != "" ? root.artist + " - " + root.album : (
+        root.artist != "" ? root.artist : root.album
+    );
+
+    height: 56px;
+    border-radius: 8px;
+    background: root.is-active ? (touch.pressed ? Theme.overlay : Theme.surface) : (touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent));
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 6px;
+                background: Theme.surface;
+                clip: true;
+
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: ImageFit.cover;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.title;
+                color: root.is-active ? Theme.accent : Theme.text;
+                font-size: 14px;
+                font-weight: 600;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+
+            if root.subtitle-text != "" : Text {
+                text: root.subtitle-text;
+                color: Theme.secondary;
+                font-size: 12px;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.duration != "" : Text {
+            text: root.duration;
+            color: Theme.secondary;
+            font-size: 12px;
+            font-weight: 500;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+export component LibraryItemCard inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <image> cover;
+    callback clicked();
+
+    height: 48px;
+    border-radius: 8px;
+    background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent);
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea { clicked => { root.clicked(); } }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 12px;
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 36px;
+                height: 36px;
+                border-radius: 6px;
+                background: Theme.surface;
+                clip: true;
+
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: ImageFit.cover;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: 13px;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: root.subtitle;
+                color: Theme.secondary;
+                font-size: 11px;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

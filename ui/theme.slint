@@ -1,0 +1,39 @@
+export struct TrackRowData {
+    index: int,
+    title: string,
+    artist: string,
+    album: string,
+    duration: string,
+    kind: string,
+    cover: image,
+}
+
+export struct ShelfData {
+    title: string,
+    tracks: [TrackRowData],
+}
+
+export struct LibraryItemData {
+    index: int,
+    title: string,
+    subtitle: string,
+    cover: image,
+}
+
+export struct LyricLineData {
+    index: int,
+    text: string,
+}
+
+export global Theme {
+    in-out property <color> window;
+    in-out property <color> panel;
+    in-out property <color> surface;
+    in-out property <color> text;
+    in-out property <color> secondary;
+    in-out property <color> accent;
+    in-out property <color> border;
+    in-out property <color> hover;
+    in-out property <color> overlay;
+    in-out property <bool> dark;
+}
