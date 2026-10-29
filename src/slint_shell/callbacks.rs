@@ -11,6 +11,7 @@ use crate::domain::{
     AudioBackend, Catalog, CoverCache, DetailKind, LyricsSource, SearchFilter, SearchResult,
     SessionStore,
 };
+use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::{request_queue_track_cover, resolve_row_cover_image};
 use crate::slint_shell::explore::{explore_item_at, load_explore_async};
 use crate::slint_shell::format::{format_playback_speed, format_queue_label};
@@ -27,7 +28,6 @@ use crate::slint_shell::theme::{apply_theme, theme_from_index};
 use crate::slint_shell::window::{
     open_detail_async, refresh_library_async, submit_search_async, trigger_playback,
 };
-use crate::slint_shell::MoggytWindow;
 
 /// Maps a clicked search result item to playback or container detail view.
 pub(crate) fn handle_filtered_item_click<

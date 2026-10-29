@@ -4,9 +4,7 @@
 
 use slint::{ModelRc, VecModel};
 
-use crate::domain::{
-    AudioBackend, Catalog, CoverCache, LyricsSource, SearchFilter, SessionStore,
-};
+use crate::domain::{AudioBackend, Catalog, CoverCache, LyricsSource, SearchFilter, SessionStore};
 use crate::i18n::tr;
 use crate::infra::GithubUpdater;
 use crate::slint_shell::covers::{resolve_row_cover_image, track_to_row_data};
@@ -19,9 +17,7 @@ use crate::slint_shell::playback::{
 use crate::slint_shell::search::SearchRow;
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::theme::{apply_theme, theme_to_index};
-use crate::slint_shell::{
-    LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData,
-};
+use crate::slint_shell::{LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData};
 
 /// Synchronizes state with Slint window properties without performing blocking I/O.
 pub(crate) fn sync_window<

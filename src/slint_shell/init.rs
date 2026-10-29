@@ -159,15 +159,13 @@ pub(crate) fn check_updater_status<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
     use crate::domain::{
         Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
     };
     use crate::i18n::Locale;
-    use crate::infra::{
-        AudioStub, LrclibStub, MemoryCoverCache, MemorySessionStore, Settings,
-    };
+    use crate::infra::{AudioStub, LrclibStub, MemoryCoverCache, MemorySessionStore, Settings};
     use crate::slint_shell::test_support::LocaleTrackingCatalog;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn test_startup_settings_refetches_home_shelves_with_settings_locale() {

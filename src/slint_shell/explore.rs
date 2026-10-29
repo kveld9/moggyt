@@ -5,7 +5,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::domain::{AudioBackend, Catalog, CoverCache, LyricsSource, SearchResult, SessionStore, Shelf};
+use crate::domain::{
+    AudioBackend, Catalog, CoverCache, LyricsSource, SearchResult, SessionStore, Shelf,
+};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::request_explore_covers;
 use crate::slint_shell::platform::dispatch_to_ui;

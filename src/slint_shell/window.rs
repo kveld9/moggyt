@@ -16,6 +16,7 @@ use crate::domain::{
     SessionStore, Shelf,
 };
 use crate::i18n::tr;
+use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::callbacks::wire_window_callbacks;
 use crate::slint_shell::covers::{
     apply_play_track_completion, request_detail_covers, request_shelf_covers,
@@ -33,7 +34,6 @@ use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{
     sync_library_and_detail, sync_playback_tick, sync_shelves_and_queue, sync_window,
 };
-use crate::slint_shell::MoggytWindow;
 
 thread_local! {
     static ACTIVE_STATE: RefCell<Option<Box<dyn Any>>> = RefCell::new(None);
