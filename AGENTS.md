@@ -39,6 +39,10 @@ Run all five before finishing. `cargo run` launches the window.
   or compiler behavior is unclear, consult the official Slint documentation
   (<https://docs.slint.dev/>) before guessing (covers enums, layouts, callbacks,
   and property semantics). Do not invent Slint syntax from memory.
+- Slint lessons stick: when Slint behavior surprises you (layout, binding,
+  i18n, compiler), verify against the official Slint documentation
+  (<https://docs.slint.dev/>) and record the distilled rule plus the doc link in
+  `docs/` (or next to the code) so it does not recur.
 - UI chrome i18n: UI chrome uses English source keys translated via
   `crate::i18n::tr(Locale, key)` in Rust before reaching Slint. Slint renders
   translated properties verbatim with no `== "English"` language branches. Spanish
