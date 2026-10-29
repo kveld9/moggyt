@@ -456,21 +456,24 @@ component NavItem inherits Rectangle {
         spacing: 12px;
         alignment: start;
 
-        if root.icon-name == "search" : IconSearch {
-            size: 18px;
-            tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
-        }
-        if root.icon-name == "library" : IconLibrary {
-            size: 18px;
-            tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
-        }
-        if root.icon-name == "music" : IconMusic {
-            size: 18px;
-            tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
-        }
-        if root.icon-name == "settings" : IconSettings {
-            size: 18px;
-            tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+        VerticalLayout {
+            alignment: center;
+            if root.icon-name == "search" : IconSearch {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+            if root.icon-name == "library" : IconLibrary {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+            if root.icon-name == "music" : IconMusic {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+            if root.icon-name == "settings" : IconSettings {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
         }
 
         Text {
@@ -761,9 +764,12 @@ component SearchView inherits VerticalLayout {
                 alignment: center;
                 spacing: 6px;
 
-                IconSearch {
-                    size: 14px;
-                    tint: btn-touch.has-hover ? Theme.text : Theme.window;
+                VerticalLayout {
+                    alignment: center;
+                    IconSearch {
+                        size: 16px;
+                        tint: btn-touch.has-hover ? Theme.text : Theme.window;
+                    }
                 }
 
                 Text {
@@ -929,21 +935,26 @@ export component PlayerBar inherits Rectangle {
                 }
             }
 
-            Rectangle {
-                width: 36px;
-                height: 36px;
-                border-radius: 18px;
-                background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (root.is-liked ? Theme.surface : transparent));
-                animate background { duration: 150ms; easing: ease-in-out; }
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 18px;
+                    background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (root.is-liked ? Theme.surface : transparent));
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
-                like-touch := TouchArea {
-                    clicked => { root.toggle-like(); }
-                }
+                    like-touch := TouchArea {
+                        clicked => { root.toggle-like(); }
+                    }
 
-                IconHeart {
-                    tint: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
-                    size: 18px;
-                    is-filled: root.is-liked;
+                    IconHeart {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        tint: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
+                        size: 18px;
+                        is-filled: root.is-liked;
+                    }
                 }
             }
         }
@@ -1157,9 +1168,12 @@ export component PlayerBar inherits Rectangle {
                     spacing: 6px;
                     alignment: center;
 
-                    IconQueue {
-                        size: 16px;
-                        tint: q-touch.has-hover ? Theme.accent : Theme.text;
+                    VerticalLayout {
+                        alignment: center;
+                        IconQueue {
+                            size: 16px;
+                            tint: q-touch.has-hover ? Theme.accent : Theme.text;
+                        }
                     }
 
                     Text {
@@ -1178,20 +1192,25 @@ export component PlayerBar inherits Rectangle {
                 tint: Theme.secondary;
             }
 
-            Rectangle {
-                width: 24px;
-                height: 24px;
-                border-radius: 12px;
-                background: vm-touch.pressed ? Theme.overlay : (vm-touch.has-hover ? Theme.hover : transparent);
-                animate background { duration: 150ms; easing: ease-in-out; }
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: vm-touch.pressed ? Theme.overlay : (vm-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
-                vm-touch := TouchArea {
-                    clicked => { root.set-volume(max(0, root.volume - 5)); }
-                }
+                    vm-touch := TouchArea {
+                        clicked => { root.set-volume(max(0, root.volume - 5)); }
+                    }
 
-                IconMinus {
-                    size: 14px;
-                    tint: vm-touch.has-hover ? Theme.text : Theme.secondary;
+                    IconMinus {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 14px;
+                        tint: vm-touch.has-hover ? Theme.text : Theme.secondary;
+                    }
                 }
             }
 
@@ -1205,20 +1224,25 @@ export component PlayerBar inherits Rectangle {
                 }
             }
 
-            Rectangle {
-                width: 24px;
-                height: 24px;
-                border-radius: 12px;
-                background: vp-touch.pressed ? Theme.overlay : (vp-touch.has-hover ? Theme.hover : transparent);
-                animate background { duration: 150ms; easing: ease-in-out; }
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: vp-touch.pressed ? Theme.overlay : (vp-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
-                vp-touch := TouchArea {
-                    clicked => { root.set-volume(min(100, root.volume + 5)); }
-                }
+                    vp-touch := TouchArea {
+                        clicked => { root.set-volume(min(100, root.volume + 5)); }
+                    }
 
-                IconPlus {
-                    size: 14px;
-                    tint: vp-touch.has-hover ? Theme.text : Theme.secondary;
+                    IconPlus {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 14px;
+                        tint: vp-touch.has-hover ? Theme.text : Theme.secondary;
+                    }
                 }
             }
 
