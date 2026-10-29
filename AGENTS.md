@@ -39,6 +39,11 @@ Run all five before finishing. `cargo run` launches the window.
   or compiler behavior is unclear, consult the official Slint documentation
   (<https://docs.slint.dev/>) before guessing (covers enums, layouts, callbacks,
   and property semantics). Do not invent Slint syntax from memory.
+- UI chrome i18n: UI chrome uses English source keys translated via
+  `crate::i18n::tr(Locale, key)` in Rust before reaching Slint. Slint renders
+  translated properties verbatim with no `== "English"` language branches. Spanish
+  literals live only in `src/i18n.rs`. Server content (shelf titles from the API,
+  track/artist names) passes through untranslated.
 
 ## Workflow (PR-only, no exceptions)
 
