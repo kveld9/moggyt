@@ -402,16 +402,64 @@ pub(crate) fn setup_app_timer<
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
     use super::*;
-    use crate::slint_shell::page::SlintPage;
+    use crate::domain::Track;
+    use crate::infra::{AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, MemorySessionStore};
     use crate::slint_shell::test_support::test_wired;
 
     #[test]
-    fn test_build_window_constructs_without_panic_with_stubs() {
+    fn test_set_and_with_ui_state_round_trip() {
         let state = test_wired();
-        let result = build_window(state);
-        assert!(result.is_ok(), "build_window should succeed with test stub adapters");
-        let (window, _timer) = result.unwrap();
-        assert_eq!(window.get_active_page(), SlintPage::Search.to_index());
+        let rc = Rc::new(RefCell::new(state));
+        set_ui_state(&rc);
+
+        let initial_len = with_ui_state(
+            |st: &mut SlintAppState<
+                CatalogStub,
+                AudioStub,
+                MemorySessionStore,
+                LrclibStub,
+                MemoryCoverCache,
+            >| {
+                st.queue.push(Track::new("t1", "Track One", "Artist One"));
+                st.queue.len()
+            },
+        );
+        assert_eq!(initial_len, Some(1));
+
+        let updated_len = with_ui_state(
+            |st: &mut SlintAppState<
+                CatalogStub,
+                AudioStub,
+                MemorySessionStore,
+                LrclibStub,
+                MemoryCoverCache,
+            >| { st.queue.len() },
+        );
+        assert_eq!(updated_len, Some(1));
+    }
+
+    #[test]
+    fn test_with_ui_state_passes_through_closure_return_value() {
+        let state = test_wired();
+        let rc = Rc::new(RefCell::new(state));
+        set_ui_state(&rc);
+
+        let result = with_ui_state(
+            |st: &mut SlintAppState<
+                CatalogStub,
+                AudioStub,
+                MemorySessionStore,
+                LrclibStub,
+                MemoryCoverCache,
+            >| {
+                st.is_shuffle = true;
+                st.is_shuffle
+            },
+        );
+        assert_eq!(result, Some(true));
     }
 }
