@@ -1,0 +1,272 @@
+import {
+    Theme,
+    TrackRowData,
+    ShelfData,
+    LibraryItemData,
+    LyricLineData,
+} from "../theme.slint";
+import { Sidebar } from "../components/sidebar.slint";
+import { PlayerBar } from "../components/player_bar.slint";
+import { ContentArea } from "./content_area.slint";
+
+export component MoggytWindow inherits Window {
+    title: "Moggyt";
+    min-width: 800px;
+    min-height: 500px;
+    preferred-width: 1024px;
+    preferred-height: 640px;
+    background: Theme.window;
+    default-font-family: "Inter";
+
+    in-out property <color> theme-window <=> Theme.window;
+    in-out property <color> theme-panel <=> Theme.panel;
+    in-out property <color> theme-surface <=> Theme.surface;
+    in-out property <color> theme-text <=> Theme.text;
+    in-out property <color> theme-secondary <=> Theme.secondary;
+    in-out property <color> theme-accent <=> Theme.accent;
+    in-out property <color> theme-border <=> Theme.border;
+    in-out property <color> theme-hover <=> Theme.hover;
+    in-out property <color> theme-overlay <=> Theme.overlay;
+    in-out property <bool> theme-dark <=> Theme.dark;
+
+    in-out property <int> active-page: 0;
+    in-out property <string> header-title: "Search";
+    in-out property <string> nav-explore-label: "Explore";
+    in-out property <string> explore-loading-text: "Loading explore...";
+    in-out property <string> explore-empty-text: "No sections found in Explore.";
+    in-out property <bool> show-settings: false;
+    in-out property <int> active-theme-index: 0;
+    in-out property <string> playback-speed-text: "1.00x";
+    in-out property <string> settings-cookie-text: "";
+    in-out property <string> app-version: "0.1.0";
+    in-out property <string> update-status-text: "Up to date";
+    in-out property <bool> has-update: false;
+    in-out property <string> query: "";
+    in-out property <string> cookie-text: "";
+    in-out property <bool> signed-in: false;
+    in-out property <[ShelfData]> shelves: [];
+    in-out property <int> search-filter: 0;
+    in-out property <[TrackRowData]> queue-tracks: [];
+    in-out property <int> queue-selected-index: -1;
+    in-out property <string> active-track-title: "No track playing";
+    in-out property <string> active-track-artist: "";
+    in-out property <bool> is-playing: false;
+    in-out property <int> volume: 100;
+    in-out property <string> position-text: "0:00";
+    in-out property <string> duration-text: "0:00";
+    in-out property <float> playback-progress: 0.0;
+    in-out property <image> cover-image;
+    in-out property <image> now-playing-cover;
+    in-out property <bool> has-cover: false;
+    in-out property <bool> is-liked: false;
+    in-out property <bool> is-shuffle: false;
+    in-out property <int> repeat-mode: 0;
+    in-out property <int> position-secs: 0;
+    in-out property <int> duration-secs: 0;
+    in-out property <int> queue-count: 0;
+    in-out property <[LyricLineData]> lyrics-lines: [];
+    in-out property <int> active-lyric-index: -1;
+    in-out property <[LibraryItemData]> library-playlists: []; in-out property <[LibraryItemData]> library-albums: []; in-out property <[LibraryItemData]> library-artists: [];
+    in-out property <bool> detail-has-detail: false; in-out property <bool> detail-has-artwork: false; in-out property <string> detail-title: ""; in-out property <string> detail-subtitle: ""; in-out property <string> detail-description: "";
+    in-out property <string> detail-kind-label: ""; in-out property <[TrackRowData]> detail-tracks: [];
+    in-out property <image> detail-cover;
+    in-out property <[ShelfData]> explore-shelves: [];
+    in-out property <bool> explore-loading: false;
+    in-out property <string> nav-search-label: "Search";
+    in-out property <string> nav-library-label: "Library";
+    in-out property <string> nav-now-playing-label: "Now Playing";
+    in-out property <string> search-placeholder: "Search songs...";
+    in-out property <string> search-button-label: "Search";
+    in-out property <string> filter-all-label: "All";
+    in-out property <string> filter-songs-label: "Songs";
+    in-out property <string> filter-albums-label: "Albums";
+    in-out property <string> filter-artists-label: "Artists";
+    in-out property <string> filter-playlists-label: "Playlists";
+    in-out property <string> search-empty-text: "No results found.";
+    in-out property <string> queue-button-text: "Queue";
+    in-out property <string> queue-empty-text: "The queue is empty.";
+    in-out property <string> no-cover-text: "No cover";
+    in-out property <string> lyrics-unavailable-text: "Lyrics unavailable";
+    in-out property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
+    in-out property <string> session-anonymous-hint: "Anonymous session: paste cookies to unlock library";
+    in-out property <string> session-cookie-placeholder: "Paste session cookies...";
+    in-out property <string> sign-in-label: "Sign in";
+    in-out property <string> session-signed-in-hint: "Signed in: library unlocked";
+    in-out property <string> sign-out-label: "Sign out";
+    in-out property <string> section-playlists-label: "Playlists";
+    in-out property <string> empty-playlists-text: "No playlists found.";
+    in-out property <string> section-albums-label: "Albums";
+    in-out property <string> empty-albums-text: "No albums found.";
+    in-out property <string> section-artists-label: "Artists";
+    in-out property <string> empty-artists-text: "No artists found.";
+    in-out property <string> empty-detail-text: "No details available.";
+    in-out property <string> play-button-label: "Play";
+    in-out property <string> shuffle-button-label: "Shuffle";
+    in-out property <string> empty-songs-text: "No songs available.";
+    in-out property <string> section-theme-label: "Theme";
+    in-out property <string> theme-white-label: "White";
+    in-out property <string> theme-black-oled-label: "Black OLED";
+    in-out property <string> theme-mono-label: "Mono";
+    in-out property <string> section-playback-label: "Playback";
+    in-out property <string> playback-speed-label: "Playback speed";
+    in-out property <string> section-session-label: "Session";
+    in-out property <string> status-signed-in-label: "Status: Signed in";
+    in-out property <string> status-anonymous-label: "Status: Anonymous";
+    in-out property <string> section-about-label: "About";
+    in-out property <string> app-version-label: "App version";
+    in-out property <string> update-status-label: "Update status";
+
+    callback page-selected(int);
+    callback back-pressed();
+    callback theme-selected(int);
+    callback cycle-playback-speed();
+    callback query-submitted(string);
+    callback track-selected(int);
+    callback filter-selected(int);
+    callback explore-track-selected(int);
+    callback queue-track-selected(int);
+    callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
+    callback detail-play();
+    callback detail-shuffle();
+    callback sign-in-submitted(string);
+    callback sign-out();
+    callback toggle-play();
+    callback prev-track();
+    callback next-track();
+    callback seek-by(int);
+    callback seek-to(int);
+    callback set-volume(int);
+    callback toggle-like();
+    callback toggle-shuffle();
+    callback cycle-repeat();
+    callback open-queue();
+
+    VerticalLayout {
+        padding: 0;
+        spacing: 0;
+
+        HorizontalLayout {
+            vertical-stretch: 1;
+            padding: 0;
+            spacing: 0;
+
+            Sidebar {
+                width: 200px;
+                active-page: root.active-page;
+                nav-search-label: root.nav-search-label;
+                nav-explore-label: root.nav-explore-label;
+                nav-library-label: root.nav-library-label;
+                nav-now-playing-label: root.nav-now-playing-label;
+                page-selected(idx) => { root.page-selected(idx); }
+            }
+
+            ContentArea {
+                horizontal-stretch: 1;
+                active-page: root.active-page; header-title: root.header-title; query <=> root.query; shelves: root.shelves;
+                search-filter: root.search-filter;
+                cookie-text <=> root.cookie-text; signed-in: root.signed-in;
+                queue-tracks: root.queue-tracks; queue-selected-index: root.queue-selected-index;
+                active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
+                position-text: root.position-text; duration-text: root.duration-text; playback-progress: root.playback-progress;
+                cover-image: root.cover-image; has-cover: root.has-cover;
+                lyrics-lines: root.lyrics-lines; active-lyric-index: root.active-lyric-index;
+                library-playlists: root.library-playlists; library-albums: root.library-albums; library-artists: root.library-artists;
+                detail-has-detail: root.detail-has-detail; detail-has-artwork: root.detail-has-artwork; detail-title: root.detail-title; detail-subtitle: root.detail-subtitle; detail-description: root.detail-description;
+                detail-kind-label: root.detail-kind-label; detail-cover: root.detail-cover; detail-tracks: root.detail-tracks;
+                explore-shelves: root.explore-shelves;
+                explore-loading: root.explore-loading;
+                explore-loading-text: root.explore-loading-text;
+                explore-empty-text: root.explore-empty-text;
+                has-update: root.has-update;
+                active-theme-index: root.active-theme-index;
+                playback-speed-text: root.playback-speed-text;
+                settings-cookie-text <=> root.settings-cookie-text;
+                app-version: root.app-version;
+                update-status-text: root.update-status-text;
+                search-placeholder: root.search-placeholder;
+                search-button-label: root.search-button-label;
+                filter-all-label: root.filter-all-label;
+                filter-songs-label: root.filter-songs-label;
+                filter-albums-label: root.filter-albums-label;
+                filter-artists-label: root.filter-artists-label;
+                filter-playlists-label: root.filter-playlists-label;
+                search-empty-text: root.search-empty-text;
+                queue-empty-text: root.queue-empty-text;
+                no-cover-text: root.no-cover-text;
+                lyrics-unavailable-text: root.lyrics-unavailable-text;
+                lyrics-hint-text: root.lyrics-hint-text;
+                session-anonymous-hint: root.session-anonymous-hint;
+                session-cookie-placeholder: root.session-cookie-placeholder;
+                sign-in-label: root.sign-in-label;
+                session-signed-in-hint: root.session-signed-in-hint;
+                sign-out-label: root.sign-out-label;
+                section-playlists-label: root.section-playlists-label;
+                empty-playlists-text: root.empty-playlists-text;
+                section-albums-label: root.section-albums-label;
+                empty-albums-text: root.empty-albums-text;
+                section-artists-label: root.section-artists-label;
+                empty-artists-text: root.empty-artists-text;
+                empty-detail-text: root.empty-detail-text;
+                play-button-label: root.play-button-label;
+                shuffle-button-label: root.shuffle-button-label;
+                empty-songs-text: root.empty-songs-text;
+                section-theme-label: root.section-theme-label;
+                theme-white-label: root.theme-white-label;
+                theme-black-oled-label: root.theme-black-oled-label;
+                theme-mono-label: root.theme-mono-label;
+                section-playback-label: root.section-playback-label;
+                playback-speed-label: root.playback-speed-label;
+                section-session-label: root.section-session-label;
+                status-signed-in-label: root.status-signed-in-label;
+                status-anonymous-label: root.status-anonymous-label;
+                section-about-label: root.section-about-label;
+                app-version-label: root.app-version-label;
+                update-status-label: root.update-status-label;
+                open-settings => { root.page-selected(5); }
+                query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
+                filter-selected(idx) => { root.filter-selected(idx); }
+                explore-track-selected(idx) => { root.explore-track-selected(idx); }
+                queue-track-selected(idx) => { root.queue-track-selected(idx); }
+                playlist-selected(idx) => { root.playlist-selected(idx); } album-selected(idx) => { root.album-selected(idx); }
+                artist-selected(idx) => { root.artist-selected(idx); } detail-track-selected(idx) => { root.detail-track-selected(idx); }
+                detail-play => { root.detail-play(); }
+                detail-shuffle => { root.detail-shuffle(); }
+                sign-in-submitted(t) => { root.sign-in-submitted(t); } sign-out() => { root.sign-out(); }
+                theme-selected(idx) => { root.theme-selected(idx); }
+                cycle-playback-speed => { root.cycle-playback-speed(); }
+                back-pressed => { root.back-pressed(); }
+            }
+        }
+
+        PlayerBar {
+            vertical-stretch: 0;
+            height: 72px;
+            active-track-title: root.active-track-title;
+            active-track-artist: root.active-track-artist;
+            is-playing: root.is-playing;
+            volume: root.volume;
+            position-text: root.position-text;
+            duration-text: root.duration-text;
+            cover: root.now-playing-cover;
+            is-liked: root.is-liked;
+            is-shuffle: root.is-shuffle;
+            repeat-mode: root.repeat-mode;
+            progress: root.playback-progress;
+            position-secs: root.position-secs;
+            duration-secs: root.duration-secs;
+            queue-count: root.queue-count;
+            queue-button-text: root.queue-button-text;
+
+            toggle-play => { root.toggle-play(); }
+            prev-track => { root.prev-track(); }
+            next-track => { root.next-track(); }
+            seek-by(delta) => { root.seek-by(delta); }
+            seek-to(secs) => { root.seek-to(secs); }
+            set-volume(vol) => { root.set-volume(vol); }
+            toggle-like => { root.toggle-like(); }
+            toggle-shuffle => { root.toggle-shuffle(); }
+            cycle-repeat => { root.cycle-repeat(); }
+            open-queue => { root.open-queue(); }
+        }
+    }
+}
