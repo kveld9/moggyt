@@ -26,6 +26,11 @@ pub fn detail_track_rows(detail: &Detail) -> Vec<TrackDisplayRow> {
         .collect()
 }
 
+/// Checks whether the detail view has its own header artwork URL.
+pub fn detail_has_artwork(detail: &Detail) -> bool {
+    detail.artwork.as_deref().is_some_and(|url| !url.trim().is_empty())
+}
+
 /// Resolves cover artwork URL for a detail view adhering to preference order:
 /// 1. Detail header artwork (e.g. playlist or album header)
 /// 2. First track's artwork
@@ -193,5 +198,21 @@ mod tests {
         // 6. Empty tracks without header art
         let empty_tracks_no_header = Detail::new(DetailKind::Playlist, "Title", "Sub", vec![]);
         assert_eq!(resolve_detail_cover_url(&empty_tracks_no_header), None);
+    }
+
+    #[test]
+    fn test_detail_has_artwork() {
+        let empty_track = Track::new("t1", "Track 1", "Artist 1");
+        let with_art = Detail::new(DetailKind::Playlist, "Title", "Sub", vec![empty_track.clone()])
+            .with_artwork("https://img.local/header.jpg");
+        assert!(detail_has_artwork(&with_art));
+
+        let without_art =
+            Detail::new(DetailKind::Playlist, "Title", "Sub", vec![empty_track.clone()]);
+        assert!(!detail_has_artwork(&without_art));
+
+        let with_blank = Detail::new(DetailKind::Playlist, "Title", "Sub", vec![empty_track])
+            .with_artwork("   ");
+        assert!(!detail_has_artwork(&with_blank));
     }
 }
