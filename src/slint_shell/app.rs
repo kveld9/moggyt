@@ -1,7 +1,7 @@
 //! Slint UI application wiring and composition root adapter.
 //!
 //! Hexagonal architecture invariant: this module connects injected port adapters
-//! to [`MoggytWindow`] without containing direct I/O or private domain rules.
+//! to [`crate::slint_shell::MoggytWindow`] without containing direct I/O or private domain rules.
 
 use std::sync::{Arc, Mutex};
 
