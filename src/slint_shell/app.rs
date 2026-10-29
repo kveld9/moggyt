@@ -790,6 +790,13 @@ impl<
         self.page = SlintPage::Detail;
     }
 
+    /// Returns from detail view to the previous page (defaults to Search).
+    pub fn go_back(&mut self) {
+        if self.page == SlintPage::Detail {
+            self.page = self.detail_return;
+        }
+    }
+
     /// Enqueues all tracks from a playlist URL into the playback queue.
     pub fn import_playlist_url(&mut self, url: &str) -> anyhow::Result<usize> {
         let playlist_id = extract_playlist_id(url)
@@ -2119,6 +2126,15 @@ fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    window.on_back_pressed(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.go_back();
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_query_submitted(move |q| {
         let Some(win) = w.upgrade() else { return };
@@ -2728,6 +2744,30 @@ mod tests {
         state.open_detail("album-1", DetailKind::Album);
         assert_eq!(state.page, SlintPage::Detail);
         assert!(state.detail.is_some());
+        state.go_back();
+        assert_eq!(state.page, SlintPage::Search);
+    }
+
+    #[test]
+    fn test_detail_back_navigation_transitions_to_return_page() {
+        let mut state = test_wired();
+        assert_eq!(state.detail_return, SlintPage::Search);
+
+        state.open_detail("album-1", DetailKind::Album);
+        assert_eq!(state.page, SlintPage::Detail);
+        assert_eq!(state.detail_return, SlintPage::Search);
+        state.go_back();
+        assert_eq!(state.page, SlintPage::Search);
+
+        state.select_page(SlintPage::Library);
+        state.open_detail("artist-1", DetailKind::Artist);
+        assert_eq!(state.page, SlintPage::Detail);
+        assert_eq!(state.detail_return, SlintPage::Library);
+        state.go_back();
+        assert_eq!(state.page, SlintPage::Library);
+
+        state.go_back();
+        assert_eq!(state.page, SlintPage::Library);
     }
 
     #[test]
