@@ -59,7 +59,8 @@ src/
 5. File-size modularity caps: Rust (`.rs`) files max 900 lines (adjusted from 800 to fit clean baseline
    `src/infra/ytm.rs` at 891 lines); Slint (`.slint`) modules max 400 lines per module. `ui/shell.slint` is the single
    designated thin entry, exempt only while it stays an import-only entry under ~200 lines with no component
-   definitions. Existing monoliths (`src/slint_shell/app.rs`, `src/infra/catalog_client.rs`, and `ui/shell.slint`)
-   are temporarily grandfathered in `scripts/check-repo.sh` pending modularization. Remediation path: split oversized
+   definitions; `MoggytWindow` itself lives in `ui/views/window.slint`. Existing monoliths
+   (`src/slint_shell/app.rs`, `src/infra/catalog_client.rs`) are temporarily grandfathered in `scripts/check-repo.sh`
+   pending modularization. Remediation path: split oversized
    files by concept (one view or endpoint-domain per module), landing each extracted unit via one small PR per module
    (< 400 lines diff).

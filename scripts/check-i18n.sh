@@ -17,8 +17,8 @@ while IFS= read -r file; do
   fi
 done < <(find src -type f -name "*.rs" ! -name "i18n.rs" | sort)
 
-# 2. Language-branch equality checks in ui/shell.slint
-BRANCH_HITS=$(grep -H -En '==\s*"[A-Z][a-zA-Z]+"' ui/shell.slint || true)
+# 2. Language-branch equality checks in every Slint module under ui/
+BRANCH_HITS=$(grep -H -En '==\s*"[A-Z][a-zA-Z]+"' $(find ui -type f -name '*.slint' | sort) || true)
 if [[ -n "${BRANCH_HITS}" ]]; then
   echo "${BRANCH_HITS}"
   ERRORS=$((ERRORS + 1))
@@ -31,8 +31,8 @@ if [[ -n "${LOCALE_HITS}" ]]; then
   ERRORS=$((ERRORS + 1))
 fi
 
-# 4. Disallowed static text/placeholder literals in ui/shell.slint
-DISALLOWED=$(grep -H -nE '^[[:space:]]*(text|placeholder-text): "' ui/shell.slint \
+# 4. Disallowed static text/placeholder literals in every Slint module under ui/
+DISALLOWED=$(grep -H -nE '^[[:space:]]*(text|placeholder-text): "' $(find ui -type f -name '*.slint' | sort) \
   | grep -vE 'text: "(Moggyt|0:00|-10s|\+10s|1\.00x|)"' \
   | grep -vE 'text: "\\\{' || true)
 if [[ -n "${DISALLOWED}" ]]; then

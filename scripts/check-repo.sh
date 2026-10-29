@@ -141,11 +141,10 @@ MAX_SHELL_SLINT_LINES=200
 # Grandfathered monoliths pending modularization:
 # - src/slint_shell/app.rs (3885 lines, pending domain/bridge split)
 # - src/infra/catalog_client.rs (2695 lines, pending API endpoint split)
-# - ui/shell.slint (2841 lines, pending component split by sibling worker)
 is_grandfathered() {
   local target="$1"
   case "${target}" in
-    src/slint_shell/app.rs|src/infra/catalog_client.rs|ui/shell.slint)
+    src/slint_shell/app.rs|src/infra/catalog_client.rs)
       return 0
       ;;
     *)
