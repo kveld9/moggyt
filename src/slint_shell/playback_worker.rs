@@ -36,6 +36,7 @@ use std::sync::{Arc, Mutex};
 use tracing::{debug, warn};
 
 use crate::domain::{Detail, DetailKind, SearchQuery, Shelf};
+use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache, LyricLine,
     LyricOverrideDir, LyricsSource, Scrobbler, decode_cover, fetch_artwork,
@@ -255,12 +256,13 @@ pub fn execute_search<C: Catalog>(
     generation: u64,
     query: &str,
     catalog: &Arc<Mutex<C>>,
+    locale: Locale,
 ) -> (u64, String, Vec<Shelf>) {
     let Some(parsed) = SearchQuery::parse(query) else {
         return (generation, query.to_string(), Vec::new());
     };
     let items = catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
-    let mut shelf = Shelf::new("Search Results");
+    let mut shelf = Shelf::new(tr(locale, "Search Results"));
     shelf.items = items;
     (generation, query.to_string(), vec![shelf])
 }
@@ -340,13 +342,19 @@ mod tests {
         let catalog = Arc::new(Mutex::new(CatalogStub::new()));
         let cat_clone = Arc::clone(&catalog);
 
-        let handle = std::thread::spawn(move || execute_search(42, "rock", &cat_clone));
+        let handle =
+            std::thread::spawn(move || execute_search(42, "rock", &cat_clone, Locale::English));
 
         let (generation, query, shelves) = handle.join().expect("thread join succeeds");
         assert_eq!(generation, 42);
         assert_eq!(query, "rock");
         assert_eq!(shelves.len(), 1);
         assert_eq!(shelves[0].title, "Search Results");
+
+        let handle_es =
+            std::thread::spawn(move || execute_search(43, "rock", &catalog, Locale::Spanish));
+        let (_, _, shelves_es) = handle_es.join().expect("thread join succeeds");
+        assert_eq!(shelves_es[0].title, "Resultados de búsqueda");
     }
 
     #[test]

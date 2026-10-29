@@ -2,6 +2,7 @@
 //! Hexagonal invariant: pure in-memory with zero I/O, network, audio, or async.
 
 use crate::domain::{Detail, DetailKind, Track};
+use crate::i18n::{Locale, tr};
 
 use super::search::{TrackDisplayRow, format_duration};
 
@@ -11,6 +12,10 @@ pub fn detail_kind_label(kind: DetailKind) -> &'static str {
         DetailKind::Artist => "Artist",
         DetailKind::Playlist => "Playlist",
     }
+}
+
+pub fn detail_kind_label_with_locale(kind: DetailKind, locale: Locale) -> &'static str {
+    tr(locale, detail_kind_label(kind))
 }
 
 pub fn detail_track_rows(detail: &Detail) -> Vec<TrackDisplayRow> {
@@ -107,14 +112,16 @@ mod tests {
     #[test]
     fn test_detail_header_strings_for_each_detail_kind() {
         let cases = [
-            (DetailKind::Album, "Album"),
-            (DetailKind::Artist, "Artist"),
-            (DetailKind::Playlist, "Playlist"),
+            (DetailKind::Album, "Album", "ÁLBUM"),
+            (DetailKind::Artist, "Artist", "ARTISTA"),
+            (DetailKind::Playlist, "Playlist", "LISTA"),
         ];
-        for (kind, expected) in cases {
-            assert_eq!(detail_kind_label(kind), expected);
+        for (kind, expected_en, expected_es) in cases {
+            assert_eq!(detail_kind_label(kind), expected_en);
+            assert_eq!(detail_kind_label_with_locale(kind, Locale::English), expected_en);
+            assert_eq!(detail_kind_label_with_locale(kind, Locale::Spanish), expected_es);
             let state = DetailState::with_detail(canned_detail(kind));
-            assert_eq!(state.header_strings(), ("Canned Title", "Canned Subtitle", expected));
+            assert_eq!(state.header_strings(), ("Canned Title", "Canned Subtitle", expected_en));
         }
     }
 

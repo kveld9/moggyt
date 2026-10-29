@@ -12,6 +12,7 @@
 use std::collections::HashSet;
 
 use crate::domain::{PlaybackQueue, RepeatMode, Track};
+use crate::i18n::{Locale, tr};
 
 use super::search::{TrackDisplayRow, format_duration};
 
@@ -190,6 +191,13 @@ impl PlaybackState {
         self.current().map(|t| t.title.as_str()).unwrap_or("No track playing")
     }
 
+    pub fn current_title_with_locale(&self, locale: Locale) -> &str {
+        match self.current() {
+            Some(t) => t.title.as_str(),
+            None => tr(locale, "No track playing"),
+        }
+    }
+
     pub fn current_artist(&self) -> &str {
         self.current().map(|t| t.artist.as_str()).unwrap_or("")
     }
@@ -227,6 +235,18 @@ mod tests {
         assert_eq!(state.current_title(), "No track playing");
         assert_eq!(state.current_artist(), "");
         assert_eq!(state.current_duration_text(), "");
+    }
+
+    #[test]
+    fn test_current_title_with_locale() {
+        let state = PlaybackState::new();
+        assert_eq!(state.current_title_with_locale(Locale::English), "No track playing");
+        assert_eq!(state.current_title_with_locale(Locale::Spanish), "Sin reproducción");
+
+        let mut populated = PlaybackState::new();
+        populated.queue.push(Track::new("id1", "My Track", "My Artist"));
+        assert_eq!(populated.current_title_with_locale(Locale::English), "My Track");
+        assert_eq!(populated.current_title_with_locale(Locale::Spanish), "My Track");
     }
 
     #[test]

@@ -18,6 +18,7 @@ use crate::domain::{
     Album, Artist, Detail, DetailKind, PlaybackQueue, Playlist, SearchFilter, SearchQuery,
     SearchResult, Shelf, SleepTimer, ThemeId, Track, extract_playlist_id,
 };
+use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CredentialStore, DesktopPresence, DiscordPresence,
     DiskCoverCache, DiskMetaStore, DiskQueueStore, DiskSettingsStore, DiskSkipStore, GithubUpdater,
@@ -102,6 +103,11 @@ impl SlintPage {
             Self::Settings => "Settings",
         }
     }
+
+    /// Returns localized page title for display in the shell header.
+    pub fn title_with_locale(self, locale: Locale) -> &'static str {
+        tr(locale, self.title())
+    }
 }
 
 /// Returns current UTC timestamp in seconds since UNIX epoch, or 0 on clock failure.
@@ -133,15 +139,17 @@ pub fn format_playback_speed(speed: f32) -> String {
 }
 
 /// Formats update status string for the About settings section.
-pub fn format_update_status(has_update: bool, latest_version: Option<&str>) -> String {
-    if has_update {
-        if let Some(ver) = latest_version {
-            format!("Update available: {ver}")
-        } else {
-            "Update available".to_string()
-        }
-    } else {
-        "Up to date".to_string()
+pub fn format_update_status(
+    locale: Locale,
+    has_update: bool,
+    latest_version: Option<&str>,
+) -> String {
+    if !has_update {
+        return tr(locale, "Up to date").to_string();
+    }
+    match latest_version {
+        Some(ver) => tr(locale, "Update available: {ver}").replace("{ver}", ver),
+        None => tr(locale, "Update available").to_string(),
     }
 }
 
@@ -308,6 +316,7 @@ pub struct SlintAppState<
     pub hi_res_covers: bool,
     pub signed_in: bool,
     pub theme: ThemeId,
+    pub locale: Locale,
     pub search_filter: SearchFilter,
     pub search_covers: std::collections::HashMap<String, slint::Image>,
     pub liked_ids: HashSet<String>,
@@ -421,6 +430,7 @@ impl<
             hi_res_covers: false,
             signed_in,
             theme: ThemeId::default(),
+            locale: Locale::default(),
             search_filter: SearchFilter::All,
             search_covers: std::collections::HashMap::new(),
             liked_ids: HashSet::new(),
@@ -596,7 +606,7 @@ impl<
                 _ => None,
             })
             .collect();
-        let mut shelf = Shelf::new("Search Results");
+        let mut shelf = Shelf::new(tr(self.locale, "Search Results"));
         shelf.items = items;
         self.home_shelves = vec![shelf];
     }
@@ -917,7 +927,7 @@ fn sync_window<
     apply_theme(window, state.theme);
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_active_page(state.page.to_index());
-    window.set_header_title(state.page.title().into());
+    window.set_header_title(tr(state.locale, state.page.title()).into());
     let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
     window.set_is_playing(is_playing);
     let volume = state.audio.try_lock().map(|a| a.volume()).unwrap_or(100);
@@ -928,7 +938,7 @@ fn sync_window<
     window.set_has_update(state.update_available);
     window.set_app_version(GithubUpdater::current_version().into());
     let update_status =
-        format_update_status(state.update_available, state.latest_version.as_deref());
+        format_update_status(state.locale, state.update_available, state.latest_version.as_deref());
     window.set_update_status_text(update_status.into());
 
     window.set_is_shuffle(state.is_shuffle);
@@ -945,7 +955,9 @@ fn sync_window<
             format_track_duration(t.duration_secs),
             t.duration_secs.unwrap_or(0),
         ),
-        None => ("No track playing".to_string(), String::new(), "0:00".to_string(), 0),
+        None => {
+            (tr(state.locale, "No track playing").to_string(), String::new(), "0:00".to_string(), 0)
+        }
     };
     window.set_active_track_title(title.into());
     window.set_active_track_artist(artist.into());
@@ -1291,7 +1303,7 @@ fn sync_library_and_detail<
         window.set_detail_has_detail(true);
         window.set_detail_title(detail.title.clone().into());
         window.set_detail_subtitle(detail.subtitle.clone().into());
-        window.set_detail_kind_label(detail_kind_label(detail.kind).into());
+        window.set_detail_kind_label(tr(state.locale, detail_kind_label(detail.kind)).into());
         let d_tracks: Vec<TrackRowData> = detail
             .tracks
             .iter()
@@ -1420,7 +1432,7 @@ pub fn apply_play_track_completion<
     res: PlayTrackResult,
 ) {
     if !res.success {
-        window.set_active_track_title("Failed to play track".into());
+        window.set_active_track_title(tr(state.locale, "Failed to play track").into());
         window.set_is_playing(false);
         return;
     }
@@ -1495,9 +1507,10 @@ fn submit_search_async<
     let q = query.to_string();
     let weak = window.as_weak();
     let tx = worker_tx.clone();
+    let loc = state.locale;
 
     std::thread::spawn(move || {
-        let (g, q_res, shelves) = execute_search(generation, &q, &cat);
+        let (g, q_res, shelves) = execute_search(generation, &q, &cat, loc);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state::<C, A, S, L, K, _>(|st| {
@@ -2371,6 +2384,7 @@ pub fn run() -> anyhow::Result<()> {
     }
     state.hi_res_covers = settings.hi_res_covers;
     state.theme = settings.theme;
+    state.locale = settings.locale;
     state.settings_store = Box::new(settings_store);
 
     let queue_store = DiskQueueStore::new(config_dir.clone());
@@ -2486,6 +2500,12 @@ mod tests {
         assert_eq!(state.search_query, "midnight");
         assert_eq!(state.home_shelves.len(), 1);
         assert_eq!(state.home_shelves[0].title, "Search Results");
+
+        let mut state_es = test_wired();
+        state_es.locale = Locale::Spanish;
+        state_es.submit_search("midnight");
+        assert_eq!(state_es.home_shelves.len(), 1);
+        assert_eq!(state_es.home_shelves[0].title, "Resultados de búsqueda");
     }
 
     #[test]
@@ -2668,10 +2688,21 @@ mod tests {
 
     #[test]
     fn test_format_update_status() {
-        assert_eq!(format_update_status(false, None), "Up to date");
-        assert_eq!(format_update_status(false, Some("v2.0.0")), "Up to date");
-        assert_eq!(format_update_status(true, Some("v2.0.0")), "Update available: v2.0.0");
-        assert_eq!(format_update_status(true, None), "Update available");
+        assert_eq!(format_update_status(Locale::English, false, None), "Up to date");
+        assert_eq!(format_update_status(Locale::English, false, Some("v2.0.0")), "Up to date");
+        assert_eq!(
+            format_update_status(Locale::English, true, Some("v2.0.0")),
+            "Update available: v2.0.0"
+        );
+        assert_eq!(format_update_status(Locale::English, true, None), "Update available");
+
+        assert_eq!(format_update_status(Locale::Spanish, false, None), "Actualizado");
+        assert_eq!(format_update_status(Locale::Spanish, false, Some("v2.0.0")), "Actualizado");
+        assert_eq!(
+            format_update_status(Locale::Spanish, true, Some("v2.0.0")),
+            "Actualización disponible: v2.0.0"
+        );
+        assert_eq!(format_update_status(Locale::Spanish, true, None), "Actualización disponible");
     }
 
     #[test]
@@ -2860,6 +2891,7 @@ mod tests {
         assert_eq!(state.page, SlintPage::Settings);
         assert_eq!(state.page.to_index(), 5);
         assert_eq!(state.page.title(), "Settings");
+        assert_eq!(state.page.title_with_locale(Locale::Spanish), "Ajustes");
         assert_eq!(SlintPage::from_index(5), SlintPage::Settings);
     }
 

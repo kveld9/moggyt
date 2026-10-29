@@ -36,7 +36,9 @@ pub mod search;
 pub mod theme;
 
 pub use app::{SlintAppState, build_window, run};
-pub use detail::{DetailState, detail_kind_label, detail_track_rows};
+pub use detail::{
+    DetailState, detail_kind_label, detail_kind_label_with_locale, detail_track_rows,
+};
 pub use library::{LibraryItemRow, LibraryState, album_row, artist_row, playlist_row};
 pub use platform::{
     CoverArtData, LyricDisplayLine, LyricsState, PlatformState, PresenceSnapshot, Transport,
@@ -99,6 +101,11 @@ impl SlintPage {
             Self::Library => "Library",
             Self::Detail => "Detail",
         }
+    }
+
+    /// Returns localized page title for display in the shell header.
+    pub fn title_with_locale(self, locale: crate::i18n::Locale) -> &'static str {
+        crate::i18n::tr(locale, self.title())
     }
 }
 
@@ -164,6 +171,18 @@ mod tests {
         assert_eq!(SlintPage::NowPlaying.title(), "Now Playing");
         assert_eq!(SlintPage::Library.title(), "Library");
         assert_eq!(SlintPage::Detail.title(), "Detail");
+
+        assert_eq!(SlintPage::Search.title_with_locale(crate::i18n::Locale::Spanish), "Buscar");
+        assert_eq!(SlintPage::Queue.title_with_locale(crate::i18n::Locale::Spanish), "Cola");
+        assert_eq!(
+            SlintPage::NowPlaying.title_with_locale(crate::i18n::Locale::Spanish),
+            "Sonando"
+        );
+        assert_eq!(
+            SlintPage::Library.title_with_locale(crate::i18n::Locale::Spanish),
+            "Biblioteca"
+        );
+        assert_eq!(SlintPage::Detail.title_with_locale(crate::i18n::Locale::Spanish), "Detalle");
     }
 
     #[test]
