@@ -1,0 +1,329 @@
+import { Theme } from "../theme.slint";
+import { StyledInputField } from "../components/controls.slint";
+
+export component SettingsView inherits VerticalLayout {
+    in property <int> active-theme-index: 0;
+    in property <string> playback-speed-text: "1.00x";
+    in property <bool> signed-in: false;
+    in-out property <string> cookie-text: "";
+    in property <string> app-version: "0.1.0";
+    in property <string> update-status-text: "Up to date";
+    in property <bool> has-update: false;
+    in property <string> section-theme-label: "Theme";
+    in property <string> theme-white-label: "White";
+    in property <string> theme-black-oled-label: "Black OLED";
+    in property <string> theme-mono-label: "Mono";
+    in property <string> section-playback-label: "Playback";
+    in property <string> playback-speed-label: "Playback speed";
+    in property <string> section-session-label: "Session";
+    in property <string> status-signed-in-label: "Status: Signed in";
+    in property <string> sign-out-label: "Sign out";
+    in property <string> status-anonymous-label: "Status: Anonymous";
+    in property <string> session-cookie-placeholder: "Paste session cookies...";
+    in property <string> sign-in-label: "Sign in";
+    in property <string> section-about-label: "About";
+    in property <string> app-version-label: "App version";
+    in property <string> update-status-label: "Update status";
+
+    callback theme-selected(int);
+    callback cycle-playback-speed();
+    callback sign-in-submitted(string);
+    callback sign-out();
+
+    spacing: 20px;
+    alignment: start;
+
+    // Section (a): Theme
+    VerticalLayout {
+        spacing: 10px;
+
+        Text {
+            text: root.section-theme-label;
+            color: Theme.text;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+
+            Rectangle {
+                height: 40px;
+                horizontal-stretch: 1;
+                border-radius: 8px;
+                background: root.active-theme-index == 0 ? Theme.accent : (th0-touch.pressed ? Theme.overlay : (th0-touch.has-hover ? Theme.hover : Theme.surface));
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                th0-touch := TouchArea {
+                    clicked => { root.theme-selected(0); }
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+
+                    Text {
+                        text: root.theme-white-label;
+                        color: root.active-theme-index == 0 ? Theme.window : Theme.text;
+                        font-size: 13px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 40px;
+                horizontal-stretch: 1;
+                border-radius: 8px;
+                background: root.active-theme-index == 1 ? Theme.accent : (th1-touch.pressed ? Theme.overlay : (th1-touch.has-hover ? Theme.hover : Theme.surface));
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                th1-touch := TouchArea {
+                    clicked => { root.theme-selected(1); }
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+
+                    Text {
+                        text: root.theme-black-oled-label;
+                        color: root.active-theme-index == 1 ? Theme.window : Theme.text;
+                        font-size: 13px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 40px;
+                horizontal-stretch: 1;
+                border-radius: 8px;
+                background: root.active-theme-index == 2 ? Theme.accent : (th2-touch.pressed ? Theme.overlay : (th2-touch.has-hover ? Theme.hover : Theme.surface));
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                th2-touch := TouchArea {
+                    clicked => { root.theme-selected(2); }
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+
+                    Text {
+                        text: root.theme-mono-label;
+                        color: root.active-theme-index == 2 ? Theme.window : Theme.text;
+                        font-size: 13px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+
+    // Section (b): Playback
+    VerticalLayout {
+        spacing: 10px;
+
+        Text {
+            text: root.section-playback-label;
+            color: Theme.text;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        Rectangle {
+            border-radius: 8px;
+            background: Theme.panel;
+
+            HorizontalLayout {
+                padding: 16px;
+                alignment: space-between;
+
+                Text {
+                    text: root.playback-speed-label;
+                    color: Theme.text;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 90px;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: speed-touch.pressed ? Theme.overlay : (speed-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    speed-touch := TouchArea {
+                        clicked => { root.cycle-playback-speed(); }
+                    }
+
+                    Text {
+                        text: root.playback-speed-text;
+                        color: Theme.accent;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+
+    // Section (c): Session
+    VerticalLayout {
+        spacing: 10px;
+
+        Text {
+            text: root.section-session-label;
+            color: Theme.text;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        Rectangle {
+            border-radius: 8px;
+            background: Theme.panel;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 12px;
+
+                if root.signed-in : HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: root.status-signed-in-label;
+                        color: Theme.accent;
+                        font-size: 14px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        width: 90px;
+                        height: 32px;
+                        border-radius: 8px;
+                        background: sign-out-touch.pressed ? Theme.overlay : (sign-out-touch.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        sign-out-touch := TouchArea {
+                            clicked => { root.sign-out(); }
+                        }
+
+                        Text {
+                            text: root.sign-out-label;
+                            color: Theme.text;
+                            font-size: 12px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                if !root.signed-in : VerticalLayout {
+                    spacing: 10px;
+
+                    Text {
+                        text: root.status-anonymous-label;
+                        color: Theme.secondary;
+                        font-size: 14px;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        height: 32px;
+
+                        StyledInputField {
+                            text <=> root.cookie-text;
+                            placeholder-text: root.session-cookie-placeholder;
+                            input-type: InputType.password;
+                            accepted(t) => { root.sign-in-submitted(t); }
+                        }
+
+                        Rectangle {
+                            width: 90px;
+                            border-radius: 8px;
+                            background: sign-in-touch.pressed ? Theme.overlay : (sign-in-touch.has-hover ? Theme.hover : Theme.accent);
+                            animate background { duration: 150ms; easing: ease-in-out; }
+
+                            sign-in-touch := TouchArea {
+                                clicked => { root.sign-in-submitted(root.cookie-text); }
+                            }
+
+                            Text {
+                                text: root.sign-in-label;
+                                color: sign-in-touch.has-hover ? Theme.text : Theme.window;
+                                font-size: 12px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Section (d): About
+    VerticalLayout {
+        spacing: 10px;
+
+        Text {
+            text: root.section-about-label;
+            color: Theme.text;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        Rectangle {
+            border-radius: 8px;
+            background: Theme.panel;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 12px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: root.app-version-label;
+                        color: Theme.secondary;
+                        font-size: 13px;
+                    }
+
+                    Text {
+                        text: root.app-version;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 600;
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: root.update-status-label;
+                        color: Theme.secondary;
+                        font-size: 13px;
+                    }
+
+                    Text {
+                        text: root.update-status-text;
+                        color: root.has-update ? Theme.accent : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                    }
+                }
+            }
+        }
+    }
+}

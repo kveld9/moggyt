@@ -1,0 +1,61 @@
+import { Theme, ShelfData } from "../theme.slint";
+import { TrackRow } from "../components/rows.slint";
+
+export component ExploreView inherits VerticalLayout {
+    in property <[ShelfData]> shelves: [];
+    in property <bool> is-loading: false;
+    in property <string> loading-text: "Loading explore...";
+    in property <string> empty-text: "No sections found in Explore.";
+    callback track-selected(int);
+
+    spacing: 16px;
+    alignment: start;
+
+    if root.is-loading : VerticalLayout {
+        padding-top: 32px;
+        alignment: center;
+
+        Text {
+            text: root.loading-text;
+            color: Theme.secondary;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    if !root.is-loading && root.shelves.length == 0 : VerticalLayout {
+        padding-top: 32px;
+        alignment: center;
+
+        Text {
+            text: root.empty-text;
+            color: Theme.secondary;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    for shelf in root.shelves : VerticalLayout {
+        spacing: 8px;
+        alignment: start;
+
+        Text {
+            text: shelf.title;
+            color: Theme.text;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        for track in shelf.tracks : TrackRow {
+            title: track.title;
+            artist: track.artist;
+            album: track.album;
+            duration: track.duration;
+            kind: track.kind;
+            cover: track.cover;
+            clicked => {
+                root.track-selected(track.index);
+            }
+        }
+    }
+}

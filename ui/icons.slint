@@ -1,0 +1,354 @@
+import { Theme } from "./theme.slint";
+
+export component IconPlay inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        commands: "M 7 6.5 C 7 5.2 8.3 4.5 9.4 5.1 L 18.4 10.6 C 19.5 11.2 19.5 12.8 18.4 13.4 L 9.4 18.9 C 8.3 19.5 7 18.8 7 17.5 Z";
+    }
+}
+
+export component IconPause inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        commands: "M 8 5 C 8.8 5 9.5 5.7 9.5 6.5 L 9.5 17.5 C 9.5 18.3 8.8 19 8 19 C 7.2 19 6.5 18.3 6.5 17.5 L 6.5 6.5 C 6.5 5.7 7.2 5 8 5 Z M 16 5 C 16.8 5 17.5 5.7 17.5 6.5 L 17.5 17.5 C 17.5 18.3 16.8 19 16 19 C 15.2 19 14.5 18.3 14.5 17.5 L 14.5 6.5 C 14.5 5.7 15.2 5 16 5 Z";
+    }
+}
+
+export component IconBack inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 19 12 L 5 12 M 12 19 L 5 12 L 12 5";
+    }
+}
+
+export component IconPrev inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        commands: "M 6 5.5 C 6 4.7 6.7 4 7.5 4 C 8.3 4 9 4.7 9 5.5 L 9 18.5 C 9 19.3 8.3 20 7.5 20 C 6.7 20 6 19.3 6 18.5 Z M 17 6 C 17 5 16 4.5 15.2 5 L 8.5 11.2 C 7.8 11.6 7.8 12.4 8.5 12.8 L 15.2 19 C 16 19.5 17 19 17 18 Z";
+    }
+}
+
+export component IconNext inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        fill: root.tint;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        commands: "M 7 6 C 7 5 8 4.5 8.8 5 L 15.5 11.2 C 16.2 11.6 16.2 12.4 15.5 12.8 L 8.8 19 C 8 19.5 7 19 7 18 Z M 18 5.5 C 18 4.7 17.3 4 16.5 4 C 15.7 4 15 4.7 15 5.5 L 15 18.5 C 15 19.3 15.7 20 16.5 20 C 17.3 20 18 19.3 18 18.5 Z";
+    }
+}
+
+export component IconShuffle inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 4 19 L 8 19 C 11 19 13 5 16 5 L 20 5 M 16.5 2.5 L 20.5 5 L 16.5 7.5 M 4 5 L 8 5 C 9.5 5 10.7 8.5 12 12 M 14 15.5 C 14.6 17.5 15.2 19 16 19 L 20 19 M 16.5 16.5 L 20.5 19 L 16.5 21.5";
+    }
+}
+
+export component IconRepeat inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 15.5 3.5 L 19 6 L 15.5 8.5 M 18 6 L 8 6 C 6.9 6 6 6.9 6 8 L 6 11 M 8.5 15.5 L 5 18 L 8.5 20.5 M 6 18 L 16 18 C 17.1 18 18 17.1 18 16 L 18 13";
+    }
+}
+
+export component IconRepeatOne inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 15.5 3.5 L 19 6 L 15.5 8.5 M 18 6 L 8 6 C 6.9 6 6 6.9 6 8 L 6 11 M 8.5 15.5 L 5 18 L 8.5 20.5 M 6 18 L 16 18 C 17.1 18 18 17.1 18 16 L 18 13";
+    }
+
+    Rectangle {
+        x: (parent.width - 4px) / 2;
+        y: (parent.height - 4px) / 2;
+        width: 4px;
+        height: 4px;
+        border-radius: 2px;
+        background: root.tint;
+    }
+}
+
+export component IconHeart inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    in property <bool> is-filled: false;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: root.is-filled ? root.tint : transparent;
+        commands: "M 12 20 C 7 15.5 3.5 12 3.5 8.5 C 3.5 5.5 5.8 3.5 8.8 3.5 C 10.5 3.5 11.5 4.3 12 5.2 C 12.5 4.3 13.5 3.5 15.2 3.5 C 18.2 3.5 20.5 5.5 20.5 8.5 C 20.5 12 17 15.5 12 20 Z";
+    }
+}
+
+export component IconQueue inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 4 6 L 20 6 M 4 11 L 20 11 M 4 16 L 13 16";
+    }
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: root.tint;
+        commands: "M 16 13.5 L 21 16 L 16 18.5 Z";
+    }
+}
+
+export component IconSettings inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 9 12 A 3 3 0 1 0 15 12 A 3 3 0 1 0 9 12 M 5.5 12 A 6.5 6.5 0 1 0 18.5 12 A 6.5 6.5 0 1 0 5.5 12 M 12 2.5 L 12 5.5 M 12 18.5 L 12 21.5 M 2.5 12 L 5.5 12 M 18.5 12 L 21.5 12 M 5.3 5.3 L 7.4 7.4 M 16.6 16.6 L 18.7 18.7 M 18.7 5.3 L 16.6 7.4 M 7.4 16.6 L 5.3 18.7";
+    }
+}
+
+export component IconSearch inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 4 10.5 A 6.5 6.5 0 1 0 17 10.5 A 6.5 6.5 0 1 0 4 10.5 M 15.5 15.5 L 20.5 20.5";
+    }
+}
+
+export component IconCompass inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 12 2.5 A 9.5 9.5 0 1 0 12 21.5 A 9.5 9.5 0 1 0 12 2.5 Z M 16.2 7.8 L 11 11 L 7.8 16.2 L 13 13 Z";
+    }
+}
+
+export component IconClose inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 5.5 5.5 L 18.5 18.5 M 18.5 5.5 L 5.5 18.5";
+    }
+}
+
+export component IconPlus inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 12 5 L 12 19 M 5 12 L 19 12";
+    }
+}
+
+export component IconMinus inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 5 12 L 19 12";
+    }
+}
+
+export component IconSpeaker inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: root.tint;
+        commands: "M 4 9.5 L 8 9.5 L 13 5.5 L 13 18.5 L 8 14.5 L 4 14.5 Z";
+    }
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 16 9 A 4.5 4.5 0 0 1 16 15 M 19 6.5 A 8 8 0 0 1 19 17.5";
+    }
+}
+
+export component IconLibrary inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 4 5 C 4 4.5 4.5 4 5 4 L 7 4 C 7.5 4 8 4.5 8 5 L 8 19 C 8 19.5 7.5 20 7 20 L 5 20 C 4.5 20 4 19.5 4 19 Z M 10 5 C 10 4.5 10.5 4 11 4 L 13 4 C 13.5 4 14 4.5 14 5 L 14 19 C 14 19.5 13.5 20 13 20 L 11 20 C 10.5 20 10 19.5 10 19 Z M 16 5.5 L 19.5 7 C 20 7.2 20.2 7.8 20 8.3 L 16.5 19.5 C 16.3 20 15.7 20.2 15.2 20 L 13.5 19.2 Z";
+    }
+}
+
+export component IconMusic inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: root.tint;
+        commands: "M 9 17 A 3 2.5 0 1 1 6 14.5 A 3 2.5 0 0 1 9 17 Z M 9 17 L 9 5.5 L 20 3 L 20 14 M 20 14 A 3 2.5 0 1 1 17 11.5 A 3 2.5 0 0 1 20 14 Z";
+    }
+}

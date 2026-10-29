@@ -1,0 +1,310 @@
+import { Theme, ShelfData, TrackRowData, LyricLineData, LibraryItemData } from "../theme.slint";
+import { IconBack, IconSettings } from "../icons.slint";
+import { SearchView } from "./search_view.slint";
+import { ExploreView } from "./explore_view.slint";
+import { QueueView } from "./queue_view.slint";
+import { NowPlayingView } from "./now_playing_view.slint";
+import { LibraryView } from "./library_view.slint";
+import { DetailView } from "./detail_view.slint";
+import { SettingsView } from "./settings_view.slint";
+
+export component ContentArea inherits Rectangle {
+    in property <int> active-page: 0;
+    in property <string> header-title: "Search";
+    in property <string> explore-loading-text: "Loading explore...";
+    in property <string> explore-empty-text: "No sections found in Explore.";
+    in property <bool> has-update: false;
+    in-out property <string> query: "";
+    in-out property <string> cookie-text: "";
+    in property <bool> signed-in: false;
+    in property <[ShelfData]> shelves: [];
+    in property <int> search-filter: 0;
+    in property <[TrackRowData]> queue-tracks: [];
+    in property <int> queue-selected-index: -1;
+    in property <string> active-track-title: "No track playing";
+    in property <string> active-track-artist: "";
+    in property <string> position-text: "0:00";
+    in property <string> duration-text: "0:00";
+    in property <float> playback-progress: 0.0;
+    in property <image> cover-image;
+    in property <bool> has-cover: false;
+    in property <[LyricLineData]> lyrics-lines: [];
+    in property <int> active-lyric-index: -1;
+    in property <[LibraryItemData]> library-playlists: []; in property <[LibraryItemData]> library-albums: []; in property <[LibraryItemData]> library-artists: [];
+    in property <bool> detail-has-detail: false; in property <bool> detail-has-artwork: false; in property <string> detail-title: ""; in property <string> detail-subtitle: ""; in property <string> detail-description: "";
+    in property <string> detail-kind-label: ""; in property <[TrackRowData]> detail-tracks: [];
+    in property <image> detail-cover;
+    in property <int> active-theme-index: 0;
+    in property <string> playback-speed-text: "1.00x";
+    in-out property <string> settings-cookie-text: "";
+    in property <string> app-version: "0.1.0";
+    in property <string> update-status-text: "Up to date";
+    in property <[ShelfData]> explore-shelves: [];
+    in property <bool> explore-loading: false;
+    in property <string> search-placeholder: "Search songs...";
+    in property <string> search-button-label: "Search";
+    in property <string> filter-all-label: "All";
+    in property <string> filter-songs-label: "Songs";
+    in property <string> filter-albums-label: "Albums";
+    in property <string> filter-artists-label: "Artists";
+    in property <string> filter-playlists-label: "Playlists";
+    in property <string> search-empty-text: "No results found.";
+    in property <string> queue-empty-text: "The queue is empty.";
+    in property <string> no-cover-text: "No cover";
+    in property <string> lyrics-unavailable-text: "Lyrics unavailable";
+    in property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
+    in property <string> session-anonymous-hint: "Anonymous session: paste cookies to unlock library";
+    in property <string> session-cookie-placeholder: "Paste session cookies...";
+    in property <string> sign-in-label: "Sign in";
+    in property <string> session-signed-in-hint: "Signed in: library unlocked";
+    in property <string> sign-out-label: "Sign out";
+    in property <string> section-playlists-label: "Playlists";
+    in property <string> empty-playlists-text: "No playlists found.";
+    in property <string> section-albums-label: "Albums";
+    in property <string> empty-albums-text: "No albums found.";
+    in property <string> section-artists-label: "Artists";
+    in property <string> empty-artists-text: "No artists found.";
+    in property <string> empty-detail-text: "No details available.";
+    in property <string> play-button-label: "Play";
+    in property <string> shuffle-button-label: "Shuffle";
+    in property <string> empty-songs-text: "No songs available.";
+    in property <string> section-theme-label: "Theme";
+    in property <string> theme-white-label: "White";
+    in property <string> theme-black-oled-label: "Black OLED";
+    in property <string> theme-mono-label: "Mono";
+    in property <string> section-playback-label: "Playback";
+    in property <string> playback-speed-label: "Playback speed";
+    in property <string> section-session-label: "Session";
+    in property <string> status-signed-in-label: "Status: Signed in";
+    in property <string> status-anonymous-label: "Status: Anonymous";
+    in property <string> section-about-label: "About";
+    in property <string> app-version-label: "App version";
+    in property <string> update-status-label: "Update status";
+
+    callback query-submitted(string);
+    callback track-selected(int);
+    callback filter-selected(int);
+    callback explore-track-selected(int);
+    callback queue-track-selected(int);
+    callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
+    callback detail-play();
+    callback detail-shuffle();
+    callback sign-in-submitted(string);
+    callback sign-out();
+    callback open-settings();
+    callback theme-selected(int);
+    callback cycle-playback-speed();
+    callback back-pressed();
+
+    background: Theme.window;
+    clip: true;
+
+    flick := Flickable {
+        TouchArea {
+            x: 0;
+            y: -flick.viewport-y;
+            width: flick.width;
+            height: flick.height;
+
+            scroll-event(event) => {
+                let min-y = min(0px, flick.height - flick.viewport-height);
+                flick.viewport-y = min(0px, max(min-y, flick.viewport-y + event.delta-y * 3.5));
+                return EventResult.accept;
+            }
+        }
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+            alignment: start;
+
+            HorizontalLayout {
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    if root.active-page == 4 : VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 8px;
+                            background: back-btn.pressed ? Theme.overlay : (back-btn.has-hover ? Theme.hover : Theme.surface);
+                            animate background { duration: 150ms; easing: ease-in-out; }
+
+                            back-btn := TouchArea {
+                                clicked => { root.back-pressed(); }
+                            }
+
+                            IconBack {
+                                size: 16px;
+                                tint: back-btn.has-hover ? Theme.accent : Theme.text;
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: root.header-title;
+                        color: Theme.text;
+                        font-size: 24px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                }
+
+                if root.active-page != 5 : VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 8px;
+                        background: settings-btn.pressed ? Theme.overlay : (settings-btn.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        settings-btn := TouchArea {
+                            clicked => { root.open-settings(); }
+                        }
+
+                        IconSettings {
+                            size: 16px;
+                            tint: settings-btn.has-hover ? Theme.accent : Theme.text;
+                        }
+
+                        if root.has-update : Rectangle {
+                            x: parent.width - 6px;
+                            y: 2px;
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 3px;
+                            background: Theme.accent;
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+
+            if root.active-page == 0 : SearchView {
+                query <=> root.query;
+                shelves: root.shelves;
+                active-filter: root.search-filter;
+                placeholder-text: root.search-placeholder;
+                search-button-label: root.search-button-label;
+                filter-all-label: root.filter-all-label;
+                filter-songs-label: root.filter-songs-label;
+                filter-albums-label: root.filter-albums-label;
+                filter-artists-label: root.filter-artists-label;
+                filter-playlists-label: root.filter-playlists-label;
+                empty-text: root.search-empty-text;
+                query-submitted(q) => { root.query-submitted(q); }
+                track-selected(idx) => { root.track-selected(idx); }
+                filter-selected(idx) => { root.filter-selected(idx); }
+            }
+
+            if root.active-page == 1 : QueueView {
+                tracks: root.queue-tracks;
+                selected-index: root.queue-selected-index;
+                empty-text: root.queue-empty-text;
+                track-selected(idx) => { root.queue-track-selected(idx); }
+            }
+
+            if root.active-page == 2 : NowPlayingView {
+                track-title: root.active-track-title;
+                track-artist: root.active-track-artist;
+                position-text: root.position-text;
+                duration-text: root.duration-text;
+                progress: root.playback-progress;
+                cover-image: root.cover-image;
+                has-cover: root.has-cover;
+                lyrics-lines: root.lyrics-lines;
+                active-lyric-index: root.active-lyric-index;
+                no-cover-text: root.no-cover-text;
+                lyrics-unavailable-text: root.lyrics-unavailable-text;
+                lyrics-hint-text: root.lyrics-hint-text;
+            }
+
+            if root.active-page == 3 : LibraryView {
+                cookie-text <=> root.cookie-text;
+                signed-in: root.signed-in;
+                session-anonymous-hint: root.session-anonymous-hint;
+                session-cookie-placeholder: root.session-cookie-placeholder;
+                sign-in-label: root.sign-in-label;
+                session-signed-in-hint: root.session-signed-in-hint;
+                sign-out-label: root.sign-out-label;
+                section-playlists-label: root.section-playlists-label;
+                empty-playlists-text: root.empty-playlists-text;
+                section-albums-label: root.section-albums-label;
+                empty-albums-text: root.empty-albums-text;
+                section-artists-label: root.section-artists-label;
+                empty-artists-text: root.empty-artists-text;
+                playlists: root.library-playlists; albums: root.library-albums; artists: root.library-artists;
+                playlist-selected(idx) => { root.playlist-selected(idx); }
+                album-selected(idx) => { root.album-selected(idx); }
+                artist-selected(idx) => { root.artist-selected(idx); }
+                sign-in-submitted(t) => { root.sign-in-submitted(t); }
+                sign-out() => { root.sign-out(); }
+            }
+
+            if root.active-page == 4 : DetailView {
+                has-detail: root.detail-has-detail;
+                detail-has-artwork: root.detail-has-artwork;
+                title: root.detail-title;
+                subtitle: root.detail-subtitle;
+                description: root.detail-description;
+                kind-label: root.detail-kind-label;
+                cover: root.detail-cover;
+                tracks: root.detail-tracks;
+                empty-text: root.empty-detail-text;
+                no-cover-text: root.no-cover-text;
+                play-button-label: root.play-button-label;
+                shuffle-button-label: root.shuffle-button-label;
+                empty-songs-text: root.empty-songs-text;
+                track-selected(idx) => { root.detail-track-selected(idx); }
+                play => { root.detail-play(); }
+                shuffle => { root.detail-shuffle(); }
+            }
+
+            if root.active-page == 5 : SettingsView {
+                active-theme-index: root.active-theme-index;
+                playback-speed-text: root.playback-speed-text;
+                signed-in: root.signed-in;
+                cookie-text <=> root.settings-cookie-text;
+                app-version: root.app-version;
+                update-status-text: root.update-status-text;
+                has-update: root.has-update;
+                section-theme-label: root.section-theme-label;
+                theme-white-label: root.theme-white-label;
+                theme-black-oled-label: root.theme-black-oled-label;
+                theme-mono-label: root.theme-mono-label;
+                section-playback-label: root.section-playback-label;
+                playback-speed-label: root.playback-speed-label;
+                section-session-label: root.section-session-label;
+                status-signed-in-label: root.status-signed-in-label;
+                sign-out-label: root.sign-out-label;
+                status-anonymous-label: root.status-anonymous-label;
+                session-cookie-placeholder: root.session-cookie-placeholder;
+                sign-in-label: root.sign-in-label;
+                section-about-label: root.section-about-label;
+                app-version-label: root.app-version-label;
+                update-status-label: root.update-status-label;
+                theme-selected(idx) => { root.theme-selected(idx); }
+                cycle-playback-speed => { root.cycle-playback-speed(); }
+                sign-in-submitted(t) => { root.sign-in-submitted(t); }
+                sign-out => { root.sign-out(); }
+            }
+
+            if root.active-page == 6 : ExploreView {
+                shelves: root.explore-shelves;
+                is-loading: root.explore-loading;
+                loading-text: root.explore-loading-text;
+                empty-text: root.explore-empty-text;
+                track-selected(idx) => { root.explore-track-selected(idx); }
+            }
+        }
+    }
+}

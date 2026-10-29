@@ -1,0 +1,118 @@
+import { Theme } from "../theme.slint";
+import {
+    IconCompass,
+    IconLibrary,
+    IconMusic,
+    IconSearch,
+    IconSettings,
+} from "../icons.slint";
+
+export component NavItem inherits Rectangle {
+    in property <string> text;
+    in property <string> icon-name: "";
+    in property <bool> is-active: false;
+    callback clicked();
+
+    height: 40px;
+    border-radius: 8px;
+    background: root.is-active ? Theme.surface : (touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent));
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 16px;
+        spacing: 12px;
+        alignment: start;
+
+        VerticalLayout {
+            alignment: center;
+            if root.icon-name == "search" : IconSearch {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+            if root.icon-name == "explore" : IconCompass {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+            if root.icon-name == "library" : IconLibrary {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+            if root.icon-name == "music" : IconMusic {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+            if root.icon-name == "settings" : IconSettings {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+        }
+
+        Text {
+            text: root.text;
+            color: root.is-active ? Theme.text : (touch.has-hover ? Theme.text : Theme.secondary);
+            font-size: 14px;
+            font-weight: root.is-active ? 700 : 500;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component Sidebar inherits Rectangle {
+    in property <int> active-page: 0;
+    in property <string> nav-search-label: "Search";
+    in property <string> nav-explore-label: "Explore";
+    in property <string> nav-library-label: "Library";
+    in property <string> nav-now-playing-label: "Now Playing";
+    callback page-selected(int);
+
+    width: 200px;
+    background: Theme.panel;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        alignment: start;
+
+        Text {
+            text: "Moggyt";
+            color: Theme.accent;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        Rectangle { height: 12px; }
+
+        NavItem {
+            text: root.nav-search-label;
+            icon-name: "search";
+            is-active: root.active-page == 0;
+            clicked => { root.page-selected(0); }
+        }
+
+        NavItem {
+            text: root.nav-explore-label;
+            icon-name: "explore";
+            is-active: root.active-page == 6;
+            clicked => { root.page-selected(6); }
+        }
+
+        NavItem {
+            text: root.nav-library-label;
+            icon-name: "library";
+            is-active: root.active-page == 3;
+            clicked => { root.page-selected(3); }
+        }
+
+        NavItem {
+            text: root.nav-now-playing-label;
+            icon-name: "music";
+            is-active: root.active-page == 2;
+            clicked => { root.page-selected(2); }
+        }
+    }
+}
