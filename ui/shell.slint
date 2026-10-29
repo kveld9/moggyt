@@ -1750,6 +1750,7 @@ component DetailView inherits VerticalLayout {
     in property <bool> has-detail: false;
     in property <string> title: "";
     in property <string> subtitle: "";
+    in property <string> description: "";
     in property <string> kind-label: "";
     in property <image> cover;
     in property <[TrackRowData]> tracks: [];
@@ -1835,6 +1836,13 @@ component DetailView inherits VerticalLayout {
                     text: root.subtitle;
                     color: Theme.secondary;
                     font-size: 13px;
+                    overflow: elide;
+                }
+
+                if root.description != "" : Text {
+                    text: root.description;
+                    color: Theme.secondary;
+                    font-size: 12px;
                     overflow: elide;
                 }
 
@@ -2293,7 +2301,7 @@ component ContentArea inherits Rectangle {
     in property <[LyricLineData]> lyrics-lines: [];
     in property <int> active-lyric-index: -1;
     in property <[LibraryItemData]> library-playlists: []; in property <[LibraryItemData]> library-albums: []; in property <[LibraryItemData]> library-artists: [];
-    in property <bool> detail-has-detail: false; in property <string> detail-title: ""; in property <string> detail-subtitle: "";
+    in property <bool> detail-has-detail: false; in property <string> detail-title: ""; in property <string> detail-subtitle: ""; in property <string> detail-description: "";
     in property <string> detail-kind-label: ""; in property <[TrackRowData]> detail-tracks: [];
     in property <image> detail-cover;
     in property <int> active-theme-index: 0;
@@ -2516,6 +2524,7 @@ component ContentArea inherits Rectangle {
             has-detail: root.detail-has-detail;
             title: root.detail-title;
             subtitle: root.detail-subtitle;
+            description: root.detail-description;
             kind-label: root.detail-kind-label;
             cover: root.detail-cover;
             tracks: root.detail-tracks;
@@ -2627,7 +2636,7 @@ export component MoggytWindow inherits Window {
     in-out property <[LyricLineData]> lyrics-lines: [];
     in-out property <int> active-lyric-index: -1;
     in-out property <[LibraryItemData]> library-playlists: []; in-out property <[LibraryItemData]> library-albums: []; in-out property <[LibraryItemData]> library-artists: [];
-    in-out property <bool> detail-has-detail: false; in-out property <string> detail-title: ""; in-out property <string> detail-subtitle: "";
+    in-out property <bool> detail-has-detail: false; in-out property <string> detail-title: ""; in-out property <string> detail-subtitle: ""; in-out property <string> detail-description: "";
     in-out property <string> detail-kind-label: ""; in-out property <[TrackRowData]> detail-tracks: [];
     in-out property <image> detail-cover;
     in-out property <[ShelfData]> explore-shelves: [];
@@ -2731,7 +2740,7 @@ export component MoggytWindow inherits Window {
                 cover-image: root.cover-image; has-cover: root.has-cover;
                 lyrics-lines: root.lyrics-lines; active-lyric-index: root.active-lyric-index;
                 library-playlists: root.library-playlists; library-albums: root.library-albums; library-artists: root.library-artists;
-                detail-has-detail: root.detail-has-detail; detail-title: root.detail-title; detail-subtitle: root.detail-subtitle;
+                detail-has-detail: root.detail-has-detail; detail-title: root.detail-title; detail-subtitle: root.detail-subtitle; detail-description: root.detail-description;
                 detail-kind-label: root.detail-kind-label; detail-cover: root.detail-cover; detail-tracks: root.detail-tracks;
                 explore-shelves: root.explore-shelves;
                 explore-loading: root.explore-loading;

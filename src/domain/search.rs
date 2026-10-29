@@ -197,7 +197,7 @@ impl Track {
         self
     }
 
-    /// Human-facing one-line rendering (`title — artist`).
+    /// Human-facing one-line rendering (`title - artist`).
     pub fn display(&self) -> String {
         format!("{} - {}", self.title, self.artist)
     }

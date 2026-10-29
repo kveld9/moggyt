@@ -37,7 +37,7 @@ pub fn fetch_artwork(url: &str, timeout_secs: u64) -> anyhow::Result<Vec<u8>> {
 
 /// Decodes raw image bytes into an [`image::RgbaImage`].
 ///
-/// Downscales images exceeding `max_px` on either dimension to fit within `max_px` × `max_px`
+/// Downscales images exceeding `max_px` on either dimension to fit within `max_px` x `max_px`
 /// while preserving the aspect ratio and using a high-quality Lanczos3 filter.
 /// Returns `None` if the byte payload cannot be decoded as an image.
 pub fn decode_cover(bytes: &[u8], max_px: u32) -> Option<image::RgbaImage> {
