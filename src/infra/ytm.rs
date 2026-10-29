@@ -49,6 +49,11 @@ pub trait Catalog {
     ///
     /// Default implementation is a no-op for anonymous catalogs or stubs.
     fn set_session_cookies(&mut self, _cookies: Option<&str>) {}
+
+    /// Updates the interface locale used for localized catalog requests.
+    ///
+    /// Default implementation is a no-op for stubs or static catalogs.
+    fn set_locale(&mut self, _locale: crate::i18n::Locale) {}
 }
 
 /// Fixed-data stub: keeps UI and tests deterministic until the real API lands.
@@ -267,10 +272,17 @@ impl LiveCatalog {
     /// Updates session cookies by swapping the inner catalog API client.
     pub fn set_session_cookies(&mut self, cookies: Option<&str>) {
         let clean = cookies.filter(|c| !c.trim().is_empty());
+        let current_locale = self.client.locale();
         self.client = match clean {
             Some(c) => CatalogClient::with_cookies(c),
             None => CatalogClient::new(),
-        };
+        }
+        .with_locale(current_locale);
+    }
+
+    /// Updates the interface locale on the inner catalog API client.
+    pub fn set_locale(&mut self, locale: crate::i18n::Locale) {
+        self.client.set_locale(locale);
     }
 
     /// Returns true if the catalog client has authenticated session credentials configured.
@@ -389,6 +401,10 @@ impl Catalog for LiveCatalog {
 
     fn set_session_cookies(&mut self, cookies: Option<&str>) {
         self.set_session_cookies(cookies);
+    }
+
+    fn set_locale(&mut self, locale: crate::i18n::Locale) {
+        self.set_locale(locale);
     }
 }
 
@@ -732,6 +748,21 @@ mod tests {
 
         catalog.set_session_cookies(None);
         assert!(!catalog.is_authenticated());
+    }
+
+    #[test]
+    fn live_catalog_set_locale_propagates_and_persists_across_cookies() {
+        let mut catalog = LiveCatalog::new();
+        assert_eq!(catalog.client.locale(), crate::i18n::Locale::English);
+
+        catalog.set_locale(crate::i18n::Locale::Spanish);
+        assert_eq!(catalog.client.locale(), crate::i18n::Locale::Spanish);
+
+        catalog.set_session_cookies(Some("SID=auth_cookie"));
+        assert_eq!(catalog.client.locale(), crate::i18n::Locale::Spanish);
+
+        catalog.set_session_cookies(None);
+        assert_eq!(catalog.client.locale(), crate::i18n::Locale::Spanish);
     }
 
     #[test]

@@ -3,6 +3,7 @@
 use crate::domain::{
     Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchResult, Shelf, Track,
 };
+use crate::i18n::Locale;
 use serde_json::Value;
 use std::time::Duration;
 
@@ -41,31 +42,33 @@ pub fn next_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/next?key={CATALOG_API_KEY}&prettyPrint=false")
 }
 
-/// Builds the minimal WEB_REMIX search payload for `query`.
-pub fn search_body(query: &str) -> Value {
+/// Default region for catalog client requests.
+pub const CATALOG_CLIENT_GL: &str = "US";
+
+fn client_context(locale: Locale) -> Value {
+    serde_json::json!({
+        "clientName": "WEB_REMIX",
+        "clientVersion": CATALOG_CLIENT_VERSION,
+        "hl": locale.tag(),
+        "gl": CATALOG_CLIENT_GL,
+    })
+}
+
+/// Builds the minimal WEB_REMIX search payload for `query` with `locale`.
+pub fn search_body(query: &str, locale: Locale) -> Value {
     serde_json::json!({
         "context": {
-            "client": {
-                "clientName": "WEB_REMIX",
-                "clientVersion": CATALOG_CLIENT_VERSION,
-                "hl": "en",
-                "gl": "US",
-            }
+            "client": client_context(locale),
         },
         "query": query,
     })
 }
 
-/// Builds the minimal WEB_REMIX next payload for `video_id`.
-pub fn next_body(video_id: &str) -> Value {
+/// Builds the minimal WEB_REMIX next payload for `video_id` with `locale`.
+pub fn next_body(video_id: &str, locale: Locale) -> Value {
     serde_json::json!({
         "context": {
-            "client": {
-                "clientName": "WEB_REMIX",
-                "clientVersion": CATALOG_CLIENT_VERSION,
-                "hl": "en",
-                "gl": "US",
-            }
+            "client": client_context(locale),
         },
         "videoId": video_id,
         "playlistId": format!("RD{video_id}"),
@@ -77,16 +80,11 @@ pub fn browse_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/browse?key={CATALOG_API_KEY}&prettyPrint=false")
 }
 
-/// Builds the minimal WEB_REMIX browse payload for `browse_id`.
-pub fn browse_body(browse_id: &str) -> Value {
+/// Builds the minimal WEB_REMIX browse payload for `browse_id` with `locale`.
+pub fn browse_body(browse_id: &str, locale: Locale) -> Value {
     serde_json::json!({
         "context": {
-            "client": {
-                "clientName": "WEB_REMIX",
-                "clientVersion": CATALOG_CLIENT_VERSION,
-                "hl": "en",
-                "gl": "US",
-            }
+            "client": client_context(locale),
         },
         "browseId": browse_id,
     })
@@ -101,16 +99,11 @@ pub fn like_url(liked: bool) -> String {
     )
 }
 
-/// Builds the minimal WEB_REMIX like/removelike payload for `video_id`.
-pub fn like_body(video_id: &str) -> Value {
+/// Builds the minimal WEB_REMIX like/removelike payload for `video_id` with `locale`.
+pub fn like_body(video_id: &str, locale: Locale) -> Value {
     serde_json::json!({
         "context": {
-            "client": {
-                "clientName": "WEB_REMIX",
-                "clientVersion": CATALOG_CLIENT_VERSION,
-                "hl": "en",
-                "gl": "US",
-            }
+            "client": client_context(locale),
         },
         "target": {
             "videoId": video_id,
@@ -298,7 +291,16 @@ fn thumbnail_candidates(value: &Value) -> Option<&[Value]> {
         "/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbs",
         "/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails",
         "/thumbnail/musicThumbnailRenderer/thumbnail/thumbs",
+        "/thumbnail/croppedThumbnailRenderer/thumbnail/thumbnails",
+        "/thumbnail/croppedThumbnailRenderer/thumbnail/thumbs",
+        "/thumbnail/croppedThumbnail/thumbnails",
+        "/thumbnail/croppedThumbnail/thumbs",
+        "/thumbnailRenderer/croppedThumbnailRenderer/thumbnail/thumbnails",
+        "/thumbnailRenderer/croppedThumbnailRenderer/thumbnail/thumbs",
         "/thumbnail/thumbnails",
+        "/thumbnail/thumbs",
+        "/thumbnails",
+        "/thumbs",
     ];
     CANDIDATES
         .iter()
@@ -734,15 +736,24 @@ fn detail_header_node(value: &Value) -> Option<&Value> {
         "/header/musicDetailHeaderRenderer",
         "/header/musicVisualHeaderRenderer",
         "/header/musicEditablePlaylistDetailHeaderRenderer/header/musicDetailHeaderRenderer",
+        "/header/musicEditablePlaylistDetailHeaderRenderer/header/musicResponsiveHeaderRenderer",
         "/header/musicResponsiveHeaderRenderer",
         "/header/musicHeaderRenderer",
+        "/header/musicEditablePlaylistDetailHeaderRenderer",
         "/header",
     ];
     PATHS.iter().find_map(|path| value.pointer(path))
 }
 
 fn detail_header_title(value: &Value) -> String {
-    const PATHS: &[&str] = &["/title/runs/0/text", "/title/simpleText"];
+    const PATHS: &[&str] = &[
+        "/title/runs/0/text",
+        "/title/simpleText",
+        "/header/musicResponsiveHeaderRenderer/title/runs/0/text",
+        "/header/musicResponsiveHeaderRenderer/title/simpleText",
+        "/header/musicDetailHeaderRenderer/title/runs/0/text",
+        "/header/musicDetailHeaderRenderer/title/simpleText",
+    ];
     let Some(header) = detail_header_node(value) else {
         return String::new();
     };
@@ -757,11 +768,25 @@ fn detail_header_title(value: &Value) -> String {
     String::new()
 }
 
+fn is_meaningful_subtitle(text: &str) -> bool {
+    let trimmed = text.trim();
+    !trimmed.is_empty() && trimmed != "\u{2022}"
+}
+
 fn detail_header_subtitle(value: &Value) -> String {
     const PATHS: &[&str] = &[
+        "/subtitle/runs/2/text",
         "/subtitle/runs/1/text",
         "/subtitle/runs/0/text",
         "/subtitle/simpleText",
+        "/secondSubtitle/runs/0/text",
+        "/secondSubtitle/simpleText",
+        "/straplineTextOne/runs/0/text",
+        "/header/musicResponsiveHeaderRenderer/subtitle/runs/2/text",
+        "/header/musicResponsiveHeaderRenderer/subtitle/runs/1/text",
+        "/header/musicResponsiveHeaderRenderer/subtitle/runs/0/text",
+        "/header/musicResponsiveHeaderRenderer/subtitle/simpleText",
+        "/header/musicResponsiveHeaderRenderer/secondSubtitle/runs/0/text",
         "/description/runs/0/text",
         "/descriptionSnippet/runs/0/text",
         "/description/simpleText",
@@ -771,13 +796,68 @@ fn detail_header_subtitle(value: &Value) -> String {
     };
     for path in PATHS {
         if let Some(text) = header.pointer(path).and_then(Value::as_str) {
-            let trimmed = text.trim();
-            if !trimmed.is_empty() && trimmed != "•" {
-                return trimmed.to_owned();
+            if is_meaningful_subtitle(text) {
+                return text.trim().to_owned();
             }
         }
     }
     String::new()
+}
+
+fn join_runs(runs: &[Value]) -> Option<String> {
+    let mut text = String::new();
+    for run in runs {
+        if let Some(t) = run.get("text").and_then(Value::as_str) {
+            text.push_str(t);
+        }
+    }
+    let trimmed = text.trim();
+    if trimmed.is_empty() { None } else { Some(trimmed.to_owned()) }
+}
+
+fn description_from_runs(header: &Value) -> Option<String> {
+    const RUNS_PATHS: &[&str] = &[
+        "/description/runs",
+        "/descriptionSnippet/runs",
+        "/header/musicResponsiveHeaderRenderer/description/runs",
+        "/header/musicResponsiveHeaderRenderer/descriptionSnippet/runs",
+    ];
+    for path in RUNS_PATHS {
+        if let Some(runs) = header.pointer(path).and_then(Value::as_array) {
+            if let Some(desc) = join_runs(runs) {
+                return Some(desc);
+            }
+        }
+    }
+    None
+}
+
+fn description_from_simple(header: &Value) -> Option<String> {
+    const SIMPLE_PATHS: &[&str] = &[
+        "/description/simpleText",
+        "/descriptionSnippet/simpleText",
+        "/header/musicResponsiveHeaderRenderer/description/simpleText",
+        "/header/musicResponsiveHeaderRenderer/descriptionSnippet/simpleText",
+    ];
+    for path in SIMPLE_PATHS {
+        if let Some(text) = header.pointer(path).and_then(Value::as_str) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_owned());
+            }
+        }
+    }
+    None
+}
+
+fn detail_header_description(value: &Value) -> Option<String> {
+    let header = detail_header_node(value)?;
+    description_from_runs(header).or_else(|| description_from_simple(header))
+}
+
+fn detail_header_artwork(value: &Value) -> Option<String> {
+    let header = detail_header_node(value)?;
+    best_thumbnail(header)
 }
 
 fn detail_video_id(renderer: &Value) -> Option<String> {
@@ -893,7 +973,14 @@ pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
     if title.is_empty() && tracks.is_empty() {
         return None;
     }
-    Some(Detail::new(kind, &title, &subtitle, tracks))
+    let mut detail = Detail::new(kind, &title, &subtitle, tracks);
+    if let Some(desc) = detail_header_description(value) {
+        detail = detail.with_description(desc);
+    }
+    if let Some(art) = detail_header_artwork(value) {
+        detail = detail.with_artwork(art);
+    }
+    Some(detail)
 }
 
 fn parse_track_count(text: &str) -> usize {
@@ -960,6 +1047,7 @@ pub struct CatalogClient {
     client: reqwest::blocking::Client,
     api_key: String,
     cookies: Option<String>,
+    locale: Locale,
 }
 
 impl std::fmt::Debug for CatalogClient {
@@ -967,6 +1055,7 @@ impl std::fmt::Debug for CatalogClient {
         f.debug_struct("CatalogClient")
             .field("api_key", &self.api_key)
             .field("has_cookies", &self.cookies.is_some())
+            .field("locale", &self.locale)
             .finish()
     }
 }
@@ -986,12 +1075,28 @@ impl CatalogClient {
         Self::with_optional_cookies(opt)
     }
 
+    /// Configures the active locale for requests.
+    pub fn with_locale(mut self, locale: Locale) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    /// Sets the active locale for subsequent requests.
+    pub fn set_locale(&mut self, locale: Locale) {
+        self.locale = locale;
+    }
+
+    /// Returns the currently configured request locale.
+    pub fn locale(&self) -> Locale {
+        self.locale
+    }
+
     fn with_optional_cookies(cookies: Option<String>) -> Self {
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
-        Self { client, api_key: CATALOG_API_KEY.to_owned(), cookies }
+        Self { client, api_key: CATALOG_API_KEY.to_owned(), cookies, locale: Locale::default() }
     }
 
     /// Returns true if this client has credentials configured for authenticated requests.
@@ -1005,7 +1110,7 @@ impl CatalogClient {
             "https://music.youtube.com/youtubei/v1/search?key={}&prettyPrint=false",
             self.api_key
         );
-        let body = search_body(query);
+        let body = search_body(query, self.locale);
         let response = self.client.post(&url).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
@@ -1029,7 +1134,7 @@ impl CatalogClient {
     /// Executes next endpoint request for radio and returns the unparsed JSON response payload.
     pub fn next_payload(&self, video_id: &str) -> anyhow::Result<Value> {
         let url = next_url();
-        let body = next_body(video_id);
+        let body = next_body(video_id, self.locale);
         let response = self.client.post(&url).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
@@ -1052,7 +1157,7 @@ impl CatalogClient {
     /// Executes browse endpoint request for `browse_id` and returns the unparsed JSON response payload.
     pub fn browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
         let url = browse_url();
-        let body = browse_body(browse_id);
+        let body = browse_body(browse_id, self.locale);
         let response = self.client.post(&url).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
@@ -1085,7 +1190,7 @@ impl CatalogClient {
             anyhow::bail!("Unauthenticated CatalogClient cannot request library endpoint");
         };
         let url = browse_url();
-        let body = browse_body(browse_id);
+        let body = browse_body(browse_id, self.locale);
         let response = self.client.post(&url).header("Cookie", cookie).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
@@ -1131,7 +1236,7 @@ impl CatalogClient {
             anyhow::bail!("Unauthenticated CatalogClient cannot execute library mutations");
         };
         let url = like_url(liked);
-        let body = like_body(video_id);
+        let body = like_body(video_id, self.locale);
         let response = self.client.post(&url).header("Cookie", cookie).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
@@ -1227,12 +1332,14 @@ mod tests {
 
     #[test]
     fn search_body_structure() {
-        let body = search_body("midnight");
-        assert_eq!(body["query"], "midnight");
-        assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
-        assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
-        assert_eq!(body["context"]["client"]["hl"], "en");
-        assert_eq!(body["context"]["client"]["gl"], "US");
+        for (locale, expected_hl) in [(Locale::English, "en"), (Locale::Spanish, "es")] {
+            let body = search_body("midnight", locale);
+            assert_eq!(body["query"], "midnight");
+            assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+            assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
+            assert_eq!(body["context"]["client"]["hl"], expected_hl);
+            assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
+        }
     }
 
     #[test]
@@ -1718,11 +1825,15 @@ mod tests {
 
     #[test]
     fn next_body_structure() {
-        let body = next_body("abc-123");
-        assert_eq!(body["videoId"], "abc-123");
-        assert_eq!(body["playlistId"], "RDabc-123");
-        assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
-        assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
+        for (locale, expected_hl) in [(Locale::English, "en"), (Locale::Spanish, "es")] {
+            let body = next_body("abc-123", locale);
+            assert_eq!(body["videoId"], "abc-123");
+            assert_eq!(body["playlistId"], "RDabc-123");
+            assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+            assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
+            assert_eq!(body["context"]["client"]["hl"], expected_hl);
+            assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
+        }
     }
 
     #[test]
@@ -1792,10 +1903,14 @@ mod tests {
 
     #[test]
     fn browse_body_structure() {
-        let body = browse_body(HOME_BROWSE_ID);
-        assert_eq!(body["browseId"], HOME_BROWSE_ID);
-        assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
-        assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
+        for (locale, expected_hl) in [(Locale::English, "en"), (Locale::Spanish, "es")] {
+            let body = browse_body(HOME_BROWSE_ID, locale);
+            assert_eq!(body["browseId"], HOME_BROWSE_ID);
+            assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+            assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
+            assert_eq!(body["context"]["client"]["hl"], expected_hl);
+            assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
+        }
     }
 
     #[test]
@@ -1906,6 +2021,8 @@ mod tests {
         assert_eq!(detail.kind, DetailKind::Album);
         assert_eq!(detail.title, "Test Album Title");
         assert_eq!(detail.subtitle, "Test Artist");
+        assert_eq!(detail.description, None);
+        assert_eq!(detail.artwork, None);
         assert_eq!(detail.tracks.len(), 2);
         assert_eq!(
             detail.tracks[0],
@@ -1923,6 +2040,62 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn parse_detail_all_playlist_golden_fixture() {
+        let raw = include_str!("../../tests/fixtures/catalog_playlist_detail.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let detail = parse_detail_all(&payload, DetailKind::Playlist).expect("parsed detail");
+        assert_eq!(detail.kind, DetailKind::Playlist);
+        assert_eq!(detail.title, "Test Playlist Title");
+        assert_eq!(detail.subtitle, "Test Creator");
+        assert_eq!(detail.description.as_deref(), Some("Test Playlist Description"));
+        assert_eq!(detail.artwork.as_deref(), Some("https://img.local/playlist_header_large.jpg"));
+        assert_eq!(detail.tracks.len(), 1);
+        assert_eq!(
+            detail.tracks[0],
+            Track::new("p-track-1", "Playlist Track 1", "Playlist Artist 1")
+                .with_duration(252)
+                .with_artwork("https://img.local/p_t1.jpg")
+        );
+    }
+
+    #[test]
+    fn parse_detail_header_description_runs_and_fallbacks() {
+        let multi_runs = serde_json::json!({
+            "header": {
+                "musicResponsiveHeaderRenderer": {
+                    "description": {
+                        "runs": [
+                            { "text": "Part 1 - " },
+                            { "text": "Part 2" }
+                        ]
+                    }
+                }
+            }
+        });
+        assert_eq!(detail_header_description(&multi_runs), Some("Part 1 - Part 2".to_owned()));
+
+        let snippet_runs = serde_json::json!({
+            "header": {
+                "musicDetailHeaderRenderer": {
+                    "descriptionSnippet": {
+                        "runs": [{ "text": "Snippet text" }]
+                    }
+                }
+            }
+        });
+        assert_eq!(detail_header_description(&snippet_runs), Some("Snippet text".to_owned()));
+
+        let empty_desc = serde_json::json!({
+            "header": {
+                "musicResponsiveHeaderRenderer": {
+                    "description": { "runs": [{ "text": "   " }] }
+                }
+            }
+        });
+        assert_eq!(detail_header_description(&empty_desc), None);
     }
 
     #[test]
@@ -1995,11 +2168,28 @@ mod tests {
     fn like_endpoints_and_mutation_parsing() {
         assert!(like_url(true).contains("/like/like?key="));
         assert!(like_url(false).contains("/like/removelike?key="));
-        let body = like_body("lib-t1");
-        assert_eq!(body["target"]["videoId"], "lib-t1");
-        assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+        for (locale, expected_hl) in [(Locale::English, "en"), (Locale::Spanish, "es")] {
+            let body = like_body("lib-t1", locale);
+            assert_eq!(body["target"]["videoId"], "lib-t1");
+            assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+            assert_eq!(body["context"]["client"]["hl"], expected_hl);
+            assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
+        }
         assert!(parse_mutation_response(&serde_json::json!({})));
         assert!(!parse_mutation_response(&serde_json::json!({"error": {"code": 401}})));
+    }
+
+    #[test]
+    fn catalog_client_locale_configuration() {
+        let client = CatalogClient::new();
+        assert_eq!(client.locale(), Locale::English);
+
+        let es_client = CatalogClient::new().with_locale(Locale::Spanish);
+        assert_eq!(es_client.locale(), Locale::Spanish);
+
+        let mut mut_client = CatalogClient::new();
+        mut_client.set_locale(Locale::Spanish);
+        assert_eq!(mut_client.locale(), Locale::Spanish);
     }
 
     #[test]

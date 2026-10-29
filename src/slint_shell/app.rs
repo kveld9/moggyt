@@ -30,7 +30,7 @@ use crate::infra::{
     decode_handoff, default_config_dir, ensure_sidecar, fetch_artwork, is_newer,
     sanitize_cookie_input, should_scrobble,
 };
-use crate::slint_shell::detail::detail_kind_label;
+use crate::slint_shell::detail::{detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::platform::{dispatch_to_ui, rgba_to_image};
 use crate::slint_shell::playback::{
     cycle_repeat_mode, format_position, format_track_duration, is_track_liked, progress_fraction,
@@ -549,6 +549,7 @@ impl<
 {
     /// Creates the Slint application state with injected collaborators.
     pub fn new(mut catalog: C, audio: A, session: S, lyrics: L, covers: K) -> Self {
+        catalog.set_locale(Locale::default());
         let stored_session = session.load();
         let signed_in = stored_session.is_some();
         if let Some(ref cookies) = stored_session {
@@ -1281,6 +1282,15 @@ pub fn request_detail_covers<
         return;
     };
     let mut seen = std::collections::HashSet::new();
+    if let Some(url) = detail.artwork.as_deref() {
+        dispatch_cover_with_generation_if_needed(
+            url,
+            state.detail_generation,
+            &state.search_covers,
+            worker_tx,
+            &mut seen,
+        );
+    }
     for track in &detail.tracks {
         if let Some(url) = track.artwork.as_deref() {
             dispatch_cover_with_generation_if_needed(
@@ -1478,6 +1488,7 @@ fn sync_library_and_detail<
         window.set_detail_has_detail(true);
         window.set_detail_title(detail.title.clone().into());
         window.set_detail_subtitle(detail.subtitle.clone().into());
+        window.set_detail_description(detail.description.as_deref().unwrap_or("").into());
         window.set_detail_kind_label(tr(state.locale, detail_kind_label(detail.kind)).into());
         let d_tracks: Vec<TrackRowData> = detail
             .tracks
@@ -1486,15 +1497,13 @@ fn sync_library_and_detail<
             .map(|(i, t)| track_to_row_data(i, t, &state.search_covers))
             .collect();
         window.set_detail_tracks(ModelRc::new(VecModel::from(d_tracks)));
-        let cover_img = detail
-            .tracks
-            .first()
-            .and_then(|t| t.artwork.as_deref())
+        let cover_img = resolve_detail_cover_url(detail)
             .map(|url| resolve_row_cover_image(Some(url), &state.search_covers))
             .unwrap_or_default();
         window.set_detail_cover(cover_img);
     } else {
         window.set_detail_has_detail(false);
+        window.set_detail_description("".into());
         window.set_detail_cover(slint::Image::default());
     }
 }
@@ -2570,6 +2579,9 @@ pub fn run() -> anyhow::Result<()> {
     state.hi_res_covers = settings.hi_res_covers;
     state.theme = settings.theme;
     state.locale = settings.locale;
+    if let Ok(mut c) = state.catalog.lock() {
+        c.set_locale(settings.locale);
+    }
     state.settings_store = Box::new(settings_store);
 
     let queue_store = DiskQueueStore::new(config_dir.clone());
@@ -3149,6 +3161,37 @@ mod tests {
             ("https://lh3.googleusercontent.com/detail-thumb-small".to_string(), 42)
         );
         assert_eq!(received[1], ("https://i.ytimg.com/vi/abc/mqdefault.jpg".to_string(), 42));
+    }
+
+    #[test]
+    fn test_request_detail_covers_dispatches_header_artwork_first() {
+        let mut state = test_wired();
+        state.detail_generation = 100;
+        let track = Track::new("t1", "Track 1", "Artist 1")
+            .with_artwork("https://lh3.googleusercontent.com/track-thumb-large");
+        let detail = Detail::new(DetailKind::Playlist, "Playlist Title", "Creator", vec![track])
+            .with_artwork("https://lh3.googleusercontent.com/header-thumb-large");
+        state.detail = Some(detail);
+
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        request_detail_covers(&state, &tx);
+
+        let mut received = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, generation } = cmd {
+                received.push((url, generation));
+            }
+        }
+
+        assert_eq!(received.len(), 2);
+        assert_eq!(
+            received[0],
+            ("https://lh3.googleusercontent.com/header-thumb-small".to_string(), 100)
+        );
+        assert_eq!(
+            received[1],
+            ("https://lh3.googleusercontent.com/track-thumb-small".to_string(), 100)
+        );
     }
 
     #[test]

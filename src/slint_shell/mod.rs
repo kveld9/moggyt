@@ -40,6 +40,7 @@ pub use app::{
 };
 pub use detail::{
     DetailState, detail_kind_label, detail_kind_label_with_locale, detail_track_rows,
+    resolve_detail_cover_url,
 };
 pub use library::{LibraryItemRow, LibraryState, album_row, artist_row, playlist_row};
 pub use platform::{

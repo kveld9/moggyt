@@ -26,6 +26,20 @@ pub fn detail_track_rows(detail: &Detail) -> Vec<TrackDisplayRow> {
         .collect()
 }
 
+/// Resolves cover artwork URL for a detail view adhering to preference order:
+/// 1. Detail header artwork (e.g. playlist or album header)
+/// 2. First track's artwork
+/// 3. None (renders default placeholder in UI)
+pub fn resolve_detail_cover_url(detail: &Detail) -> Option<&str> {
+    detail.artwork.as_deref().filter(|url| !url.trim().is_empty()).or_else(|| {
+        detail
+            .tracks
+            .first()
+            .and_then(|t| t.artwork.as_deref())
+            .filter(|url| !url.trim().is_empty())
+    })
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct DetailState {
     pub detail: Option<Detail>,
@@ -135,5 +149,49 @@ mod tests {
 
         let state = DetailState::with_detail(detail);
         assert_eq!(state.detail_track_rows(), rows);
+    }
+
+    #[test]
+    fn test_resolve_detail_cover_url_preference_order() {
+        let t1 =
+            Track::new("t1", "Track 1", "Artist 1").with_artwork("https://img.local/track.jpg");
+        let t2 =
+            Track::new("t2", "Track 2", "Artist 2").with_artwork("https://img.local/track2.jpg");
+
+        // 1. Header art > track art
+        let with_both =
+            Detail::new(DetailKind::Playlist, "Title", "Sub", vec![t1.clone(), t2.clone()])
+                .with_artwork("https://img.local/header.jpg");
+        assert_eq!(resolve_detail_cover_url(&with_both), Some("https://img.local/header.jpg"));
+
+        // 2. Track art fallback when header art is None
+        let with_track_only =
+            Detail::new(DetailKind::Playlist, "Title", "Sub", vec![t1.clone(), t2.clone()]);
+        assert_eq!(resolve_detail_cover_url(&with_track_only), Some("https://img.local/track.jpg"));
+
+        // 3. Track art fallback when header art is blank string
+        let with_blank_header =
+            Detail::new(DetailKind::Playlist, "Title", "Sub", vec![t1.clone()]).with_artwork("   ");
+        assert_eq!(
+            resolve_detail_cover_url(&with_blank_header),
+            Some("https://img.local/track.jpg")
+        );
+
+        // 4. Default None when neither has artwork
+        let no_art_track = Track::new("t3", "Track 3", "Artist 3");
+        let with_none = Detail::new(DetailKind::Album, "Title", "Sub", vec![no_art_track]);
+        assert_eq!(resolve_detail_cover_url(&with_none), None);
+
+        // 5. Empty tracks with header art
+        let empty_tracks_with_header = Detail::new(DetailKind::Playlist, "Title", "Sub", vec![])
+            .with_artwork("https://img.local/header.jpg");
+        assert_eq!(
+            resolve_detail_cover_url(&empty_tracks_with_header),
+            Some("https://img.local/header.jpg")
+        );
+
+        // 6. Empty tracks without header art
+        let empty_tracks_no_header = Detail::new(DetailKind::Playlist, "Title", "Sub", vec![]);
+        assert_eq!(resolve_detail_cover_url(&empty_tracks_no_header), None);
     }
 }

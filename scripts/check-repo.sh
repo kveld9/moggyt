@@ -123,6 +123,7 @@ check_file "src/infra/audio.rs" true
 
 echo -e "\n${BOLD}6. Maintenance & Setup Automation (scripts/)${RESET}"
 check_file "scripts/check-repo.sh" true
+check_file "scripts/check-i18n.sh" true
 
 echo -e "\n--------------------------------------------------"
 echo -e "Audit Summary: ${TOTAL_CHECKS} checked | ${GREEN}${PASSED_CHECKS} passed${RESET} | ${RED}${FAILED_CHECKS} failed${RESET}"

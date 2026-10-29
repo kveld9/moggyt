@@ -174,12 +174,33 @@ pub struct Detail {
     pub kind: DetailKind,
     pub title: String,
     pub subtitle: String,
+    pub description: Option<String>,
+    pub artwork: Option<String>,
     pub tracks: Vec<Track>,
 }
 
 impl Detail {
     pub fn new(kind: DetailKind, title: &str, subtitle: &str, tracks: Vec<Track>) -> Self {
-        Self { kind, title: title.to_owned(), subtitle: subtitle.to_owned(), tracks }
+        Self {
+            kind,
+            title: title.to_owned(),
+            subtitle: subtitle.to_owned(),
+            description: None,
+            artwork: None,
+            tracks,
+        }
+    }
+
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        let desc = description.into();
+        self.description = if desc.trim().is_empty() { None } else { Some(desc) };
+        self
+    }
+
+    pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {
+        let art = artwork.into();
+        self.artwork = if art.trim().is_empty() { None } else { Some(art) };
+        self
     }
 }
 
@@ -194,7 +215,19 @@ mod tests {
         assert_eq!(detail.kind, DetailKind::Album);
         assert_eq!(detail.title, "Title");
         assert_eq!(detail.subtitle, "Subtitle");
+        assert_eq!(detail.description, None);
+        assert_eq!(detail.artwork, None);
         assert_eq!(detail.tracks, tracks);
+
+        let enriched = detail
+            .with_description("A collection of tracks.")
+            .with_artwork("https://img.local/cover.jpg");
+        assert_eq!(enriched.description.as_deref(), Some("A collection of tracks."));
+        assert_eq!(enriched.artwork.as_deref(), Some("https://img.local/cover.jpg"));
+
+        let trimmed_empty = enriched.with_description("   ").with_artwork("");
+        assert_eq!(trimmed_empty.description, None);
+        assert_eq!(trimmed_empty.artwork, None);
     }
 
     #[test]
