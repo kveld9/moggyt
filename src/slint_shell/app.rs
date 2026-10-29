@@ -320,6 +320,8 @@ pub struct SlintAppState<
     pub search_generation: u64,
     pub detail_generation: u64,
     pub library_generation: u64,
+
+    pub worker_tx: Option<std::sync::mpsc::Sender<PlaybackWorkerCommand>>,
 }
 
 /// Shared reference-counted wrapper for [`SlintAppState`].
@@ -430,6 +432,7 @@ impl<
             search_generation: 0,
             detail_generation: 0,
             library_generation: 0,
+            worker_tx: None,
         }
     }
 
@@ -622,7 +625,17 @@ impl<
             .detail(&playlist_id, DetailKind::Playlist)
             .ok_or_else(|| anyhow::anyhow!("playlist detail not found: {playlist_id}"))?;
         let count = detail.tracks.len();
+        let worker_tx = self.worker_tx.clone();
+        let generation = self.play_generation;
         for track in detail.tracks {
+            if let Some(ref tx) = worker_tx {
+                request_queue_track_cover(
+                    track.artwork.as_deref(),
+                    generation,
+                    &self.search_covers,
+                    tx,
+                );
+            }
             self.queue.push(track);
         }
         Ok(count)
@@ -776,8 +789,18 @@ impl<
         let current_id = current.id.clone();
         drop(audio);
         let recs = self.catalog.lock().map(|c| c.radio(&current_id)).unwrap_or_default();
+        let worker_tx = self.worker_tx.clone();
+        let generation = self.play_generation;
         for track in recs {
             if !self.queue.tracks().iter().any(|t| t.id == track.id) {
+                if let Some(ref tx) = worker_tx {
+                    request_queue_track_cover(
+                        track.artwork.as_deref(),
+                        generation,
+                        &self.search_covers,
+                        tx,
+                    );
+                }
                 self.queue.push(track);
             }
         }
@@ -1002,6 +1025,21 @@ fn resolve_row_cover_image(
     covers.get(&thumb).or_else(|| covers.get(url)).cloned().unwrap_or_default()
 }
 
+/// Dispatches a single cover fetch command with explicit generation if not already in UI cache or pending set.
+fn dispatch_cover_with_generation_if_needed(
+    url: &str,
+    generation: u64,
+    covers: &std::collections::HashMap<String, slint::Image>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    let row_url = thumbnail_variant_for_row(url);
+    if covers.contains_key(&row_url) || !seen.insert(row_url.clone()) {
+        return;
+    }
+    let _ = worker_tx.send(PlaybackWorkerCommand::FetchCover { url: row_url, generation });
+}
+
 /// Dispatches a single cover fetch command if not already in UI cache or pending set.
 fn dispatch_shelf_cover_if_needed<
     C: Catalog + Send + 'static,
@@ -1015,14 +1053,13 @@ fn dispatch_shelf_cover_if_needed<
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
     seen: &mut std::collections::HashSet<String>,
 ) {
-    let row_url = thumbnail_variant_for_row(url);
-    if state.search_covers.contains_key(&row_url) || !seen.insert(row_url.clone()) {
-        return;
-    }
-    let _ = worker_tx.send(PlaybackWorkerCommand::FetchCover {
-        url: row_url,
-        generation: state.search_generation,
-    });
+    dispatch_cover_with_generation_if_needed(
+        url,
+        state.search_generation,
+        &state.search_covers,
+        worker_tx,
+        seen,
+    );
 }
 
 /// Requests background cover decoding for all uncached artwork URLs in shelves.
@@ -1040,6 +1077,95 @@ fn request_shelf_covers<
     for url in iter_shelf_artwork_urls(&state.home_shelves) {
         dispatch_shelf_cover_if_needed(url, state, worker_tx, &mut seen);
     }
+}
+
+/// Requests background cover decoding for all uncached artwork URLs in detail view.
+pub fn request_detail_covers<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    state: &SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let Some(detail) = &state.detail else {
+        return;
+    };
+    let mut seen = std::collections::HashSet::new();
+    for track in &detail.tracks {
+        if let Some(url) = track.artwork.as_deref() {
+            dispatch_cover_with_generation_if_needed(
+                url,
+                state.detail_generation,
+                &state.search_covers,
+                worker_tx,
+                &mut seen,
+            );
+        }
+    }
+}
+
+/// Requests background cover decoding for all uncached artwork URLs in user library.
+pub fn request_library_covers<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    state: &SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let mut seen = std::collections::HashSet::new();
+    for p in &state.library_playlists {
+        if let Some(url) = p.artwork.as_deref() {
+            dispatch_cover_with_generation_if_needed(
+                url,
+                state.library_generation,
+                &state.search_covers,
+                worker_tx,
+                &mut seen,
+            );
+        }
+    }
+    for a in &state.library_albums {
+        if let Some(url) = a.artwork.as_deref() {
+            dispatch_cover_with_generation_if_needed(
+                url,
+                state.library_generation,
+                &state.search_covers,
+                worker_tx,
+                &mut seen,
+            );
+        }
+    }
+    for ar in &state.library_artists {
+        if let Some(url) = ar.artwork.as_deref() {
+            dispatch_cover_with_generation_if_needed(
+                url,
+                state.library_generation,
+                &state.search_covers,
+                worker_tx,
+                &mut seen,
+            );
+        }
+    }
+}
+
+/// Requests background cover decoding for a track being enqueued if uncached.
+pub fn request_queue_track_cover(
+    artwork_url: Option<&str>,
+    generation: u64,
+    covers: &std::collections::HashMap<String, slint::Image>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let Some(url) = artwork_url else {
+        return;
+    };
+    let mut seen = std::collections::HashSet::new();
+    dispatch_cover_with_generation_if_needed(url, generation, covers, worker_tx, &mut seen);
 }
 
 /// Converts a domain track to Slint TrackRowData with cached cover art if available.
@@ -1130,6 +1256,7 @@ fn sync_library_and_detail<
             index: i as i32,
             title: p.title.clone().into(),
             subtitle: format!("{} tracks", p.track_count).into(),
+            cover: resolve_row_cover_image(p.artwork.as_deref(), &state.search_covers),
         })
         .collect();
     window.set_library_playlists(ModelRc::new(VecModel::from(playlists)));
@@ -1142,6 +1269,7 @@ fn sync_library_and_detail<
             index: i as i32,
             title: a.title.clone().into(),
             subtitle: a.artist.clone().into(),
+            cover: resolve_row_cover_image(a.artwork.as_deref(), &state.search_covers),
         })
         .collect();
     window.set_library_albums(ModelRc::new(VecModel::from(albums)));
@@ -1154,6 +1282,7 @@ fn sync_library_and_detail<
             index: i as i32,
             title: a.name.clone().into(),
             subtitle: "Artist".into(),
+            cover: resolve_row_cover_image(a.artwork.as_deref(), &state.search_covers),
         })
         .collect();
     window.set_library_artists(ModelRc::new(VecModel::from(artists)));
@@ -1230,12 +1359,22 @@ fn trigger_playback<
     state.maybe_scrobble_current();
 
     state.current_cover_image = None;
-    state.now_playing_cover =
-        track.artwork.as_ref().and_then(|u| state.search_covers.get(u).cloned());
-    if let Some(ref img) = state.now_playing_cover {
-        window.set_now_playing_cover(img.clone());
+    let initial_cover = resolve_row_cover_image(track.artwork.as_deref(), &state.search_covers);
+    if initial_cover.size().width > 0 {
+        state.now_playing_cover = Some(initial_cover.clone());
+        window.set_now_playing_cover(initial_cover);
     } else {
+        state.now_playing_cover = None;
         window.set_now_playing_cover(slint::Image::default());
+    }
+
+    if let Some(ref art_url) = track.artwork {
+        let target_url =
+            if state.hi_res_covers { art_url.clone() } else { thumbnail_variant_for_row(art_url) };
+        if !state.search_covers.contains_key(&target_url) {
+            let _ =
+                worker_tx.send(PlaybackWorkerCommand::FetchCover { url: target_url, generation });
+        }
     }
     state.lyrics_lines.clear();
     state.lyrics_key = None;
@@ -1395,6 +1534,7 @@ fn open_detail_async<
     state: &mut SlintAppState<C, A, S, L, K>,
     browse_id: &str,
     kind: DetailKind,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let trimmed = browse_id.trim();
     if trimmed.is_empty() {
@@ -1412,6 +1552,7 @@ fn open_detail_async<
     let id = trimmed.to_string();
     let cat = Arc::clone(&state.catalog);
     let weak = window.as_weak();
+    let tx = worker_tx.clone();
 
     std::thread::spawn(move || {
         let (g, detail) = execute_detail(generation, &id, kind, &cat);
@@ -1420,6 +1561,7 @@ fn open_detail_async<
             with_ui_state::<C, A, S, L, K, _>(|st| {
                 if st.detail_generation == g {
                     st.detail = detail;
+                    request_detail_covers(st, &tx);
                     sync_library_and_detail(&win, st);
                 }
             });
@@ -1437,11 +1579,13 @@ fn refresh_library_async<
 >(
     window: &MoggytWindow,
     state: &mut SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     state.library_generation = state.library_generation.wrapping_add(1);
     let generation = state.library_generation;
     let cat = Arc::clone(&state.catalog);
     let weak = window.as_weak();
+    let tx = worker_tx.clone();
 
     std::thread::spawn(move || {
         let (g, playlists, albums) = execute_refresh_library(generation, &cat);
@@ -1452,6 +1596,7 @@ fn refresh_library_async<
                     st.library_playlists = playlists;
                     st.library_albums = albums;
                     st.library_artists = Vec::new();
+                    request_library_covers(st, &tx);
                     sync_library_and_detail(&win, st);
                 }
             });
@@ -1506,7 +1651,8 @@ fn handle_fetch_cover_command<
     covers: &Arc<Mutex<K>>,
     weak: slint::Weak<MoggytWindow>,
 ) {
-    let Some(cover) = fetch_and_decode_cover(url, covers, false) else {
+    let is_hi_res = url != thumbnail_variant_for_row(url);
+    let Some(cover) = fetch_and_decode_cover(url, covers, is_hi_res) else {
         return;
     };
     let _ = dispatch_to_ui(move || {
@@ -1535,9 +1681,19 @@ fn apply_fetched_cover_to_state<
     let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) else {
         return;
     };
-    if st.search_generation == generation {
+    let is_search = st.search_generation == generation;
+    let is_detail = st.detail_generation == generation;
+    let is_library = st.library_generation == generation;
+    let is_play = st.play_generation == generation;
+
+    if is_search || is_detail || is_library || is_play {
         st.search_covers.insert(cover.url.clone(), img.clone());
-        sync_shelves_and_queue(win, st);
+        if is_search || is_play {
+            sync_shelves_and_queue(win, st);
+        }
+        if is_detail || is_library {
+            sync_library_and_detail(win, st);
+        }
     }
     sync_now_playing_after_cover_fetch(win, st, &cover.url, &img);
 }
@@ -1558,9 +1714,16 @@ fn sync_now_playing_after_cover_fetch<
     let Some(track) = st.queue.current() else {
         return;
     };
-    let is_match = track.artwork.as_deref() == Some(cover_url)
-        || track.artwork.as_deref().map(thumbnail_variant_for_row).as_deref() == Some(cover_url);
-    if is_match && st.now_playing_cover.is_none() {
+    let is_full_match = track.artwork.as_deref() == Some(cover_url);
+    let is_thumb_match =
+        track.artwork.as_deref().map(thumbnail_variant_for_row).as_deref() == Some(cover_url);
+    if is_full_match {
+        st.now_playing_cover = Some(img.clone());
+        st.current_cover_image = Some(img.clone());
+        win.set_now_playing_cover(img.clone());
+        win.set_cover_image(img.clone());
+        win.set_has_cover(true);
+    } else if is_thumb_match && st.now_playing_cover.is_none() {
         st.now_playing_cover = Some(img.clone());
         win.set_now_playing_cover(img.clone());
     }
@@ -1697,6 +1860,7 @@ pub fn build_window<
     spawn_playback_worker::<C, A, S, L, K>(&window, adapters, worker_rx);
     request_shelf_covers(&state_rc.borrow(), &worker_tx);
 
+    state_rc.borrow_mut().worker_tx = Some(worker_tx.clone());
     sync_window(&window, &mut state_rc.borrow_mut());
     window.set_query(state_rc.borrow().search_query.as_str().into());
     wire_window_callbacks(&window, Rc::clone(&state_rc), worker_tx);
@@ -1720,6 +1884,12 @@ fn handle_filtered_item_click<
 ) {
     match item {
         SearchResult::Track(track) => {
+            request_queue_track_cover(
+                track.artwork.as_deref(),
+                state.play_generation,
+                &state.search_covers,
+                worker_tx,
+            );
             state.queue.push(track);
             let last_idx = state.queue.len().saturating_sub(1);
             state.play_track_at_index_in_memory(last_idx);
@@ -1728,13 +1898,13 @@ fn handle_filtered_item_click<
             sync_window(window, state);
         }
         SearchResult::Album(album) => {
-            open_detail_async(window, state, &album.id, DetailKind::Album);
+            open_detail_async(window, state, &album.id, DetailKind::Album, worker_tx);
         }
         SearchResult::Artist(artist) => {
-            open_detail_async(window, state, &artist.id, DetailKind::Artist);
+            open_detail_async(window, state, &artist.id, DetailKind::Artist, worker_tx);
         }
         SearchResult::Playlist(playlist) => {
-            open_detail_async(window, state, &playlist.id, DetailKind::Playlist);
+            open_detail_async(window, state, &playlist.id, DetailKind::Playlist, worker_tx);
         }
     }
 }
@@ -1753,13 +1923,14 @@ fn wire_window_callbacks<
 ) {
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_page_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         let page = SlintPage::from_index(idx);
         st.page = page;
         if page == SlintPage::Library {
-            refresh_library_async(&win, &mut st);
+            refresh_library_async(&win, &mut st, &tx);
         }
         sync_window(&win, &mut st);
     });
@@ -1815,31 +1986,34 @@ fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_playlist_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         if let Some(p) = st.library_playlists.get(idx as usize).cloned() {
-            open_detail_async(&win, &mut st, &p.id, DetailKind::Playlist);
+            open_detail_async(&win, &mut st, &p.id, DetailKind::Playlist, &tx);
         }
     });
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_album_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         if let Some(a) = st.library_albums.get(idx as usize).cloned() {
-            open_detail_async(&win, &mut st, &a.id, DetailKind::Album);
+            open_detail_async(&win, &mut st, &a.id, DetailKind::Album, &tx);
         }
     });
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_artist_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         if let Some(a) = st.library_artists.get(idx as usize).cloned() {
-            open_detail_async(&win, &mut st, &a.id, DetailKind::Artist);
+            open_detail_async(&win, &mut st, &a.id, DetailKind::Artist, &tx);
         }
     });
 
@@ -1851,6 +2025,12 @@ fn wire_window_callbacks<
         let mut st = s.borrow_mut();
         if let Some(detail) = st.detail.clone() {
             if let Some(track) = detail.tracks.get(idx as usize).cloned() {
+                request_queue_track_cover(
+                    track.artwork.as_deref(),
+                    st.play_generation,
+                    &st.search_covers,
+                    &tx,
+                );
                 st.queue.push(track);
                 let last = st.queue.len().saturating_sub(1);
                 st.play_track_at_index_in_memory(last);
@@ -1869,6 +2049,14 @@ fn wire_window_callbacks<
         if let Some(detail) = st.detail.clone() {
             if !detail.tracks.is_empty() {
                 let start_idx = st.queue.len();
+                for track in &detail.tracks {
+                    request_queue_track_cover(
+                        track.artwork.as_deref(),
+                        st.play_generation,
+                        &st.search_covers,
+                        &tx,
+                    );
+                }
                 for track in detail.tracks {
                     st.queue.push(track);
                 }
@@ -1889,6 +2077,14 @@ fn wire_window_callbacks<
             if !detail.tracks.is_empty() {
                 st.is_shuffle = true;
                 let start_idx = st.queue.len();
+                for track in &detail.tracks {
+                    request_queue_track_cover(
+                        track.artwork.as_deref(),
+                        st.play_generation,
+                        &st.search_covers,
+                        &tx,
+                    );
+                }
                 for track in detail.tracks {
                     st.queue.push(track);
                 }
@@ -1941,7 +2137,7 @@ fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
-    let tx = worker_tx;
+    let tx = worker_tx.clone();
     window.on_seek_to(move |secs| {
         let Some(win) = w.upgrade() else { return };
         let st = s.borrow();
@@ -2009,24 +2205,26 @@ fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_sign_in_submitted(move |cookies| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         if st.sign_in_from_input(cookies.as_str()) {
             win.set_cookie_text("".into());
             win.set_settings_cookie_text("".into());
-            refresh_library_async(&win, &mut st);
+            refresh_library_async(&win, &mut st, &tx);
         }
         sync_window(&win, &mut st);
     });
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_sign_out(move || {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         st.sign_out();
-        refresh_library_async(&win, &mut st);
+        refresh_library_async(&win, &mut st, &tx);
         sync_window(&win, &mut st);
     });
 
@@ -2681,5 +2879,100 @@ mod tests {
         state.play_track_at_index_in_memory(0);
         assert_eq!(state.queue.len(), 2);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+    }
+
+    #[test]
+    fn test_request_detail_covers_dispatches_with_detail_generation() {
+        let mut state = test_wired();
+        state.detail_generation = 42;
+        let track1 = Track::new("t1", "Track 1", "Artist 1")
+            .with_artwork("https://lh3.googleusercontent.com/detail-thumb-large");
+        let track2 = Track::new("t2", "Track 2", "Artist 2")
+            .with_artwork("https://i.ytimg.com/vi/abc/hqdefault.jpg");
+        state.detail =
+            Some(Detail::new(DetailKind::Album, "Album Title", "Artist", vec![track1, track2]));
+
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        request_detail_covers(&state, &tx);
+
+        let mut received = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, generation } = cmd {
+                received.push((url, generation));
+            }
+        }
+
+        assert_eq!(received.len(), 2);
+        assert_eq!(
+            received[0],
+            ("https://lh3.googleusercontent.com/detail-thumb-small".to_string(), 42)
+        );
+        assert_eq!(received[1], ("https://i.ytimg.com/vi/abc/mqdefault.jpg".to_string(), 42));
+    }
+
+    #[test]
+    fn test_request_library_covers_dispatches_all_entities() {
+        let mut state = test_wired();
+        state.library_generation = 7;
+        state.library_playlists = vec![Playlist::new(
+            "p1",
+            "Play",
+            10,
+            Some("https://lh3.googleusercontent.com/p-thumb-large".into()),
+        )];
+        state.library_albums = vec![Album::new(
+            "a1",
+            "Alb",
+            "Art",
+            Some("https://lh3.googleusercontent.com/a-thumb-large".into()),
+        )];
+        state.library_artists = vec![Artist::new(
+            "ar1",
+            "ArtName",
+            Some("https://lh3.googleusercontent.com/ar-thumb-large".into()),
+        )];
+
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        request_library_covers(&state, &tx);
+
+        let mut received = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, generation } = cmd {
+                received.push((url, generation));
+            }
+        }
+
+        assert_eq!(received.len(), 3);
+        assert_eq!(received[0], ("https://lh3.googleusercontent.com/p-thumb-small".to_string(), 7));
+        assert_eq!(received[1], ("https://lh3.googleusercontent.com/a-thumb-small".to_string(), 7));
+        assert_eq!(
+            received[2],
+            ("https://lh3.googleusercontent.com/ar-thumb-small".to_string(), 7)
+        );
+    }
+
+    #[test]
+    fn test_request_queue_track_cover_dispatches_with_play_generation() {
+        let mut state = test_wired();
+        state.play_generation = 99;
+        let track = Track::new("t1", "Track 1", "Artist 1")
+            .with_artwork("https://lh3.googleusercontent.com/q-thumb-large");
+
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        request_queue_track_cover(
+            track.artwork.as_deref(),
+            state.play_generation,
+            &state.search_covers,
+            &tx,
+        );
+
+        let cmd = rx.try_recv().expect("command dispatched");
+        match cmd {
+            PlaybackWorkerCommand::FetchCover { url, generation } => {
+                assert_eq!(url, "https://lh3.googleusercontent.com/q-thumb-small");
+                assert_eq!(generation, 99);
+            }
+            _ => panic!("unexpected command variant"),
+        }
     }
 }

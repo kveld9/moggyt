@@ -7,24 +7,42 @@ use crate::domain::{Album, Artist, Playlist};
 pub struct LibraryItemRow {
     pub title: String,
     pub subtitle: String,
+    pub artwork_url: Option<String>,
 }
 
 impl LibraryItemRow {
     pub fn new(title: impl Into<String>, subtitle: impl Into<String>) -> Self {
-        Self { title: title.into(), subtitle: subtitle.into() }
+        Self { title: title.into(), subtitle: subtitle.into(), artwork_url: None }
+    }
+
+    pub fn with_artwork(mut self, artwork_url: impl Into<String>) -> Self {
+        self.artwork_url = Some(artwork_url.into());
+        self
     }
 }
 
 pub fn playlist_row(playlist: &Playlist) -> LibraryItemRow {
-    LibraryItemRow::new(&playlist.title, format!("{} tracks", playlist.track_count))
+    LibraryItemRow {
+        title: playlist.title.clone(),
+        subtitle: format!("{} tracks", playlist.track_count),
+        artwork_url: playlist.artwork.clone(),
+    }
 }
 
 pub fn album_row(album: &Album) -> LibraryItemRow {
-    LibraryItemRow::new(&album.title, &album.artist)
+    LibraryItemRow {
+        title: album.title.clone(),
+        subtitle: album.artist.clone(),
+        artwork_url: album.artwork.clone(),
+    }
 }
 
 pub fn artist_row(artist: &Artist) -> LibraryItemRow {
-    LibraryItemRow::new(&artist.name, "Artist")
+    LibraryItemRow {
+        title: artist.name.clone(),
+        subtitle: "Artist".to_string(),
+        artwork_url: artist.artwork.clone(),
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -125,5 +143,28 @@ mod tests {
         assert_eq!(state.playlist_rows(), vec![playlist_row(&p)]);
         assert_eq!(state.album_rows(), vec![album_row(&a)]);
         assert_eq!(state.artist_rows(), vec![artist_row(&ar)]);
+    }
+
+    #[test]
+    fn test_library_display_rows_with_artwork() {
+        let p = Playlist::new("p1", "Favorites", 25, Some("https://example.com/p1.jpg".into()));
+        let a =
+            Album::new("a1", "Discovery", "Daft Punk", Some("https://example.com/a1.jpg".into()));
+        let ar = Artist::new("ar1", "Daft Punk", Some("https://example.com/ar1.jpg".into()));
+
+        assert_eq!(
+            playlist_row(&p),
+            LibraryItemRow::new("Favorites", "25 tracks")
+                .with_artwork("https://example.com/p1.jpg")
+        );
+        assert_eq!(
+            album_row(&a),
+            LibraryItemRow::new("Discovery", "Daft Punk")
+                .with_artwork("https://example.com/a1.jpg")
+        );
+        assert_eq!(
+            artist_row(&ar),
+            LibraryItemRow::new("Daft Punk", "Artist").with_artwork("https://example.com/ar1.jpg")
+        );
     }
 }
