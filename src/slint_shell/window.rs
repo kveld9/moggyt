@@ -401,3 +401,19 @@ pub(crate) fn setup_app_timer<
     });
     timer
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::slint_shell::page::SlintPage;
+    use crate::slint_shell::test_support::test_wired;
+
+    #[test]
+    fn test_build_window_constructs_without_panic_with_stubs() {
+        let state = test_wired();
+        let result = build_window(state);
+        assert!(result.is_ok(), "build_window should succeed with test stub adapters");
+        let (window, _timer) = result.unwrap();
+        assert_eq!(window.get_active_page(), SlintPage::Search.to_index());
+    }
+}

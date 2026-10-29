@@ -122,3 +122,16 @@ pub fn run() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_thin_composition_reexports_resolve() {
+        assert_eq!(SlintPage::Search.to_index(), 0);
+        let labels = StaticLabels::resolve(crate::i18n::Locale::English);
+        assert_eq!(labels.nav_search, "Search");
+        assert_eq!(format_queue_label(crate::i18n::Locale::English, 2), "Queue (2)");
+    }
+}

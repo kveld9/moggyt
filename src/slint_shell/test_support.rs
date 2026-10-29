@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Shared test support fakes and state fixtures for UI shell tests.
 //!
 //! Hexagonal invariant: in-memory stubs only; zero network, zero audio hardware, zero async.
@@ -93,5 +94,19 @@ impl Catalog for LocaleTrackingCatalog {
     fn set_locale(&mut self, locale: Locale) {
         self.locales.lock().unwrap().push(locale);
         *self.current.lock().unwrap() = locale;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::slint_shell::page::SlintPage;
+
+    #[test]
+    fn test_test_wired_builds_default_search_page() {
+        let state = test_wired();
+        assert_eq!(state.page, SlintPage::Search);
+        assert!(state.queue.is_empty());
+        assert_eq!(state.locale, Locale::default());
     }
 }
