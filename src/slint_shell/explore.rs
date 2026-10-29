@@ -5,6 +5,8 @@
 
 use std::sync::{Arc, Mutex};
 
+use slint::ComponentHandle;
+
 use crate::domain::{SearchResult, Shelf};
 use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 use crate::slint_shell::MoggytWindow;

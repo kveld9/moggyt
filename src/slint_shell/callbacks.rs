@@ -15,8 +15,8 @@ use crate::slint_shell::explore::{explore_item_at, load_explore_async};
 use crate::slint_shell::format::format_playback_speed;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
-    cycle_repeat_mode, format_position, progress_fraction, repeat_mode_to_int, should_seek,
-    toggle_like,
+    cycle_repeat_mode, format_position, is_track_liked, progress_fraction, repeat_mode_to_int,
+    should_seek, toggle_like,
 };
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::iter_shelf_items;

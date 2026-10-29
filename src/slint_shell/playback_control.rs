@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore, should_scrobble,
+    AudioBackend, Catalog, CoverCache, LyricsSource, Presence, SessionStore, should_scrobble,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::current_unix_secs;
@@ -265,6 +265,8 @@ impl<
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use crate::domain::{SkipSegment, Track};
     use crate::slint_shell::test_support::test_wired;
 

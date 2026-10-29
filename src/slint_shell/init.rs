@@ -7,9 +7,9 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, DiskCoverCache, GithubUpdater, KeyringCredentialStore,
-    LastFmClient, LiveAudio, LyricsSource, RodioBackend, SessionStore, client_from_credentials,
-    ensure_sidecar, is_newer,
+    AudioBackend, Catalog, CoverCache, CredentialStore, DiskCoverCache, GithubUpdater,
+    KeyringCredentialStore, LastFmClient, LiveAudio, LyricsSource, RodioBackend, SessionStore,
+    Updater, client_from_credentials, ensure_sidecar, is_newer,
 };
 use crate::slint_shell::state::SlintAppState;
 

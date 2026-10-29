@@ -5,10 +5,12 @@
 
 use std::sync::{Arc, Mutex};
 
+use slint::ComponentHandle;
+
 use crate::infra::{
-    DiskMetaStore, DiskQueueStore, DiskSettingsStore, DiskSkipStore, KeyringSessionStore,
-    LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir, Scrobbler, SingleInstanceGuard,
-    TrayHandle, default_config_dir,
+    AudioBackend, Catalog, DiskMetaStore, DiskQueueStore, DiskSettingsStore, DiskSkipStore,
+    KeyringSessionStore, LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir, QueueStore,
+    Scrobbler, SettingsStore, SingleInstanceGuard, TrayHandle, default_config_dir,
 };
 
 pub use crate::slint_shell::covers::{
