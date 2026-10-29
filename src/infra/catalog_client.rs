@@ -1009,6 +1009,21 @@ fn detail_header_description(value: &Value) -> Option<String> {
     description_from_runs(header).or_else(|| description_from_simple(header))
 }
 
+fn detail_microformat_title(value: &Value) -> Option<String> {
+    let text = value.pointer("/microformat/microformatDataRenderer/title")?.as_str()?.trim();
+    if text.is_empty() { None } else { Some(text.to_owned()) }
+}
+
+fn detail_microformat_description(value: &Value) -> Option<String> {
+    let text = value.pointer("/microformat/microformatDataRenderer/description")?.as_str()?.trim();
+    if text.is_empty() { None } else { Some(text.to_owned()) }
+}
+
+fn detail_microformat_artwork(value: &Value) -> Option<String> {
+    let renderer = value.pointer("/microformat/microformatDataRenderer")?;
+    best_thumbnail(renderer)
+}
+
 fn detail_header_artwork(value: &Value) -> Option<String> {
     let header = detail_header_node(value)?;
     best_thumbnail(header)
@@ -1121,17 +1136,24 @@ fn collect_detail_tracks(value: &Value) -> Vec<Track> {
 ///
 /// Returns `None` when neither a header title nor any valid track items are found.
 pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
-    let title = detail_header_title(value);
+    let mut title = detail_header_title(value);
+    if title.is_empty() {
+        if let Some(fallback) = detail_microformat_title(value) {
+            title = fallback;
+        }
+    }
     let subtitle = detail_header_subtitle(value);
     let tracks = collect_detail_tracks(value);
     if title.is_empty() && tracks.is_empty() {
         return None;
     }
     let mut detail = Detail::new(kind, &title, &subtitle, tracks);
-    if let Some(desc) = detail_header_description(value) {
+    let desc = detail_header_description(value).or_else(|| detail_microformat_description(value));
+    if let Some(desc) = desc {
         detail = detail.with_description(desc);
     }
-    if let Some(art) = detail_header_artwork(value) {
+    let art = detail_header_artwork(value).or_else(|| detail_microformat_artwork(value));
+    if let Some(art) = art {
         detail = detail.with_artwork(art);
     }
     Some(detail)
@@ -2219,6 +2241,30 @@ mod tests {
             Track::new("p-track-1", "Playlist Track 1", "Playlist Artist 1")
                 .with_duration(252)
                 .with_artwork("https://img.local/p_t1.jpg")
+        );
+    }
+
+    #[test]
+    fn parse_detail_all_mix_golden_fixture() {
+        let raw = include_str!("../../tests/fixtures/catalog_mix_detail.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let detail = parse_detail_all(&payload, DetailKind::Playlist).expect("parsed detail");
+        assert_eq!(detail.kind, DetailKind::Playlist);
+        assert_eq!(detail.title, "Clásicos de la Cumbia Argentina");
+        assert_eq!(detail.subtitle, "");
+        assert_eq!(detail.description.as_deref(), Some("Lista de reproducción • YouTube Music"));
+        assert_eq!(
+            detail.artwork.as_deref(),
+            Some(
+                "https://yt3.googleusercontent.com/xkWPhHWhGL36aRI8LVgeavJRd0GohhE2RZYMswdwuk9zqMjlNztDew3QpYi7VAS4DaSpbMW_lIUJ3Vg=w544-h544-l90-rj"
+            )
+        );
+        assert_eq!(detail.tracks.len(), 2);
+        assert_eq!(
+            detail.tracks[0],
+            Track::new("U1FKs6yBbmo", "Yo Tomo Licor", "Amar Azul")
+                .with_duration(151)
+                .with_artwork("https://yt3.googleusercontent.com/5vFLgD23SHCS1DpEOaviRl9UtOavRu2cv_DPVFuoveHZpPyNmuEGwZX0_otVrfzsO6N3jElN_vOI2cTz=w120-h120-l90-rj")
         );
     }
 
