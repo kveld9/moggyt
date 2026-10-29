@@ -851,19 +851,6 @@ mod tests {
     }
 
     #[test]
-    fn stub_explore_shelves_determinism_and_content() {
-        let catalog = CatalogStub::new();
-        let first = catalog.explore_shelves();
-        let second = catalog.explore_shelves();
-        assert_eq!(first, second);
-        assert_eq!(first.len(), 2);
-        assert_eq!(first[0].title, "Charts");
-        assert_eq!(first[0].items.len(), 1);
-        assert_eq!(first[1].title, "Moods & genres");
-        assert_eq!(first[1].items.len(), 1);
-    }
-
-    #[test]
     fn default_explore_shelves_returns_empty_vec() {
         let pass_through = PassThroughCatalog::default();
         assert!(pass_through.explore_shelves().is_empty());

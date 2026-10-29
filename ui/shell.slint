@@ -79,6 +79,26 @@ component IconPause inherits Rectangle {
     }
 }
 
+component IconBack inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 19 12 L 5 12 M 12 19 L 5 12 L 12 5";
+    }
+}
+
 component IconPrev inherits Rectangle {
     in property <color> tint: Theme.text;
     in property <length> size: 20px;
@@ -566,7 +586,10 @@ component NavItem inherits Rectangle {
 
 component Sidebar inherits Rectangle {
     in property <int> active-page: 0;
+    in property <string> nav-search-label: "Search";
     in property <string> nav-explore-label: "Explore";
+    in property <string> nav-library-label: "Library";
+    in property <string> nav-now-playing-label: "Now Playing";
     callback page-selected(int);
 
     width: 200px;
@@ -587,7 +610,7 @@ component Sidebar inherits Rectangle {
         Rectangle { height: 12px; }
 
         NavItem {
-            text: "Buscar";
+            text: root.nav-search-label;
             icon-name: "search";
             is-active: root.active-page == 0;
             clicked => { root.page-selected(0); }
@@ -601,14 +624,14 @@ component Sidebar inherits Rectangle {
         }
 
         NavItem {
-            text: "Biblioteca";
+            text: root.nav-library-label;
             icon-name: "library";
             is-active: root.active-page == 3;
             clicked => { root.page-selected(3); }
         }
 
         NavItem {
-            text: "Sonando";
+            text: root.nav-now-playing-label;
             icon-name: "music";
             is-active: root.active-page == 2;
             clicked => { root.page-selected(2); }
@@ -714,18 +737,21 @@ component TrackRow inherits Rectangle {
         padding-right: 12px;
         spacing: 12px;
 
-        Rectangle {
-            width: 40px;
-            height: 40px;
-            border-radius: 6px;
-            background: Theme.surface;
-            clip: true;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 6px;
+                background: Theme.surface;
+                clip: true;
 
-            Image {
-                width: parent.width;
-                height: parent.height;
-                source: root.cover;
-                image-fit: ImageFit.cover;
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: ImageFit.cover;
+                }
             }
         }
 
@@ -740,6 +766,7 @@ component TrackRow inherits Rectangle {
                 font-size: 14px;
                 font-weight: 600;
                 overflow: elide;
+                vertical-alignment: center;
             }
 
             if root.subtitle-text != "" : Text {
@@ -747,6 +774,7 @@ component TrackRow inherits Rectangle {
                 color: Theme.secondary;
                 font-size: 12px;
                 overflow: elide;
+                vertical-alignment: center;
             }
         }
 
@@ -765,6 +793,14 @@ component SearchView inherits VerticalLayout {
     in-out property <string> query: "";
     in property <[ShelfData]> shelves: [];
     in property <int> active-filter: 0;
+    in property <string> placeholder-text: "Search songs...";
+    in property <string> search-button-label: "Search";
+    in property <string> filter-all-label: "All";
+    in property <string> filter-songs-label: "Songs";
+    in property <string> filter-albums-label: "Albums";
+    in property <string> filter-artists-label: "Artists";
+    in property <string> filter-playlists-label: "Playlists";
+    in property <string> empty-text: "No results found.";
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
@@ -820,7 +856,7 @@ component SearchView inherits VerticalLayout {
                     if root.query == "" && !input.has-focus : Text {
                         width: parent.width;
                         height: parent.height;
-                        text: "Buscar canciones...";
+                        text: root.placeholder-text;
                         color: Theme.secondary;
                         vertical-alignment: center;
 
@@ -877,7 +913,7 @@ component SearchView inherits VerticalLayout {
                 }
 
                 Text {
-                    text: "Buscar";
+                    text: root.search-button-label;
                     color: btn-touch.has-hover ? Theme.text : Theme.window;
                     font-size: 13px;
                     font-weight: 700;
@@ -892,27 +928,27 @@ component SearchView inherits VerticalLayout {
         alignment: start;
 
         FilterChip {
-            text: "Todo";
+            text: root.filter-all-label;
             is-active: root.active-filter == 0;
             clicked => { root.filter-selected(0); }
         }
         FilterChip {
-            text: "Canciones";
+            text: root.filter-songs-label;
             is-active: root.active-filter == 1;
             clicked => { root.filter-selected(1); }
         }
         FilterChip {
-            text: "Álbumes";
+            text: root.filter-albums-label;
             is-active: root.active-filter == 2;
             clicked => { root.filter-selected(2); }
         }
         FilterChip {
-            text: "Artistas";
+            text: root.filter-artists-label;
             is-active: root.active-filter == 3;
             clicked => { root.filter-selected(3); }
         }
         FilterChip {
-            text: "Listas";
+            text: root.filter-playlists-label;
             is-active: root.active-filter == 4;
             clicked => { root.filter-selected(4); }
         }
@@ -923,7 +959,7 @@ component SearchView inherits VerticalLayout {
         alignment: center;
 
         Text {
-            text: "No se encontraron resultados.";
+            text: root.empty-text;
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
@@ -1014,8 +1050,8 @@ component ExploreView inherits VerticalLayout {
     }
 }
 
-export component PlayerBar inherits Rectangle {
-    in property <string> active-track-title: "Sin reproducción";
+component PlayerBar inherits Rectangle {
+    in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
     in property <bool> is-playing: false;
     in property <int> volume: 100;
@@ -1029,6 +1065,7 @@ export component PlayerBar inherits Rectangle {
     in property <int> position-secs: 0;
     in property <int> duration-secs: 0;
     in property <int> queue-count: 0;
+    in property <string> queue-button-text: "Queue";
 
     callback toggle-play();
     callback prev-track();
@@ -1083,7 +1120,7 @@ export component PlayerBar inherits Rectangle {
                 spacing: 2px;
 
                 Text {
-                    text: root.active-track-title == "No track playing" ? "Sin reproducción" : root.active-track-title;
+                    text: root.active-track-title;
                     color: Theme.text;
                     font-size: 13px;
                     font-weight: 700;
@@ -1340,7 +1377,7 @@ export component PlayerBar inherits Rectangle {
                     }
 
                     Text {
-                        text: root.queue-count > 0 ? "Cola (" + root.queue-count + ")" : "Cola";
+                        text: root.queue-button-text;
                         color: q-touch.has-hover ? Theme.accent : Theme.text;
                         font-size: 11px;
                         font-weight: 700;
@@ -1424,15 +1461,16 @@ export component PlayerBar inherits Rectangle {
     }
 }
 
-export component QueueView inherits VerticalLayout {
+component QueueView inherits VerticalLayout {
     in property <[TrackRowData]> tracks: [];
     in property <int> selected-index: -1;
+    in property <string> empty-text: "The queue is empty.";
     callback track-selected(int);
 
     spacing: 8px; alignment: start;
     if root.tracks.length == 0 : VerticalLayout {
         padding-top: 24px; alignment: center;
-        Text { text: "La cola está vacía."; color: Theme.secondary; font-size: 14px; horizontal-alignment: center; }
+        Text { text: root.empty-text; color: Theme.secondary; font-size: 14px; horizontal-alignment: center; }
     }
     for track in root.tracks : TrackRow {
         title: track.title;
@@ -1446,8 +1484,8 @@ export component QueueView inherits VerticalLayout {
     }
 }
 
-export component NowPlayingView inherits VerticalLayout {
-    in property <string> track-title: "Sin reproducción";
+component NowPlayingView inherits VerticalLayout {
+    in property <string> track-title: "No track playing";
     in property <string> track-artist: "";
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
@@ -1456,6 +1494,9 @@ export component NowPlayingView inherits VerticalLayout {
     in property <bool> has-cover: false;
     in property <[LyricLineData]> lyrics-lines: [];
     in property <int> active-lyric-index: -1;
+    in property <string> no-cover-text: "No cover";
+    in property <string> lyrics-unavailable-text: "Lyrics unavailable";
+    in property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
 
     spacing: 16px; alignment: start;
 
@@ -1469,13 +1510,13 @@ export component NowPlayingView inherits VerticalLayout {
                 image-fit: cover;
             }
             if !root.has-cover : Text {
-                text: "Sin portada"; color: Theme.secondary; font-size: 12px;
+                text: root.no-cover-text; color: Theme.secondary; font-size: 12px;
                 horizontal-alignment: center; vertical-alignment: center;
             }
         }
         VerticalLayout {
             spacing: 6px; alignment: center;
-            Text { text: root.track-title == "No track playing" ? "Sin reproducción" : root.track-title; color: Theme.text; font-size: 20px; font-weight: 700; }
+            Text { text: root.track-title; color: Theme.text; font-size: 20px; font-weight: 700; }
             Text { text: root.track-artist; color: Theme.secondary; font-size: 14px; }
             Rectangle { height: 6px; }
             // Progress bar
@@ -1495,8 +1536,8 @@ export component NowPlayingView inherits VerticalLayout {
         height: 140px; border-radius: 8px; background: Theme.panel;
         VerticalLayout {
             alignment: center; spacing: 4px;
-            Text { text: "Letras no disponibles"; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
-            Text { text: "Las letras sincronizadas aparecerán durante la reproducción"; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
+            Text { text: root.lyrics-unavailable-text; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
+            Text { text: root.lyrics-hint-text; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
         }
     }
 
@@ -1532,18 +1573,21 @@ component LibraryItemCard inherits Rectangle {
         padding-right: 8px;
         spacing: 12px;
 
-        Rectangle {
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
-            background: Theme.surface;
-            clip: true;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 36px;
+                height: 36px;
+                border-radius: 6px;
+                background: Theme.surface;
+                clip: true;
 
-            Image {
-                width: parent.width;
-                height: parent.height;
-                source: root.cover;
-                image-fit: ImageFit.cover;
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: ImageFit.cover;
+                }
             }
         }
 
@@ -1569,12 +1613,23 @@ component LibraryItemCard inherits Rectangle {
     }
 }
 
-export component LibraryView inherits VerticalLayout {
+component LibraryView inherits VerticalLayout {
     in-out property <string> cookie-text: "";
     in property <bool> signed-in: false;
     in property <[LibraryItemData]> playlists: [];
     in property <[LibraryItemData]> albums: [];
     in property <[LibraryItemData]> artists: [];
+    in property <string> session-anonymous-hint: "Anonymous session: paste cookies to unlock library";
+    in property <string> session-cookie-placeholder: "Paste session cookies...";
+    in property <string> sign-in-label: "Sign in";
+    in property <string> session-signed-in-hint: "Signed in: library unlocked";
+    in property <string> sign-out-label: "Sign out";
+    in property <string> section-playlists-label: "Playlists";
+    in property <string> empty-playlists-text: "No playlists found.";
+    in property <string> section-albums-label: "Albums";
+    in property <string> empty-albums-text: "No albums found.";
+    in property <string> section-artists-label: "Artists";
+    in property <string> empty-artists-text: "No artists found.";
     callback playlist-selected(int);
     callback album-selected(int);
     callback artist-selected(int);
@@ -1595,7 +1650,7 @@ export component LibraryView inherits VerticalLayout {
                 spacing: 8px;
 
                 Text {
-                    text: "Sesión anónima: pegar cookies para desbloquear la biblioteca";
+                    text: root.session-anonymous-hint;
                     color: Theme.secondary;
                     font-size: 13px;
                 }
@@ -1606,7 +1661,7 @@ export component LibraryView inherits VerticalLayout {
 
                     StyledInputField {
                         text <=> root.cookie-text;
-                        placeholder-text: "Pegar cookies de sesión...";
+                        placeholder-text: root.session-cookie-placeholder;
                         input-type: InputType.password;
                         accepted(t) => { root.sign-in-submitted(t); }
                     }
@@ -1622,7 +1677,7 @@ export component LibraryView inherits VerticalLayout {
                         }
 
                         Text {
-                            text: "Iniciar sesión";
+                            text: root.sign-in-label;
                             color: sign-in-btn.has-hover ? Theme.text : Theme.window;
                             font-size: 12px;
                             font-weight: 700;
@@ -1638,7 +1693,7 @@ export component LibraryView inherits VerticalLayout {
                 alignment: space-between;
 
                 Text {
-                    text: "Sesión iniciada: biblioteca desbloqueada";
+                    text: root.session-signed-in-hint;
                     color: Theme.accent;
                     font-size: 13px;
                     font-weight: 700;
@@ -1657,7 +1712,7 @@ export component LibraryView inherits VerticalLayout {
                     }
 
                     Text {
-                        text: "Cerrar sesión";
+                        text: root.sign-out-label;
                         color: Theme.text;
                         font-size: 12px;
                         font-weight: 700;
@@ -1671,33 +1726,38 @@ export component LibraryView inherits VerticalLayout {
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Listas de reproducción"; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.playlists.length == 0 : Text { text: "No hay listas de reproducción."; color: Theme.secondary; font-size: 13px; }
+        Text { text: root.section-playlists-label; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.playlists.length == 0 : Text { text: root.empty-playlists-text; color: Theme.secondary; font-size: 13px; }
         for item in root.playlists : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.playlist-selected(item.index); } }
     }
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Álbumes"; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.albums.length == 0 : Text { text: "No hay álbumes."; color: Theme.secondary; font-size: 13px; }
+        Text { text: root.section-albums-label; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.albums.length == 0 : Text { text: root.empty-albums-text; color: Theme.secondary; font-size: 13px; }
         for item in root.albums : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.album-selected(item.index); } }
     }
 
     VerticalLayout {
         spacing: 6px;
-        Text { text: "Artistas"; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.artists.length == 0 : Text { text: "No hay artistas."; color: Theme.secondary; font-size: 13px; }
+        Text { text: root.section-artists-label; color: Theme.text; font-size: 16px; font-weight: 700; }
+        if root.artists.length == 0 : Text { text: root.empty-artists-text; color: Theme.secondary; font-size: 13px; }
         for item in root.artists : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.artist-selected(item.index); } }
     }
 }
 
-export component DetailView inherits VerticalLayout {
+component DetailView inherits VerticalLayout {
     in property <bool> has-detail: false;
     in property <string> title: "";
     in property <string> subtitle: "";
     in property <string> kind-label: "";
     in property <image> cover;
     in property <[TrackRowData]> tracks: [];
+    in property <string> empty-text: "No details available.";
+    in property <string> no-cover-text: "No cover";
+    in property <string> play-button-label: "Play";
+    in property <string> shuffle-button-label: "Shuffle";
+    in property <string> empty-songs-text: "No songs available.";
     callback track-selected(int);
     callback play();
     callback shuffle();
@@ -1708,7 +1768,7 @@ export component DetailView inherits VerticalLayout {
         padding-top: 24px;
         alignment: center;
         Text {
-            text: "No hay detalles disponibles.";
+            text: root.empty-text;
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
@@ -1742,7 +1802,7 @@ export component DetailView inherits VerticalLayout {
                     image-fit: ImageFit.cover;
                 }
                 if root.cover.width == 0 && (root.tracks.length == 0 || root.tracks[0].cover.width == 0) : Text {
-                    text: root.kind-label != "" ? (root.kind-label == "Album" ? "ÁLBUM" : (root.kind-label == "Artist" ? "ARTISTA" : (root.kind-label == "Playlist" ? "LISTA" : root.kind-label))) : "Sin portada";
+                    text: root.kind-label != "" ? root.kind-label : root.no-cover-text;
                     color: Theme.secondary;
                     font-size: 12px;
                     font-weight: 700;
@@ -1757,7 +1817,7 @@ export component DetailView inherits VerticalLayout {
                 horizontal-stretch: 1;
 
                 Text {
-                    text: root.kind-label == "Album" ? "ÁLBUM" : (root.kind-label == "Artist" ? "ARTISTA" : (root.kind-label == "Playlist" ? "LISTA" : root.kind-label));
+                    text: root.kind-label;
                     color: Theme.accent;
                     font-size: 11px;
                     font-weight: 700;
@@ -1800,13 +1860,16 @@ export component DetailView inherits VerticalLayout {
                             spacing: 8px;
                             alignment: center;
 
-                            IconPlay {
-                                size: 16px;
-                                tint: play-touch.has-hover ? Theme.text : Theme.window;
+                            VerticalLayout {
+                                alignment: center;
+                                IconPlay {
+                                    size: 16px;
+                                    tint: play-touch.has-hover ? Theme.text : Theme.window;
+                                }
                             }
 
                             Text {
-                                text: "Reproducir";
+                                text: root.play-button-label;
                                 color: play-touch.has-hover ? Theme.text : Theme.window;
                                 font-size: 13px;
                                 font-weight: 700;
@@ -1831,13 +1894,16 @@ export component DetailView inherits VerticalLayout {
                             spacing: 8px;
                             alignment: center;
 
-                            IconShuffle {
-                                size: 16px;
-                                tint: shuf-touch.has-hover ? Theme.accent : Theme.text;
+                            VerticalLayout {
+                                alignment: center;
+                                IconShuffle {
+                                    size: 16px;
+                                    tint: shuf-touch.has-hover ? Theme.accent : Theme.text;
+                                }
                             }
 
                             Text {
-                                text: "Aleatorio";
+                                text: root.shuffle-button-label;
                                 color: shuf-touch.has-hover ? Theme.accent : Theme.text;
                                 font-size: 13px;
                                 font-weight: 700;
@@ -1858,7 +1924,7 @@ export component DetailView inherits VerticalLayout {
             padding-top: 16px;
             alignment: center;
             Text {
-                text: "No hay canciones disponibles.";
+                text: root.empty-songs-text;
                 color: Theme.secondary;
                 font-size: 13px;
                 horizontal-alignment: center;
@@ -1877,14 +1943,29 @@ export component DetailView inherits VerticalLayout {
     }
 }
 
-export component SettingsView inherits VerticalLayout {
+component SettingsView inherits VerticalLayout {
     in property <int> active-theme-index: 0;
     in property <string> playback-speed-text: "1.00x";
     in property <bool> signed-in: false;
     in-out property <string> cookie-text: "";
     in property <string> app-version: "0.1.0";
-    in property <string> update-status-text: "Actualizado";
+    in property <string> update-status-text: "Up to date";
     in property <bool> has-update: false;
+    in property <string> section-theme-label: "Theme";
+    in property <string> theme-white-label: "White";
+    in property <string> theme-black-oled-label: "Black OLED";
+    in property <string> theme-mono-label: "Mono";
+    in property <string> section-playback-label: "Playback";
+    in property <string> playback-speed-label: "Playback speed";
+    in property <string> section-session-label: "Session";
+    in property <string> status-signed-in-label: "Status: Signed in";
+    in property <string> sign-out-label: "Sign out";
+    in property <string> status-anonymous-label: "Status: Anonymous";
+    in property <string> session-cookie-placeholder: "Paste session cookies...";
+    in property <string> sign-in-label: "Sign in";
+    in property <string> section-about-label: "About";
+    in property <string> app-version-label: "App version";
+    in property <string> update-status-label: "Update status";
 
     callback theme-selected(int);
     callback cycle-playback-speed();
@@ -1899,7 +1980,7 @@ export component SettingsView inherits VerticalLayout {
         spacing: 10px;
 
         Text {
-            text: "Tema";
+            text: root.section-theme-label;
             color: Theme.text;
             font-size: 16px;
             font-weight: 700;
@@ -1923,7 +2004,7 @@ export component SettingsView inherits VerticalLayout {
                     alignment: center;
 
                     Text {
-                        text: "Blanco";
+                        text: root.theme-white-label;
                         color: root.active-theme-index == 0 ? Theme.window : Theme.text;
                         font-size: 13px;
                         font-weight: 600;
@@ -1948,7 +2029,7 @@ export component SettingsView inherits VerticalLayout {
                     alignment: center;
 
                     Text {
-                        text: "Negro OLED";
+                        text: root.theme-black-oled-label;
                         color: root.active-theme-index == 1 ? Theme.window : Theme.text;
                         font-size: 13px;
                         font-weight: 600;
@@ -1973,7 +2054,7 @@ export component SettingsView inherits VerticalLayout {
                     alignment: center;
 
                     Text {
-                        text: "Monocromo";
+                        text: root.theme-mono-label;
                         color: root.active-theme-index == 2 ? Theme.window : Theme.text;
                         font-size: 13px;
                         font-weight: 600;
@@ -1990,7 +2071,7 @@ export component SettingsView inherits VerticalLayout {
         spacing: 10px;
 
         Text {
-            text: "Reproducción";
+            text: root.section-playback-label;
             color: Theme.text;
             font-size: 16px;
             font-weight: 700;
@@ -2005,7 +2086,7 @@ export component SettingsView inherits VerticalLayout {
                 alignment: space-between;
 
                 Text {
-                    text: "Velocidad de reproducción";
+                    text: root.playback-speed-label;
                     color: Theme.text;
                     font-size: 14px;
                     vertical-alignment: center;
@@ -2040,7 +2121,7 @@ export component SettingsView inherits VerticalLayout {
         spacing: 10px;
 
         Text {
-            text: "Sesión";
+            text: root.section-session-label;
             color: Theme.text;
             font-size: 16px;
             font-weight: 700;
@@ -2058,7 +2139,7 @@ export component SettingsView inherits VerticalLayout {
                     alignment: space-between;
 
                     Text {
-                        text: "Estado: Sesión iniciada";
+                        text: root.status-signed-in-label;
                         color: Theme.accent;
                         font-size: 14px;
                         font-weight: 600;
@@ -2077,7 +2158,7 @@ export component SettingsView inherits VerticalLayout {
                         }
 
                         Text {
-                            text: "Cerrar sesión";
+                            text: root.sign-out-label;
                             color: Theme.text;
                             font-size: 12px;
                             font-weight: 700;
@@ -2091,7 +2172,7 @@ export component SettingsView inherits VerticalLayout {
                     spacing: 10px;
 
                     Text {
-                        text: "Estado: Anónimo";
+                        text: root.status-anonymous-label;
                         color: Theme.secondary;
                         font-size: 14px;
                     }
@@ -2102,7 +2183,7 @@ export component SettingsView inherits VerticalLayout {
 
                         StyledInputField {
                             text <=> root.cookie-text;
-                            placeholder-text: "Pegar cookies de sesión...";
+                            placeholder-text: root.session-cookie-placeholder;
                             input-type: InputType.password;
                             accepted(t) => { root.sign-in-submitted(t); }
                         }
@@ -2118,7 +2199,7 @@ export component SettingsView inherits VerticalLayout {
                             }
 
                             Text {
-                                text: "Iniciar sesión";
+                                text: root.sign-in-label;
                                 color: sign-in-touch.has-hover ? Theme.text : Theme.window;
                                 font-size: 12px;
                                 font-weight: 700;
@@ -2137,7 +2218,7 @@ export component SettingsView inherits VerticalLayout {
         spacing: 10px;
 
         Text {
-            text: "Acerca de";
+            text: root.section-about-label;
             color: Theme.text;
             font-size: 16px;
             font-weight: 700;
@@ -2155,7 +2236,7 @@ export component SettingsView inherits VerticalLayout {
                     alignment: space-between;
 
                     Text {
-                        text: "Versión de la app";
+                        text: root.app-version-label;
                         color: Theme.secondary;
                         font-size: 13px;
                     }
@@ -2172,341 +2253,17 @@ export component SettingsView inherits VerticalLayout {
                     alignment: space-between;
 
                     Text {
-                        text: "Estado de actualización";
+                        text: root.update-status-label;
                         color: Theme.secondary;
                         font-size: 13px;
                     }
 
                     Text {
-                        text: root.update-status-text == "Up to date" ? "Actualizado" : (
-                            root.update-status-text == "Update available" ? "Actualización disponible" : root.update-status-text
-                        );
+                        text: root.update-status-text;
                         color: root.has-update ? Theme.accent : Theme.secondary;
                         font-size: 13px;
                         font-weight: 600;
                     }
-                }
-            }
-        }
-    }
-}
-
-export component SettingsDialog inherits Rectangle {
-    in property <int> active-theme-index: 0;
-    in property <string> playback-speed-text: "1.00x";
-    in property <bool> signed-in: false;
-    in-out property <string> cookie-text: "";
-    in property <string> app-version: "0.1.0";
-    in property <string> update-status-text: "Actualizado";
-    in property <bool> has-update: false;
-
-    callback close();
-    callback theme-selected(int);
-    callback cycle-playback-speed();
-    callback sign-in-submitted(string);
-    callback sign-out();
-
-    TouchArea {}
-
-    width: 480px;
-    border-radius: 12px;
-    background: Theme.panel;
-    border-width: 1px;
-    border-color: Theme.border;
-
-    VerticalLayout {
-        padding: 20px;
-        spacing: 16px;
-        alignment: start;
-
-        HorizontalLayout {
-            alignment: space-between;
-
-            Text {
-                text: "Ajustes";
-                color: Theme.text;
-                font-size: 18px;
-                font-weight: 700;
-                vertical-alignment: center;
-            }
-
-            Rectangle {
-                width: 32px;
-                height: 32px;
-                border-radius: 8px;
-                background: close-touch.pressed ? Theme.overlay : (close-touch.has-hover ? Theme.hover : transparent);
-                animate background { duration: 150ms; easing: ease-in-out; }
-
-                close-touch := TouchArea {
-                    clicked => { root.close(); }
-                }
-
-                IconClose {
-                    size: 16px;
-                    tint: close-touch.has-hover ? Theme.accent : Theme.secondary;
-                }
-            }
-        }
-
-        Rectangle {
-            height: 1px;
-            background: Theme.border;
-        }
-
-        // Section (a): Theme
-        VerticalLayout {
-            spacing: 8px;
-
-            Text {
-                text: "Tema";
-                color: Theme.text;
-                font-size: 14px;
-                font-weight: 700;
-            }
-
-            HorizontalLayout {
-                spacing: 8px;
-
-                Rectangle {
-                    height: 36px;
-                    horizontal-stretch: 1;
-                    border-radius: 8px;
-                    background: root.active-theme-index == 0 ? Theme.accent : (th0-touch.pressed ? Theme.overlay : (th0-touch.has-hover ? Theme.hover : Theme.surface));
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    th0-touch := TouchArea {
-                        clicked => { root.theme-selected(0); }
-                    }
-
-                    Text {
-                        text: "Blanco";
-                        color: root.active-theme-index == 0 ? Theme.window : Theme.text;
-                        font-size: 12px;
-                        font-weight: 600;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
-
-                Rectangle {
-                    height: 36px;
-                    horizontal-stretch: 1;
-                    border-radius: 8px;
-                    background: root.active-theme-index == 1 ? Theme.accent : (th1-touch.pressed ? Theme.overlay : (th1-touch.has-hover ? Theme.hover : Theme.surface));
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    th1-touch := TouchArea {
-                        clicked => { root.theme-selected(1); }
-                    }
-
-                    Text {
-                        text: "Negro OLED";
-                        color: root.active-theme-index == 1 ? Theme.window : Theme.text;
-                        font-size: 12px;
-                        font-weight: 600;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
-
-                Rectangle {
-                    height: 36px;
-                    horizontal-stretch: 1;
-                    border-radius: 8px;
-                    background: root.active-theme-index == 2 ? Theme.accent : (th2-touch.pressed ? Theme.overlay : (th2-touch.has-hover ? Theme.hover : Theme.surface));
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    th2-touch := TouchArea {
-                        clicked => { root.theme-selected(2); }
-                    }
-
-                    Text {
-                        text: "Monocromo";
-                        color: root.active-theme-index == 2 ? Theme.window : Theme.text;
-                        font-size: 12px;
-                        font-weight: 600;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-        }
-
-        // Section (b): Playback
-        VerticalLayout {
-            spacing: 8px;
-
-            Text {
-                text: "Reproducción";
-                color: Theme.text;
-                font-size: 14px;
-                font-weight: 700;
-            }
-
-            HorizontalLayout {
-                alignment: space-between;
-
-                Text {
-                    text: "Velocidad de reproducción";
-                    color: Theme.secondary;
-                    font-size: 13px;
-                    vertical-alignment: center;
-                }
-
-                Rectangle {
-                    width: 90px;
-                    height: 32px;
-                    border-radius: 8px;
-                    background: speed-touch.pressed ? Theme.overlay : (speed-touch.has-hover ? Theme.hover : Theme.surface);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    speed-touch := TouchArea {
-                        clicked => { root.cycle-playback-speed(); }
-                    }
-
-                    Text {
-                        text: root.playback-speed-text;
-                        color: Theme.accent;
-                        font-size: 12px;
-                        font-weight: 700;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-        }
-
-        // Section (c): Session
-        VerticalLayout {
-            spacing: 8px;
-
-            Text {
-                text: "Sesión";
-                color: Theme.text;
-                font-size: 14px;
-                font-weight: 700;
-            }
-
-            if root.signed-in : HorizontalLayout {
-                alignment: space-between;
-
-                Text {
-                    text: "Estado: Sesión iniciada";
-                    color: Theme.accent;
-                    font-size: 13px;
-                    font-weight: 600;
-                    vertical-alignment: center;
-                }
-
-                Rectangle {
-                    width: 90px;
-                    height: 32px;
-                    border-radius: 8px;
-                    background: sign-out-touch.pressed ? Theme.overlay : (sign-out-touch.has-hover ? Theme.hover : Theme.surface);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    sign-out-touch := TouchArea {
-                        clicked => { root.sign-out(); }
-                    }
-
-                    Text {
-                        text: "Cerrar sesión";
-                        color: Theme.text;
-                        font-size: 12px;
-                        font-weight: 700;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-
-            if !root.signed-in : VerticalLayout {
-                spacing: 8px;
-
-                Text {
-                    text: "Estado: Anónimo";
-                    color: Theme.secondary;
-                    font-size: 13px;
-                }
-
-                HorizontalLayout {
-                    spacing: 8px;
-                    height: 32px;
-
-                    StyledInputField {
-                        text <=> root.cookie-text;
-                        placeholder-text: "Pegar cookies de sesión...";
-                        input-type: InputType.password;
-                        accepted(t) => { root.sign-in-submitted(t); }
-                    }
-
-                    Rectangle {
-                        width: 90px;
-                        border-radius: 8px;
-                        background: sign-in-touch.pressed ? Theme.overlay : (sign-in-touch.has-hover ? Theme.hover : Theme.accent);
-                        animate background { duration: 150ms; easing: ease-in-out; }
-
-                        sign-in-touch := TouchArea {
-                            clicked => { root.sign-in-submitted(root.cookie-text); }
-                        }
-
-                        Text {
-                            text: "Iniciar sesión";
-                            color: sign-in-touch.has-hover ? Theme.text : Theme.window;
-                            font-size: 12px;
-                            font-weight: 700;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Section (d): About
-        VerticalLayout {
-            spacing: 6px;
-
-            Text {
-                text: "Acerca de";
-                color: Theme.text;
-                font-size: 14px;
-                font-weight: 700;
-            }
-
-            HorizontalLayout {
-                alignment: space-between;
-
-                Text {
-                    text: "Versión de la app";
-                    color: Theme.secondary;
-                    font-size: 12px;
-                }
-
-                Text {
-                    text: root.app-version;
-                    color: Theme.text;
-                    font-size: 12px;
-                    font-weight: 600;
-                }
-            }
-
-            HorizontalLayout {
-                alignment: space-between;
-
-                Text {
-                    text: "Estado de actualización";
-                    color: Theme.secondary;
-                    font-size: 12px;
-                }
-
-                Text {
-                    text: root.update-status-text == "Up to date" ? "Actualizado" : (
-                        root.update-status-text == "Update available" ? "Actualización disponible" : root.update-status-text
-                    );
-                    color: root.has-update ? Theme.accent : Theme.secondary;
-                    font-size: 12px;
-                    font-weight: 600;
                 }
             }
         }
@@ -2526,7 +2283,7 @@ component ContentArea inherits Rectangle {
     in property <int> search-filter: 0;
     in property <[TrackRowData]> queue-tracks: [];
     in property <int> queue-selected-index: -1;
-    in property <string> active-track-title: "Sin reproducción";
+    in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
@@ -2543,9 +2300,48 @@ component ContentArea inherits Rectangle {
     in property <string> playback-speed-text: "1.00x";
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
-    in property <string> update-status-text: "Actualizado";
+    in property <string> update-status-text: "Up to date";
     in property <[ShelfData]> explore-shelves: [];
     in property <bool> explore-loading: false;
+    in property <string> search-placeholder: "Search songs...";
+    in property <string> search-button-label: "Search";
+    in property <string> filter-all-label: "All";
+    in property <string> filter-songs-label: "Songs";
+    in property <string> filter-albums-label: "Albums";
+    in property <string> filter-artists-label: "Artists";
+    in property <string> filter-playlists-label: "Playlists";
+    in property <string> search-empty-text: "No results found.";
+    in property <string> queue-empty-text: "The queue is empty.";
+    in property <string> no-cover-text: "No cover";
+    in property <string> lyrics-unavailable-text: "Lyrics unavailable";
+    in property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
+    in property <string> session-anonymous-hint: "Anonymous session: paste cookies to unlock library";
+    in property <string> session-cookie-placeholder: "Paste session cookies...";
+    in property <string> sign-in-label: "Sign in";
+    in property <string> session-signed-in-hint: "Signed in: library unlocked";
+    in property <string> sign-out-label: "Sign out";
+    in property <string> section-playlists-label: "Playlists";
+    in property <string> empty-playlists-text: "No playlists found.";
+    in property <string> section-albums-label: "Albums";
+    in property <string> empty-albums-text: "No albums found.";
+    in property <string> section-artists-label: "Artists";
+    in property <string> empty-artists-text: "No artists found.";
+    in property <string> empty-detail-text: "No details available.";
+    in property <string> play-button-label: "Play";
+    in property <string> shuffle-button-label: "Shuffle";
+    in property <string> empty-songs-text: "No songs available.";
+    in property <string> section-theme-label: "Theme";
+    in property <string> theme-white-label: "White";
+    in property <string> theme-black-oled-label: "Black OLED";
+    in property <string> theme-mono-label: "Mono";
+    in property <string> section-playback-label: "Playback";
+    in property <string> playback-speed-label: "Playback speed";
+    in property <string> section-session-label: "Session";
+    in property <string> status-signed-in-label: "Status: Signed in";
+    in property <string> status-anonymous-label: "Status: Anonymous";
+    in property <string> section-about-label: "About";
+    in property <string> app-version-label: "App version";
+    in property <string> update-status-label: "Update status";
 
     callback query-submitted(string);
     callback track-selected(int);
@@ -2560,6 +2356,7 @@ component ContentArea inherits Rectangle {
     callback open-settings();
     callback theme-selected(int);
     callback cycle-playback-speed();
+    callback back-pressed();
 
     background: Theme.window;
     clip: true;
@@ -2586,40 +2383,68 @@ component ContentArea inherits Rectangle {
             HorizontalLayout {
                 alignment: space-between;
 
-                Text {
-                    text: root.header-title;
-                    color: Theme.text;
-                    font-size: 24px;
-                    font-weight: 700;
-                    vertical-alignment: center;
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    if root.active-page == 4 : VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 8px;
+                            background: back-btn.pressed ? Theme.overlay : (back-btn.has-hover ? Theme.hover : Theme.surface);
+                            animate background { duration: 150ms; easing: ease-in-out; }
+
+                            back-btn := TouchArea {
+                                clicked => { root.back-pressed(); }
+                            }
+
+                            IconBack {
+                                size: 16px;
+                                tint: back-btn.has-hover ? Theme.accent : Theme.text;
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: root.header-title;
+                        color: Theme.text;
+                        font-size: 24px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
                 }
 
-            if root.active-page != 5 : Rectangle {
-                width: 32px;
-                height: 32px;
-                border-radius: 8px;
-                background: settings-btn.pressed ? Theme.overlay : (settings-btn.has-hover ? Theme.hover : Theme.surface);
-                animate background { duration: 150ms; easing: ease-in-out; }
+                if root.active-page != 5 : VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 8px;
+                        background: settings-btn.pressed ? Theme.overlay : (settings-btn.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
 
-                settings-btn := TouchArea {
-                    clicked => { root.open-settings(); }
-                }
+                        settings-btn := TouchArea {
+                            clicked => { root.open-settings(); }
+                        }
 
-                IconSettings {
-                    size: 16px;
-                    tint: settings-btn.has-hover ? Theme.accent : Theme.text;
-                }
+                        IconSettings {
+                            size: 16px;
+                            tint: settings-btn.has-hover ? Theme.accent : Theme.text;
+                        }
 
-                if root.has-update : Rectangle {
-                    x: parent.width - 6px;
-                    y: 2px;
-                    width: 6px;
-                    height: 6px;
-                    border-radius: 3px;
-                    background: Theme.accent;
+                        if root.has-update : Rectangle {
+                            x: parent.width - 6px;
+                            y: 2px;
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 3px;
+                            background: Theme.accent;
+                        }
+                    }
                 }
             }
-        }
 
         Rectangle {
             height: 1px;
@@ -2630,6 +2455,14 @@ component ContentArea inherits Rectangle {
             query <=> root.query;
             shelves: root.shelves;
             active-filter: root.search-filter;
+            placeholder-text: root.search-placeholder;
+            search-button-label: root.search-button-label;
+            filter-all-label: root.filter-all-label;
+            filter-songs-label: root.filter-songs-label;
+            filter-albums-label: root.filter-albums-label;
+            filter-artists-label: root.filter-artists-label;
+            filter-playlists-label: root.filter-playlists-label;
+            empty-text: root.search-empty-text;
             query-submitted(q) => { root.query-submitted(q); }
             track-selected(idx) => { root.track-selected(idx); }
             filter-selected(idx) => { root.filter-selected(idx); }
@@ -2638,6 +2471,7 @@ component ContentArea inherits Rectangle {
         if root.active-page == 1 : QueueView {
             tracks: root.queue-tracks;
             selected-index: root.queue-selected-index;
+            empty-text: root.queue-empty-text;
             track-selected(idx) => { root.queue-track-selected(idx); }
         }
 
@@ -2651,11 +2485,25 @@ component ContentArea inherits Rectangle {
             has-cover: root.has-cover;
             lyrics-lines: root.lyrics-lines;
             active-lyric-index: root.active-lyric-index;
+            no-cover-text: root.no-cover-text;
+            lyrics-unavailable-text: root.lyrics-unavailable-text;
+            lyrics-hint-text: root.lyrics-hint-text;
         }
 
         if root.active-page == 3 : LibraryView {
             cookie-text <=> root.cookie-text;
             signed-in: root.signed-in;
+            session-anonymous-hint: root.session-anonymous-hint;
+            session-cookie-placeholder: root.session-cookie-placeholder;
+            sign-in-label: root.sign-in-label;
+            session-signed-in-hint: root.session-signed-in-hint;
+            sign-out-label: root.sign-out-label;
+            section-playlists-label: root.section-playlists-label;
+            empty-playlists-text: root.empty-playlists-text;
+            section-albums-label: root.section-albums-label;
+            empty-albums-text: root.empty-albums-text;
+            section-artists-label: root.section-artists-label;
+            empty-artists-text: root.empty-artists-text;
             playlists: root.library-playlists; albums: root.library-albums; artists: root.library-artists;
             playlist-selected(idx) => { root.playlist-selected(idx); }
             album-selected(idx) => { root.album-selected(idx); }
@@ -2671,6 +2519,11 @@ component ContentArea inherits Rectangle {
             kind-label: root.detail-kind-label;
             cover: root.detail-cover;
             tracks: root.detail-tracks;
+            empty-text: root.empty-detail-text;
+            no-cover-text: root.no-cover-text;
+            play-button-label: root.play-button-label;
+            shuffle-button-label: root.shuffle-button-label;
+            empty-songs-text: root.empty-songs-text;
             track-selected(idx) => { root.detail-track-selected(idx); }
             play => { root.detail-play(); }
             shuffle => { root.detail-shuffle(); }
@@ -2684,6 +2537,21 @@ component ContentArea inherits Rectangle {
             app-version: root.app-version;
             update-status-text: root.update-status-text;
             has-update: root.has-update;
+            section-theme-label: root.section-theme-label;
+            theme-white-label: root.theme-white-label;
+            theme-black-oled-label: root.theme-black-oled-label;
+            theme-mono-label: root.theme-mono-label;
+            section-playback-label: root.section-playback-label;
+            playback-speed-label: root.playback-speed-label;
+            section-session-label: root.section-session-label;
+            status-signed-in-label: root.status-signed-in-label;
+            sign-out-label: root.sign-out-label;
+            status-anonymous-label: root.status-anonymous-label;
+            session-cookie-placeholder: root.session-cookie-placeholder;
+            sign-in-label: root.sign-in-label;
+            section-about-label: root.section-about-label;
+            app-version-label: root.app-version-label;
+            update-status-label: root.update-status-label;
             theme-selected(idx) => { root.theme-selected(idx); }
             cycle-playback-speed => { root.cycle-playback-speed(); }
             sign-in-submitted(t) => { root.sign-in-submitted(t); }
@@ -2731,7 +2599,7 @@ export component MoggytWindow inherits Window {
     in-out property <string> playback-speed-text: "1.00x";
     in-out property <string> settings-cookie-text: "";
     in-out property <string> app-version: "0.1.0";
-    in-out property <string> update-status-text: "Actualizado";
+    in-out property <string> update-status-text: "Up to date";
     in-out property <bool> has-update: false;
     in-out property <string> query: "";
     in-out property <string> cookie-text: "";
@@ -2740,7 +2608,7 @@ export component MoggytWindow inherits Window {
     in-out property <int> search-filter: 0;
     in-out property <[TrackRowData]> queue-tracks: [];
     in-out property <int> queue-selected-index: -1;
-    in-out property <string> active-track-title: "Sin reproducción";
+    in-out property <string> active-track-title: "No track playing";
     in-out property <string> active-track-artist: "";
     in-out property <bool> is-playing: false;
     in-out property <int> volume: 100;
@@ -2764,8 +2632,52 @@ export component MoggytWindow inherits Window {
     in-out property <image> detail-cover;
     in-out property <[ShelfData]> explore-shelves: [];
     in-out property <bool> explore-loading: false;
+    in-out property <string> nav-search-label: "Search";
+    in-out property <string> nav-library-label: "Library";
+    in-out property <string> nav-now-playing-label: "Now Playing";
+    in-out property <string> search-placeholder: "Search songs...";
+    in-out property <string> search-button-label: "Search";
+    in-out property <string> filter-all-label: "All";
+    in-out property <string> filter-songs-label: "Songs";
+    in-out property <string> filter-albums-label: "Albums";
+    in-out property <string> filter-artists-label: "Artists";
+    in-out property <string> filter-playlists-label: "Playlists";
+    in-out property <string> search-empty-text: "No results found.";
+    in-out property <string> queue-button-text: "Queue";
+    in-out property <string> queue-empty-text: "The queue is empty.";
+    in-out property <string> no-cover-text: "No cover";
+    in-out property <string> lyrics-unavailable-text: "Lyrics unavailable";
+    in-out property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
+    in-out property <string> session-anonymous-hint: "Anonymous session: paste cookies to unlock library";
+    in-out property <string> session-cookie-placeholder: "Paste session cookies...";
+    in-out property <string> sign-in-label: "Sign in";
+    in-out property <string> session-signed-in-hint: "Signed in: library unlocked";
+    in-out property <string> sign-out-label: "Sign out";
+    in-out property <string> section-playlists-label: "Playlists";
+    in-out property <string> empty-playlists-text: "No playlists found.";
+    in-out property <string> section-albums-label: "Albums";
+    in-out property <string> empty-albums-text: "No albums found.";
+    in-out property <string> section-artists-label: "Artists";
+    in-out property <string> empty-artists-text: "No artists found.";
+    in-out property <string> empty-detail-text: "No details available.";
+    in-out property <string> play-button-label: "Play";
+    in-out property <string> shuffle-button-label: "Shuffle";
+    in-out property <string> empty-songs-text: "No songs available.";
+    in-out property <string> section-theme-label: "Theme";
+    in-out property <string> theme-white-label: "White";
+    in-out property <string> theme-black-oled-label: "Black OLED";
+    in-out property <string> theme-mono-label: "Mono";
+    in-out property <string> section-playback-label: "Playback";
+    in-out property <string> playback-speed-label: "Playback speed";
+    in-out property <string> section-session-label: "Session";
+    in-out property <string> status-signed-in-label: "Status: Signed in";
+    in-out property <string> status-anonymous-label: "Status: Anonymous";
+    in-out property <string> section-about-label: "About";
+    in-out property <string> app-version-label: "App version";
+    in-out property <string> update-status-label: "Update status";
 
     callback page-selected(int);
+    callback back-pressed();
     callback theme-selected(int);
     callback cycle-playback-speed();
     callback query-submitted(string);
@@ -2801,7 +2713,10 @@ export component MoggytWindow inherits Window {
             Sidebar {
                 width: 200px;
                 active-page: root.active-page;
+                nav-search-label: root.nav-search-label;
                 nav-explore-label: root.nav-explore-label;
+                nav-library-label: root.nav-library-label;
+                nav-now-playing-label: root.nav-now-playing-label;
                 page-selected(idx) => { root.page-selected(idx); }
             }
 
@@ -2828,6 +2743,45 @@ export component MoggytWindow inherits Window {
                 settings-cookie-text <=> root.settings-cookie-text;
                 app-version: root.app-version;
                 update-status-text: root.update-status-text;
+                search-placeholder: root.search-placeholder;
+                search-button-label: root.search-button-label;
+                filter-all-label: root.filter-all-label;
+                filter-songs-label: root.filter-songs-label;
+                filter-albums-label: root.filter-albums-label;
+                filter-artists-label: root.filter-artists-label;
+                filter-playlists-label: root.filter-playlists-label;
+                search-empty-text: root.search-empty-text;
+                queue-empty-text: root.queue-empty-text;
+                no-cover-text: root.no-cover-text;
+                lyrics-unavailable-text: root.lyrics-unavailable-text;
+                lyrics-hint-text: root.lyrics-hint-text;
+                session-anonymous-hint: root.session-anonymous-hint;
+                session-cookie-placeholder: root.session-cookie-placeholder;
+                sign-in-label: root.sign-in-label;
+                session-signed-in-hint: root.session-signed-in-hint;
+                sign-out-label: root.sign-out-label;
+                section-playlists-label: root.section-playlists-label;
+                empty-playlists-text: root.empty-playlists-text;
+                section-albums-label: root.section-albums-label;
+                empty-albums-text: root.empty-albums-text;
+                section-artists-label: root.section-artists-label;
+                empty-artists-text: root.empty-artists-text;
+                empty-detail-text: root.empty-detail-text;
+                play-button-label: root.play-button-label;
+                shuffle-button-label: root.shuffle-button-label;
+                empty-songs-text: root.empty-songs-text;
+                section-theme-label: root.section-theme-label;
+                theme-white-label: root.theme-white-label;
+                theme-black-oled-label: root.theme-black-oled-label;
+                theme-mono-label: root.theme-mono-label;
+                section-playback-label: root.section-playback-label;
+                playback-speed-label: root.playback-speed-label;
+                section-session-label: root.section-session-label;
+                status-signed-in-label: root.status-signed-in-label;
+                status-anonymous-label: root.status-anonymous-label;
+                section-about-label: root.section-about-label;
+                app-version-label: root.app-version-label;
+                update-status-label: root.update-status-label;
                 open-settings => { root.page-selected(5); }
                 query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
@@ -2840,6 +2794,7 @@ export component MoggytWindow inherits Window {
                 sign-in-submitted(t) => { root.sign-in-submitted(t); } sign-out() => { root.sign-out(); }
                 theme-selected(idx) => { root.theme-selected(idx); }
                 cycle-playback-speed => { root.cycle-playback-speed(); }
+                back-pressed => { root.back-pressed(); }
             }
         }
 
@@ -2860,6 +2815,7 @@ export component MoggytWindow inherits Window {
             position-secs: root.position-secs;
             duration-secs: root.duration-secs;
             queue-count: root.queue-count;
+            queue-button-text: root.queue-button-text;
 
             toggle-play => { root.toggle-play(); }
             prev-track => { root.prev-track(); }

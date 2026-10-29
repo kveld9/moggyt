@@ -85,27 +85,79 @@ pub fn tr(locale: Locale, key: &str) -> &str {
     }
 }
 
-/// Permitted exception: In-memory Spanish translation table for UI strings.
-pub const SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
-    ("Theme", "Tema"),
-    ("White", "Blanco"),
+/// Static lookup table of English source keys to Spanish UI strings.
+/// Permitted exception: User-facing Spanish UI string literals are permitted in this table.
+static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
+    ("About", "Acerca de"),
+    ("Album", "ÁLBUM"),
+    ("Albums", "Álbumes"),
+    ("All", "Todo"),
+    (
+        "Anonymous session: paste cookies to unlock library",
+        "Sesión anónima: pegar cookies para desbloquear la biblioteca",
+    ),
+    ("App version", "Versión de la app"),
+    ("Artist", "ARTISTA"),
+    ("Artists", "Artistas"),
     ("Black OLED", "Negro OLED"),
-    ("Mono", "Monocromo"),
-    ("Language", "Idioma"),
+    ("Detail", "Detalle"),
     ("English", "Inglés"),
-    ("Spanish", "Español"),
     ("Explore", "Explorar"),
+    ("Failed to play track", "Error al reproducir la canción"),
+    ("Language", "Idioma"),
+    ("Library", "Biblioteca"),
+    ("Loading...", "Cargando..."),
     ("Loading explore...", "Cargando exploracion..."),
+    ("Lyrics unavailable", "Letras no disponibles"),
+    ("Mono", "Monocromo"),
+    ("No albums found.", "No hay álbumes."),
+    ("No artists found.", "No hay artistas."),
+    ("No cover", "Sin portada"),
+    ("No details available.", "No hay detalles disponibles."),
+    ("No playlists found.", "No hay listas de reproducción."),
+    ("No results found.", "No se encontraron resultados."),
     ("No sections found in Explore.", "No se encontraron secciones en Explorar."),
+    ("No songs available.", "No hay canciones disponibles."),
+    ("No track playing", "Sin reproducción"),
+    ("No tracks available.", "No hay canciones disponibles."),
+    ("Now Playing", "Sonando"),
+    ("Paste session cookies...", "Pegar cookies de sesión..."),
+    ("Play", "Reproducir"),
+    ("Playback", "Reproducción"),
+    ("Playback speed", "Velocidad de reproducción"),
+    ("Playlist", "LISTA"),
+    ("Playlists", "Listas de reproducción"),
+    ("Queue", "Cola"),
+    ("Queue ({count})", "Cola ({count})"),
+    ("Search", "Buscar"),
+    ("Search Results", "Resultados de búsqueda"),
+    ("Search songs...", "Buscar canciones..."),
+    ("Searching...", "Buscando..."),
+    ("Session", "Sesión"),
+    ("Settings", "Ajustes"),
+    ("Shuffle", "Aleatorio"),
+    ("Sign in", "Iniciar sesión"),
+    ("Sign out", "Cerrar sesión"),
+    ("Signed in: library unlocked", "Sesión iniciada: biblioteca desbloqueada"),
+    ("Songs", "Canciones"),
+    ("Spanish", "Español"),
+    ("Status: Anonymous", "Estado: Anónimo"),
+    ("Status: Signed in", "Estado: Sesión iniciada"),
+    (
+        "Synchronized lyrics will appear during playback",
+        "Las letras sincronizadas aparecerán durante la reproducción",
+    ),
+    ("The queue is empty.", "La cola está vacía."),
+    ("Theme", "Tema"),
+    ("Up to date", "Actualizado"),
+    ("Update available", "Actualización disponible"),
+    ("Update available: {ver}", "Actualización disponible: {ver}"),
+    ("Update status", "Estado de actualización"),
+    ("White", "Blanco"),
 ];
 
 fn translate_spanish(key: &str) -> &str {
-    for &(src, dst) in SPANISH_TRANSLATIONS {
-        if src == key {
-            return dst;
-        }
-    }
-    key
+    SPANISH_TRANSLATIONS.iter().find(|&&(k, _)| k == key).map(|&(_, v)| v).unwrap_or(key)
 }
 
 #[cfg(test)]
@@ -114,21 +166,8 @@ mod tests {
 
     #[test]
     fn test_6_given_locale_spanish_when_tr_called_then_returns_spanish_and_fallbacks_to_english() {
-        let keys = [
-            ("Theme", "Tema"),
-            ("White", "Blanco"),
-            ("Black OLED", "Negro OLED"),
-            ("Mono", "Monocromo"),
-            ("Language", "Idioma"),
-            ("English", "Inglés"),
-            ("Spanish", "Español"),
-            ("Explore", "Explorar"),
-            ("Loading explore...", "Cargando exploracion..."),
-            ("No sections found in Explore.", "No se encontraron secciones en Explorar."),
-        ];
-
         // 1. Spanish translations match expected strings
-        for (key, expected_es) in keys {
+        for &(key, expected_es) in SPANISH_TRANSLATIONS {
             assert_eq!(
                 tr(Locale::Spanish, key),
                 expected_es,
@@ -140,10 +179,57 @@ mod tests {
         assert_eq!(tr(Locale::Spanish, "nonexistent_key"), "nonexistent_key");
 
         // 3. English locale returns English source key as-is
-        for (key, _) in keys {
+        for &(key, _) in SPANISH_TRANSLATIONS {
             assert_eq!(tr(Locale::English, key), key);
         }
         assert_eq!(tr(Locale::English, "nonexistent_key"), "nonexistent_key");
+    }
+
+    #[test]
+    fn test_ui_chrome_keys_and_parameterized_pattern() {
+        // Page titles
+        assert_eq!(tr(Locale::Spanish, "Search"), "Buscar");
+        assert_eq!(tr(Locale::Spanish, "Queue"), "Cola");
+        assert_eq!(tr(Locale::Spanish, "Now Playing"), "Sonando");
+        assert_eq!(tr(Locale::Spanish, "Library"), "Biblioteca");
+        assert_eq!(tr(Locale::Spanish, "Detail"), "Detalle");
+        assert_eq!(tr(Locale::Spanish, "Settings"), "Ajustes");
+        assert_eq!(tr(Locale::Spanish, "Explore"), "Explorar");
+
+        // Sentinels
+        assert_eq!(tr(Locale::Spanish, "No track playing"), "Sin reproducción");
+        assert_eq!(tr(Locale::Spanish, "Search Results"), "Resultados de búsqueda");
+        assert_eq!(
+            tr(Locale::Spanish, "No sections found in Explore."),
+            "No se encontraron secciones en Explorar."
+        );
+
+        // Update status & parameterized pattern
+        assert_eq!(tr(Locale::Spanish, "Up to date"), "Actualizado");
+        assert_eq!(tr(Locale::Spanish, "Update available"), "Actualización disponible");
+        assert_eq!(
+            tr(Locale::Spanish, "Update available: {ver}").replace("{ver}", "v1.2.3"),
+            "Actualización disponible: v1.2.3"
+        );
+        assert_eq!(
+            tr(Locale::English, "Update available: {ver}").replace("{ver}", "v1.2.3"),
+            "Update available: v1.2.3"
+        );
+
+        // Kind labels
+        assert_eq!(tr(Locale::Spanish, "Album"), "ÁLBUM");
+        assert_eq!(tr(Locale::Spanish, "Artist"), "ARTISTA");
+        assert_eq!(tr(Locale::Spanish, "Playlist"), "LISTA");
+
+        // Dynamic labels & transient status
+        assert_eq!(tr(Locale::Spanish, "Queue ({count})").replace("{count}", "3"), "Cola (3)");
+        assert_eq!(tr(Locale::English, "Queue ({count})").replace("{count}", "3"), "Queue (3)");
+        assert_eq!(tr(Locale::Spanish, "Searching..."), "Buscando...");
+        assert_eq!(tr(Locale::English, "Searching..."), "Searching...");
+        assert_eq!(tr(Locale::Spanish, "Loading..."), "Cargando...");
+        assert_eq!(tr(Locale::English, "Loading..."), "Loading...");
+        assert_eq!(tr(Locale::Spanish, "Loading explore..."), "Cargando exploracion...");
+        assert_eq!(tr(Locale::English, "Loading explore..."), "Loading explore...");
     }
 
     #[test]
