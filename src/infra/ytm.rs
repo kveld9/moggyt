@@ -115,19 +115,19 @@ impl CatalogStub {
     }
 
     fn stub_album() -> Album {
-        Album::new("stub-album-1", "Stub Album", "Stub Artist")
+        Album::new("stub-album-1", "Stub Album", "Stub Artist", Some(STUB_ARTWORK_URL.to_owned()))
     }
 
     fn stub_artist() -> Artist {
-        Artist::new("stub-artist-1", "Stub Artist")
+        Artist::new("stub-artist-1", "Stub Artist", Some(STUB_ARTWORK_URL.to_owned()))
     }
 
     fn stub_playlist() -> Playlist {
-        Playlist::new("stub-playlist-1", "Stub Playlist", 12)
+        Playlist::new("stub-playlist-1", "Stub Playlist", 12, Some(STUB_ARTWORK_URL.to_owned()))
     }
 
     fn stub_playlists() -> Vec<Playlist> {
-        vec![Self::stub_playlist(), Playlist::new("stub-playlist-2", "Favorites", 24)]
+        vec![Self::stub_playlist(), Playlist::new("stub-playlist-2", "Favorites", 24, None)]
     }
 
     fn stub_home_shelves() -> Vec<Shelf> {
@@ -316,15 +316,21 @@ fn map_tracks(tracks: Vec<RawTrack>) -> impl Iterator<Item = SearchResult> {
 }
 
 fn map_albums(albums: Vec<RawAlbum>) -> impl Iterator<Item = SearchResult> {
-    albums.into_iter().map(|a| SearchResult::Album(Album::new(&a.browse_id, &a.title, &a.artist)))
+    albums
+        .into_iter()
+        .map(|a| SearchResult::Album(Album::new(&a.browse_id, &a.title, &a.artist, a.thumb_url)))
 }
 
 fn map_artists(artists: Vec<RawArtist>) -> impl Iterator<Item = SearchResult> {
-    artists.into_iter().map(|a| SearchResult::Artist(Artist::new(&a.browse_id, &a.name)))
+    artists
+        .into_iter()
+        .map(|a| SearchResult::Artist(Artist::new(&a.browse_id, &a.name, a.thumb_url)))
 }
 
 fn map_playlists(playlists: Vec<RawPlaylist>) -> impl Iterator<Item = SearchResult> {
-    playlists.into_iter().map(|p| SearchResult::Playlist(Playlist::new(&p.browse_id, &p.title, 0)))
+    playlists
+        .into_iter()
+        .map(|p| SearchResult::Playlist(Playlist::new(&p.browse_id, &p.title, 0, p.thumb_url)))
 }
 
 impl Catalog for LiveCatalog {
@@ -462,9 +468,18 @@ mod tests {
                 browse_id: "b1".into(),
                 title: "Alb".into(),
                 artist: "Art".into(),
+                thumb_url: Some("https://artwork.test/alb1".into()),
             }],
-            artists: vec![RawArtist { browse_id: "ar1".into(), name: "ArtName".into() }],
-            playlists: vec![RawPlaylist { browse_id: "p1".into(), title: "PlayTitle".into() }],
+            artists: vec![RawArtist {
+                browse_id: "ar1".into(),
+                name: "ArtName".into(),
+                thumb_url: Some("https://artwork.test/ar1".into()),
+            }],
+            playlists: vec![RawPlaylist {
+                browse_id: "p1".into(),
+                title: "PlayTitle".into(),
+                thumb_url: None,
+            }],
         };
 
         let all = LiveCatalog::map_hits(hits.clone(), SearchFilter::All);
@@ -476,9 +491,24 @@ mod tests {
             )
         );
         assert_eq!(all[1], SearchResult::Track(Track::new("v2", "T2", "A2")));
-        assert_eq!(all[2], SearchResult::Album(Album::new("b1", "Alb", "Art")));
-        assert_eq!(all[3], SearchResult::Artist(Artist::new("ar1", "ArtName")));
-        assert_eq!(all[4], SearchResult::Playlist(Playlist::new("p1", "PlayTitle", 0)));
+        assert_eq!(
+            all[2],
+            SearchResult::Album(Album::new(
+                "b1",
+                "Alb",
+                "Art",
+                Some("https://artwork.test/alb1".into())
+            ))
+        );
+        assert_eq!(
+            all[3],
+            SearchResult::Artist(Artist::new(
+                "ar1",
+                "ArtName",
+                Some("https://artwork.test/ar1".into())
+            ))
+        );
+        assert_eq!(all[4], SearchResult::Playlist(Playlist::new("p1", "PlayTitle", 0, None)));
 
         for (filter, expected) in [
             (SearchFilter::Tracks, 2),

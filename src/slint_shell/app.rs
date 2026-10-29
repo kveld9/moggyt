@@ -984,7 +984,9 @@ fn sync_cover_and_lyrics<
 fn iter_shelf_artwork_urls(shelves: &[Shelf]) -> impl Iterator<Item = &str> {
     shelves.iter().flat_map(|s| s.items.iter()).filter_map(|it| match it {
         SearchResult::Track(t) => t.artwork.as_deref(),
-        _ => None,
+        SearchResult::Album(a) => a.artwork.as_deref(),
+        SearchResult::Artist(a) => a.artwork.as_deref(),
+        SearchResult::Playlist(p) => p.artwork.as_deref(),
     })
 }
 
@@ -2535,6 +2537,55 @@ mod tests {
         assert_eq!(received_urls.len(), 2);
         assert_eq!(received_urls[0], "https://lh3.googleusercontent.com/test-thumb-small");
         assert_eq!(received_urls[1], "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg");
+    }
+
+    #[test]
+    fn test_request_shelf_covers_dispatches_all_search_result_kinds() {
+        let mut state = test_wired();
+        let track = Track::new("t1", "Track 1", "Artist 1")
+            .with_artwork("https://lh3.googleusercontent.com/track-large");
+        let album = Album::new(
+            "a1",
+            "Album 1",
+            "Artist 1",
+            Some("https://lh3.googleusercontent.com/album-large".to_owned()),
+        );
+        let artist = Artist::new(
+            "ar1",
+            "Artist 1",
+            Some("https://lh3.googleusercontent.com/artist-thumb".to_owned()),
+        );
+        let playlist = Playlist::new(
+            "p1",
+            "Playlist 1",
+            10,
+            Some("https://i.ytimg.com/vi/playlist-id/hqdefault.jpg".to_owned()),
+        );
+        let no_art_album = Album::new("a2", "No Art", "Artist 2", None);
+
+        let mut shelf = Shelf::new("All Kinds Shelf");
+        shelf.items.push(SearchResult::Track(track));
+        shelf.items.push(SearchResult::Album(album));
+        shelf.items.push(SearchResult::Artist(artist));
+        shelf.items.push(SearchResult::Playlist(playlist));
+        shelf.items.push(SearchResult::Album(no_art_album));
+        state.home_shelves = vec![shelf];
+
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        request_shelf_covers(&state, &tx);
+
+        let mut received_urls = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, .. } = cmd {
+                received_urls.push(url);
+            }
+        }
+
+        assert_eq!(received_urls.len(), 4);
+        assert_eq!(received_urls[0], "https://lh3.googleusercontent.com/track-small");
+        assert_eq!(received_urls[1], "https://lh3.googleusercontent.com/album-small");
+        assert_eq!(received_urls[2], "https://lh3.googleusercontent.com/artist-thumb");
+        assert_eq!(received_urls[3], "https://i.ytimg.com/vi/playlist-id/mqdefault.jpg");
     }
 
     #[test]
