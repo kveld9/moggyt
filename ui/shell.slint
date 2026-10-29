@@ -18,6 +18,7 @@ export struct LibraryItemData {
     index: int,
     title: string,
     subtitle: string,
+    cover: image,
 }
 
 export struct LyricLineData {
@@ -1425,6 +1426,7 @@ export component NowPlayingView inherits VerticalLayout {
 component LibraryItemCard inherits Rectangle {
     in property <string> title;
     in property <string> subtitle;
+    in property <image> cover;
     callback clicked();
 
     height: 48px;
@@ -1439,19 +1441,18 @@ component LibraryItemCard inherits Rectangle {
         padding-right: 8px;
         spacing: 12px;
 
-        // Cover-art placeholder (owned by a later tranche)
         Rectangle {
             width: 36px;
             height: 36px;
             border-radius: 6px;
             background: Theme.surface;
+            clip: true;
 
-            Text {
-                text: "Portada";
-                color: Theme.secondary;
-                font-size: 10px;
-                horizontal-alignment: center;
-                vertical-alignment: center;
+            Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.cover;
+                image-fit: ImageFit.cover;
             }
         }
 
@@ -1581,21 +1582,21 @@ export component LibraryView inherits VerticalLayout {
         spacing: 6px;
         Text { text: "Listas de reproducción"; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.playlists.length == 0 : Text { text: "No hay listas de reproducción."; color: Theme.secondary; font-size: 13px; }
-        for item in root.playlists : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.playlist-selected(item.index); } }
+        for item in root.playlists : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.playlist-selected(item.index); } }
     }
 
     VerticalLayout {
         spacing: 6px;
         Text { text: "Álbumes"; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.albums.length == 0 : Text { text: "No hay álbumes."; color: Theme.secondary; font-size: 13px; }
-        for item in root.albums : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.album-selected(item.index); } }
+        for item in root.albums : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.album-selected(item.index); } }
     }
 
     VerticalLayout {
         spacing: 6px;
         Text { text: "Artistas"; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.artists.length == 0 : Text { text: "No hay artistas."; color: Theme.secondary; font-size: 13px; }
-        for item in root.artists : LibraryItemCard { title: item.title; subtitle: item.subtitle; clicked => { root.artist-selected(item.index); } }
+        for item in root.artists : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.artist-selected(item.index); } }
     }
 }
 
@@ -2467,7 +2468,20 @@ component ContentArea inherits Rectangle {
     background: Theme.window;
     clip: true;
 
-    Flickable {
+    flick := Flickable {
+        TouchArea {
+            x: 0;
+            y: -flick.viewport-y;
+            width: flick.width;
+            height: flick.height;
+
+            scroll-event(event) => {
+                let min-y = min(0px, flick.height - flick.viewport-height);
+                flick.viewport-y = min(0px, max(min-y, flick.viewport-y + event.delta-y * 3.5));
+                return EventResult.accept;
+            }
+        }
+
         VerticalLayout {
             padding: 24px;
             spacing: 16px;
