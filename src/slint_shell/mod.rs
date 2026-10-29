@@ -27,13 +27,26 @@ slint::include_modules!();
 pub use MoggytWindow as AppWindow;
 
 pub mod app;
+pub mod callbacks;
+pub mod covers;
 pub mod detail;
+pub mod explore;
+pub mod format;
+pub mod init;
+pub mod labels;
 pub mod library;
+pub mod page;
 pub mod platform;
 pub mod playback;
+pub mod playback_control;
 pub mod playback_worker;
 pub mod search;
+pub mod state;
+pub mod sync;
+#[cfg(test)]
+pub mod test_support;
 pub mod theme;
+pub mod window;
 
 pub use app::{
     SlintAppState, StaticLabels, build_window, format_queue_label, run, sync_static_labels,
