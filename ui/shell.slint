@@ -1,4 +1,3 @@
-import { Slider } from "std-widgets.slint";
 
 export struct TrackRowData {
     index: int,
@@ -135,7 +134,7 @@ component IconShuffle inherits Rectangle {
         stroke: root.tint;
         stroke-width: 1.8px;
         fill: transparent;
-        commands: "M 4 18 L 8 18 L 16 6 L 20 6 M 16.5 3.5 L 20.5 6 L 16.5 8.5 M 4 6 L 8 6 L 16 18 L 20 18 M 16.5 15.5 L 20.5 18 L 16.5 20.5";
+        commands: "M 4 19 L 8 19 C 11 19 13 5 16 5 L 20 5 M 16.5 2.5 L 20.5 5 L 16.5 7.5 M 4 5 L 8 5 C 9.5 5 10.7 8.5 12 12 M 14 15.5 C 14.6 17.5 15.2 19 16 19 L 20 19 M 16.5 16.5 L 20.5 19 L 16.5 21.5";
     }
 }
 
@@ -342,23 +341,77 @@ component IconMinus inherits Rectangle {
     }
 }
 
-component IconCheck inherits Rectangle {
-    in property <color> tint: Theme.text;
-    in property <length> size: 20px;
-    width: root.size;
-    height: root.size;
 
-    Path {
-        width: root.size;
-        height: root.size;
-        viewbox-x: 0;
-        viewbox-y: 0;
-        viewbox-width: 24;
-        viewbox-height: 24;
-        stroke: root.tint;
-        stroke-width: 1.8px;
-        fill: transparent;
-        commands: "M 4.5 12.5 L 9.5 17.5 L 19.5 6.5";
+component ThemedSlider inherits Rectangle {
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in-out property <float> value: 0;
+    in property <bool> enabled: true;
+    callback changed(float);
+
+    min-height: 20px;
+    vertical-stretch: 0;
+    horizontal-stretch: 1;
+
+    property <float> clamped-val: max(root.minimum, min(root.maximum, root.value));
+    property <float> range: max(1, root.maximum - root.minimum);
+    property <float> ratio: (root.clamped-val - root.minimum) / root.range;
+
+    // Track background
+    Rectangle {
+        y: (parent.height - 4px) / 2;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.surface;
+    }
+
+    // Active fill
+    Rectangle {
+        x: 0;
+        y: (parent.height - 4px) / 2;
+        width: parent.width * root.ratio;
+        height: 4px;
+        border-radius: 2px;
+        background: touch.has-hover ? Theme.accent : (touch.pressed ? Theme.accent : Theme.accent);
+    }
+
+    // Thumb
+    Rectangle {
+        x: clamp(parent.width * root.ratio - 6px, 0px, parent.width - 12px);
+        y: (parent.height - 12px) / 2;
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        background: Theme.text;
+        border-width: 1px;
+        border-color: Theme.border;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        property <bool> is-dragging: false;
+
+        pointer-event(event) => {
+            if (!root.enabled || event.button != PointerEventButton.left) {
+                return;
+            }
+            if (event.kind == PointerEventKind.down) {
+                self.is-dragging = true;
+                let r = clamp(self.mouse-x / parent.width, 0.0, 1.0);
+                root.value = root.minimum + r * root.range;
+                root.changed(root.value);
+            } else if (event.kind == PointerEventKind.up) {
+                self.is-dragging = false;
+            }
+        }
+
+        moved => {
+            if (self.is-dragging && root.enabled) {
+                let r = clamp(self.mouse-x / parent.width, 0.0, 1.0);
+                root.value = root.minimum + r * root.range;
+                root.changed(root.value);
+            }
+        }
     }
 }
 
@@ -1144,7 +1197,7 @@ export component PlayerBar inherits Rectangle {
                     vertical-alignment: center;
                 }
 
-                Slider {
+                ThemedSlider {
                     horizontal-stretch: 1;
                     minimum: 0;
                     maximum: max(1, root.duration-secs);
@@ -1205,9 +1258,12 @@ export component PlayerBar inherits Rectangle {
                 }
             }
 
-            IconSpeaker {
-                size: 16px;
-                tint: Theme.secondary;
+            VerticalLayout {
+                alignment: center;
+                IconSpeaker {
+                    size: 16px;
+                    tint: Theme.secondary;
+                }
             }
 
             VerticalLayout {
@@ -1232,7 +1288,7 @@ export component PlayerBar inherits Rectangle {
                 }
             }
 
-            Slider {
+            ThemedSlider {
                 width: 80px;
                 minimum: 0;
                 maximum: 100;
@@ -1773,12 +1829,6 @@ export component SettingsView inherits VerticalLayout {
 
                 HorizontalLayout {
                     alignment: center;
-                    spacing: 6px;
-
-                    if root.active-theme-index == 0 : IconCheck {
-                        size: 14px;
-                        tint: Theme.window;
-                    }
 
                     Text {
                         text: "Blanco";
@@ -1804,12 +1854,6 @@ export component SettingsView inherits VerticalLayout {
 
                 HorizontalLayout {
                     alignment: center;
-                    spacing: 6px;
-
-                    if root.active-theme-index == 1 : IconCheck {
-                        size: 14px;
-                        tint: Theme.window;
-                    }
 
                     Text {
                         text: "Negro OLED";
@@ -1835,12 +1879,6 @@ export component SettingsView inherits VerticalLayout {
 
                 HorizontalLayout {
                     alignment: center;
-                    spacing: 6px;
-
-                    if root.active-theme-index == 2 : IconCheck {
-                        size: 14px;
-                        tint: Theme.window;
-                    }
 
                     Text {
                         text: "Monocromo";
