@@ -35,7 +35,9 @@ pub mod playback_worker;
 pub mod search;
 pub mod theme;
 
-pub use app::{SlintAppState, build_window, run};
+pub use app::{
+    SlintAppState, StaticLabels, build_window, format_queue_label, run, sync_static_labels,
+};
 pub use detail::{
     DetailState, detail_kind_label, detail_kind_label_with_locale, detail_track_rows,
 };
