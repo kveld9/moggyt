@@ -298,16 +298,28 @@ mod tests {
         assert_eq!(artist, SearchResult::Artist(Artist::new("UC_art_1", "ArtTitle", None)));
 
         let playlist_vl = classify_home_item("VL_pl_1", "PLTitle", "PLSub", None);
-        assert_eq!(playlist_vl, SearchResult::Playlist(Playlist::new("VL_pl_1", "PLTitle", 0, None)));
+        assert_eq!(
+            playlist_vl,
+            SearchResult::Playlist(Playlist::new("VL_pl_1", "PLTitle", 0, None))
+        );
 
         let playlist_rd = classify_home_item("RD_radio_1", "RadioTitle", "RadioSub", None);
-        assert_eq!(playlist_rd, SearchResult::Playlist(Playlist::new("RD_radio_1", "RadioTitle", 0, None)));
+        assert_eq!(
+            playlist_rd,
+            SearchResult::Playlist(Playlist::new("RD_radio_1", "RadioTitle", 0, None))
+        );
 
         let playlist_fe = classify_home_item("FEmusic_mix", "MixTitle", "MixSub", None);
-        assert_eq!(playlist_fe, SearchResult::Playlist(Playlist::new("FEmusic_mix", "MixTitle", 0, None)));
+        assert_eq!(
+            playlist_fe,
+            SearchResult::Playlist(Playlist::new("FEmusic_mix", "MixTitle", 0, None))
+        );
 
         let album = classify_home_item("MPREb_alb_1", "AlbTitle", "AlbSub", None);
-        assert_eq!(album, SearchResult::Album(Album::new("MPREb_alb_1", "AlbTitle", "AlbSub", None)));
+        assert_eq!(
+            album,
+            SearchResult::Album(Album::new("MPREb_alb_1", "AlbTitle", "AlbSub", None))
+        );
     }
 
     #[test]

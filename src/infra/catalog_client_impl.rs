@@ -10,9 +10,9 @@ use super::catalog_parse_library::{
 use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::{parse_search_all, parse_search_tracks};
 use super::catalog_requests::{
-    browse_body, browse_url, like_body, like_url, next_body, next_url, parse_mutation_response,
-    search_body, search_url, CATALOG_API_KEY, EXPLORE_BROWSE_ID, HOME_BROWSE_ID,
-    LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_LIKED_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID,
+    CATALOG_API_KEY, EXPLORE_BROWSE_ID, HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID,
+    LIBRARY_LIKED_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_url, like_body,
+    like_url, next_body, next_url, parse_mutation_response, search_body, search_url,
 };
 use crate::domain::{Album, Detail, DetailKind, Playlist, Shelf, Track};
 use crate::i18n::Locale;
