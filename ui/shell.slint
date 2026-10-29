@@ -79,6 +79,26 @@ component IconPause inherits Rectangle {
     }
 }
 
+component IconBack inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 19 12 L 5 12 M 12 19 L 5 12 L 12 5";
+    }
+}
+
 component IconPrev inherits Rectangle {
     in property <color> tint: Theme.text;
     in property <length> size: 20px;
@@ -685,18 +705,21 @@ component TrackRow inherits Rectangle {
         padding-right: 12px;
         spacing: 12px;
 
-        Rectangle {
-            width: 40px;
-            height: 40px;
-            border-radius: 6px;
-            background: Theme.surface;
-            clip: true;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 6px;
+                background: Theme.surface;
+                clip: true;
 
-            Image {
-                width: parent.width;
-                height: parent.height;
-                source: root.cover;
-                image-fit: ImageFit.cover;
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: ImageFit.cover;
+                }
             }
         }
 
@@ -711,6 +734,7 @@ component TrackRow inherits Rectangle {
                 font-size: 14px;
                 font-weight: 600;
                 overflow: elide;
+                vertical-alignment: center;
             }
 
             if root.subtitle-text != "" : Text {
@@ -718,6 +742,7 @@ component TrackRow inherits Rectangle {
                 color: Theme.secondary;
                 font-size: 12px;
                 overflow: elide;
+                vertical-alignment: center;
             }
         }
 
@@ -1457,18 +1482,21 @@ component LibraryItemCard inherits Rectangle {
         padding-right: 8px;
         spacing: 12px;
 
-        Rectangle {
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
-            background: Theme.surface;
-            clip: true;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 36px;
+                height: 36px;
+                border-radius: 6px;
+                background: Theme.surface;
+                clip: true;
 
-            Image {
-                width: parent.width;
-                height: parent.height;
-                source: root.cover;
-                image-fit: ImageFit.cover;
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.cover;
+                    image-fit: ImageFit.cover;
+                }
             }
         }
 
@@ -1741,9 +1769,12 @@ component DetailView inherits VerticalLayout {
                             spacing: 8px;
                             alignment: center;
 
-                            IconPlay {
-                                size: 16px;
-                                tint: play-touch.has-hover ? Theme.text : Theme.window;
+                            VerticalLayout {
+                                alignment: center;
+                                IconPlay {
+                                    size: 16px;
+                                    tint: play-touch.has-hover ? Theme.text : Theme.window;
+                                }
                             }
 
                             Text {
@@ -1772,9 +1803,12 @@ component DetailView inherits VerticalLayout {
                             spacing: 8px;
                             alignment: center;
 
-                            IconShuffle {
-                                size: 16px;
-                                tint: shuf-touch.has-hover ? Theme.accent : Theme.text;
+                            VerticalLayout {
+                                alignment: center;
+                                IconShuffle {
+                                    size: 16px;
+                                    tint: shuf-touch.has-hover ? Theme.accent : Theme.text;
+                                }
                             }
 
                             Text {
@@ -2226,6 +2260,7 @@ component ContentArea inherits Rectangle {
     callback open-settings();
     callback theme-selected(int);
     callback cycle-playback-speed();
+    callback back-pressed();
 
     background: Theme.window;
     clip: true;
@@ -2252,40 +2287,68 @@ component ContentArea inherits Rectangle {
             HorizontalLayout {
                 alignment: space-between;
 
-                Text {
-                    text: root.header-title;
-                    color: Theme.text;
-                    font-size: 24px;
-                    font-weight: 700;
-                    vertical-alignment: center;
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+
+                    if root.active-page == 4 : VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 8px;
+                            background: back-btn.pressed ? Theme.overlay : (back-btn.has-hover ? Theme.hover : Theme.surface);
+                            animate background { duration: 150ms; easing: ease-in-out; }
+
+                            back-btn := TouchArea {
+                                clicked => { root.back-pressed(); }
+                            }
+
+                            IconBack {
+                                size: 16px;
+                                tint: back-btn.has-hover ? Theme.accent : Theme.text;
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: root.header-title;
+                        color: Theme.text;
+                        font-size: 24px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
                 }
 
-            if root.active-page != 5 : Rectangle {
-                width: 32px;
-                height: 32px;
-                border-radius: 8px;
-                background: settings-btn.pressed ? Theme.overlay : (settings-btn.has-hover ? Theme.hover : Theme.surface);
-                animate background { duration: 150ms; easing: ease-in-out; }
+                if root.active-page != 5 : VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 8px;
+                        background: settings-btn.pressed ? Theme.overlay : (settings-btn.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
 
-                settings-btn := TouchArea {
-                    clicked => { root.open-settings(); }
-                }
+                        settings-btn := TouchArea {
+                            clicked => { root.open-settings(); }
+                        }
 
-                IconSettings {
-                    size: 16px;
-                    tint: settings-btn.has-hover ? Theme.accent : Theme.text;
-                }
+                        IconSettings {
+                            size: 16px;
+                            tint: settings-btn.has-hover ? Theme.accent : Theme.text;
+                        }
 
-                if root.has-update : Rectangle {
-                    x: parent.width - 6px;
-                    y: 2px;
-                    width: 6px;
-                    height: 6px;
-                    border-radius: 3px;
-                    background: Theme.accent;
+                        if root.has-update : Rectangle {
+                            x: parent.width - 6px;
+                            y: 2px;
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 3px;
+                            background: Theme.accent;
+                        }
+                    }
                 }
             }
-        }
 
         Rectangle {
             height: 1px;
@@ -2505,6 +2568,7 @@ export component MoggytWindow inherits Window {
     in-out property <string> update-status-label: "Update status";
 
     callback page-selected(int);
+    callback back-pressed();
     callback theme-selected(int);
     callback cycle-playback-speed();
     callback query-submitted(string);
@@ -2614,6 +2678,7 @@ export component MoggytWindow inherits Window {
                 sign-in-submitted(t) => { root.sign-in-submitted(t); } sign-out() => { root.sign-out(); }
                 theme-selected(idx) => { root.theme-selected(idx); }
                 cycle-playback-speed => { root.cycle-playback-speed(); }
+                back-pressed => { root.back-pressed(); }
             }
         }
 
