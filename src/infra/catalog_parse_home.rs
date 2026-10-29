@@ -70,6 +70,7 @@ pub fn parse_home_all(value: &Value) -> Vec<Shelf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{Album, Artist, Playlist};
 
     #[test]
     fn parse_home_all_tolerates_empty_and_malformed() {

@@ -160,6 +160,7 @@ pub fn parse_explore_all(value: &Value) -> Vec<Shelf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Album;
 
     #[test]
     fn parse_explore_all_tolerates_empty_and_malformed() {
