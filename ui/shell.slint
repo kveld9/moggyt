@@ -682,6 +682,7 @@ component SearchView inherits VerticalLayout {
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
+    forward-focus: input;
 
     spacing: 16px;
     alignment: start;
@@ -698,19 +699,26 @@ component SearchView inherits VerticalLayout {
             background: Theme.surface;
             animate border-color { duration: 150ms; easing: ease-in-out; }
 
+            search-touch := TouchArea {
+                clicked => { input.focus(); }
+            }
+
             HorizontalLayout {
                 padding-left: 10px;
                 padding-right: 8px;
                 spacing: 8px;
-                alignment: start;
 
-                IconSearch {
-                    size: 16px;
-                    tint: input.has-focus ? Theme.accent : Theme.secondary;
+                VerticalLayout {
+                    alignment: center;
+                    IconSearch {
+                        size: 16px;
+                        tint: input.has-focus ? Theme.accent : Theme.secondary;
+                    }
                 }
 
                 Rectangle {
                     horizontal-stretch: 1;
+                    clip: true;
 
                     input := TextInput {
                         width: parent.width;
@@ -729,22 +737,32 @@ component SearchView inherits VerticalLayout {
                         text: "Buscar canciones...";
                         color: Theme.secondary;
                         vertical-alignment: center;
+
+                        TouchArea {
+                            clicked => { input.focus(); }
+                        }
                     }
                 }
 
-                if root.query != "" : Rectangle {
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 10px;
-                    background: clear-touch.has-hover ? Theme.hover : transparent;
+                if root.query != "" : VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 10px;
+                        background: clear-touch.has-hover ? Theme.hover : transparent;
 
-                    clear-touch := TouchArea {
-                        clicked => { root.query = ""; }
-                    }
+                        clear-touch := TouchArea {
+                            clicked => {
+                                root.query = "";
+                                input.focus();
+                            }
+                        }
 
-                    IconClose {
-                        size: 10px;
-                        tint: clear-touch.has-hover ? Theme.text : Theme.secondary;
+                        IconClose {
+                            size: 10px;
+                            tint: clear-touch.has-hover ? Theme.text : Theme.secondary;
+                        }
                     }
                 }
             }
