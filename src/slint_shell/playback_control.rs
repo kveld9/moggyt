@@ -67,6 +67,7 @@ impl<
             }
         }
         self.last_skip_target = None;
+        self.cached_skip_ranges = None;
         self.sync_presence_track(&artist, &title, true);
         self.refresh_lyrics();
     }
@@ -140,6 +141,7 @@ impl<
     pub fn check_auto_skip(&mut self) {
         let Some(track) = self.queue.current() else {
             self.last_skip_target = None;
+            self.cached_skip_ranges = None;
             return;
         };
         let Ok(mut audio) = self.audio.try_lock() else {
@@ -153,8 +155,11 @@ impl<
         {
             self.last_skip_target = None;
         }
-        let skips_map = self.skip_store.load();
-        let Some(ranges) = skips_map.get(&track.id) else {
+        if !self.cached_skip_ranges.as_ref().is_some_and(|(id, _)| id == &track.id) {
+            let ranges = self.skip_store.load().remove(&track.id);
+            self.cached_skip_ranges = Some((track.id.clone(), ranges));
+        }
+        let Some((_, Some(ranges))) = self.cached_skip_ranges.as_ref() else {
             return;
         };
         let Some(target) = ranges.jump_target(current_pos) else {
@@ -324,14 +329,36 @@ pub fn apply_play_track_completion<
     state.sync_presence_track(&res.artist, &res.title, true);
     state.started_at = Some((Instant::now(), current_unix_secs()));
     state.last_skip_target = None;
+    state.cached_skip_ranges = None;
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
 
-    use crate::domain::{SkipSegment, Track};
+    use crate::domain::{SkipRanges, SkipSegment, Track};
+    use crate::infra::SkipStore;
     use crate::slint_shell::test_support::test_wired;
+
+    #[derive(Debug)]
+    struct CountingSkipStore {
+        load_count: Arc<AtomicUsize>,
+        ranges: HashMap<String, SkipRanges>,
+    }
+
+    impl SkipStore for CountingSkipStore {
+        fn load(&self) -> HashMap<String, SkipRanges> {
+            self.load_count.fetch_add(1, Ordering::SeqCst);
+            self.ranges.clone()
+        }
+
+        fn save(&self, _map: &HashMap<String, SkipRanges>) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn test_playback_controls_toggle_and_queue_navigation() {
@@ -382,6 +409,50 @@ mod tests {
         state.seek_by(12);
         state.check_auto_skip();
         assert_eq!(state.audio.lock().unwrap().position_secs(), 20);
+    }
+
+    #[test]
+    fn test_auto_skip_repeated_checks_load_once() {
+        let mut state = test_wired();
+        let counter = Arc::new(AtomicUsize::new(0));
+        let mut ranges = SkipRanges::new();
+        ranges.insert(SkipSegment::new(10, 20).unwrap());
+        let mut map = HashMap::new();
+        map.insert("t1".to_string(), ranges);
+
+        state.skip_store =
+            Box::new(CountingSkipStore { load_count: Arc::clone(&counter), ranges: map });
+
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.check_auto_skip();
+        state.check_auto_skip();
+        state.check_auto_skip();
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_auto_skip_switching_track_loads_again() {
+        let mut state = test_wired();
+        let counter = Arc::new(AtomicUsize::new(0));
+        let mut ranges1 = SkipRanges::new();
+        ranges1.insert(SkipSegment::new(10, 20).unwrap());
+        let mut ranges2 = SkipRanges::new();
+        ranges2.insert(SkipSegment::new(30, 40).unwrap());
+        let mut map = HashMap::new();
+        map.insert("t1".to_string(), ranges1);
+        map.insert("t2".to_string(), ranges2);
+
+        state.skip_store =
+            Box::new(CountingSkipStore { load_count: Arc::clone(&counter), ranges: map });
+
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.check_auto_skip();
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
+        state.queue.advance();
+        state.check_auto_skip();
+        assert_eq!(counter.load(Ordering::SeqCst), 2);
     }
 
     #[test]
