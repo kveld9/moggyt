@@ -40,7 +40,6 @@ pub mod explore;
 pub mod format;
 pub mod init;
 pub mod labels;
-pub mod library;
 pub mod page;
 pub mod platform;
 pub mod playback;
@@ -58,48 +57,17 @@ pub mod window;
 pub use app::{
     SlintAppState, StaticLabels, build_window, format_queue_label, run, sync_static_labels,
 };
-pub use detail::{
-    DetailState, detail_has_artwork, detail_kind_label, detail_kind_label_with_locale,
-    detail_track_rows, resolve_detail_cover_url,
-};
-pub use library::{LibraryItemRow, LibraryState, album_row, artist_row, playlist_row};
+pub use detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 pub use page::SlintPage;
-pub use platform::{
-    CoverArtData, LyricDisplayLine, LyricsState, PlatformState, PresenceSnapshot, Transport,
-    TransportCommand, TransportStub, dispatch_to_ui, lyrics_display_lines, rgba_to_image,
-};
-pub use playback::{PlaybackState, format_position, format_track_duration, queue_track_rows};
+pub use platform::{CoverArtData, PresenceSnapshot, dispatch_to_ui, rgba_to_image};
+pub use playback::{format_position, format_track_duration};
 pub use playback_worker::{
     PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters, PlaybackWorkerCommand,
     execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
 };
 pub use player_bar::{PLAYER_BAR_OPTION_COUNT, PlayerBarPrefs, mode_from_index, mode_to_index};
-pub use search::{SearchState, TrackDisplayRow, canned_shelves, format_duration, shelf_tracks};
+pub use search::format_duration;
 pub use theme::{ThemeColors, apply_theme, palette_for, rgb_to_slint};
-
-/// Pure in-memory UI shell state for navigation.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct SlintShellState {
-    /// Currently active navigation page.
-    pub page: SlintPage,
-}
-
-impl SlintShellState {
-    /// Creates a new default shell state with the Search page active.
-    pub fn new() -> Self {
-        Self { page: SlintPage::Search }
-    }
-
-    /// Selects a new active page.
-    pub fn select_page(&mut self, page: SlintPage) {
-        self.page = page;
-    }
-
-    /// Selects a new active page by index, falling back to Search if out of bounds.
-    pub fn select_page_from_index(&mut self, index: i32) {
-        self.page = SlintPage::from_index(index);
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -155,61 +123,5 @@ mod tests {
         assert_eq!(SlintPage::Detail.title_with_locale(crate::i18n::Locale::Spanish), "Detalle");
         assert_eq!(SlintPage::Settings.title_with_locale(crate::i18n::Locale::Spanish), "Ajustes");
         assert_eq!(SlintPage::Explore.title_with_locale(crate::i18n::Locale::Spanish), "Explorar");
-    }
-
-    #[test]
-    fn test_slint_shell_state_default() {
-        let state = SlintShellState::default();
-        assert_eq!(state.page, SlintPage::Search);
-
-        let new_state = SlintShellState::new();
-        assert_eq!(new_state.page, SlintPage::Search);
-    }
-
-    #[test]
-    fn test_slint_shell_state_select_page() {
-        let mut state = SlintShellState::new();
-        assert_eq!(state.page, SlintPage::Search);
-
-        state.select_page(SlintPage::NowPlaying);
-        assert_eq!(state.page, SlintPage::NowPlaying);
-
-        state.select_page(SlintPage::Library);
-        assert_eq!(state.page, SlintPage::Library);
-
-        state.select_page(SlintPage::Detail);
-        assert_eq!(state.page, SlintPage::Detail);
-
-        state.select_page(SlintPage::Settings);
-        assert_eq!(state.page, SlintPage::Settings);
-
-        state.select_page(SlintPage::Explore);
-        assert_eq!(state.page, SlintPage::Explore);
-
-        state.select_page(SlintPage::Search);
-        assert_eq!(state.page, SlintPage::Search);
-    }
-
-    #[test]
-    fn test_slint_shell_state_select_page_from_index() {
-        let mut state = SlintShellState::new();
-
-        state.select_page_from_index(1);
-        assert_eq!(state.page, SlintPage::NowPlaying);
-
-        state.select_page_from_index(2);
-        assert_eq!(state.page, SlintPage::Library);
-
-        state.select_page_from_index(4);
-        assert_eq!(state.page, SlintPage::Settings);
-
-        state.select_page_from_index(5);
-        assert_eq!(state.page, SlintPage::Explore);
-
-        state.select_page_from_index(999);
-        assert_eq!(state.page, SlintPage::Search);
-
-        state.select_page_from_index(-42);
-        assert_eq!(state.page, SlintPage::Search);
     }
 }
