@@ -19,11 +19,16 @@ export struct ExploreCardData {
     subtitle: string,
     has_cover: bool,
     cover: image,
+    tile_color: color,
+}
+
+export struct ExploreCardRow {
+    cards: [ExploreCardData],
 }
 
 export struct ExploreShelfData {
     title: string,
-    cards: [ExploreCardData],
+    rows: [ExploreCardRow],
 }
 
 export struct LibraryItemData {
