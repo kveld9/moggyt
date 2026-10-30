@@ -355,19 +355,26 @@ impl<
         if idx == 0 { -1 } else { (idx - 1) as i32 }
     }
 
+    fn cover_bytes_or_fetch(covers: &Arc<Mutex<K>>, url: &str) -> Option<Vec<u8>> {
+        if let Some(cached) = covers.lock().ok()?.get(url) {
+            return Some(cached);
+        }
+        let fetched = fetch_artwork(url, 8).ok()?;
+        if let Ok(mut c) = covers.lock() {
+            c.put(url, fetched.clone());
+        }
+        Some(fetched)
+    }
+
+    fn cover_max_px(&self) -> u32 {
+        if self.hi_res_covers { 1024 } else { 512 }
+    }
+
     /// Fetches, caches, decodes, and converts active track cover art to Slint Image.
     pub fn resolve_cover_image(&mut self) -> Option<slint::Image> {
         let url = self.queue.current()?.artwork.clone()?;
-        let bytes = if let Some(cached) = self.covers.lock().ok()?.get(&url) {
-            cached
-        } else {
-            let fetched = fetch_artwork(&url, 8).ok()?;
-            if let Ok(mut c) = self.covers.lock() {
-                c.put(&url, fetched.clone());
-            }
-            fetched
-        };
-        let max_px = if self.hi_res_covers { 1024 } else { 512 };
+        let bytes = Self::cover_bytes_or_fetch(&self.covers, &url)?;
+        let max_px = self.cover_max_px();
         let rgba = decode_cover(&bytes, max_px)?;
         rgba_to_image(rgba.as_raw(), rgba.width(), rgba.height())
     }
@@ -641,5 +648,28 @@ mod tests {
         assert_eq!(*fetch_locales.lock().unwrap(), vec![Locale::English]);
         assert_eq!(state.home_shelves.len(), 1);
         assert_eq!(state.home_shelves[0].title, "Home English");
+    }
+
+    #[test]
+    fn test_cover_max_px_resolution() {
+        let mut state = test_wired();
+        state.hi_res_covers = false;
+        assert_eq!(state.cover_max_px(), 512);
+        state.hi_res_covers = true;
+        assert_eq!(state.cover_max_px(), 1024);
+    }
+
+    #[test]
+    fn test_cover_bytes_or_fetch_cache_hit() {
+        let state = test_wired();
+        state.covers.lock().unwrap().put("https://example.com/art.jpg", vec![1, 2, 3]);
+        let cached = SlintAppState::<
+            crate::infra::CatalogStub,
+            crate::infra::AudioStub,
+            crate::infra::MemorySessionStore,
+            crate::infra::LrclibStub,
+            crate::infra::MemoryCoverCache,
+        >::cover_bytes_or_fetch(&state.covers, "https://example.com/art.jpg");
+        assert_eq!(cached, Some(vec![1, 2, 3]));
     }
 }

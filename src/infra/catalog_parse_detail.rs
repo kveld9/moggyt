@@ -260,22 +260,15 @@ pub fn collect_detail_tracks(value: &Value) -> Vec<Track> {
     tracks
 }
 
-/// Parses a detail view (album, artist, or playlist) from catalog API browse response payload.
-///
-/// Returns `None` when neither a header title nor any valid track items are found.
-pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
-    let mut title = detail_header_title(value);
-    if title.is_empty() {
-        if let Some(fallback) = detail_microformat_title(value) {
-            title = fallback;
-        }
+fn resolve_detail_title(value: &Value) -> String {
+    let title = detail_header_title(value);
+    if !title.is_empty() {
+        return title;
     }
-    let subtitle = detail_header_subtitle(value);
-    let tracks = collect_detail_tracks(value);
-    if title.is_empty() && tracks.is_empty() {
-        return None;
-    }
-    let mut detail = Detail::new(kind, &title, &subtitle, tracks);
+    detail_microformat_title(value).unwrap_or_default()
+}
+
+fn with_optional_detail_fields(mut detail: Detail, value: &Value) -> Detail {
     let desc = detail_header_description(value).or_else(|| detail_microformat_description(value));
     if let Some(desc) = desc {
         detail = detail.with_description(desc);
@@ -284,7 +277,21 @@ pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
     if let Some(art) = art {
         detail = detail.with_artwork(art);
     }
-    Some(detail)
+    detail
+}
+
+/// Parses a detail view (album, artist, or playlist) from catalog API browse response payload.
+///
+/// Returns `None` when neither a header title nor any valid track items are found.
+pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
+    let title = resolve_detail_title(value);
+    let subtitle = detail_header_subtitle(value);
+    let tracks = collect_detail_tracks(value);
+    if title.is_empty() && tracks.is_empty() {
+        return None;
+    }
+    let detail = Detail::new(kind, &title, &subtitle, tracks);
+    Some(with_optional_detail_fields(detail, value))
 }
 
 #[cfg(test)]
@@ -398,5 +405,51 @@ mod tests {
             }
         });
         assert_eq!(detail_header_description(&empty_desc), None);
+    }
+
+    #[test]
+    fn test_resolve_detail_title_precedence() {
+        let header_only = serde_json::json!({
+            "header": {
+                "musicDetailHeaderRenderer": {
+                    "title": { "runs": [{ "text": "Header Title" }] }
+                }
+            }
+        });
+        assert_eq!(resolve_detail_title(&header_only), "Header Title");
+
+        let microformat_only = serde_json::json!({
+            "microformat": {
+                "microformatDataRenderer": {
+                    "title": "Microformat Title"
+                }
+            }
+        });
+        assert_eq!(resolve_detail_title(&microformat_only), "Microformat Title");
+
+        let empty = serde_json::json!({});
+        assert_eq!(resolve_detail_title(&empty), "");
+    }
+
+    #[test]
+    fn test_with_optional_detail_fields_applies_both() {
+        let detail = Detail::new(DetailKind::Album, "Title", "Sub", Vec::new());
+        let payload = serde_json::json!({
+            "header": {
+                "musicDetailHeaderRenderer": {
+                    "description": { "runs": [{ "text": "Desc" }] },
+                    "thumbnail": {
+                        "musicThumbnailRenderer": {
+                            "thumbnail": {
+                                "thumbnails": [{ "url": "https://img.local/art.jpg", "width": 500 }]
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        let enriched = with_optional_detail_fields(detail, &payload);
+        assert_eq!(enriched.description.as_deref(), Some("Desc"));
+        assert_eq!(enriched.artwork.as_deref(), Some("https://img.local/art.jpg"));
     }
 }

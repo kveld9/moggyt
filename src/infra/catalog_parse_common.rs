@@ -126,16 +126,21 @@ pub fn parse_two_row(renderer: &Value) -> Option<(String, String, Option<String>
     Some((title, subtitle, id))
 }
 
+fn parse_mm_ss(mins: &str, secs: &str) -> Option<u32> {
+    mins.parse::<u32>().ok()?.checked_mul(60)?.checked_add(secs.parse().ok()?)
+}
+
+fn parse_hh_mm_ss(hours: &str, mins: &str, secs: &str) -> Option<u32> {
+    let total_m = hours.parse::<u32>().ok()?.checked_mul(60)?.checked_add(mins.parse().ok()?)?;
+    total_m.checked_mul(60)?.checked_add(secs.parse().ok()?)
+}
+
 /// Parses duration string formatted as "mm:ss" or "hh:mm:ss" into total seconds.
 pub fn parse_duration_secs(raw: &str) -> Option<u32> {
     let parts: Vec<&str> = raw.trim().split(':').collect();
     match parts.as_slice() {
-        [mins, secs] => mins.parse::<u32>().ok()?.checked_mul(60)?.checked_add(secs.parse().ok()?),
-        [hours, mins, secs] => {
-            let total_m =
-                hours.parse::<u32>().ok()?.checked_mul(60)?.checked_add(mins.parse().ok()?)?;
-            total_m.checked_mul(60)?.checked_add(secs.parse().ok()?)
-        }
+        [mins, secs] => parse_mm_ss(mins, secs),
+        [hours, mins, secs] => parse_hh_mm_ss(hours, mins, secs),
         _ => None,
     }
 }
@@ -290,6 +295,25 @@ mod tests {
         ] {
             assert_eq!(parse_duration_secs(input), expected, "failed for: {input}");
         }
+    }
+
+    #[test]
+    fn test_parse_mm_ss_valid_overflow_non_numeric() {
+        assert_eq!(parse_mm_ss("3", "30"), Some(210));
+        assert_eq!(parse_mm_ss("0", "0"), Some(0));
+        assert_eq!(parse_mm_ss("71582789", "0"), None);
+        assert_eq!(parse_mm_ss("abc", "30"), None);
+        assert_eq!(parse_mm_ss("3", "xyz"), None);
+    }
+
+    #[test]
+    fn test_parse_hh_mm_ss_valid_overflow_non_numeric() {
+        assert_eq!(parse_hh_mm_ss("1", "02", "15"), Some(3735));
+        assert_eq!(parse_hh_mm_ss("0", "0", "0"), Some(0));
+        assert_eq!(parse_hh_mm_ss("71582789", "0", "0"), None);
+        assert_eq!(parse_hh_mm_ss("foo", "02", "15"), None);
+        assert_eq!(parse_hh_mm_ss("1", "bar", "15"), None);
+        assert_eq!(parse_hh_mm_ss("1", "02", "baz"), None);
     }
 
     #[test]
