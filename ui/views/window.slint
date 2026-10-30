@@ -2,6 +2,7 @@ import {
     Theme,
     TrackRowData,
     ShelfData,
+    ExploreShelfData,
     LibraryItemData,
     LyricLineData,
 } from "../theme.slint";
@@ -70,7 +71,7 @@ export component MoggytWindow inherits Window {
     in-out property <bool> detail-has-detail: false; in-out property <bool> detail-has-artwork: false; in-out property <string> detail-title: ""; in-out property <string> detail-subtitle: ""; in-out property <string> detail-description: "";
     in-out property <string> detail-kind-label: ""; in-out property <[TrackRowData]> detail-tracks: [];
     in-out property <image> detail-cover;
-    in-out property <[ShelfData]> explore-shelves: [];
+    in-out property <[ExploreShelfData]> explore-shelves: [];
     in-out property <bool> explore-loading: false;
     in-out property <string> nav-search-label: "Search";
     in-out property <string> nav-library-label: "Library";

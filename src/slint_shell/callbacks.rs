@@ -11,7 +11,9 @@ use crate::domain::{DetailKind, SearchFilter, SearchResult};
 use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::request_queue_track_cover;
-use crate::slint_shell::explore::{explore_item_at, load_explore_async};
+use crate::slint_shell::explore::{
+    explore_item_at, load_explore_async, refresh_explore_covers_if_loaded,
+};
 use crate::slint_shell::format::format_playback_speed;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
@@ -125,6 +127,8 @@ pub(crate) fn wire_window_callbacks<
             refresh_library_async(&win, &mut st, &tx);
         } else if page == SlintPage::Explore && !st.explore_loaded && !st.explore_loading {
             load_explore_async(&win, &mut st, &tx);
+        } else if page == SlintPage::Explore {
+            refresh_explore_covers_if_loaded(&st, &tx);
         }
         sync_window(&win, &mut st);
     });
