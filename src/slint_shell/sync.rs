@@ -2,12 +2,14 @@
 //!
 //! Hexagonal invariant: pure in-memory projections pushing domain models into Slint UI properties.
 
+use std::collections::HashMap;
+
 use slint::{ModelRc, VecModel};
 
-use crate::domain::SearchFilter;
+use crate::domain::{SearchFilter, Track};
 use crate::i18n::tr;
 use crate::infra::{AudioBackend, Catalog, CoverCache, GithubUpdater, LyricsSource, SessionStore};
-use crate::slint_shell::covers::{resolve_row_cover_image, track_to_row_data};
+use crate::slint_shell::covers::resolve_row_cover_image;
 use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::explore::explore_card_shelves;
 use crate::slint_shell::format::{format_playback_speed, format_queue_label, format_update_status};
@@ -16,7 +18,7 @@ use crate::slint_shell::playback::{
     format_position, format_track_duration, is_track_liked, progress_fraction, repeat_mode_to_int,
 };
 use crate::slint_shell::player_bar::mode_to_index;
-use crate::slint_shell::search::SearchRow;
+use crate::slint_shell::search::{SearchRow, format_duration};
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::theme::{apply_theme, theme_to_index};
 use crate::slint_shell::{LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData};
@@ -347,5 +349,38 @@ pub(crate) fn sync_playback_tick<
     window.set_is_playing(is_playing);
 }
 
+/// Converts a domain track to Slint TrackRowData with cached cover art if available.
+pub(crate) fn track_to_row_data(
+    index: usize,
+    track: &Track,
+    covers: &HashMap<String, slint::Image>,
+) -> TrackRowData {
+    let cover = resolve_row_cover_image(track.artwork.as_deref(), covers);
+    TrackRowData {
+        index: index as i32,
+        title: track.title.clone().into(),
+        artist: track.artist.clone().into(),
+        album: track.album.clone().unwrap_or_default().into(),
+        duration: format_duration(track.duration_secs).into(),
+        kind: "track".into(),
+        cover,
+    }
+}
+
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_track_to_row_data_uses_thumbnail_variant() {
+        let track = Track::new("t1", "Title", "Artist")
+            .with_artwork("https://lh3.googleusercontent.com/test-thumb-large");
+        let covers = HashMap::new();
+
+        let row_data = track_to_row_data(0, &track, &covers);
+        assert_eq!(row_data.index, 0);
+        assert_eq!(row_data.title.as_str(), "Title");
+        assert_eq!(row_data.artist.as_str(), "Artist");
+        assert_eq!(row_data.kind.as_str(), "track");
+    }
+}
