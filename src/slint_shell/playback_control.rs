@@ -1,16 +1,23 @@
-//! Playback control, queue progression, volume, seeking, and presence updates on SlintAppState.
+//! Playback control, track completion, queue progression, volume, seeking,
+//! and presence updates on SlintAppState.
 //!
 //! Hexagonal invariant: non-blocking audio port calls and presence sync without UI event loop stalls.
 
 use std::sync::Arc;
 use std::time::Instant;
 
+use slint::{ModelRc, VecModel};
+
+use crate::i18n::tr;
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, LyricsSource, Presence, SessionStore, should_scrobble,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::current_unix_secs;
+use crate::slint_shell::platform::rgba_to_image;
+use crate::slint_shell::playback_worker::PlayTrackResult;
 use crate::slint_shell::state::SlintAppState;
+use crate::slint_shell::{LyricLineData, MoggytWindow};
 
 impl<
     C: Catalog + Send + 'static,
@@ -261,6 +268,62 @@ impl<
             self.sync_presence_playing(false);
         }
     }
+}
+
+/// Applies completed playback worker results back to the Slint window on the event loop.
+pub fn apply_play_track_completion<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+    res: PlayTrackResult,
+) {
+    if !res.success {
+        window.set_active_track_title(tr(state.locale, "Failed to play track").into());
+        window.set_is_playing(false);
+        return;
+    }
+    window.set_is_playing(true);
+    state.lyrics_lines = res.lyrics_lines;
+    state.lyrics_key = Some((res.artist.clone(), res.title.clone()));
+
+    let line_data: Vec<LyricLineData> = state
+        .lyrics_lines
+        .iter()
+        .enumerate()
+        .map(|(i, l)| LyricLineData { index: i as i32, text: l.text.clone().into() })
+        .collect();
+    window.set_lyrics_lines(ModelRc::new(VecModel::from(line_data)));
+    window.set_active_lyric_index(state.active_lyric_index());
+
+    if let Some(cover) = res.cover_data {
+        if let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) {
+            state.current_cover_image = Some(img.clone());
+            state.now_playing_cover = Some(img.clone());
+            state.search_covers.insert(cover.url, img.clone());
+            window.set_cover_image(img.clone());
+            window.set_now_playing_cover(img);
+            window.set_has_cover(true);
+        } else {
+            state.current_cover_image = None;
+            state.now_playing_cover = None;
+            window.set_has_cover(false);
+            window.set_now_playing_cover(slint::Image::default());
+        }
+    } else {
+        state.current_cover_image = None;
+        state.now_playing_cover = None;
+        window.set_has_cover(false);
+        window.set_now_playing_cover(slint::Image::default());
+    }
+
+    state.sync_presence_track(&res.artist, &res.title, true);
+    state.started_at = Some((Instant::now(), current_unix_secs()));
+    state.last_skip_target = None;
 }
 
 #[cfg(test)]

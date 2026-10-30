@@ -15,8 +15,8 @@ use crate::infra::{
 };
 
 pub use crate::slint_shell::covers::{
-    apply_play_track_completion, request_detail_covers, request_explore_covers,
-    request_library_covers, request_queue_track_cover,
+    request_detail_covers, request_explore_covers, request_library_covers,
+    request_queue_track_cover,
 };
 pub use crate::slint_shell::explore::execute_explore;
 pub use crate::slint_shell::format::{
@@ -29,6 +29,7 @@ pub use crate::slint_shell::init::{
 };
 pub use crate::slint_shell::labels::{StaticLabels, sync_static_labels};
 pub use crate::slint_shell::page::SlintPage;
+pub use crate::slint_shell::playback_control::apply_play_track_completion;
 pub use crate::slint_shell::player_bar::PlayerBarPrefs;
 pub use crate::slint_shell::state::{SharedState, SlintAppState};
 pub use crate::slint_shell::window::build_window;
