@@ -242,9 +242,9 @@ impl CatalogClient {
         let _ = self.set_liked_payload(trimmed, liked);
     }
 
-    /// Converts this catalog API client into a [`LiveCatalog`](super::ytm::LiveCatalog) adapter.
-    pub fn into_catalog(self) -> super::ytm::LiveCatalog {
-        super::ytm::LiveCatalog::with_client(self)
+    /// Converts this catalog API client into a [`LiveCatalog`](super::catalog_live::LiveCatalog) adapter.
+    pub fn into_catalog(self) -> super::catalog_live::LiveCatalog {
+        super::catalog_live::LiveCatalog::with_client(self)
     }
 }
 

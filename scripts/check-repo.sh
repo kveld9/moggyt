@@ -118,7 +118,7 @@ check_file "src/domain/mod.rs" true
 check_file "src/domain/queue.rs" true
 check_file "src/domain/search.rs" true
 check_file "src/infra/mod.rs" true
-check_file "src/infra/ytm.rs" true
+check_file "src/infra/catalog.rs" true
 check_file "src/infra/audio.rs" true
 
 echo -e "\n${BOLD}6. Maintenance & Setup Automation (scripts/)${RESET}"

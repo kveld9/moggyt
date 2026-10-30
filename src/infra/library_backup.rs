@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
-use super::ytm::Catalog;
+use super::catalog::Catalog;
 use crate::domain::{Album, Playlist, Track};
 
 /// Canonical backup schema version for library backups.
