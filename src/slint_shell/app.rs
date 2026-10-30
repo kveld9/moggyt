@@ -97,17 +97,9 @@ pub fn run() -> anyhow::Result<()> {
     state.theme = settings.theme;
     state.locale = settings.locale;
     state.player_bar = PlayerBarPrefs::from_settings(&settings);
+    state.recent_searches = settings.recent_searches;
     if let Ok(mut c) = state.catalog.lock() {
         c.set_locale(settings.locale);
-        let refreshed = c.home_shelves();
-        if refreshed.is_empty() {
-            tracing::warn!(
-                "failed to re-fetch home shelves for locale {:?}; retaining fallback shelves",
-                settings.locale
-            );
-        } else {
-            state.home_shelves = refreshed;
-        }
     }
     state.settings_store = Box::new(settings_store);
 

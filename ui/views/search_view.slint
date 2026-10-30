@@ -15,9 +15,17 @@ export component SearchView inherits VerticalLayout {
     in property <string> filter-artists-label: "Artists";
     in property <string> filter-playlists-label: "Playlists";
     in property <string> empty-text: "No results found.";
+    in property <[string]> recent-searches: [];
+    in property <bool> search-active: false;
+    in property <string> recent-title-label: "Recent searches";
+    in property <string> recent-empty-label: "No recent searches.";
+    in property <string> clear-history-label: "Clear history";
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
+    callback recent-search-selected(string);
+    callback recent-search-removed(string);
+    callback recent-searches-cleared();
     forward-focus: input;
 
     spacing: 16px;
@@ -137,7 +145,7 @@ export component SearchView inherits VerticalLayout {
         }
     }
 
-    HorizontalLayout {
+    if root.search-active && root.query != "" : HorizontalLayout {
         spacing: 8px;
         alignment: start;
 
@@ -168,7 +176,7 @@ export component SearchView inherits VerticalLayout {
         }
     }
 
-    if root.shelves.length == 0 : VerticalLayout {
+    if root.search-active && root.query != "" && root.shelves.length == 0 : VerticalLayout {
         padding-top: 24px;
         alignment: center;
 
@@ -180,26 +188,130 @@ export component SearchView inherits VerticalLayout {
         }
     }
 
-    for shelf in root.shelves : VerticalLayout {
-        spacing: 8px;
+    if root.search-active && root.query != "" : VerticalLayout {
+        spacing: 16px;
+        alignment: start;
+
+        for shelf in root.shelves : VerticalLayout {
+            spacing: 8px;
+            alignment: start;
+
+            Text {
+                text: shelf.title;
+                color: Theme.text;
+                font-size: 18px;
+                font-weight: 700;
+            }
+
+            for track in shelf.tracks : TrackRow {
+                title: track.title;
+                artist: track.artist;
+                album: track.album;
+                duration: track.duration;
+                kind: track.kind;
+                cover: track.cover;
+                clicked => {
+                    root.track-selected(track.index);
+                }
+            }
+        }
+    }
+
+    if !root.search-active || root.query == "" : VerticalLayout {
+        spacing: 12px;
         alignment: start;
 
         Text {
-            text: shelf.title;
+            text: root.recent-title-label;
             color: Theme.text;
             font-size: 18px;
             font-weight: 700;
         }
 
-        for track in shelf.tracks : TrackRow {
-            title: track.title;
-            artist: track.artist;
-            album: track.album;
-            duration: track.duration;
-            kind: track.kind;
-            cover: track.cover;
-            clicked => {
-                root.track-selected(track.index);
+        if root.recent-searches.length == 0 : VerticalLayout {
+            padding-top: 12px;
+            alignment: center;
+
+            Text {
+                text: root.recent-empty-label;
+                color: Theme.secondary;
+                font-size: 14px;
+            }
+        }
+
+        for query-item in root.recent-searches : Rectangle {
+            height: 36px;
+            border-radius: 6px;
+            background: row-touch.has-hover ? Theme.hover : transparent;
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            row-touch := TouchArea {
+                clicked => { root.recent-search-selected(query-item); }
+            }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 8px;
+                spacing: 8px;
+
+                Text {
+                    horizontal-stretch: 1;
+                    text: query-item;
+                    color: Theme.text;
+                    font-size: 14px;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+
+                VerticalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 12px;
+                        background: delete-touch.has-hover ? Theme.overlay : transparent;
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        delete-touch := TouchArea {
+                            clicked => { root.recent-search-removed(query-item); }
+                        }
+
+                        IconClose {
+                            size: 10px;
+                            tint: delete-touch.has-hover ? Theme.text : Theme.secondary;
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.recent-searches.length > 0 : HorizontalLayout {
+            padding-top: 4px;
+
+            Rectangle {
+                border-radius: 6px;
+                background: clear-btn-touch.has-hover ? Theme.hover : transparent;
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                clear-btn-touch := TouchArea {
+                    clicked => { root.recent-searches-cleared(); }
+                }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    padding-top: 6px;
+                    padding-bottom: 6px;
+
+                    Text {
+                        text: root.clear-history-label;
+                        color: clear-btn-touch.has-hover ? Theme.accent : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
             }
         }
     }

@@ -86,6 +86,11 @@ export component MoggytWindow inherits Window {
     in-out property <string> filter-artists-label: "Artists";
     in-out property <string> filter-playlists-label: "Playlists";
     in-out property <string> search-empty-text: "No results found.";
+    in-out property <[string]> recent-searches: [];
+    in-out property <bool> search-active: false;
+    in-out property <string> recent-title-label: "Recent searches";
+    in-out property <string> recent-empty-label: "No recent searches.";
+    in-out property <string> clear-history-label: "Clear history";
     in-out property <string> queue-title-label: "Queue";
     in-out property <string> queue-button-text: "Queue";
     in-out property <string> queue-empty-text: "The queue is empty.";
@@ -145,6 +150,9 @@ export component MoggytWindow inherits Window {
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
+    callback recent-search-selected(string);
+    callback recent-search-removed(string);
+    callback recent-searches-cleared();
     callback explore-track-selected(int);
     callback width-changed(int);
     callback queue-track-selected(int);
@@ -218,6 +226,11 @@ export component MoggytWindow inherits Window {
                 filter-artists-label: root.filter-artists-label;
                 filter-playlists-label: root.filter-playlists-label;
                 search-empty-text: root.search-empty-text;
+                recent-searches: root.recent-searches;
+                search-active: root.search-active;
+                recent-title-label: root.recent-title-label;
+                recent-empty-label: root.recent-empty-label;
+                clear-history-label: root.clear-history-label;
                 no-cover-text: root.no-cover-text;
                 lyrics-unavailable-text: root.lyrics-unavailable-text;
                 lyrics-hint-text: root.lyrics-hint-text;
@@ -269,6 +282,9 @@ export component MoggytWindow inherits Window {
                 open-settings => { root.page-selected(4); }
                 query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
+                recent-search-selected(q) => { root.recent-search-selected(q); }
+                recent-search-removed(q) => { root.recent-search-removed(q); }
+                recent-searches-cleared => { root.recent-searches-cleared(); }
                 explore-track-selected(idx) => { root.explore-track-selected(idx); }
                 playlist-selected(idx) => { root.playlist-selected(idx); } album-selected(idx) => { root.album-selected(idx); }
                 artist-selected(idx) => { root.artist-selected(idx); } detail-track-selected(idx) => { root.detail-track-selected(idx); }

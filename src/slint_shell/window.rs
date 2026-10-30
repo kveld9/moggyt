@@ -30,7 +30,8 @@ use crate::slint_shell::playback_worker::{
 };
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{
-    sync_library_and_detail, sync_playback_tick, sync_shelves_and_queue, sync_window,
+    persist_recent_searches, sync_library_and_detail, sync_playback_tick, sync_recent_searches,
+    sync_shelves_and_queue, sync_window,
 };
 
 thread_local! {
@@ -156,6 +157,11 @@ pub(crate) fn submit_search_async<
     if trimmed.is_empty() {
         return;
     }
+    state.search_active = true;
+    state.recent_searches.record(trimmed);
+    persist_recent_searches(state);
+    sync_recent_searches(window, state);
+
     state.search_query = query.to_string();
     state.search_filter = crate::domain::SearchFilter::All;
     state.search_covers.clear();
