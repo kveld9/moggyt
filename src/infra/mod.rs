@@ -7,8 +7,10 @@
 mod audio;
 mod audio_dsp;
 mod audio_rodio;
+mod catalog;
 mod catalog_client;
 pub mod catalog_client_impl;
+mod catalog_live;
 pub mod catalog_model;
 pub mod catalog_parse_common;
 pub mod catalog_parse_detail;
@@ -18,6 +20,7 @@ pub mod catalog_parse_library;
 pub mod catalog_parse_radio;
 pub mod catalog_parse_search;
 pub mod catalog_requests;
+mod catalog_stub;
 mod cover;
 mod cover_art;
 mod cover_disk;
@@ -42,7 +45,6 @@ mod tray;
 mod updater;
 mod updater_github;
 mod ytdlp;
-mod ytm;
 
 pub use audio::{AudioBackend, AudioStub, clamp_speed};
 pub use audio_dsp::{
@@ -51,7 +53,10 @@ pub use audio_dsp::{
     is_silent_sample, linear_to_db, rms_to_db,
 };
 pub use audio_rodio::{LiveAudio, RodioBackend, volume_to_amplitude};
+pub use catalog::Catalog;
 pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
+pub use catalog_live::LiveCatalog;
+pub use catalog_stub::CatalogStub;
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use cover_art::{COVER_HIRES_MAX_PX, COVER_MAX_PX, decode_cover, fetch_artwork};
 pub use cover_disk::{DiskCoverCache, cache_file_name, fnv1a_hex};
@@ -99,4 +104,3 @@ pub use ytdlp::{
     YTDLP_AUDIO_FORMAT, YTDLP_UPDATE_INTERVAL_SECS, YtDlpResolver, ensure_sidecar, format_args,
     parse_version, release_asset_name, sidecar_needs_update, watch_url,
 };
-pub use ytm::{Catalog, CatalogStub, LiveCatalog};

@@ -47,7 +47,9 @@ src/
     ├── tray.rs        # System tray handle and action event loop
     ├── updater*.rs    # Updater port and GitHub Releases release checker
     ├── ytdlp.rs       # yt-dlp sidecar download and stream resolution adapter
-    └── ytm.rs         # Catalog adapter implementing search and library views
+    ├── catalog.rs      # Catalog port trait definition
+    ├── catalog_live.rs # Catalog API-backed live adapter
+    └── catalog_stub.rs # Deterministic catalog stub for testing
 ```
 
 ## Evolution rules
