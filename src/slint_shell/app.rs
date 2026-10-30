@@ -28,6 +28,7 @@ pub use crate::slint_shell::playback_control::apply_play_track_completion;
 pub use crate::slint_shell::player_bar::PlayerBarPrefs;
 pub use crate::slint_shell::state::{SharedState, SlintAppState};
 pub use crate::slint_shell::window::build_window;
+use crate::slint_shell::window::with_ui_state;
 
 use crate::slint_shell::init::{check_updater_status, handle_cli_args};
 
@@ -122,12 +123,32 @@ where
     let (window, _timer) = build_window(state)?;
     window.run().map_err(|err| anyhow::anyhow!("Slint execution failed: {err}"))?;
 
+    let _ = with_ui_state::<C, A, S, L, K, _>(|st| {
+        let _ = persist_state_on_exit(st);
+    });
+
     Ok(())
+}
+
+/// Persists the active playback queue to storage on application exit.
+pub fn persist_state_on_exit<C, A, S, L, K>(
+    state: &SlintAppState<C, A, S, L, K>,
+) -> anyhow::Result<()>
+where
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+{
+    state.queue_store.save(&state.queue)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Track;
+    use crate::slint_shell::test_support::test_wired;
 
     #[test]
     fn test_thin_composition_reexports_resolve() {
@@ -135,5 +156,20 @@ mod tests {
         let labels = StaticLabels::resolve(crate::i18n::Locale::English);
         assert_eq!(labels.nav_search, "Search");
         assert_eq!(format_queue_label(crate::i18n::Locale::English, 2), "Queue (2)");
+    }
+
+    #[test]
+    fn test_persist_state_on_exit_saves_queue() {
+        let mut state = test_wired();
+        let track1 = Track::new("t1", "Track 1", "Artist 1");
+        let track2 = Track::new("t2", "Track 2", "Artist 2");
+        state.queue.push(track1.clone());
+        state.queue.push(track2.clone());
+
+        persist_state_on_exit(&state).expect("failed to persist queue on exit");
+
+        let loaded = state.queue_store.load();
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded.tracks(), &[track1, track2]);
     }
 }
