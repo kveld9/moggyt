@@ -93,6 +93,8 @@ pub struct SlintAppState<
     pub explore_shelves: Vec<Shelf>,
     pub explore_loaded: bool,
     pub explore_loading: bool,
+    /// Explore grid columns for the current window width.
+    pub(crate) explore_columns: usize,
 
     pub worker_tx: Option<std::sync::mpsc::Sender<PlaybackWorkerCommand>>,
 }
@@ -174,6 +176,7 @@ impl<
             explore_shelves: Vec::new(),
             explore_loaded: false,
             explore_loading: false,
+            explore_columns: crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS,
             worker_tx: None,
         }
     }
@@ -438,6 +441,7 @@ mod tests {
         assert!(state.now_playing_cover.is_none());
         assert!(!state.is_shuffle);
         assert_eq!(state.search_query, "");
+        assert_eq!(state.explore_columns, crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS);
     }
 
     #[test]

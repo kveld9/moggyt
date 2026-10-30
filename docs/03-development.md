@@ -73,3 +73,10 @@ guessing; every rule here was verified against a build or the official documenta
   (`row: i / 5`) does not compile. Use one `Flickable` whose `viewport-width` is computed
   from the model length, with a single `HorizontalLayout` of fixed-size cards inside.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/gridlayout/>.
+- Rows of cards only wrap when each card has a real width: a `HorizontalLayout` of cards
+  without a width sizes them from their own preferred width, so the row overflows the window
+  and gets clipped, and `preferred-width: 0px` collapses it to zero instead. Give the card a
+  fixed `width` and chunk the model into rows of the cards that fit the window width, then
+  recompute that chunking from a `changed width => { ... }` handler on the `Window`, which
+  Slint fires on every resize and is the only way to reflow without a scroll offset.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/horizontallayout/>.
