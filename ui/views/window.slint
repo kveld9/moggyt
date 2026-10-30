@@ -116,6 +116,24 @@ export component MoggytWindow inherits Window {
     in-out property <string> section-about-label: "About";
     in-out property <string> app-version-label: "App version";
     in-out property <string> update-status-label: "Update status";
+    in-out property <int> player-bar-mode: 0;
+    in-out property <bool> player-bar-show-artwork: true;
+    in-out property <bool> player-bar-show-like: true;
+    in-out property <bool> player-bar-show-shuffle: true;
+    in-out property <bool> player-bar-show-repeat: true;
+    in-out property <bool> player-bar-show-skip-seconds: false;
+    in-out property <bool> player-bar-show-queue: true;
+    in-out property <bool> player-bar-show-volume: true;
+    in-out property <string> section-player-bar-label: "Player bar";
+    in-out property <string> player-bar-classic-label: "Classic";
+    in-out property <string> player-bar-floating-label: "Floating";
+    in-out property <string> player-bar-artwork-label: "Show artwork";
+    in-out property <string> player-bar-like-label: "Show like button";
+    in-out property <string> player-bar-shuffle-label: "Show shuffle button";
+    in-out property <string> player-bar-repeat-label: "Show repeat button";
+    in-out property <string> player-bar-skip-label: "Show skip 10s buttons";
+    in-out property <string> player-bar-queue-label: "Show queue button";
+    in-out property <string> player-bar-volume-label: "Show volume slider";
 
     callback page-selected(int);
     callback back-pressed();
@@ -142,6 +160,8 @@ export component MoggytWindow inherits Window {
     callback toggle-shuffle();
     callback cycle-repeat();
     callback open-queue();
+    callback player-bar-mode-selected(int);
+    callback player-bar-option-toggled(int);
 
     changed width => { root.width-changed(self.width / 1px); }
 
@@ -226,6 +246,24 @@ export component MoggytWindow inherits Window {
                 section-about-label: root.section-about-label;
                 app-version-label: root.app-version-label;
                 update-status-label: root.update-status-label;
+                player-bar-mode: root.player-bar-mode;
+                player-bar-show-artwork: root.player-bar-show-artwork;
+                player-bar-show-like: root.player-bar-show-like;
+                player-bar-show-shuffle: root.player-bar-show-shuffle;
+                player-bar-show-repeat: root.player-bar-show-repeat;
+                player-bar-show-skip-seconds: root.player-bar-show-skip-seconds;
+                player-bar-show-queue: root.player-bar-show-queue;
+                player-bar-show-volume: root.player-bar-show-volume;
+                section-player-bar-label: root.section-player-bar-label;
+                player-bar-classic-label: root.player-bar-classic-label;
+                player-bar-floating-label: root.player-bar-floating-label;
+                player-bar-artwork-label: root.player-bar-artwork-label;
+                player-bar-like-label: root.player-bar-like-label;
+                player-bar-shuffle-label: root.player-bar-shuffle-label;
+                player-bar-repeat-label: root.player-bar-repeat-label;
+                player-bar-skip-label: root.player-bar-skip-label;
+                player-bar-queue-label: root.player-bar-queue-label;
+                player-bar-volume-label: root.player-bar-volume-label;
                 open-settings => { root.page-selected(5); }
                 query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
@@ -239,38 +277,58 @@ export component MoggytWindow inherits Window {
                 theme-selected(idx) => { root.theme-selected(idx); }
                 cycle-playback-speed => { root.cycle-playback-speed(); }
                 back-pressed => { root.back-pressed(); }
+                player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
+                player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
             }
         }
 
-        PlayerBar {
+        Rectangle {
             vertical-stretch: 0;
-            height: 72px;
-            active-track-title: root.active-track-title;
-            active-track-artist: root.active-track-artist;
-            is-playing: root.is-playing;
-            volume: root.volume;
-            position-text: root.position-text;
-            duration-text: root.duration-text;
-            cover: root.now-playing-cover;
-            is-liked: root.is-liked;
-            is-shuffle: root.is-shuffle;
-            repeat-mode: root.repeat-mode;
-            progress: root.playback-progress;
-            position-secs: root.position-secs;
-            duration-secs: root.duration-secs;
-            queue-count: root.queue-count;
-            queue-button-text: root.queue-button-text;
+            background: transparent;
+            height: root.player-bar-mode == 1 ? 92px : 72px;
 
-            toggle-play => { root.toggle-play(); }
-            prev-track => { root.prev-track(); }
-            next-track => { root.next-track(); }
-            seek-by(delta) => { root.seek-by(delta); }
-            seek-to(secs) => { root.seek-to(secs); }
-            set-volume(vol) => { root.set-volume(vol); }
-            toggle-like => { root.toggle-like(); }
-            toggle-shuffle => { root.toggle-shuffle(); }
-            cycle-repeat => { root.cycle-repeat(); }
-            open-queue => { root.open-queue(); }
+            PlayerBar {
+                mode: root.player-bar-mode;
+                show-artwork: root.player-bar-show-artwork;
+                show-like: root.player-bar-show-like;
+                show-shuffle: root.player-bar-show-shuffle;
+                show-repeat: root.player-bar-show-repeat;
+                show-skip-seconds: root.player-bar-show-skip-seconds;
+                show-queue: root.player-bar-show-queue;
+                show-volume: root.player-bar-show-volume;
+
+                width: root.player-bar-mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
+                height: 72px;
+                x: (parent.width - self.width) / 2;
+                y: root.player-bar-mode == 1 ? 8px : 0px;
+
+                active-track-title: root.active-track-title;
+                active-track-artist: root.active-track-artist;
+                is-playing: root.is-playing;
+                volume: root.volume;
+                position-text: root.position-text;
+                duration-text: root.duration-text;
+                cover: root.now-playing-cover;
+                is-liked: root.is-liked;
+                is-shuffle: root.is-shuffle;
+                repeat-mode: root.repeat-mode;
+                progress: root.playback-progress;
+                position-secs: root.position-secs;
+                duration-secs: root.duration-secs;
+                queue-count: root.queue-count;
+                queue-button-text: root.queue-button-text;
+
+                toggle-play => { root.toggle-play(); }
+                prev-track => { root.prev-track(); }
+                next-track => { root.next-track(); }
+                seek-by(delta) => { root.seek-by(delta); }
+                seek-to(secs) => { root.seek-to(secs); }
+                set-volume(vol) => { root.set-volume(vol); }
+                toggle-like => { root.toggle-like(); }
+                toggle-shuffle => { root.toggle-shuffle(); }
+                cycle-repeat => { root.cycle-repeat(); }
+                open-queue => { root.open-queue(); }
+            }
         }
     }
 }

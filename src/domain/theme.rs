@@ -7,6 +7,18 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Presentation mode of the playback bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum PlayerBarMode {
+    /// Docked, full-width bar flush with the window bottom edge.
+    #[default]
+    #[serde(rename = "classic")]
+    Classic,
+    /// Rounded bar floating above the bottom edge, centered and width-capped.
+    #[serde(rename = "floating")]
+    Floating,
+}
+
 /// Built-in theme identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -341,5 +353,20 @@ mod tests {
         let deserialized_tokens: DesignTokens =
             serde_json::from_str(&serialized_tokens).expect("tokens deserialization");
         assert_eq!(tokens, deserialized_tokens);
+    }
+
+    #[test]
+    fn test_player_bar_mode_serde_and_default() {
+        assert_eq!(PlayerBarMode::default(), PlayerBarMode::Classic);
+
+        let classic_json = serde_json::to_string(&PlayerBarMode::Classic).unwrap();
+        assert_eq!(classic_json, "\"classic\"");
+        let classic_deser: PlayerBarMode = serde_json::from_str("\"classic\"").unwrap();
+        assert_eq!(classic_deser, PlayerBarMode::Classic);
+
+        let floating_json = serde_json::to_string(&PlayerBarMode::Floating).unwrap();
+        assert_eq!(floating_json, "\"floating\"");
+        let floating_deser: PlayerBarMode = serde_json::from_str("\"floating\"").unwrap();
+        assert_eq!(floating_deser, PlayerBarMode::Floating);
     }
 }

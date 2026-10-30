@@ -97,3 +97,10 @@ guessing; every rule here was verified against a build or the official documenta
   is fixed upstream, and re-run the bottom-of-scroll check before switching to
   `FlexboxLayout`.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/flexboxlayout/>.
+- Setting layout `alignment` cancels child `horizontal-stretch` / `vertical-stretch`: by default,
+  `HorizontalLayout` and `VerticalLayout` use `alignment: stretch`, sizing children to their minimum size and
+  distributing remaining space according to each child's stretch factor. Specifying an explicit alignment (such as
+  `space-between` or `center`) sizes children only to their preferred/minimum size and places extra space into gaps,
+  preventing children with `horizontal-stretch: 1` from expanding. To let a center child stretch between fixed-width
+  edge elements, omit `alignment` on the container layout.
+  Source: <https://docs.slint.dev/latest/docs/slint/src/language/builtins/layouts>.

@@ -1,7 +1,7 @@
 import { Theme } from "../theme.slint";
 import { ThemedSlider } from "./controls.slint";
 import {
-    IconMinus, IconNext, IconPause, IconPlay, IconPlus,
+    IconNext, IconPause, IconPlay,
     IconPrev, IconRepeat, IconRepeatOne, IconShuffle,
 } from "../icons.slint";
 
@@ -13,6 +13,9 @@ export component PlayerCenterControls inherits VerticalLayout {
     in property <int> duration-secs: 0;
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
+    in property <bool> show-shuffle: true;
+    in property <bool> show-repeat: true;
+    in property <bool> show-skip-seconds: false;
 
     callback toggle-play();
     callback prev-track();
@@ -23,17 +26,18 @@ export component PlayerCenterControls inherits VerticalLayout {
     callback cycle-repeat();
 
     horizontal-stretch: 1;
+    min-width: 240px;
     alignment: center;
     spacing: 4px;
 
     HorizontalLayout {
-        spacing: 8px;
+        spacing: 6px;
         alignment: center;
 
-        Rectangle {
-            width: 36px;
-            height: 36px;
-            border-radius: 18px;
+        if root.show-shuffle : Rectangle {
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
             background: shuf-touch.pressed ? Theme.overlay : (root.is-shuffle ? Theme.surface : (shuf-touch.has-hover ? Theme.hover : transparent));
             animate background { duration: 150ms; easing: ease-in-out; }
 
@@ -43,14 +47,14 @@ export component PlayerCenterControls inherits VerticalLayout {
 
             IconShuffle {
                 tint: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
-                size: 18px;
+                size: 16px;
             }
         }
 
         Rectangle {
-            width: 36px;
-            height: 36px;
-            border-radius: 18px;
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
             background: pt.pressed ? Theme.overlay : (pt.has-hover ? Theme.hover : transparent);
             animate background { duration: 150ms; easing: ease-in-out; }
 
@@ -60,13 +64,14 @@ export component PlayerCenterControls inherits VerticalLayout {
 
             IconPrev {
                 tint: pt.has-hover ? Theme.text : Theme.secondary;
-                size: 18px;
+                size: 16px;
             }
         }
 
-        Rectangle {
-            height: 28px;
-            border-radius: 14px;
+        if root.show-skip-seconds : Rectangle {
+            min-width: 32px;
+            height: 26px;
+            border-radius: 13px;
             background: s10m-touch.pressed ? Theme.overlay : (s10m-touch.has-hover ? Theme.hover : transparent);
             animate background { duration: 150ms; easing: ease-in-out; }
 
@@ -75,8 +80,8 @@ export component PlayerCenterControls inherits VerticalLayout {
             }
 
             HorizontalLayout {
-                padding-left: 8px;
-                padding-right: 8px;
+                padding-left: 6px;
+                padding-right: 6px;
                 alignment: center;
 
                 Text {
@@ -111,9 +116,10 @@ export component PlayerCenterControls inherits VerticalLayout {
             }
         }
 
-        Rectangle {
-            height: 28px;
-            border-radius: 14px;
+        if root.show-skip-seconds : Rectangle {
+            min-width: 32px;
+            height: 26px;
+            border-radius: 13px;
             background: s10p-touch.pressed ? Theme.overlay : (s10p-touch.has-hover ? Theme.hover : transparent);
             animate background { duration: 150ms; easing: ease-in-out; }
 
@@ -122,8 +128,8 @@ export component PlayerCenterControls inherits VerticalLayout {
             }
 
             HorizontalLayout {
-                padding-left: 8px;
-                padding-right: 8px;
+                padding-left: 6px;
+                padding-right: 6px;
                 alignment: center;
 
                 Text {
@@ -138,9 +144,9 @@ export component PlayerCenterControls inherits VerticalLayout {
         }
 
         Rectangle {
-            width: 36px;
-            height: 36px;
-            border-radius: 18px;
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
             background: nt.pressed ? Theme.overlay : (nt.has-hover ? Theme.hover : transparent);
             animate background { duration: 150ms; easing: ease-in-out; }
 
@@ -150,14 +156,14 @@ export component PlayerCenterControls inherits VerticalLayout {
 
             IconNext {
                 tint: nt.has-hover ? Theme.text : Theme.secondary;
-                size: 18px;
+                size: 16px;
             }
         }
 
-        Rectangle {
-            width: 36px;
-            height: 36px;
-            border-radius: 18px;
+        if root.show-repeat : Rectangle {
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
             background: rep-touch.pressed ? Theme.overlay : (root.repeat-mode != 0 ? Theme.surface : (rep-touch.has-hover ? Theme.hover : transparent));
             animate background { duration: 150ms; easing: ease-in-out; }
 
@@ -167,18 +173,21 @@ export component PlayerCenterControls inherits VerticalLayout {
 
             if root.repeat-mode == 2 : IconRepeatOne {
                 tint: Theme.accent;
-                size: 18px;
+                size: 16px;
             }
             if root.repeat-mode != 2 : IconRepeat {
                 tint: root.repeat-mode != 0 ? Theme.accent : (rep-touch.has-hover ? Theme.text : Theme.secondary);
-                size: 18px;
+                size: 16px;
             }
         }
     }
 
+    // Slint layout rule: avoid `alignment: center` on the progress layout;
+    // default stretch alignment allows ThemedSlider (horizontal-stretch: 1) to expand
+    // across all remaining space while timestamp labels remain pinned at the edges.
     HorizontalLayout {
+        min-width: 180px;
         spacing: 8px;
-        alignment: center;
 
         Text {
             text: root.position-text;
@@ -189,6 +198,7 @@ export component PlayerCenterControls inherits VerticalLayout {
 
         ThemedSlider {
             horizontal-stretch: 1;
+            min-width: 120px;
             minimum: 0;
             maximum: max(1, root.duration-secs);
             value: min(root.position-secs, max(1, root.duration-secs));

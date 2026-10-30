@@ -100,10 +100,12 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Artist", "ARTISTA"),
     ("Artists", "Artistas"),
     ("Black OLED", "Negro OLED"),
+    ("Classic", "Clásica"),
     ("Detail", "Detalle"),
     ("English", "Inglés"),
     ("Explore", "Explorar"),
     ("Failed to play track", "Error al reproducir la canción"),
+    ("Floating", "Flotante"),
     ("Language", "Idioma"),
     ("Library", "Biblioteca"),
     ("Loading...", "Cargando..."),
@@ -122,6 +124,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No tracks available.", "No hay canciones disponibles."),
     ("Now Playing", "Sonando"),
     ("Paste session cookies...", "Pegar cookies de sesión..."),
+    ("Player bar", "Barra de reproducción"),
     ("Play", "Reproducir"),
     ("Playback", "Reproducción"),
     ("Playback speed", "Velocidad de reproducción"),
@@ -135,6 +138,13 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Searching...", "Buscando..."),
     ("Session", "Sesión"),
     ("Settings", "Ajustes"),
+    ("Show artwork", "Mostrar portada"),
+    ("Show like button", "Mostrar botón Me gusta"),
+    ("Show queue button", "Mostrar botón de cola"),
+    ("Show repeat button", "Mostrar botón Repetir"),
+    ("Show shuffle button", "Mostrar botón Aleatorio"),
+    ("Show skip 10s buttons", "Mostrar botones +/-10s"),
+    ("Show volume slider", "Mostrar control de volumen"),
     ("Shuffle", "Aleatorio"),
     ("Sign in", "Iniciar sesión"),
     ("Sign out", "Cerrar sesión"),
@@ -230,6 +240,18 @@ mod tests {
         assert_eq!(tr(Locale::English, "Loading..."), "Loading...");
         assert_eq!(tr(Locale::Spanish, "Loading explore..."), "Cargando exploracion...");
         assert_eq!(tr(Locale::English, "Loading explore..."), "Loading explore...");
+
+        // Player bar chrome keys
+        assert_eq!(tr(Locale::Spanish, "Player bar"), "Barra de reproducción");
+        assert_eq!(tr(Locale::Spanish, "Classic"), "Clásica");
+        assert_eq!(tr(Locale::Spanish, "Floating"), "Flotante");
+        assert_eq!(tr(Locale::Spanish, "Show artwork"), "Mostrar portada");
+        assert_eq!(tr(Locale::Spanish, "Show like button"), "Mostrar botón Me gusta");
+        assert_eq!(tr(Locale::Spanish, "Show shuffle button"), "Mostrar botón Aleatorio");
+        assert_eq!(tr(Locale::Spanish, "Show repeat button"), "Mostrar botón Repetir");
+        assert_eq!(tr(Locale::Spanish, "Show skip 10s buttons"), "Mostrar botones +/-10s");
+        assert_eq!(tr(Locale::Spanish, "Show queue button"), "Mostrar botón de cola");
+        assert_eq!(tr(Locale::Spanish, "Show volume slider"), "Mostrar control de volumen");
     }
 
     #[test]

@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::domain::{
-    Album, Artist, Detail, DetailKind, PlaybackQueue, Playlist, SearchFilter, SearchQuery,
-    SearchResult, Shelf, SleepTimer, ThemeId, Track, extract_playlist_id,
+    Album, Artist, Detail, DetailKind, PlaybackQueue, PlayerBarMode, Playlist, SearchFilter,
+    SearchQuery, SearchResult, Shelf, SleepTimer, ThemeId, Track, extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
@@ -26,6 +26,7 @@ use crate::slint_shell::format::cycle_playback_speed_preset;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
+use crate::slint_shell::player_bar::PlayerBarPrefs;
 
 /// In-memory state and collaborator wiring for the Slint UI shell.
 pub struct SlintAppState<
@@ -77,6 +78,7 @@ pub struct SlintAppState<
     pub signed_in: bool,
     pub theme: ThemeId,
     pub locale: Locale,
+    pub player_bar: PlayerBarPrefs,
     pub search_filter: SearchFilter,
     pub search_covers: HashMap<String, slint::Image>,
     pub liked_ids: HashSet<String>,
@@ -161,6 +163,7 @@ impl<
             signed_in,
             theme: ThemeId::default(),
             locale: Locale::default(),
+            player_bar: PlayerBarPrefs::default(),
             search_filter: SearchFilter::All,
             search_covers: HashMap::new(),
             liked_ids: HashSet::new(),
@@ -186,6 +189,22 @@ impl<
         self.theme = theme;
         let mut settings = self.settings_store.load();
         settings.theme = theme;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Updates the player bar layout mode and persists to settings store.
+    pub fn set_player_bar_mode(&mut self, mode: PlayerBarMode) {
+        self.player_bar.mode = mode;
+        let mut settings = self.settings_store.load();
+        self.player_bar.apply_to_settings(&mut settings);
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Toggles an individual player bar element option by index and persists to settings store.
+    pub fn toggle_player_bar_option(&mut self, index: i32) {
+        self.player_bar = self.player_bar.toggled(index);
+        let mut settings = self.settings_store.load();
+        self.player_bar.apply_to_settings(&mut settings);
         let _ = self.settings_store.save(&settings);
     }
 
@@ -573,6 +592,39 @@ mod tests {
         assert_eq!(state.theme, ThemeId::Mono);
         let loaded2 = state.settings_store.load();
         assert_eq!(loaded2.theme, ThemeId::Mono);
+    }
+
+    #[test]
+    fn test_set_player_bar_mode_persists_to_settings_store() {
+        let mut state = test_wired();
+        assert_eq!(state.player_bar.mode, PlayerBarMode::Classic);
+
+        state.set_player_bar_mode(PlayerBarMode::Floating);
+        assert_eq!(state.player_bar.mode, PlayerBarMode::Floating);
+        let loaded = state.settings_store.load();
+        assert_eq!(loaded.player_bar_mode, PlayerBarMode::Floating);
+
+        state.set_player_bar_mode(PlayerBarMode::Classic);
+        assert_eq!(state.player_bar.mode, PlayerBarMode::Classic);
+        let loaded2 = state.settings_store.load();
+        assert_eq!(loaded2.player_bar_mode, PlayerBarMode::Classic);
+    }
+
+    #[test]
+    fn test_toggle_player_bar_option_persists_to_settings_store() {
+        let mut state = test_wired();
+        assert!(state.player_bar.show_artwork);
+        assert!(!state.player_bar.show_skip_seconds);
+
+        state.toggle_player_bar_option(0);
+        assert!(!state.player_bar.show_artwork);
+        let loaded = state.settings_store.load();
+        assert!(!loaded.player_bar_show_artwork);
+
+        state.toggle_player_bar_option(4);
+        assert!(state.player_bar.show_skip_seconds);
+        let loaded2 = state.settings_store.load();
+        assert!(loaded2.player_bar_show_skip_seconds);
     }
 
     #[test]

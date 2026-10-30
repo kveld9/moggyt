@@ -28,6 +28,7 @@ pub use crate::slint_shell::init::{
 };
 pub use crate::slint_shell::labels::{StaticLabels, sync_static_labels};
 pub use crate::slint_shell::page::SlintPage;
+pub use crate::slint_shell::player_bar::PlayerBarPrefs;
 pub use crate::slint_shell::state::{SharedState, SlintAppState};
 pub use crate::slint_shell::window::build_window;
 
@@ -80,6 +81,7 @@ pub fn run() -> anyhow::Result<()> {
     state.hi_res_covers = settings.hi_res_covers;
     state.theme = settings.theme;
     state.locale = settings.locale;
+    state.player_bar = PlayerBarPrefs::from_settings(&settings);
     if let Ok(mut c) = state.catalog.lock() {
         c.set_locale(settings.locale);
         let refreshed = c.home_shelves();

@@ -1,11 +1,18 @@
 import { Theme } from "../theme.slint";
 import { ThemedSlider } from "./controls.slint";
 import { PlayerCenterControls } from "./player_controls.slint";
-import {
-    IconHeart, IconMinus, IconPlus, IconQueue, IconSpeaker,
-} from "../icons.slint";
+import { IconHeart, IconQueue, IconSpeaker } from "../icons.slint";
 
 export component PlayerBar inherits Rectangle {
+    in property <int> mode: 0;
+    in property <bool> show-artwork: true;
+    in property <bool> show-like: true;
+    in property <bool> show-shuffle: true;
+    in property <bool> show-repeat: true;
+    in property <bool> show-skip-seconds: false;
+    in property <bool> show-queue: true;
+    in property <bool> show-volume: true;
+
     in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
     in property <bool> is-playing: false;
@@ -33,31 +40,42 @@ export component PlayerBar inherits Rectangle {
     callback cycle-repeat();
     callback open-queue();
 
-    height: 72px;
+    border-radius: root.mode == 1 ? 20px : 0px;
+    border-width: root.mode == 1 ? 1px : 0px;
+    border-color: Theme.border;
     background: Theme.panel;
+    drop-shadow-blur: root.mode == 1 ? 16px : 0px;
+    drop-shadow-offset-y: root.mode == 1 ? 4px : 0px;
+    drop-shadow-color: root.mode == 1 ? #00000066 : #00000000;
 
-    Rectangle {
+    if root.mode == 0 : Rectangle {
         y: 0;
         height: 1px;
         background: Theme.border;
     }
 
+    // Slint layout rule (https://docs.slint.dev/latest/docs/slint/src/language/builtins/layouts):
+    // Layouts default to `alignment: stretch`. When an explicit alignment (such as
+    // `space-between`) is set, children are sized only to their preferred/minimum
+    // sizes and remaining space is distributed into gaps, preventing children with
+    // `horizontal-stretch: 1` from expanding. Omitting `alignment` restores default
+    // stretch distribution so the center zone fills the space between fixed edge zones.
     HorizontalLayout {
-        padding-left: 16px;
-        padding-right: 16px;
+        padding-left: root.mode == 1 ? 18px : 20px;
+        padding-right: root.mode == 1 ? 18px : 20px;
         spacing: 16px;
-        alignment: space-between;
 
         // LEFT ZONE: Artwork, Title + Artist, Like toggle
         HorizontalLayout {
-            width: 240px;
+            width: root.mode == 1 ? 220px : 260px;
+            horizontal-stretch: 0;
             spacing: 12px;
             alignment: start;
 
-            Rectangle {
-                width: 44px;
-                height: 44px;
-                border-radius: 6px;
+            if root.show-artwork : Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
                 background: Theme.surface;
                 clip: true;
 
@@ -90,12 +108,13 @@ export component PlayerBar inherits Rectangle {
                 }
             }
 
-            VerticalLayout {
+            if root.show-like : VerticalLayout {
                 alignment: center;
+
                 Rectangle {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 18px;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 16px;
                     background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (root.is-liked ? Theme.surface : transparent));
                     animate background { duration: 150ms; easing: ease-in-out; }
 
@@ -107,15 +126,16 @@ export component PlayerBar inherits Rectangle {
                         x: (parent.width - self.width) / 2;
                         y: (parent.height - self.height) / 2;
                         tint: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
-                        size: 18px;
+                        size: 16px;
                         is-filled: root.is-liked;
                     }
                 }
             }
         }
 
-        // CENTER ZONE: Shuffle, Prev, -10s, Play/Pause, +10s, Next, Repeat + Progress row
+        // CENTER ZONE: Reused center controls
         PlayerCenterControls {
+            horizontal-stretch: 1;
             is-playing: root.is-playing;
             is-shuffle: root.is-shuffle;
             repeat-mode: root.repeat-mode;
@@ -123,6 +143,9 @@ export component PlayerBar inherits Rectangle {
             duration-secs: root.duration-secs;
             position-text: root.position-text;
             duration-text: root.duration-text;
+            show-shuffle: root.show-shuffle;
+            show-repeat: root.show-repeat;
+            show-skip-seconds: root.show-skip-seconds;
 
             toggle-play => { root.toggle-play(); }
             prev-track => { root.prev-track(); }
@@ -133,116 +156,71 @@ export component PlayerBar inherits Rectangle {
             cycle-repeat => { root.cycle-repeat(); }
         }
 
-        // RIGHT ZONE: Queue button, Volume Slider + percentage
+        // RIGHT ZONE: Queue button, Volume Slider
         HorizontalLayout {
-            width: 240px;
+            width: 200px;
+            horizontal-stretch: 0;
             alignment: end;
             spacing: 10px;
 
-            Rectangle {
-                height: 32px;
-                border-radius: 16px;
-                background: q-touch.pressed ? Theme.overlay : (q-touch.has-hover ? Theme.hover : Theme.surface);
-                animate background { duration: 150ms; easing: ease-in-out; }
+            if root.show-queue : VerticalLayout {
+                alignment: center;
 
-                q-touch := TouchArea {
-                    clicked => { root.open-queue(); }
-                }
+                Rectangle {
+                    width: root.queue-count > 0 ? 44px : 32px;
+                    height: 32px;
+                    border-radius: 16px;
+                    background: q-touch.pressed ? Theme.overlay : (q-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
-                HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 12px;
-                    spacing: 6px;
-                    alignment: center;
+                    q-touch := TouchArea {
+                        clicked => { root.open-queue(); }
+                    }
 
-                    VerticalLayout {
+                    HorizontalLayout {
                         alignment: center;
-                        IconQueue {
-                            size: 16px;
-                            tint: q-touch.has-hover ? Theme.accent : Theme.text;
+                        spacing: 4px;
+
+                        VerticalLayout {
+                            alignment: center;
+                            IconQueue {
+                                size: 16px;
+                                tint: q-touch.has-hover ? Theme.accent : Theme.secondary;
+                            }
+                        }
+
+                        if root.queue-count > 0 : Text {
+                            text: "\{root.queue-count}";
+                            color: q-touch.has-hover ? Theme.accent : Theme.secondary;
+                            font-size: 11px;
+                            font-weight: 700;
+                            vertical-alignment: center;
                         }
                     }
-
-                    Text {
-                        text: root.queue-button-text;
-                        color: q-touch.has-hover ? Theme.accent : Theme.text;
-                        font-size: 11px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        horizontal-alignment: center;
-                    }
                 }
             }
 
-            VerticalLayout {
+            if root.show-volume : HorizontalLayout {
+                spacing: 8px;
                 alignment: center;
-                IconSpeaker {
-                    size: 16px;
-                    tint: Theme.secondary;
-                }
-            }
 
-            VerticalLayout {
-                alignment: center;
-                Rectangle {
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 12px;
-                    background: vm-touch.pressed ? Theme.overlay : (vm-touch.has-hover ? Theme.hover : transparent);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    vm-touch := TouchArea {
-                        clicked => { root.set-volume(max(0, root.volume - 5)); }
-                    }
-
-                    IconMinus {
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                        size: 14px;
-                        tint: vm-touch.has-hover ? Theme.text : Theme.secondary;
+                VerticalLayout {
+                    alignment: center;
+                    IconSpeaker {
+                        size: 16px;
+                        tint: Theme.secondary;
                     }
                 }
-            }
 
-            ThemedSlider {
-                width: 80px;
-                minimum: 0;
-                maximum: 100;
-                value: root.volume;
-                changed(val) => {
-                    root.set-volume(round(val));
-                }
-            }
-
-            VerticalLayout {
-                alignment: center;
-                Rectangle {
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 12px;
-                    background: vp-touch.pressed ? Theme.overlay : (vp-touch.has-hover ? Theme.hover : transparent);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    vp-touch := TouchArea {
-                        clicked => { root.set-volume(min(100, root.volume + 5)); }
-                    }
-
-                    IconPlus {
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                        size: 14px;
-                        tint: vp-touch.has-hover ? Theme.text : Theme.secondary;
+                ThemedSlider {
+                    width: 90px;
+                    minimum: 0;
+                    maximum: 100;
+                    value: root.volume;
+                    changed(val) => {
+                        root.set-volume(round(val));
                     }
                 }
-            }
-
-            Text {
-                text: "\{root.volume}%";
-                color: Theme.secondary;
-                font-size: 11px;
-                width: 34px;
-                horizontal-alignment: right;
-                vertical-alignment: center;
             }
         }
     }
