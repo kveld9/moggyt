@@ -96,6 +96,8 @@ impl RodioBackend {
     /// Downloads and decodes audio from `url`, immediately starting playback.
     ///
     /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     pub fn play_url(&mut self, track_id: &str, url: &str) -> anyhow::Result<()> {
         let stream = match open_audio_stream(url) {
             Ok(stream) => stream,
@@ -163,6 +165,8 @@ impl AudioBackend for RodioBackend {
     ///
     /// Soft-fails to a no-state-change on missing binary or decoding failures.
     /// Records `last_requested` strictly upon successful playback start.
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn play(&mut self, track_id: &str) {
         let Some(url) = self.resolver.resolve(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL");

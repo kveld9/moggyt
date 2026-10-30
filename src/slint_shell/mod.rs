@@ -22,7 +22,11 @@
 //!     - crate::domain::Detail (container model for album, artist, or playlist)
 //!     - crate::domain::DetailKind (Album, Artist, Playlist discriminator)
 
-slint::include_modules!();
+#[allow(clippy::cognitive_complexity)]
+mod generated {
+    slint::include_modules!();
+}
+pub use generated::*;
 
 pub use MoggytWindow as AppWindow;
 

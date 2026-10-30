@@ -36,6 +36,8 @@ pub fn action_for(event: MediaControlEvent) -> Option<MediaKeyAction> {
 }
 
 /// Non-blocking enqueue that drops actions on full or disconnected channel.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 pub fn try_enqueue_action(sender: &SyncSender<MediaKeyAction>, action: MediaKeyAction) {
     if let Err(err) = sender.try_send(action) {
         // Deliberate drop policy: the OS callback thread must never block or panic.

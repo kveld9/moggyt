@@ -93,6 +93,8 @@ pub fn resolve_lyrics<L: LyricsSource>(req: &PlayTrackRequest, lyrics: &Arc<L>) 
 }
 
 /// Fetches or retrieves cached artwork bytes for a given URL off the UI thread.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 fn get_or_fetch_artwork<K: CoverCache>(url: &str, covers: &Arc<Mutex<K>>) -> Option<Vec<u8>> {
     if let Some(data) = covers.lock().ok()?.get(url) {
         debug!(url = %url, bytes = data.len(), "cover cache hit");
@@ -113,6 +115,8 @@ fn get_or_fetch_artwork<K: CoverCache>(url: &str, covers: &Arc<Mutex<K>>) -> Opt
 }
 
 /// Fetches, caches, and decodes cover artwork for an arbitrary URL off the UI thread.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 pub fn fetch_and_decode_cover<K: CoverCache>(
     url: &str,
     covers: &Arc<Mutex<K>>,
@@ -131,6 +135,8 @@ pub fn fetch_and_decode_cover<K: CoverCache>(
 }
 
 /// Fetches, caches, and decodes cover artwork into raw RGBA bytes off the UI thread.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 pub fn resolve_cover_art<K: CoverCache>(
     req: &PlayTrackRequest,
     covers: &Arc<Mutex<K>>,

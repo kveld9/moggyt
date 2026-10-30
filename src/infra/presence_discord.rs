@@ -72,6 +72,8 @@ impl Presence for DiscordPresence {
     /// Publishes track metadata to Discord Rich Presence when live; always records the test seam.
     ///
     /// On IPC error, logs a warning and retains the client for future track retries.
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn set_track(&mut self, artist: &str, title: &str) {
         let (details, state) = activity_parts(artist, title);
         self.last_published = Some((details.clone(), state.clone()));
@@ -85,6 +87,8 @@ impl Presence for DiscordPresence {
     }
 
     /// Clears the active Discord Rich Presence activity.
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn clear(&mut self) {
         self.last_published = None;
         let Some(client) = &mut self.client else {
@@ -103,6 +107,8 @@ fn try_connect(app_id: u64) -> Option<DiscordIpcClient> {
     std::panic::catch_unwind(|| connect_ipc(app_id)).ok().flatten()
 }
 
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 fn connect_ipc(app_id: u64) -> Option<DiscordIpcClient> {
     let mut client = DiscordIpcClient::new(&app_id.to_string()).ok()?;
     if let Err(err) = client.connect() {
