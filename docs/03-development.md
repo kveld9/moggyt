@@ -62,3 +62,14 @@ cp .githooks/pre-commit.example .githooks/pre-commit
 chmod +x .githooks/pre-commit
 git config core.hooksPath .githooks
 ```
+
+## Slint lessons
+
+Distilled rules from Slint behavior that surprised us. Consult the linked source before
+guessing; every rule here was verified against a build or the official documentation.
+
+- A card grid built from a runtime model cannot use `GridLayout` `row` / `col`: both are
+  cell properties whose bindings must be compile-time constants, so an index-derived grid
+  (`row: i / 5`) does not compile. Use one `Flickable` whose `viewport-width` is computed
+  from the model length, with a single `HorizontalLayout` of fixed-size cards inside.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/gridlayout/>.
