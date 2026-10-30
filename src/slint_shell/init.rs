@@ -8,8 +8,8 @@ use anyhow::Context;
 
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CredentialStore, DiskCoverCache, GithubUpdater,
-    KeyringCredentialStore, LastFmClient, LiveAudio, LyricsSource, RodioBackend, SessionStore,
-    Updater, client_from_credentials, ensure_sidecar, is_newer,
+    KeyringCredentialStore, LastFmClient, LiveAudio, LyricsSource, ReleaseInfo, RodioBackend,
+    SessionStore, Updater, client_from_credentials, ensure_sidecar, is_newer,
 };
 use crate::slint_shell::state::SlintAppState;
 
@@ -142,10 +142,10 @@ pub(crate) fn handle_cli_args<
     }
 }
 
-/// Checks GitHub Releases for newer version tags and records update availability.
+/// Applies release info to application state without performing any I/O.
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-pub(crate) fn check_updater_status<
+pub(crate) fn apply_updater_release<
     C: Catalog + Send + 'static,
     A: AudioBackend + Send + 'static,
     S: SessionStore + 'static,
@@ -153,20 +153,33 @@ pub(crate) fn check_updater_status<
     K: CoverCache + Send + 'static,
 >(
     state: &mut SlintAppState<C, A, S, L, K>,
+    info: Option<ReleaseInfo>,
 ) {
-    if let Some(info) = state.updater.latest() {
-        let current = GithubUpdater::current_version();
-        if is_newer(current, &info.version) {
-            tracing::info!(version = %info.version, url = %info.url, "update available");
-            state.update_available = true;
-            state.latest_version = Some(info.version);
-        }
+    let Some(info) = info else {
+        return;
+    };
+    let current = GithubUpdater::current_version();
+    if is_newer(current, &info.version) {
+        tracing::info!(version = %info.version, url = %info.url, "update available");
+        state.update_available = true;
+        state.latest_version = Some(info.version);
     }
+}
+
+/// Spawns a background worker checking for application updates without blocking startup.
+pub(crate) fn spawn_updater_check() -> std::sync::mpsc::Receiver<Option<ReleaseInfo>> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let _ = std::thread::Builder::new().name("moggyt-updater".into()).spawn(move || {
+        let updater = GithubUpdater::new();
+        let _ = tx.send(updater.latest());
+    });
+    rx
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::slint_shell::test_support::test_wired;
 
     #[test]
     fn test_ensure_data_dir_creates_directory_when_missing() {
@@ -190,5 +203,49 @@ mod tests {
     fn test_init_secondary_lastfm_scrobbler_disabled_returns_none() {
         let scrobbler = init_secondary_lastfm_scrobbler(false);
         assert!(scrobbler.is_none());
+    }
+
+    #[test]
+    fn test_apply_updater_release_newer_sets_status() {
+        let mut state = test_wired();
+        assert!(!state.update_available);
+        assert_eq!(state.latest_version, None);
+
+        let info = ReleaseInfo {
+            version: "v99.0.0".to_string(),
+            url: "https://github.com/example/releases/tag/v99.0.0".to_string(),
+        };
+        apply_updater_release(&mut state, Some(info));
+
+        assert!(state.update_available);
+        assert_eq!(state.latest_version.as_deref(), Some("v99.0.0"));
+    }
+
+    #[test]
+    fn test_apply_updater_release_older_or_equal_leaves_state_alone() {
+        let mut state = test_wired();
+        let equal_info = ReleaseInfo {
+            version: "0.1.0".to_string(),
+            url: "https://github.com/example/releases/tag/v0.1.0".to_string(),
+        };
+        apply_updater_release(&mut state, Some(equal_info));
+        assert!(!state.update_available);
+        assert_eq!(state.latest_version, None);
+
+        let older_info = ReleaseInfo {
+            version: "v0.0.1".to_string(),
+            url: "https://github.com/example/releases/tag/v0.0.1".to_string(),
+        };
+        apply_updater_release(&mut state, Some(older_info));
+        assert!(!state.update_available);
+        assert_eq!(state.latest_version, None);
+    }
+
+    #[test]
+    fn test_apply_updater_release_none_changes_nothing() {
+        let mut state = test_wired();
+        apply_updater_release(&mut state, None);
+        assert!(!state.update_available);
+        assert_eq!(state.latest_version, None);
     }
 }

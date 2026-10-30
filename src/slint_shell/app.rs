@@ -30,7 +30,7 @@ pub use crate::slint_shell::state::{SharedState, SlintAppState};
 pub use crate::slint_shell::window::build_window;
 use crate::slint_shell::window::with_ui_state;
 
-use crate::slint_shell::init::{check_updater_status, handle_cli_args};
+use crate::slint_shell::init::{handle_cli_args, spawn_updater_check};
 
 /// Collaborator dependencies and platform handles injected into the Slint application shell.
 pub struct AppDependencies<C, A, S, L, K> {
@@ -118,7 +118,7 @@ where
     state.secondary_scrobbler = secondary_scrobbler.map(|s| Arc::new(Mutex::new(s)));
 
     handle_cli_args(&mut state);
-    check_updater_status(&mut state);
+    state.updater_rx = Some(spawn_updater_check());
 
     let (window, _timer) = build_window(state)?;
     window.run().map_err(|err| anyhow::anyhow!("Slint execution failed: {err}"))?;
