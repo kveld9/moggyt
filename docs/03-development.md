@@ -32,6 +32,13 @@ Enforced automatically by `./scripts/check-repo.sh`:
 - Remediation path: split oversized files by concept (one view or endpoint-domain per module), landing each
   extracted unit via one small PR per module (< 400 lines diff).
 
+## Complexity limits
+
+Functions target cognitive complexity CC <= 5 (hard limit 10), using guard clauses first.
+CI runs an advisory step (`cargo clippy --locked --all-targets --all-features -- -W clippy::cognitive_complexity`)
+that reports annotations without failing the build (`continue-on-error: true`) because legacy hotspots exist.
+The plan is to switch this gate to deny once existing hotspots are refactored.
+
 ## Branches and commits
 
 - Default branch `main`. Every change enters via Pull Request from `<type>/<short-desc>`
