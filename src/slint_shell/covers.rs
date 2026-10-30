@@ -139,6 +139,30 @@ pub fn request_detail_covers<
     }
 }
 
+fn dispatch_library_cover_urls<
+    'a,
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    urls: impl Iterator<Item = Option<&'a str>>,
+    state: &SlintAppState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+    seen: &mut HashSet<String>,
+) {
+    for url in urls.flatten() {
+        dispatch_cover_with_generation_if_needed(
+            url,
+            state.library_generation,
+            &state.search_covers,
+            worker_tx,
+            seen,
+        );
+    }
+}
+
 /// Requests background cover decoding for all uncached artwork URLs in user library.
 pub fn request_library_covers<
     C: Catalog + Send + 'static,
@@ -151,39 +175,24 @@ pub fn request_library_covers<
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let mut seen = HashSet::new();
-    for p in &state.library_playlists {
-        if let Some(url) = p.artwork.as_deref() {
-            dispatch_cover_with_generation_if_needed(
-                url,
-                state.library_generation,
-                &state.search_covers,
-                worker_tx,
-                &mut seen,
-            );
-        }
-    }
-    for a in &state.library_albums {
-        if let Some(url) = a.artwork.as_deref() {
-            dispatch_cover_with_generation_if_needed(
-                url,
-                state.library_generation,
-                &state.search_covers,
-                worker_tx,
-                &mut seen,
-            );
-        }
-    }
-    for ar in &state.library_artists {
-        if let Some(url) = ar.artwork.as_deref() {
-            dispatch_cover_with_generation_if_needed(
-                url,
-                state.library_generation,
-                &state.search_covers,
-                worker_tx,
-                &mut seen,
-            );
-        }
-    }
+    dispatch_library_cover_urls(
+        state.library_playlists.iter().map(|p| p.artwork.as_deref()),
+        state,
+        worker_tx,
+        &mut seen,
+    );
+    dispatch_library_cover_urls(
+        state.library_albums.iter().map(|a| a.artwork.as_deref()),
+        state,
+        worker_tx,
+        &mut seen,
+    );
+    dispatch_library_cover_urls(
+        state.library_artists.iter().map(|ar| ar.artwork.as_deref()),
+        state,
+        worker_tx,
+        &mut seen,
+    );
 }
 
 /// Requests background cover decoding for all uncached artwork URLs in explore shelves.
@@ -803,5 +812,23 @@ mod tests {
         assert_eq!(received.len(), 2);
         assert_eq!(received[0], ("https://lh3.googleusercontent.com/track-small".to_string(), 15));
         assert_eq!(received[1], ("https://lh3.googleusercontent.com/album-small".to_string(), 15));
+    }
+
+    #[test]
+    fn test_dispatch_library_cover_urls_skips_none() {
+        let state = test_wired();
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        let mut seen = HashSet::new();
+        let urls = [None, Some("https://lh3.googleusercontent.com/test-thumb"), None];
+        dispatch_library_cover_urls(urls.into_iter(), &state, &tx, &mut seen);
+
+        let mut received = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, .. } = cmd {
+                received.push(url);
+            }
+        }
+        assert_eq!(received.len(), 1);
+        assert_eq!(received[0], "https://lh3.googleusercontent.com/test-thumb");
     }
 }

@@ -8,9 +8,10 @@ use std::sync::{Arc, Mutex};
 use slint::ComponentHandle;
 
 use crate::infra::{
-    AudioBackend, Catalog, DiskMetaStore, DiskQueueStore, DiskSettingsStore, DiskSkipStore,
-    KeyringSessionStore, LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir, QueueStore,
-    Scrobbler, SettingsStore, SingleInstanceGuard, TrayHandle, default_config_dir,
+    AudioBackend, Catalog, CoverCache, DiskMetaStore, DiskQueueStore, DiskSettingsStore,
+    DiskSkipStore, KeyringSessionStore, LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir,
+    LyricsSource, QueueStore, Scrobbler, SessionStore, SettingsStore, SingleInstanceGuard,
+    TrayHandle, default_config_dir,
 };
 
 pub use crate::slint_shell::covers::{
@@ -33,18 +34,32 @@ pub use crate::slint_shell::window::build_window;
 
 use crate::slint_shell::init::{check_updater_status, handle_cli_args};
 
+fn acquire_single_instance() -> Option<SingleInstanceGuard> {
+    let guard = SingleInstanceGuard::try_acquire();
+    if guard.is_none() {
+        eprintln!("moggyt is already running; exiting.");
+    }
+    guard
+}
+
+fn attach_tray<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
+    state: &mut SlintAppState<C, A, S, L, K>,
+) {
+    if let Some(h) = TrayHandle::try_new() {
+        state.tray = Some(h);
+    } else {
+        tracing::warn!("tray unavailable; running without system tray icon");
+    }
+}
+
 /// Composition function launching the Slint desktop UI wired to live platform adapters.
 ///
 /// TODO Gap: Settings modal: DiskSettingsStore persists volume, speed, quality, DSP
 /// toggles, and Last.fm credentials; playback speed and volume are fully wired, but
 /// ui/shell.slint lacks an interactive settings dialog for DSP and credential management.
 pub fn run() -> anyhow::Result<()> {
-    let _instance = match SingleInstanceGuard::try_acquire() {
-        Some(g) => g,
-        None => {
-            eprintln!("moggyt is already running; exiting.");
-            return Ok(());
-        }
+    let Some(_instance) = acquire_single_instance() else {
+        return Ok(());
     };
 
     tracing_subscriber_setup();
@@ -62,11 +77,7 @@ pub fn run() -> anyhow::Result<()> {
     let lyric_overrides = LyricOverrideDir::new(config_dir.join("lyrics"));
     state.lyric_overrides = Some(lyric_overrides);
 
-    if let Some(h) = TrayHandle::try_new() {
-        state.tray = Some(h);
-    } else {
-        tracing::warn!("tray unavailable; running without system tray icon");
-    }
+    attach_tray(&mut state);
 
     let settings_store = DiskSettingsStore::new(config_dir.clone());
     let settings = settings_store.load();
