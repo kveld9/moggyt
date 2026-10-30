@@ -11,8 +11,9 @@ UI (slint_shell/, Slint) --> domain (domain/) <-- ports <-- adapters (infra/)
 
 - `domain/`: immutable types and pure rules. Direct `std::net`, `std::fs`, `std::process`, clocks, and randomness are forbidden.
 - `infra/`: implements the ports with real I/O (HTTP to YouTube Music, audio backend).
-- `main.rs` (bin) is the only *composition root*: builds the `tokio` runtime,
-  instantiates adapters, and injects dependencies into `slint_shell`.
+- `main.rs` (bin) is the only *composition root*: constructs every live adapter
+  and passes them as ports through `AppDependencies`; `slint_shell::app::run`
+  performs wiring only.
 - Time and randomness are injected as parameters or fake clocks in tests (determinism, zero `sleep` in tests).
 
 ## Module map
