@@ -59,10 +59,10 @@ src/
 2. Acyclic graph: `domain` never depends on `infra` or `slint_shell`; `infra` never depends on `slint_shell`.
 3. New adapters (real API, `rodio`/`gstreamer`) are added behind the existing port, never touching the domain.
 4. Cyclomatic complexity CC <= 5 per function; guard clauses first; DRY only from the third repetition.
-5. File-size modularity caps: Rust (`.rs`) files max 900 lines (adjusted from 800 to fit clean baseline
-   `src/infra/ytm.rs` at 891 lines); Slint (`.slint`) modules max 400 lines per module. `ui/shell.slint` is the single
-   designated thin entry, exempt only while it stays an import-only entry under ~200 lines with no component
-   definitions; `MoggytWindow` itself lives in `ui/views/window.slint`. No file is grandfathered from these caps.
+5. File-size modularity caps: Rust (`.rs`) files max 800 lines for every Rust file, with no exemptions;
+   Slint (`.slint`) modules max 400 lines per module. `ui/shell.slint` is the single designated thin entry, exempt
+   only while it stays an import-only entry under ~200 lines with no component definitions; `MoggytWindow` itself
+   lives in `ui/views/window.slint`. No file is exempt from these caps.
    Remediation path: split oversized
    files by concept (one view or endpoint-domain per module), landing each extracted unit via one small PR per module
    (< 400 lines diff).

@@ -128,12 +128,11 @@ check_file "scripts/check-i18n.sh" true
 echo -e "\n${BOLD}7. Source Modularity & File Size Limits${RESET}"
 
 # Modularity caps:
-# - Rust (.rs): max 900 lines (the 900-line cap was raised once to fit
-#   src/infra/ytm.rs (891 lines) and no file is exempt any more).
+# - Rust (.rs): max 800 lines for every Rust file, with no exemptions.
 # - Slint (.slint): max 400 lines per component module.
 # - Thin entry (ui/shell.slint): max 200 lines, exempt only while it stays an
 #   import-only entry under ~200 lines with no component definitions.
-MAX_RUST_LINES=900
+MAX_RUST_LINES=800
 MAX_SLINT_LINES=400
 MAX_SHELL_SLINT_LINES=200
 

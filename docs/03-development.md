@@ -22,8 +22,7 @@ CI additionally runs markdown quality checks using `markdownlint-cli2`.
 
 Enforced automatically by `./scripts/check-repo.sh`:
 
-- Rust (`.rs`): max 900 lines per file (baseline cap adjusted from suggested 800 lines to fit
-  `src/infra/ytm.rs` at 891 lines).
+- Rust (`.rs`): max 800 lines for every Rust file, with no exemptions.
 - Slint (`.slint`): max 400 lines per component module.
 - Thin entry exemption: `ui/shell.slint` is exempt only while it stays an import-only entry under ~200 lines
   with no component definitions.
