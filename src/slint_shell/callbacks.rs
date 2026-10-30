@@ -119,7 +119,27 @@ pub(crate) fn wire_window_callbacks<
     state_rc: SharedState<C, A, S, L, K>,
     worker_tx: std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
-    let s = Rc::clone(&state_rc);
+    wire_navigation_callbacks(window, &state_rc, &worker_tx);
+    wire_search_callbacks(window, &state_rc, &worker_tx);
+    wire_library_callbacks(window, &state_rc, &worker_tx);
+    wire_detail_callbacks(window, &state_rc, &worker_tx);
+    wire_playback_callbacks(window, &state_rc, &worker_tx);
+    wire_settings_callbacks(window, &state_rc, &worker_tx);
+}
+
+/// Wires page navigation, back navigation, and queue panel drawer visibility callbacks.
+fn wire_navigation_callbacks<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state_rc: &SharedState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_page_selected(move |idx| {
@@ -137,7 +157,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_back_pressed(move || {
         let Some(win) = w.upgrade() else { return };
@@ -146,7 +166,38 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_toggle_queue_panel(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.toggle_queue_panel();
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_close_queue_panel(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.close_queue_panel();
+        sync_window(&win, &mut st);
+    });
+}
+
+/// Wires search query, filter selection, and result interaction callbacks.
+fn wire_search_callbacks<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state_rc: &SharedState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_query_submitted(move |q| {
@@ -155,7 +206,7 @@ pub(crate) fn wire_window_callbacks<
         submit_search_async(&win, &mut st, q.as_str(), &tx);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_recent_search_selected(move |q| {
@@ -164,7 +215,7 @@ pub(crate) fn wire_window_callbacks<
         submit_search_async(&win, &mut st, q.as_str(), &tx);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_recent_search_removed(move |q| {
         let Some(win) = w.upgrade() else { return };
@@ -174,7 +225,7 @@ pub(crate) fn wire_window_callbacks<
         sync_recent_searches(&win, &st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_recent_searches_cleared(move || {
         let Some(win) = w.upgrade() else { return };
@@ -184,7 +235,7 @@ pub(crate) fn wire_window_callbacks<
         sync_recent_searches(&win, &st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_track_selected(move |idx| {
@@ -197,7 +248,7 @@ pub(crate) fn wire_window_callbacks<
         }
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_explore_track_selected(move |idx| {
@@ -209,7 +260,7 @@ pub(crate) fn wire_window_callbacks<
         }
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_filter_selected(move |filter_idx| {
         let Some(win) = w.upgrade() else { return };
@@ -224,8 +275,21 @@ pub(crate) fn wire_window_callbacks<
         win.set_search_filter(filter_idx);
         sync_shelves_and_queue(&win, &st);
     });
+}
 
-    let s = Rc::clone(&state_rc);
+/// Wires library container and queue selection callbacks.
+fn wire_library_callbacks<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state_rc: &SharedState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_queue_track_selected(move |idx| {
@@ -236,7 +300,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_playlist_selected(move |idx| {
@@ -247,7 +311,7 @@ pub(crate) fn wire_window_callbacks<
         }
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_album_selected(move |idx| {
@@ -258,7 +322,7 @@ pub(crate) fn wire_window_callbacks<
         }
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_artist_selected(move |idx| {
@@ -268,8 +332,21 @@ pub(crate) fn wire_window_callbacks<
             open_detail_async(&win, &mut st, &a.id, DetailKind::Artist, &tx);
         }
     });
+}
 
-    let s = Rc::clone(&state_rc);
+/// Wires detail view track selection and playback action callbacks.
+fn wire_detail_callbacks<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state_rc: &SharedState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_detail_track_selected(move |idx| {
@@ -292,7 +369,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_detail_play(move || {
@@ -319,7 +396,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_detail_shuffle(move || {
@@ -346,8 +423,21 @@ pub(crate) fn wire_window_callbacks<
         }
         sync_window(&win, &mut st);
     });
+}
 
-    let s = Rc::clone(&state_rc);
+/// Wires playback transport, track stepping, seek, volume, and preference callbacks.
+fn wire_playback_callbacks<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state_rc: &SharedState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_toggle_play(move || {
@@ -356,7 +446,7 @@ pub(crate) fn wire_window_callbacks<
         handle_toggle_play(&win, &mut st, &tx);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_prev_track(move || {
@@ -367,7 +457,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_next_track(move || {
@@ -378,7 +468,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_seek_by(move |delta| {
         let Some(win) = w.upgrade() else { return };
@@ -387,7 +477,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_seek_to(move |secs| {
@@ -406,7 +496,7 @@ pub(crate) fn wire_window_callbacks<
         win.set_playback_progress(progress_fraction(target as u32, dur));
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_set_volume(move |vol| {
         let Some(win) = w.upgrade() else { return };
@@ -415,7 +505,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_toggle_like(move || {
         let Some(win) = w.upgrade() else { return };
@@ -427,7 +517,7 @@ pub(crate) fn wire_window_callbacks<
         }
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_toggle_shuffle(move || {
         let Some(win) = w.upgrade() else { return };
@@ -436,7 +526,7 @@ pub(crate) fn wire_window_callbacks<
         win.set_is_shuffle(st.is_shuffle);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_cycle_repeat(move || {
         let Some(win) = w.upgrade() else { return };
@@ -446,25 +536,29 @@ pub(crate) fn wire_window_callbacks<
         win.set_repeat_mode(repeat_mode_to_int(next));
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_toggle_queue_panel(move || {
+    window.on_cycle_playback_speed(move || {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.toggle_queue_panel();
-        sync_window(&win, &mut st);
+        let speed = st.cycle_playback_speed();
+        win.set_playback_speed_text(format_playback_speed(speed).into());
     });
+}
 
-    let s = Rc::clone(&state_rc);
-    let w = window.as_weak();
-    window.on_close_queue_panel(move || {
-        let Some(win) = w.upgrade() else { return };
-        let mut st = s.borrow_mut();
-        st.close_queue_panel();
-        sync_window(&win, &mut st);
-    });
-
-    let s = Rc::clone(&state_rc);
+/// Wires settings, account authentication, player bar preferences, and resize callbacks.
+fn wire_settings_callbacks<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state_rc: &SharedState<C, A, S, L, K>,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_sign_in_submitted(move |cookies| {
@@ -478,7 +572,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
     window.on_sign_out(move || {
@@ -489,7 +583,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_theme_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
@@ -500,7 +594,7 @@ pub(crate) fn wire_window_callbacks<
         win.set_active_theme_index(idx);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_player_bar_mode_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
@@ -510,7 +604,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_player_bar_option_toggled(move |idx| {
         let Some(win) = w.upgrade() else { return };
@@ -519,16 +613,7 @@ pub(crate) fn wire_window_callbacks<
         sync_window(&win, &mut st);
     });
 
-    let s = Rc::clone(&state_rc);
-    let w = window.as_weak();
-    window.on_cycle_playback_speed(move || {
-        let Some(win) = w.upgrade() else { return };
-        let mut st = s.borrow_mut();
-        let speed = st.cycle_playback_speed();
-        win.set_playback_speed_text(format_playback_speed(speed).into());
-    });
-
-    let s = Rc::clone(&state_rc);
+    let s = Rc::clone(state_rc);
     let w = window.as_weak();
     window.on_width_changed(move |width| {
         let Some(win) = w.upgrade() else { return };
