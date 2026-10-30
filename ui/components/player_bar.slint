@@ -1,7 +1,7 @@
 import { Theme } from "../theme.slint";
 import { ThemedSlider } from "./controls.slint";
 import { PlayerCenterControls } from "./player_controls.slint";
-import { IconHeart, IconQueue, IconSpeaker } from "../icons.slint";
+import { IconHeart, IconQueue, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
 
 export component PlayerBar inherits Rectangle {
     in property <int> mode: 0;
@@ -28,6 +28,8 @@ export component PlayerBar inherits Rectangle {
     in property <int> duration-secs: 0;
     in property <int> queue-count: 0;
     in property <string> queue-button-text: "Queue";
+
+    property <int> last-audible-volume: 100;
 
     callback toggle-play();
     callback prev-track();
@@ -206,9 +208,38 @@ export component PlayerBar inherits Rectangle {
 
                 VerticalLayout {
                     alignment: center;
-                    IconSpeaker {
-                        size: 16px;
-                        tint: Theme.secondary;
+
+                    Rectangle {
+                        width: 28px;
+                        height: 28px;
+                        border-radius: 14px;
+                        background: vol-touch.pressed ? Theme.overlay : (vol-touch.has-hover ? Theme.hover : transparent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        vol-touch := TouchArea {
+                            clicked => {
+                                if (root.volume > 0) {
+                                    root.last-audible-volume = root.volume;
+                                    root.set-volume(0);
+                                } else {
+                                    root.set-volume(root.last-audible-volume > 0 ? root.last-audible-volume : 50);
+                                }
+                            }
+                        }
+
+                        if root.volume == 0 : IconSpeakerMuted {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            size: 16px;
+                            tint: Theme.accent;
+                        }
+
+                        if root.volume != 0 : IconSpeaker {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            size: 16px;
+                            tint: Theme.secondary;
+                        }
                     }
                 }
 
