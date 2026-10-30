@@ -20,8 +20,8 @@ use crate::slint_shell::search::SearchRow;
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::theme::{apply_theme, theme_to_index};
 use crate::slint_shell::{
-    ExploreCardData, ExploreShelfData, LibraryItemData, LyricLineData, MoggytWindow, ShelfData,
-    TrackRowData,
+    ExploreCardData, ExploreCardRow, ExploreShelfData, LibraryItemData, LyricLineData,
+    MoggytWindow, ShelfData, TrackRowData,
 };
 
 /// Synchronizes state with Slint window properties without performing blocking I/O.
@@ -256,6 +256,69 @@ pub(crate) fn sync_library_and_detail<
     }
 }
 
+const EXPLORE_GRID_COLUMNS: usize = 5;
+
+/// Muted tile palette used for explore items that carry no artwork.
+const TILE_PALETTE: [[u8; 3]; 8] = [
+    [123, 77, 161],
+    [45, 110, 142],
+    [46, 125, 91],
+    [138, 90, 43],
+    [142, 59, 77],
+    [63, 90, 142],
+    [90, 107, 46],
+    [107, 63, 122],
+];
+
+/// Picks a stable tile colour from the palette for a title.
+pub(crate) fn tile_color_for(title: &str) -> slint::Color {
+    let hash =
+        title.bytes().fold(0u32, |acc, byte| acc.wrapping_mul(31).wrapping_add(u32::from(byte)));
+    let [r, g, b] = TILE_PALETTE[(hash as usize) % TILE_PALETTE.len()];
+    slint::Color::from_rgb_u8(r, g, b)
+}
+
+fn spacer_card() -> ExploreCardData {
+    ExploreCardData {
+        index: -1,
+        title: "".into(),
+        subtitle: "".into(),
+        has_cover: false,
+        cover: slint::Image::default(),
+        tile_color: slint::Color::default(),
+    }
+}
+
+fn pad_row_with_spacers(mut row: Vec<ExploreCardData>) -> ExploreCardRow {
+    let padding = EXPLORE_GRID_COLUMNS.saturating_sub(row.len());
+    row.extend(std::iter::repeat_with(spacer_card).take(padding));
+    ExploreCardRow { cards: ModelRc::new(VecModel::from(row)) }
+}
+
+/// Splits cards into fixed-width rows, padding the last row with invisible spacers.
+pub(crate) fn chunk_card_rows(cards: Vec<ExploreCardData>) -> Vec<ExploreCardRow> {
+    if cards.is_empty() {
+        return Vec::new();
+    }
+    let mut rows = Vec::new();
+    let mut current_row = Vec::with_capacity(EXPLORE_GRID_COLUMNS);
+    for card in cards {
+        current_row.push(card);
+        if current_row.len() == EXPLORE_GRID_COLUMNS {
+            rows.push(ExploreCardRow {
+                cards: ModelRc::new(VecModel::from(std::mem::replace(
+                    &mut current_row,
+                    Vec::with_capacity(EXPLORE_GRID_COLUMNS),
+                ))),
+            });
+        }
+    }
+    if !current_row.is_empty() {
+        rows.push(pad_row_with_spacers(current_row));
+    }
+    rows
+}
+
 fn explore_shelf_to_card_data(
     shelf: &Shelf,
     covers: &HashMap<String, slint::Image>,
@@ -266,18 +329,20 @@ fn explore_shelf_to_card_data(
         let row = SearchRow::from(item);
         let has_cover = row.artwork_url.is_some();
         let cover = resolve_row_cover_image(row.artwork_url.as_deref(), covers);
+        let tile_color = tile_color_for(&row.title);
         cards.push(ExploreCardData {
             index: *global_idx,
             title: row.title.into(),
             subtitle: row.subtitle.into(),
             has_cover,
             cover,
+            tile_color,
         });
         *global_idx += 1;
     }
     ExploreShelfData {
         title: shelf.title.clone().into(),
-        cards: ModelRc::new(VecModel::from(cards)),
+        rows: ModelRc::new(VecModel::from(chunk_card_rows(cards))),
     }
 }
 
@@ -343,6 +408,46 @@ mod tests {
     use crate::slint_shell::platform::rgba_to_image;
     use crate::slint_shell::playback_worker::thumbnail_variant_for_row;
 
+    fn make_test_card(index: i32) -> ExploreCardData {
+        ExploreCardData {
+            index,
+            title: format!("Title {index}").into(),
+            subtitle: "".into(),
+            has_cover: false,
+            cover: slint::Image::default(),
+            tile_color: slint::Color::default(),
+        }
+    }
+
+    #[test]
+    fn test_chunk_card_rows_padding_and_empty() {
+        // 0 cards -> 0 rows
+        let rows_0 = chunk_card_rows(Vec::new());
+        assert_eq!(rows_0.len(), 0);
+
+        // 3 cards -> 1 row of 5 with indexes [0, 1, 2, -1, -1]
+        let cards_3 = vec![make_test_card(0), make_test_card(1), make_test_card(2)];
+        let rows_1 = chunk_card_rows(cards_3);
+        assert_eq!(rows_1.len(), 1);
+        assert_eq!(rows_1[0].cards.row_count(), 5);
+        let indices_1: Vec<i32> =
+            (0..5).map(|i| rows_1[0].cards.row_data(i).unwrap().index).collect();
+        assert_eq!(indices_1, vec![0, 1, 2, -1, -1]);
+
+        // 7 cards -> 2 rows of 5 with the second row padded
+        let cards_7: Vec<_> = (0..7).map(make_test_card).collect();
+        let rows_2 = chunk_card_rows(cards_7);
+        assert_eq!(rows_2.len(), 2);
+        assert_eq!(rows_2[0].cards.row_count(), 5);
+        assert_eq!(rows_2[1].cards.row_count(), 5);
+        let row0_indices: Vec<i32> =
+            (0..5).map(|i| rows_2[0].cards.row_data(i).unwrap().index).collect();
+        let row1_indices: Vec<i32> =
+            (0..5).map(|i| rows_2[1].cards.row_data(i).unwrap().index).collect();
+        assert_eq!(row0_indices, vec![0, 1, 2, 3, 4]);
+        assert_eq!(row1_indices, vec![5, 6, -1, -1, -1]);
+    }
+
     #[test]
     fn test_explore_card_shelves_keeps_global_index_across_shelves() {
         let shelves = vec![
@@ -365,18 +470,22 @@ mod tests {
         assert_eq!(result[0].title.as_str(), "Shelf 1");
         assert_eq!(result[1].title.as_str(), "Shelf 2");
 
-        assert_eq!(result[0].cards.row_count(), 2);
-        let card0 = result[0].cards.row_data(0).unwrap();
-        let card1 = result[0].cards.row_data(1).unwrap();
-        assert_eq!(card0.index, 0);
-        assert_eq!(card0.title.as_str(), "Track 1");
-        assert_eq!(card1.index, 1);
-        assert_eq!(card1.title.as_str(), "Track 2");
+        assert_eq!(result[0].rows.row_count(), 1);
+        let row0 = result[0].rows.row_data(0).unwrap();
+        assert_eq!(row0.cards.row_count(), 5);
+        let row0_indices: Vec<i32> =
+            (0..5).map(|i| row0.cards.row_data(i).unwrap().index).collect();
+        assert_eq!(row0_indices, vec![0, 1, -1, -1, -1]);
+        assert_eq!(row0.cards.row_data(0).unwrap().title.as_str(), "Track 1");
+        assert_eq!(row0.cards.row_data(1).unwrap().title.as_str(), "Track 2");
 
-        assert_eq!(result[1].cards.row_count(), 1);
-        let card2 = result[1].cards.row_data(0).unwrap();
-        assert_eq!(card2.index, 2);
-        assert_eq!(card2.title.as_str(), "Track 3");
+        assert_eq!(result[1].rows.row_count(), 1);
+        let row1 = result[1].rows.row_data(0).unwrap();
+        assert_eq!(row1.cards.row_count(), 5);
+        let row1_indices: Vec<i32> =
+            (0..5).map(|i| row1.cards.row_data(i).unwrap().index).collect();
+        assert_eq!(row1_indices, vec![2, -1, -1, -1, -1]);
+        assert_eq!(row1.cards.row_data(0).unwrap().title.as_str(), "Track 3");
     }
 
     #[test]
@@ -394,13 +503,16 @@ mod tests {
         let result = explore_card_shelves(&shelves, &covers);
 
         assert_eq!(result.len(), 1);
-        let cards = &result[0].cards;
-        assert_eq!(cards.row_count(), 4);
+        assert_eq!(result[0].rows.row_count(), 1);
+        let row0 = result[0].rows.row_data(0).unwrap();
+        let cards = &row0.cards;
+        assert_eq!(cards.row_count(), 5);
 
         assert_eq!(cards.row_data(0).unwrap().subtitle.as_str(), "Artist");
         assert_eq!(cards.row_data(1).unwrap().subtitle.as_str(), "Artist");
         assert_eq!(cards.row_data(2).unwrap().subtitle.as_str(), "");
         assert_eq!(cards.row_data(3).unwrap().subtitle.as_str(), "");
+        assert_eq!(cards.row_data(4).unwrap().index, -1);
     }
 
     #[test]
@@ -417,8 +529,9 @@ mod tests {
         // Map is empty: has_cover false for playlist, true for album; album cover empty image
         let empty_covers = HashMap::new();
         let res_empty = explore_card_shelves(&shelves, &empty_covers);
-        let pl_card = res_empty[0].cards.row_data(0).unwrap();
-        let alb_card_empty = res_empty[0].cards.row_data(1).unwrap();
+        let row_empty = res_empty[0].rows.row_data(0).unwrap();
+        let pl_card = row_empty.cards.row_data(0).unwrap();
+        let alb_card_empty = row_empty.cards.row_data(1).unwrap();
 
         assert!(!pl_card.has_cover);
         assert_eq!(pl_card.cover.size(), slint::Image::default().size());
@@ -432,9 +545,69 @@ mod tests {
         populated_covers.insert(thumb_url, real_img);
 
         let res_populated = explore_card_shelves(&shelves, &populated_covers);
-        let alb_card_populated = res_populated[0].cards.row_data(1).unwrap();
+        let row_pop = res_populated[0].rows.row_data(0).unwrap();
+        let alb_card_populated = row_pop.cards.row_data(1).unwrap();
 
         assert!(alb_card_populated.has_cover);
         assert!(alb_card_populated.cover.size().width > 0);
+    }
+
+    #[test]
+    fn test_tile_color_for_deterministic_and_within_palette() {
+        let color1 = tile_color_for("Chill Vibes");
+        let color2 = tile_color_for("Chill Vibes");
+        assert_eq!(color1, color2);
+
+        let titles = [
+            "Rock",
+            "Pop",
+            "Jazz",
+            "Classical",
+            "Hip Hop",
+            "Electronic",
+            "Acoustic",
+            "Metal",
+            "Ambient",
+            "Dance",
+            "Country",
+            "Blues",
+            "Folk",
+            "Latin",
+        ];
+        let palette_colors: Vec<slint::Color> =
+            TILE_PALETTE.iter().map(|&[r, g, b]| slint::Color::from_rgb_u8(r, g, b)).collect();
+
+        for title in titles {
+            let color = tile_color_for(title);
+            assert!(
+                palette_colors.contains(&color),
+                "tile_color_for({title:?}) returned color not in TILE_PALETTE"
+            );
+        }
+    }
+
+    #[test]
+    fn test_artless_item_keeps_has_cover_false_and_receives_tile_color() {
+        let shelves = vec![Shelf {
+            title: "Moods".to_string(),
+            items: vec![SearchResult::Playlist(Playlist::new("PL1", "Energize", 0, None))],
+        }];
+        let covers = HashMap::new();
+        let result = explore_card_shelves(&shelves, &covers);
+
+        assert_eq!(result.len(), 1);
+        let row0 = result[0].rows.row_data(0).unwrap();
+        let card0 = row0.cards.row_data(0).unwrap();
+
+        assert_eq!(card0.title.as_str(), "Energize");
+        assert!(!card0.has_cover);
+        let expected_color = tile_color_for("Energize");
+        assert_eq!(card0.tile_color, expected_color);
+
+        // Verify trailing spacer cards
+        let spacer = row0.cards.row_data(1).unwrap();
+        assert_eq!(spacer.index, -1);
+        assert!(!spacer.has_cover);
+        assert_eq!(spacer.tile_color, slint::Color::default());
     }
 }

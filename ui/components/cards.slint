@@ -1,16 +1,17 @@
 import { Theme } from "../theme.slint";
-import { IconMusic } from "../icons.slint";
 
 export component MediaCard inherits Rectangle {
+    in property <int> index: 0;
     in property <string> title;
     in property <string> subtitle;
     in property <bool> has-cover: false;
     in property <image> cover;
+    in property <color> tile-color: Theme.surface;
     callback clicked();
 
-    width: 156px;
     height: 202px;
     border-radius: 10px;
+    opacity: root.index < 0 ? 0 : 1;
     background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent);
     animate background { duration: 150ms; easing: ease-in-out; }
 
@@ -26,7 +27,7 @@ export component MediaCard inherits Rectangle {
         Rectangle {
             height: 140px;
             border-radius: 8px;
-            background: Theme.surface;
+            background: root.has-cover ? Theme.surface : root.tile-color;
             clip: true;
 
             if root.has-cover : Image {
@@ -37,30 +38,38 @@ export component MediaCard inherits Rectangle {
             }
 
             if !root.has-cover : VerticalLayout {
+                padding: 10px;
                 alignment: center;
 
-                IconMusic {
-                    size: 36px;
-                    tint: Theme.secondary;
+                Text {
+                    text: root.title;
+                    color: Theme.text;
+                    font-size: 14px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    overflow: elide;
                 }
             }
         }
 
-        Text {
-            text: root.title;
-            color: Theme.text;
-            font-size: 13px;
-            font-weight: 600;
-            overflow: elide;
-            vertical-alignment: center;
-        }
+        if root.has-cover : VerticalLayout {
+            spacing: 2px;
+            alignment: start;
 
-        if root.subtitle != "" : Text {
-            text: root.subtitle;
-            color: Theme.secondary;
-            font-size: 11px;
-            overflow: elide;
-            vertical-alignment: center;
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: 13px;
+                font-weight: 600;
+                overflow: elide;
+            }
+
+            if root.subtitle != "" : Text {
+                text: root.subtitle;
+                color: Theme.secondary;
+                font-size: 11px;
+                overflow: elide;
+            }
         }
     }
 }
