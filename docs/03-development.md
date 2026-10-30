@@ -119,3 +119,15 @@ guessing; every rule here was verified against a build or the official documenta
   preventing children with `horizontal-stretch: 1` from expanding. To let a center child stretch between fixed-width
   edge elements, omit `alignment` on the container layout.
   Source: <https://docs.slint.dev/latest/docs/slint/src/language/builtins/layouts>.
+- `Flickable` viewport content-sizing and layout interaction: a `Flickable` does not provide an intrinsic
+  content height to enclosing layouts or intermediate containers; its `viewport-height` is computed from its
+  children, while its own outer `height` defaults to 100% of the parent element or must be allocated by layout stretch.
+  Wrapping a `Flickable` inside an intermediate `Rectangle` with circular height constraints (`height: parent.height`)
+  or placing it in a layout with explicit alignment (such as `alignment: start`) collapses the container to zero height
+  because `vertical-stretch` is ignored and `Flickable`'s preferred height is zero. To allow vertical scrolling without
+  clipping or collapse, place `Flickable` directly in the stretching layout with `vertical-stretch: 1` (leaving the parent
+  layout at default `stretch` alignment). Inside `Flickable`, keep the inner `VerticalLayout` free of explicit `height`
+  and explicit `width` so its height follows content rows naturally, enabling `viewport-height` to be derived accurately.
+  Empty states that do not scroll should be rendered outside `Flickable` in a dedicated layout with `vertical-stretch: 1`
+  so they cannot collapse when the list is empty.
+  Source: <https://docs.slint.dev/latest/docs/slint/src/language/builtins/elements#flickable>.

@@ -203,6 +203,65 @@ impl Track {
     }
 }
 
+/// Maximum number of recent search queries retained in history.
+pub const RECENT_SEARCH_LIMIT: usize = 10;
+
+/// Persistent recent search history capped at [`RECENT_SEARCH_LIMIT`] entries.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecentSearches(Vec<String>);
+
+impl RecentSearches {
+    /// Creates an empty recent search history.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Ordered entries (newest first).
+    pub fn entries(&self) -> &[String] {
+        &self.0
+    }
+
+    /// Whether history contains no entries.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Number of retained entries.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Records a query into history.
+    ///
+    /// Trims the query, ignores blank input, drops any existing entry equal
+    /// ignoring ASCII case, pushes the trimmed text at the front, and truncates
+    /// to [`RECENT_SEARCH_LIMIT`].
+    pub fn record(&mut self, query: &str) {
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        self.0.retain(|entry| !entry.eq_ignore_ascii_case(trimmed));
+        self.0.insert(0, trimmed.to_owned());
+        self.0.truncate(RECENT_SEARCH_LIMIT);
+    }
+
+    /// Removes an entry matching query ignoring ASCII case.
+    ///
+    /// Returns true if an entry was removed, false otherwise.
+    pub fn remove(&mut self, query: &str) -> bool {
+        let trimmed = query.trim();
+        let initial_len = self.0.len();
+        self.0.retain(|entry| !entry.eq_ignore_ascii_case(trimmed));
+        self.0.len() < initial_len
+    }
+
+    /// Clears all recent searches.
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,5 +352,82 @@ mod tests {
         let json = serde_json::to_string(&track).expect("serialize track");
         let deserialized: Track = serde_json::from_str(&json).expect("deserialize track");
         assert_eq!(track, deserialized);
+    }
+
+    #[test]
+    fn recent_searches_blank_or_whitespace_ignored() {
+        let mut recents = RecentSearches::new();
+        recents.record("");
+        recents.record("   ");
+        recents.record("\t\n ");
+        assert!(recents.is_empty());
+        assert_eq!(recents.len(), 0);
+        assert_eq!(recents.entries(), &[] as &[String]);
+    }
+
+    #[test]
+    fn recent_searches_duplicate_moves_to_front_and_updates_casing() {
+        let mut recents = RecentSearches::new();
+        recents.record("Radiohead");
+        recents.record("coldplay");
+        assert_eq!(recents.entries(), &["coldplay", "Radiohead"]);
+
+        // Duplicate with different case moves to front and keeps newest casing
+        recents.record("RADIOHEAD");
+        assert_eq!(recents.entries(), &["RADIOHEAD", "coldplay"]);
+        assert_eq!(recents.len(), 2);
+    }
+
+    #[test]
+    fn recent_searches_cap_drops_oldest() {
+        let mut recents = RecentSearches::new();
+        for i in 1..=12 {
+            recents.record(&format!("query {i}"));
+        }
+        assert_eq!(recents.len(), RECENT_SEARCH_LIMIT);
+        assert_eq!(recents.entries().first().map(|s| s.as_str()), Some("query 12"));
+        assert_eq!(recents.entries().last().map(|s| s.as_str()), Some("query 3"));
+    }
+
+    #[test]
+    fn recent_searches_remove_is_case_insensitive_and_reports_status() {
+        let mut recents = RecentSearches::new();
+        recents.record("Daft Punk");
+        assert!(!recents.remove("nonexistent"));
+        assert!(recents.remove("daft punk"));
+        assert!(!recents.remove("DAFT PUNK"));
+        assert!(recents.is_empty());
+    }
+
+    #[test]
+    fn recent_searches_clear_empties_all() {
+        let mut recents = RecentSearches::new();
+        recents.record("Pink Floyd");
+        assert_eq!(recents.len(), 1);
+        recents.clear();
+        assert!(recents.is_empty());
+        assert_eq!(recents.len(), 0);
+    }
+
+    #[test]
+    fn recent_searches_serde_roundtrip_and_missing_field_default() {
+        let mut recents = RecentSearches::new();
+        recents.record("Queen");
+        recents.record("ABBA");
+        let json = serde_json::to_string(&recents).expect("serialize recent searches");
+        assert_eq!(json, r#"["ABBA","Queen"]"#);
+
+        let deserialized: RecentSearches =
+            serde_json::from_str(&json).expect("deserialize recent searches");
+        assert_eq!(recents, deserialized);
+
+        #[derive(Deserialize)]
+        struct Container {
+            #[serde(default)]
+            history: RecentSearches,
+        }
+        let container: Container = serde_json::from_str("{}").expect("deserialize missing field");
+        assert!(container.history.is_empty());
+        assert_eq!(container.history.len(), 0);
     }
 }

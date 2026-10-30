@@ -10,8 +10,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::domain::{
-    Album, Artist, Detail, DetailKind, PlaybackQueue, PlayerBarMode, Playlist, SearchFilter,
-    SearchQuery, SearchResult, Shelf, SleepTimer, ThemeId, Track, extract_playlist_id,
+    Album, Artist, Detail, DetailKind, PlaybackQueue, PlayerBarMode, Playlist, RecentSearches,
+    SearchFilter, SearchQuery, SearchResult, Shelf, SleepTimer, ThemeId, Track,
+    extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
@@ -54,9 +55,12 @@ pub struct SlintAppState<
     pub updater: GithubUpdater,
 
     pub page: SlintPage,
+    pub queue_panel_open: bool,
     pub queue: PlaybackQueue,
     pub home_shelves: Vec<Shelf>,
     pub search_query: String,
+    pub search_active: bool,
+    pub recent_searches: RecentSearches,
     pub search_results: Vec<Track>,
     pub library_playlists: Vec<Playlist>,
     pub library_albums: Vec<Album>,
@@ -120,7 +124,8 @@ impl<
         if let Some(ref cookies) = stored_session {
             catalog.set_session_cookies(Some(cookies));
         }
-        let shelves = catalog.home_shelves();
+        let settings_store = Box::new(MemorySettingsStore::default());
+        let recent_searches = settings_store.load().recent_searches;
         Self {
             catalog: Arc::new(Mutex::new(catalog)),
             audio: Arc::new(Mutex::new(audio)),
@@ -133,15 +138,18 @@ impl<
             discord: DiscordPresence::new(),
             scrobbler: Arc::new(Mutex::new(Box::new(StubScrobbler::new()))),
             secondary_scrobbler: None,
-            settings_store: Box::new(MemorySettingsStore::default()),
+            settings_store,
             queue_store: Box::new(MemoryQueueStore::default()),
             skip_store: Box::new(MemorySkipStore::new()),
             meta_store: Box::new(MemoryMetaStore::new()),
             updater: GithubUpdater::new(),
             page: SlintPage::Search,
+            queue_panel_open: false,
             queue: PlaybackQueue::new(),
-            home_shelves: shelves,
+            home_shelves: Vec::new(),
             search_query: String::new(),
+            search_active: false,
+            recent_searches,
             search_results: Vec::new(),
             library_playlists: Vec::new(),
             library_albums: Vec::new(),
@@ -216,6 +224,16 @@ impl<
         next
     }
 
+    /// Toggles the queue side panel open or closed.
+    pub fn toggle_queue_panel(&mut self) {
+        self.queue_panel_open = !self.queue_panel_open;
+    }
+
+    /// Closes the queue side panel.
+    pub fn close_queue_panel(&mut self) {
+        self.queue_panel_open = false;
+    }
+
     /// Selects active navigation page and refreshes content when entering Library or Explore view.
     pub fn select_page(&mut self, page: SlintPage) {
         self.page = page;
@@ -255,6 +273,8 @@ impl<
         let Some(parsed) = SearchQuery::parse(query) else {
             return;
         };
+        self.search_active = true;
+        self.recent_searches.record(parsed.text());
         let items = self.catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
         self.search_results = items
             .iter()
@@ -461,13 +481,43 @@ mod tests {
         let state = test_wired();
         assert_eq!(state.page, SlintPage::Search);
         assert!(state.queue.is_empty());
-        assert!(!state.home_shelves.is_empty());
+        assert!(state.home_shelves.is_empty());
+        assert!(state.recent_searches.is_empty());
+        assert!(!state.search_active);
         assert_eq!(state.active_lyric_index(), -1);
         assert!(state.liked_ids.is_empty());
         assert!(state.now_playing_cover.is_none());
         assert!(!state.is_shuffle);
         assert_eq!(state.search_query, "");
         assert_eq!(state.explore_columns, crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS);
+        assert!(!state.queue_panel_open);
+    }
+
+    #[test]
+    fn test_queue_panel_open_close_and_toggle_lifecycle() {
+        let mut state = test_wired();
+        assert!(!state.queue_panel_open);
+        assert_eq!(state.page, SlintPage::Search);
+
+        state.toggle_queue_panel();
+        assert!(state.queue_panel_open);
+        state.toggle_queue_panel();
+        assert!(!state.queue_panel_open);
+
+        assert_eq!(state.page, SlintPage::Search);
+
+        state.close_queue_panel();
+        assert!(!state.queue_panel_open);
+
+        state.select_page(SlintPage::NowPlaying);
+        assert_eq!(state.page, SlintPage::NowPlaying);
+        state.toggle_queue_panel();
+        assert!(state.queue_panel_open);
+        assert_eq!(state.page, SlintPage::NowPlaying);
+
+        state.close_queue_panel();
+        assert!(!state.queue_panel_open);
+        assert_eq!(state.page, SlintPage::NowPlaying);
     }
 
     #[test]
@@ -485,6 +535,8 @@ mod tests {
         let mut state = test_wired();
         state.submit_search("midnight");
         assert_eq!(state.search_query, "midnight");
+        assert!(state.search_active);
+        assert_eq!(state.recent_searches.entries(), &["midnight"]);
         assert_eq!(state.home_shelves.len(), 1);
         assert_eq!(state.home_shelves[0].title, "Search Results");
 
@@ -499,9 +551,10 @@ mod tests {
     fn test_search_submission_empty_query_preserves_shelves() {
         let mut state = test_wired();
         let initial_shelves = state.home_shelves.clone();
-        assert!(!initial_shelves.is_empty());
+        assert!(initial_shelves.is_empty());
         state.submit_search("   ");
         assert_eq!(state.search_query, "   ");
+        assert!(!state.search_active);
         assert_eq!(state.home_shelves, initial_shelves);
     }
 
@@ -635,7 +688,7 @@ mod tests {
     }
 
     #[test]
-    fn test_slint_app_state_new_fetches_home_shelves_with_default_locale() {
+    fn test_slint_app_state_new_configures_locale_and_initializes_empty_shelves() {
         let (catalog, locales, fetch_locales) = LocaleTrackingCatalog::new();
         let audio = crate::infra::AudioStub::new();
         let session = crate::infra::MemorySessionStore::new();
@@ -645,9 +698,10 @@ mod tests {
         let state = SlintAppState::new(catalog, audio, session, lyrics, covers);
 
         assert_eq!(*locales.lock().unwrap(), vec![Locale::English]);
-        assert_eq!(*fetch_locales.lock().unwrap(), vec![Locale::English]);
-        assert_eq!(state.home_shelves.len(), 1);
-        assert_eq!(state.home_shelves[0].title, "Home English");
+        assert!(fetch_locales.lock().unwrap().is_empty());
+        assert!(state.home_shelves.is_empty());
+        assert!(!state.search_active);
+        assert!(state.recent_searches.is_empty());
     }
 
     #[test]

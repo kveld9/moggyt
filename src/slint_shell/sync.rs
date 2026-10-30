@@ -40,6 +40,7 @@ pub(crate) fn sync_window<
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_active_page(state.page.to_index());
     window.set_header_title(tr(state.locale, state.page.title()).into());
+    window.set_queue_panel_open(state.queue_panel_open);
     let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
     window.set_is_playing(is_playing);
     let volume = state.audio.try_lock().map(|a| a.volume()).unwrap_or(100);
@@ -92,6 +93,7 @@ pub(crate) fn sync_window<
     window.set_playback_progress(progress_fraction(pos_secs, dur_secs));
 
     sync_cover_and_lyrics(window, state);
+    sync_recent_searches(window, state);
     sync_shelves_and_queue(window, state);
     sync_library_and_detail(window, state);
     sync_explore_shelves(window, state);
@@ -187,6 +189,42 @@ pub(crate) fn sync_shelves_and_queue<
         .collect();
     window.set_queue_tracks(ModelRc::new(VecModel::from(q_tracks)));
     window.set_queue_selected_index(state.queue.cursor() as i32);
+}
+
+/// Synchronizes recent search queries and search-active state with Slint window.
+pub(crate) fn sync_recent_searches<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    window: &MoggytWindow,
+    state: &SlintAppState<C, A, S, L, K>,
+) {
+    let rows: Vec<slint::SharedString> = state
+        .recent_searches
+        .entries()
+        .iter()
+        .map(|s| slint::SharedString::from(s.as_str()))
+        .collect();
+    window.set_recent_searches(ModelRc::new(VecModel::from(rows)));
+    window.set_search_active(state.search_active);
+}
+
+/// Persists current recent searches to the settings store, ignoring save errors.
+pub(crate) fn persist_recent_searches<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    state: &SlintAppState<C, A, S, L, K>,
+) {
+    let mut settings = state.settings_store.load();
+    settings.recent_searches = state.recent_searches.clone();
+    let _ = state.settings_store.save(&settings);
 }
 
 /// Synchronizes library collections and detail view models with Slint window.

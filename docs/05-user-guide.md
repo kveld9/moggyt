@@ -6,7 +6,7 @@ This guide covers the interface layout, playback controls, queue management, and
 
 The interface consists of three primary regions:
 
-1. **Top Bar**: displays application title, page navigation tabs (`Search`, `Queue`, `Now playing`, `Library`, `Detail`),
+1. **Top Bar**: displays application title, page navigation tabs (`Search`, `Now playing`, `Library`, `Detail`),
    and an update badge when a newer release is detected.
 2. **Body Panel**: renders the active page selected in the top bar.
 3. **Player Bar**: persistent bottom panel providing transport controls, volume slider, and track position.
@@ -15,14 +15,18 @@ The interface consists of three primary regions:
 
 ### Search Page
 
-The search view presents curated home shelves and accepts queries for tracks, artists, and albums:
+The search view accepts queries for tracks, artists, and albums, and maintains a persistent recent-search history:
 
-- **Home Shelves**: displays categorized carousels (albums, artists, playlists) loaded lazily on open. Click `Refresh`
-  to clear the cache and refetch home shelves from the catalog. Click `Open` to view full container tracklistings.
-- Type your search terms into the single-line input field.
-- Press `Enter` or click the `Search` button.
-- Catalog hits are queried through the catalog adapter and the top hit is enqueued automatically, transitioning the
-  view to the `Queue` page.
+- **Idle State**: when no search has been submitted yet, the page displays only the search input field and the
+  recent-search list. Filter chips, result shelves, and discovery content remain hidden until a search is executed.
+- **Recent Searches**: displays up to 10 recent searches (newest first, case-insensitively deduplicated), persisted
+  across restarts.
+  - Clicking any recent search entry populates the search query and executes the search immediately.
+  - Each entry features a delete button (`X`) on the right that removes only that entry from history.
+  - Below the list, a `Clear history` button removes all entries at once. When history is empty, a placeholder
+    indicates no recent searches.
+- **Search Execution**: type your query into the input field and press `Enter` or click `Search` to view filtered
+  search results.
 
 ### Detail Page
 
@@ -34,15 +38,15 @@ The detail view displays full tracklistings for an album, artist, or playlist:
 - **Navigation**: click `Back` to close the detail view and return to the previous page.
 - Home shelf items in the `Search` page provide an `Open` button to navigate directly to their detail view.
 
-### Queue Page
+### Queue Panel
 
-The queue view manages the ordered list of upcoming tracks:
+The collapsible right-side queue panel manages the ordered list of upcoming tracks:
 
-- Displays the total number of queued tracks (`N track(s) queued`).
-- `Previous`: retreats the playback cursor to the preceding track in the queue.
-- `Play head`: starts playback of the track currently at the cursor and switches navigation to `Now playing`.
-- `Next`: advances the playback cursor to the subsequent track in the queue.
-- Below the controls, every queued track is listed in order (`title - artist`).
+- Opened and closed from the queue icon in the player bar, docking on the right at 340px.
+- Lists the queued tracks in order with the active track highlighted.
+- Displays the queued track count badge on the queue icon in the player bar.
+- Shows an empty-state text (`The queue is empty.`) when nothing is queued.
+- Clicking a track row plays that track immediately and leaves the queue panel open.
 
 ### Now Playing Page
 

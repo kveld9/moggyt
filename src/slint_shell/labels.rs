@@ -20,6 +20,10 @@ pub struct StaticLabels {
     pub filter_artists: &'static str,
     pub filter_playlists: &'static str,
     pub search_empty: &'static str,
+    pub recent_searches_title: &'static str,
+    pub recent_searches_empty: &'static str,
+    pub clear_history: &'static str,
+    pub queue_title: &'static str,
     pub queue_empty: &'static str,
     pub no_cover: &'static str,
     pub lyrics_unavailable: &'static str,
@@ -81,6 +85,10 @@ impl StaticLabels {
             filter_artists: tr(locale, "Artists"),
             filter_playlists: tr(locale, "Playlists"),
             search_empty: tr(locale, "No results found."),
+            recent_searches_title: tr(locale, "Recent searches"),
+            recent_searches_empty: tr(locale, "No recent searches."),
+            clear_history: tr(locale, "Clear history"),
+            queue_title: tr(locale, "Queue"),
             queue_empty: tr(locale, "The queue is empty."),
             no_cover: tr(locale, "No cover"),
             lyrics_unavailable: tr(locale, "Lyrics unavailable"),
@@ -145,7 +153,11 @@ impl StaticLabels {
         window.set_filter_artists_label(self.filter_artists.into());
         window.set_filter_playlists_label(self.filter_playlists.into());
         window.set_search_empty_text(self.search_empty.into());
+        window.set_recent_title_label(self.recent_searches_title.into());
+        window.set_recent_empty_label(self.recent_searches_empty.into());
+        window.set_clear_history_label(self.clear_history.into());
 
+        window.set_queue_title_label(self.queue_title.into());
         window.set_queue_empty_text(self.queue_empty.into());
 
         window.set_no_cover_text(self.no_cover.into());
@@ -233,6 +245,10 @@ mod tests {
         assert_eq!(es.filter_artists, "Artistas");
         assert_eq!(es.filter_playlists, "Listas de reproducción");
         assert_eq!(es.search_empty, "No se encontraron resultados.");
+        assert_eq!(es.recent_searches_title, "Búsquedas recientes");
+        assert_eq!(es.recent_searches_empty, "Aún no hay búsquedas recientes.");
+        assert_eq!(es.clear_history, "Borrar todo el historial");
+        assert_eq!(es.queue_title, "Cola");
         assert_eq!(es.queue_empty, "La cola está vacía.");
         assert_eq!(es.no_cover, "Sin portada");
         assert_eq!(es.lyrics_unavailable, "Letras no disponibles");
@@ -293,6 +309,10 @@ mod tests {
         assert_eq!(en.filter_artists, "Artists");
         assert_eq!(en.filter_playlists, "Playlists");
         assert_eq!(en.search_empty, "No results found.");
+        assert_eq!(en.recent_searches_title, "Recent searches");
+        assert_eq!(en.recent_searches_empty, "No recent searches.");
+        assert_eq!(en.clear_history, "Clear history");
+        assert_eq!(en.queue_title, "Queue");
         assert_eq!(en.queue_empty, "The queue is empty.");
         assert_eq!(en.no_cover, "No cover");
         assert_eq!(en.lyrics_unavailable, "Lyrics unavailable");

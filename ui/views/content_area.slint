@@ -9,7 +9,6 @@ import {
 import { IconBack, IconSettings } from "../icons.slint";
 import { SearchView } from "./search_view.slint";
 import { ExploreView } from "./explore_view.slint";
-import { QueueView } from "./queue_view.slint";
 import { NowPlayingView } from "./now_playing_view.slint";
 import { LibraryView } from "./library_view.slint";
 import { DetailView } from "./detail_view.slint";
@@ -26,8 +25,6 @@ export component ContentArea inherits Rectangle {
     in property <bool> signed-in: false;
     in property <[ShelfData]> shelves: [];
     in property <int> search-filter: 0;
-    in property <[TrackRowData]> queue-tracks: [];
-    in property <int> queue-selected-index: -1;
     in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
     in property <string> position-text: "0:00";
@@ -56,7 +53,11 @@ export component ContentArea inherits Rectangle {
     in property <string> filter-artists-label: "Artists";
     in property <string> filter-playlists-label: "Playlists";
     in property <string> search-empty-text: "No results found.";
-    in property <string> queue-empty-text: "The queue is empty.";
+    in property <[string]> recent-searches: [];
+    in property <bool> search-active: false;
+    in property <string> recent-title-label: "Recent searches";
+    in property <string> recent-empty-label: "No recent searches.";
+    in property <string> clear-history-label: "Clear history";
     in property <string> no-cover-text: "No cover";
     in property <string> lyrics-unavailable-text: "Lyrics unavailable";
     in property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
@@ -109,8 +110,10 @@ export component ContentArea inherits Rectangle {
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
+    callback recent-search-selected(string);
+    callback recent-search-removed(string);
+    callback recent-searches-cleared();
     callback explore-track-selected(int);
-    callback queue-track-selected(int);
     callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
     callback detail-play();
     callback detail-shuffle();
@@ -152,7 +155,7 @@ export component ContentArea inherits Rectangle {
                     spacing: 12px;
                     alignment: start;
 
-                    if root.active-page == 4 : VerticalLayout {
+                    if root.active-page == 3 : VerticalLayout {
                         alignment: center;
                         Rectangle {
                             width: 32px;
@@ -181,7 +184,7 @@ export component ContentArea inherits Rectangle {
                     }
                 }
 
-                if root.active-page != 5 : VerticalLayout {
+                if root.active-page != 4 : VerticalLayout {
                     alignment: center;
                     Rectangle {
                         width: 32px;
@@ -228,19 +231,20 @@ export component ContentArea inherits Rectangle {
                 filter-artists-label: root.filter-artists-label;
                 filter-playlists-label: root.filter-playlists-label;
                 empty-text: root.search-empty-text;
+                recent-searches: root.recent-searches;
+                search-active: root.search-active;
+                recent-title-label: root.recent-title-label;
+                recent-empty-label: root.recent-empty-label;
+                clear-history-label: root.clear-history-label;
                 query-submitted(q) => { root.query-submitted(q); }
                 track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
+                recent-search-selected(q) => { root.recent-search-selected(q); }
+                recent-search-removed(q) => { root.recent-search-removed(q); }
+                recent-searches-cleared => { root.recent-searches-cleared(); }
             }
 
-            if root.active-page == 1 : QueueView {
-                tracks: root.queue-tracks;
-                selected-index: root.queue-selected-index;
-                empty-text: root.queue-empty-text;
-                track-selected(idx) => { root.queue-track-selected(idx); }
-            }
-
-            if root.active-page == 2 : NowPlayingView {
+            if root.active-page == 1 : NowPlayingView {
                 track-title: root.active-track-title;
                 track-artist: root.active-track-artist;
                 position-text: root.position-text;
@@ -255,7 +259,7 @@ export component ContentArea inherits Rectangle {
                 lyrics-hint-text: root.lyrics-hint-text;
             }
 
-            if root.active-page == 3 : LibraryView {
+            if root.active-page == 2 : LibraryView {
                 cookie-text <=> root.cookie-text;
                 signed-in: root.signed-in;
                 session-anonymous-hint: root.session-anonymous-hint;
@@ -277,7 +281,7 @@ export component ContentArea inherits Rectangle {
                 sign-out() => { root.sign-out(); }
             }
 
-            if root.active-page == 4 : DetailView {
+            if root.active-page == 3 : DetailView {
                 has-detail: root.detail-has-detail;
                 detail-has-artwork: root.detail-has-artwork;
                 title: root.detail-title;
@@ -296,7 +300,7 @@ export component ContentArea inherits Rectangle {
                 shuffle => { root.detail-shuffle(); }
             }
 
-            if root.active-page == 5 : SettingsView {
+            if root.active-page == 4 : SettingsView {
                 active-theme-index: root.active-theme-index;
                 playback-speed-text: root.playback-speed-text;
                 signed-in: root.signed-in;
@@ -345,7 +349,7 @@ export component ContentArea inherits Rectangle {
                 player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
             }
 
-            if root.active-page == 6 : ExploreView {
+            if root.active-page == 5 : ExploreView {
                 shelves: root.explore-shelves;
                 is-loading: root.explore-loading;
                 loading-text: root.explore-loading-text;
