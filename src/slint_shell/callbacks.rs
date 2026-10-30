@@ -21,6 +21,7 @@ use crate::slint_shell::playback::{
     toggle_like,
 };
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
+use crate::slint_shell::player_bar::mode_from_index;
 use crate::slint_shell::search::iter_shelf_items;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{
@@ -458,6 +459,25 @@ pub(crate) fn wire_window_callbacks<
         st.set_theme(theme);
         apply_theme(&win, theme);
         win.set_active_theme_index(idx);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_player_bar_mode_selected(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        let mode = mode_from_index(idx);
+        st.set_player_bar_mode(mode);
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_player_bar_option_toggled(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.toggle_player_bar_option(idx);
+        sync_window(&win, &mut st);
     });
 
     let s = Rc::clone(&state_rc);

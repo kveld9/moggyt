@@ -80,7 +80,27 @@ The library view manages account authentication, release update actions, and sav
 
 ## Persistent Player Bar
 
-The bottom player bar remains visible across all pages and provides continuous transport controls:
+The bottom player bar remains visible across all pages and provides continuous transport controls.
+
+### Bar Modes and Customization
+
+Users can customize the player bar appearance and element visibility under **Settings -> Player bar**:
+
+- **Presentation Modes**:
+  - `Classic`: Docked, full-width bar flush with the bottom edge of the window, separated by a thin 1px top border.
+  - `Floating`: Centered, rounded pill card floating above the bottom edge with a subtle drop shadow and a 960px width
+    cap.
+- **Customizable Toggles**:
+  - `Show artwork`: Toggles track album art thumbnail on the left. When hidden, the title and artist move flush left.
+  - `Show like button`: Toggles the favorite heart icon button next to track metadata.
+  - `Show shuffle button`: Toggles the shuffle order button in transport controls.
+  - `Show repeat button`: Toggles the repeat cycle button (Off, All, One) in transport controls.
+  - `Show skip 10s buttons`: Toggles the `-10s` and `+10s` jump chips next to the play/pause button (disabled by
+    default for a minimal bar layout).
+  - `Show queue button`: Toggles the queue button on the right displaying active queue count.
+  - `Show volume slider`: Toggles the speaker icon and volume slider on the right.
+
+### Transport and Playback Controls
 
 - **Track Info**: displays `title - artist` of the track under the cursor, or `Queue empty` when empty.
 - **Playback Controls**:

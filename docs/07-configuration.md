@@ -78,7 +78,15 @@ The configuration file uses JSON serialization with atomic replacement:
   "locale": "en",
   "volume": 100,
   "quality": "standard",
-  "keyboard_shortcuts": true
+  "keyboard_shortcuts": true,
+  "player_bar_mode": "classic",
+  "player_bar_show_artwork": true,
+  "player_bar_show_like": true,
+  "player_bar_show_shuffle": true,
+  "player_bar_show_repeat": true,
+  "player_bar_show_skip_seconds": false,
+  "player_bar_show_queue": true,
+  "player_bar_show_volume": true
 }
 ```
 
@@ -102,6 +110,17 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Keyboard Shortcuts (`keyboard_shortcuts`)**:
   - `true`: Global transport and playback shortcuts enabled (default).
   - `false`: Shortcuts disabled.
+- **Player Bar Mode (`player_bar_mode`)**:
+  - `"classic"`: Docked full-width bar flush with window bottom edge (default).
+  - `"floating"`: Rounded, centered card floating above the bottom edge capped at 960px.
+- **Player Bar Elements**:
+  - `player_bar_show_artwork` (boolean, default `true`): Whether cover artwork thumbnail is shown.
+  - `player_bar_show_like` (boolean, default `true`): Whether like/favorite heart button is shown.
+  - `player_bar_show_shuffle` (boolean, default `true`): Whether shuffle button is shown.
+  - `player_bar_show_repeat` (boolean, default `true`): Whether repeat cycle button is shown.
+  - `player_bar_show_skip_seconds` (boolean, default `false`): Whether `-10s` / `+10s` buttons are shown.
+  - `player_bar_show_queue` (boolean, default `true`): Whether queue button is shown.
+  - `player_bar_show_volume` (boolean, default `true`): Whether speaker icon and volume slider are shown.
 
 ### Fault Tolerance & Atomic Persistence
 

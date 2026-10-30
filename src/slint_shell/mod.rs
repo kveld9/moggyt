@@ -40,6 +40,7 @@ pub mod platform;
 pub mod playback;
 pub mod playback_control;
 pub mod playback_worker;
+pub mod player_bar;
 pub mod search;
 pub mod state;
 pub mod sync;
@@ -65,6 +66,7 @@ pub use playback_worker::{
     PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters, PlaybackWorkerCommand,
     execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
 };
+pub use player_bar::{PLAYER_BAR_OPTION_COUNT, PlayerBarPrefs, mode_from_index, mode_to_index};
 pub use search::{SearchState, TrackDisplayRow, canned_shelves, format_duration, shelf_tracks};
 pub use theme::{ThemeColors, apply_theme, palette_for, rgb_to_slint};
 

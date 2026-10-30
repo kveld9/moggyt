@@ -16,6 +16,7 @@ use crate::slint_shell::labels::sync_static_labels;
 use crate::slint_shell::playback::{
     format_position, format_track_duration, is_track_liked, progress_fraction, repeat_mode_to_int,
 };
+use crate::slint_shell::player_bar::mode_to_index;
 use crate::slint_shell::search::SearchRow;
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::theme::{apply_theme, theme_to_index};
@@ -56,6 +57,14 @@ pub(crate) fn sync_window<
     window.set_repeat_mode(repeat_mode_to_int(state.queue.repeat()));
     window.set_queue_count(state.queue.len() as i32);
     window.set_queue_button_text(format_queue_label(state.locale, state.queue.len()).into());
+    window.set_player_bar_mode(mode_to_index(state.player_bar.mode));
+    window.set_player_bar_show_artwork(state.player_bar.show_artwork);
+    window.set_player_bar_show_like(state.player_bar.show_like);
+    window.set_player_bar_show_shuffle(state.player_bar.show_shuffle);
+    window.set_player_bar_show_repeat(state.player_bar.show_repeat);
+    window.set_player_bar_show_skip_seconds(state.player_bar.show_skip_seconds);
+    window.set_player_bar_show_queue(state.player_bar.show_queue);
+    window.set_player_bar_show_volume(state.player_bar.show_volume);
     sync_static_labels(window, state.locale);
     let is_liked =
         state.queue.current().map(|t| is_track_liked(&state.liked_ids, &t.id)).unwrap_or(false);

@@ -23,4 +23,4 @@ pub use search::{
 };
 pub use segments::{InvalidSegment, SkipRanges, SkipSegment};
 pub use sleep_timer::{SleepTimer, TimerPreset};
-pub use theme::{DesignTokens, Palette, ThemeId};
+pub use theme::{DesignTokens, Palette, PlayerBarMode, ThemeId};

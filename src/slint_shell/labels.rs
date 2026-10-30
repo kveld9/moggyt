@@ -53,6 +53,16 @@ pub struct StaticLabels {
     pub update_status: &'static str,
     pub explore_loading: &'static str,
     pub explore_empty: &'static str,
+    pub section_player_bar: &'static str,
+    pub player_bar_classic: &'static str,
+    pub player_bar_floating: &'static str,
+    pub player_bar_artwork: &'static str,
+    pub player_bar_like: &'static str,
+    pub player_bar_shuffle: &'static str,
+    pub player_bar_repeat: &'static str,
+    pub player_bar_skip: &'static str,
+    pub player_bar_queue: &'static str,
+    pub player_bar_volume: &'static str,
 }
 
 impl StaticLabels {
@@ -107,6 +117,16 @@ impl StaticLabels {
             update_status: tr(locale, "Update status"),
             explore_loading: tr(locale, "Loading explore..."),
             explore_empty: tr(locale, "No sections found in Explore."),
+            section_player_bar: tr(locale, "Player bar"),
+            player_bar_classic: tr(locale, "Classic"),
+            player_bar_floating: tr(locale, "Floating"),
+            player_bar_artwork: tr(locale, "Show artwork"),
+            player_bar_like: tr(locale, "Show like button"),
+            player_bar_shuffle: tr(locale, "Show shuffle button"),
+            player_bar_repeat: tr(locale, "Show repeat button"),
+            player_bar_skip: tr(locale, "Show skip 10s buttons"),
+            player_bar_queue: tr(locale, "Show queue button"),
+            player_bar_volume: tr(locale, "Show volume slider"),
         }
     }
 
@@ -163,6 +183,16 @@ impl StaticLabels {
         window.set_update_status_label(self.update_status.into());
         window.set_explore_loading_text(self.explore_loading.into());
         window.set_explore_empty_text(self.explore_empty.into());
+        window.set_section_player_bar_label(self.section_player_bar.into());
+        window.set_player_bar_classic_label(self.player_bar_classic.into());
+        window.set_player_bar_floating_label(self.player_bar_floating.into());
+        window.set_player_bar_artwork_label(self.player_bar_artwork.into());
+        window.set_player_bar_like_label(self.player_bar_like.into());
+        window.set_player_bar_shuffle_label(self.player_bar_shuffle.into());
+        window.set_player_bar_repeat_label(self.player_bar_repeat.into());
+        window.set_player_bar_skip_label(self.player_bar_skip.into());
+        window.set_player_bar_queue_label(self.player_bar_queue.into());
+        window.set_player_bar_volume_label(self.player_bar_volume.into());
     }
 }
 
@@ -239,6 +269,16 @@ mod tests {
         assert_eq!(es.update_status, "Estado de actualización");
         assert_eq!(es.explore_loading, "Cargando exploracion...");
         assert_eq!(es.explore_empty, "No se encontraron secciones en Explorar.");
+        assert_eq!(es.section_player_bar, "Barra de reproducción");
+        assert_eq!(es.player_bar_classic, "Clásica");
+        assert_eq!(es.player_bar_floating, "Flotante");
+        assert_eq!(es.player_bar_artwork, "Mostrar portada");
+        assert_eq!(es.player_bar_like, "Mostrar botón Me gusta");
+        assert_eq!(es.player_bar_shuffle, "Mostrar botón Aleatorio");
+        assert_eq!(es.player_bar_repeat, "Mostrar botón Repetir");
+        assert_eq!(es.player_bar_skip, "Mostrar botones +/-10s");
+        assert_eq!(es.player_bar_queue, "Mostrar botón de cola");
+        assert_eq!(es.player_bar_volume, "Mostrar control de volumen");
 
         let en = StaticLabels::resolve(Locale::English);
         assert_eq!(en.nav_search, "Search");
@@ -286,5 +326,15 @@ mod tests {
         assert_eq!(en.update_status, "Update status");
         assert_eq!(en.explore_loading, "Loading explore...");
         assert_eq!(en.explore_empty, "No sections found in Explore.");
+        assert_eq!(en.section_player_bar, "Player bar");
+        assert_eq!(en.player_bar_classic, "Classic");
+        assert_eq!(en.player_bar_floating, "Floating");
+        assert_eq!(en.player_bar_artwork, "Show artwork");
+        assert_eq!(en.player_bar_like, "Show like button");
+        assert_eq!(en.player_bar_shuffle, "Show shuffle button");
+        assert_eq!(en.player_bar_repeat, "Show repeat button");
+        assert_eq!(en.player_bar_skip, "Show skip 10s buttons");
+        assert_eq!(en.player_bar_queue, "Show queue button");
+        assert_eq!(en.player_bar_volume, "Show volume slider");
     }
 }

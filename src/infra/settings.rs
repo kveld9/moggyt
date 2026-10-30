@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::audio::clamp_speed;
 use super::stream::AudioQuality;
-use crate::domain::ThemeId;
+use crate::domain::{PlayerBarMode, ThemeId};
 use crate::i18n::Locale;
 
 const fn default_true() -> bool {
@@ -64,6 +64,30 @@ pub struct Settings {
     /// Whether loudness normalization to -14 LUFS is enabled.
     #[serde(default = "default_false")]
     pub loudness_normalization: bool,
+    /// Presentation mode of the playback bar.
+    #[serde(default)]
+    pub player_bar_mode: PlayerBarMode,
+    /// Whether cover artwork thumbnail is shown in the player bar.
+    #[serde(default = "default_true")]
+    pub player_bar_show_artwork: bool,
+    /// Whether like button toggle is shown in the player bar.
+    #[serde(default = "default_true")]
+    pub player_bar_show_like: bool,
+    /// Whether shuffle button is shown in the player bar.
+    #[serde(default = "default_true")]
+    pub player_bar_show_shuffle: bool,
+    /// Whether repeat mode button is shown in the player bar.
+    #[serde(default = "default_true")]
+    pub player_bar_show_repeat: bool,
+    /// Whether skip 10s buttons are shown in the player bar.
+    #[serde(default = "default_false")]
+    pub player_bar_show_skip_seconds: bool,
+    /// Whether queue button is shown in the player bar.
+    #[serde(default = "default_true")]
+    pub player_bar_show_queue: bool,
+    /// Whether volume slider is shown in the player bar.
+    #[serde(default = "default_true")]
+    pub player_bar_show_volume: bool,
 }
 
 impl Default for Settings {
@@ -81,6 +105,14 @@ impl Default for Settings {
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
+            player_bar_mode: PlayerBarMode::Classic,
+            player_bar_show_artwork: true,
+            player_bar_show_like: true,
+            player_bar_show_shuffle: true,
+            player_bar_show_repeat: true,
+            player_bar_show_skip_seconds: false,
+            player_bar_show_queue: true,
+            player_bar_show_volume: true,
         }
     }
 }
@@ -100,6 +132,14 @@ impl Settings {
             hi_res_covers: false,
             skip_silence: false,
             loudness_normalization: false,
+            player_bar_mode: PlayerBarMode::Classic,
+            player_bar_show_artwork: true,
+            player_bar_show_like: true,
+            player_bar_show_shuffle: true,
+            player_bar_show_repeat: true,
+            player_bar_show_skip_seconds: false,
+            player_bar_show_queue: true,
+            player_bar_show_volume: true,
         }
     }
 }
@@ -230,6 +270,14 @@ mod tests {
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
+        assert_eq!(loaded.player_bar_mode, PlayerBarMode::Classic);
+        assert!(loaded.player_bar_show_artwork);
+        assert!(loaded.player_bar_show_like);
+        assert!(loaded.player_bar_show_shuffle);
+        assert!(loaded.player_bar_show_repeat);
+        assert!(!loaded.player_bar_show_skip_seconds);
+        assert!(loaded.player_bar_show_queue);
+        assert!(loaded.player_bar_show_volume);
         assert_eq!(loaded, Settings::default());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -275,6 +323,14 @@ mod tests {
             hi_res_covers: true,
             skip_silence: true,
             loudness_normalization: true,
+            player_bar_mode: PlayerBarMode::Floating,
+            player_bar_show_artwork: false,
+            player_bar_show_like: false,
+            player_bar_show_shuffle: false,
+            player_bar_show_repeat: false,
+            player_bar_show_skip_seconds: true,
+            player_bar_show_queue: false,
+            player_bar_show_volume: false,
         };
 
         store.save(&modified).expect("save should succeed");
@@ -302,6 +358,14 @@ mod tests {
         assert!(!fallback.hi_res_covers);
         assert!(!fallback.skip_silence);
         assert!(!fallback.loudness_normalization);
+        assert_eq!(fallback.player_bar_mode, PlayerBarMode::Classic);
+        assert!(fallback.player_bar_show_artwork);
+        assert!(fallback.player_bar_show_like);
+        assert!(fallback.player_bar_show_shuffle);
+        assert!(fallback.player_bar_show_repeat);
+        assert!(!fallback.player_bar_show_skip_seconds);
+        assert!(fallback.player_bar_show_queue);
+        assert!(fallback.player_bar_show_volume);
     }
 
     #[test]
@@ -319,7 +383,48 @@ mod tests {
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
+        assert_eq!(loaded.player_bar_mode, PlayerBarMode::Classic);
+        assert!(loaded.player_bar_show_artwork);
+        assert!(loaded.player_bar_show_like);
+        assert!(loaded.player_bar_show_shuffle);
+        assert!(loaded.player_bar_show_repeat);
+        assert!(!loaded.player_bar_show_skip_seconds);
+        assert!(loaded.player_bar_show_queue);
+        assert!(loaded.player_bar_show_volume);
         assert_eq!(loaded, Settings::default());
+    }
+
+    #[test]
+    fn test_player_bar_settings_serde_defaults_and_explicit_deserialization() {
+        let empty: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(empty.player_bar_mode, PlayerBarMode::Classic);
+        assert!(empty.player_bar_show_artwork);
+        assert!(empty.player_bar_show_like);
+        assert!(empty.player_bar_show_shuffle);
+        assert!(empty.player_bar_show_repeat);
+        assert!(!empty.player_bar_show_skip_seconds);
+        assert!(empty.player_bar_show_queue);
+        assert!(empty.player_bar_show_volume);
+
+        let explicit_json = r#"{
+            "player_bar_mode": "floating",
+            "player_bar_show_artwork": false,
+            "player_bar_show_like": false,
+            "player_bar_show_shuffle": false,
+            "player_bar_show_repeat": false,
+            "player_bar_show_skip_seconds": true,
+            "player_bar_show_queue": false,
+            "player_bar_show_volume": false
+        }"#;
+        let explicit: Settings = serde_json::from_str(explicit_json).expect("deserialize explicit");
+        assert_eq!(explicit.player_bar_mode, PlayerBarMode::Floating);
+        assert!(!explicit.player_bar_show_artwork);
+        assert!(!explicit.player_bar_show_like);
+        assert!(!explicit.player_bar_show_shuffle);
+        assert!(!explicit.player_bar_show_repeat);
+        assert!(explicit.player_bar_show_skip_seconds);
+        assert!(!explicit.player_bar_show_queue);
+        assert!(!explicit.player_bar_show_volume);
     }
 
     #[test]
@@ -345,6 +450,14 @@ mod tests {
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
+        assert_eq!(loaded.player_bar_mode, PlayerBarMode::Classic);
+        assert!(loaded.player_bar_show_artwork);
+        assert!(loaded.player_bar_show_like);
+        assert!(loaded.player_bar_show_shuffle);
+        assert!(loaded.player_bar_show_repeat);
+        assert!(!loaded.player_bar_show_skip_seconds);
+        assert!(loaded.player_bar_show_queue);
+        assert!(loaded.player_bar_show_volume);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

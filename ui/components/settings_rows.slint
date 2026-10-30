@@ -1,0 +1,75 @@
+import { Theme } from "../theme.slint";
+
+export component SettingsModeButton inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> is-active: false;
+    callback clicked();
+
+    height: 40px;
+    horizontal-stretch: 1;
+    border-radius: 8px;
+    background: root.is-active ? Theme.accent : (touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : Theme.surface));
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+
+        Text {
+            text: root.label;
+            color: root.is-active ? Theme.window : Theme.text;
+            font-size: 13px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component SettingsToggleRow inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> checked: false;
+    callback toggled();
+
+    height: 44px;
+
+    TouchArea {
+        clicked => { root.toggled(); }
+    }
+
+    HorizontalLayout {
+        alignment: space-between;
+
+        Text {
+            text: root.label;
+            color: Theme.text;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+
+        VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 38px;
+                height: 20px;
+                border-radius: 10px;
+                background: root.checked ? Theme.accent : Theme.surface;
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                Rectangle {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 8px;
+                    background: root.checked ? Theme.window : Theme.secondary;
+                    y: 2px;
+                    x: root.checked ? 20px : 2px;
+                    animate x { duration: 150ms; easing: ease-in-out; }
+                }
+            }
+        }
+    }
+}

@@ -1,5 +1,6 @@
 import { Theme } from "../theme.slint";
 import { StyledInputField } from "../components/controls.slint";
+import { SettingsModeButton, SettingsToggleRow } from "../components/settings_rows.slint";
 
 export component SettingsView inherits VerticalLayout {
     in property <int> active-theme-index: 0;
@@ -25,10 +26,32 @@ export component SettingsView inherits VerticalLayout {
     in property <string> app-version-label: "App version";
     in property <string> update-status-label: "Update status";
 
+    in property <int> player-bar-mode: 0;
+    in property <bool> player-bar-show-artwork: true;
+    in property <bool> player-bar-show-like: true;
+    in property <bool> player-bar-show-shuffle: true;
+    in property <bool> player-bar-show-repeat: true;
+    in property <bool> player-bar-show-skip-seconds: false;
+    in property <bool> player-bar-show-queue: true;
+    in property <bool> player-bar-show-volume: true;
+
+    in property <string> section-player-bar-label: "Player bar";
+    in property <string> player-bar-classic-label: "Classic";
+    in property <string> player-bar-floating-label: "Floating";
+    in property <string> player-bar-artwork-label: "Show artwork";
+    in property <string> player-bar-like-label: "Show like button";
+    in property <string> player-bar-shuffle-label: "Show shuffle button";
+    in property <string> player-bar-repeat-label: "Show repeat button";
+    in property <string> player-bar-skip-label: "Show skip 10s buttons";
+    in property <string> player-bar-queue-label: "Show queue button";
+    in property <string> player-bar-volume-label: "Show volume slider";
+
     callback theme-selected(int);
     callback cycle-playback-speed();
     callback sign-in-submitted(string);
     callback sign-out();
+    callback player-bar-mode-selected(int);
+    callback player-bar-option-toggled(int);
 
     spacing: 20px;
     alignment: start;
@@ -47,84 +70,107 @@ export component SettingsView inherits VerticalLayout {
         HorizontalLayout {
             spacing: 12px;
 
-            Rectangle {
-                height: 40px;
-                horizontal-stretch: 1;
-                border-radius: 8px;
-                background: root.active-theme-index == 0 ? Theme.accent : (th0-touch.pressed ? Theme.overlay : (th0-touch.has-hover ? Theme.hover : Theme.surface));
-                animate background { duration: 150ms; easing: ease-in-out; }
-
-                th0-touch := TouchArea {
-                    clicked => { root.theme-selected(0); }
-                }
-
-                HorizontalLayout {
-                    alignment: center;
-
-                    Text {
-                        text: root.theme-white-label;
-                        color: root.active-theme-index == 0 ? Theme.window : Theme.text;
-                        font-size: 13px;
-                        font-weight: 600;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
+            SettingsModeButton {
+                label: root.theme-white-label;
+                is-active: root.active-theme-index == 0;
+                clicked => { root.theme-selected(0); }
             }
 
-            Rectangle {
-                height: 40px;
-                horizontal-stretch: 1;
-                border-radius: 8px;
-                background: root.active-theme-index == 1 ? Theme.accent : (th1-touch.pressed ? Theme.overlay : (th1-touch.has-hover ? Theme.hover : Theme.surface));
-                animate background { duration: 150ms; easing: ease-in-out; }
-
-                th1-touch := TouchArea {
-                    clicked => { root.theme-selected(1); }
-                }
-
-                HorizontalLayout {
-                    alignment: center;
-
-                    Text {
-                        text: root.theme-black-oled-label;
-                        color: root.active-theme-index == 1 ? Theme.window : Theme.text;
-                        font-size: 13px;
-                        font-weight: 600;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
+            SettingsModeButton {
+                label: root.theme-black-oled-label;
+                is-active: root.active-theme-index == 1;
+                clicked => { root.theme-selected(1); }
             }
 
-            Rectangle {
-                height: 40px;
-                horizontal-stretch: 1;
-                border-radius: 8px;
-                background: root.active-theme-index == 2 ? Theme.accent : (th2-touch.pressed ? Theme.overlay : (th2-touch.has-hover ? Theme.hover : Theme.surface));
-                animate background { duration: 150ms; easing: ease-in-out; }
+            SettingsModeButton {
+                label: root.theme-mono-label;
+                is-active: root.active-theme-index == 2;
+                clicked => { root.theme-selected(2); }
+            }
+        }
+    }
 
-                th2-touch := TouchArea {
-                    clicked => { root.theme-selected(2); }
-                }
+    // Section (b): Player bar
+    VerticalLayout {
+        spacing: 10px;
+
+        Text {
+            text: root.section-player-bar-label;
+            color: Theme.text;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        Rectangle {
+            border-radius: 8px;
+            background: Theme.panel;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 12px;
 
                 HorizontalLayout {
-                    alignment: center;
+                    spacing: 12px;
 
-                    Text {
-                        text: root.theme-mono-label;
-                        color: root.active-theme-index == 2 ? Theme.window : Theme.text;
-                        font-size: 13px;
-                        font-weight: 600;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+                    SettingsModeButton {
+                        label: root.player-bar-classic-label;
+                        is-active: root.player-bar-mode == 0;
+                        clicked => { root.player-bar-mode-selected(0); }
                     }
+
+                    SettingsModeButton {
+                        label: root.player-bar-floating-label;
+                        is-active: root.player-bar-mode == 1;
+                        clicked => { root.player-bar-mode-selected(1); }
+                    }
+                }
+
+                SettingsToggleRow {
+                    label: root.player-bar-artwork-label;
+                    checked: root.player-bar-show-artwork;
+                    toggled => { root.player-bar-option-toggled(0); }
+                }
+
+                SettingsToggleRow {
+                    label: root.player-bar-like-label;
+                    checked: root.player-bar-show-like;
+                    toggled => { root.player-bar-option-toggled(1); }
+                }
+
+                SettingsToggleRow {
+                    label: root.player-bar-shuffle-label;
+                    checked: root.player-bar-show-shuffle;
+                    toggled => { root.player-bar-option-toggled(2); }
+                }
+
+                SettingsToggleRow {
+                    label: root.player-bar-repeat-label;
+                    checked: root.player-bar-show-repeat;
+                    toggled => { root.player-bar-option-toggled(3); }
+                }
+
+                SettingsToggleRow {
+                    label: root.player-bar-skip-label;
+                    checked: root.player-bar-show-skip-seconds;
+                    toggled => { root.player-bar-option-toggled(4); }
+                }
+
+                SettingsToggleRow {
+                    label: root.player-bar-queue-label;
+                    checked: root.player-bar-show-queue;
+                    toggled => { root.player-bar-option-toggled(5); }
+                }
+
+                SettingsToggleRow {
+                    label: root.player-bar-volume-label;
+                    checked: root.player-bar-show-volume;
+                    toggled => { root.player-bar-option-toggled(6); }
                 }
             }
         }
     }
 
-    // Section (b): Playback
+    // Section (c): Playback
     VerticalLayout {
         spacing: 10px;
 
@@ -174,7 +220,7 @@ export component SettingsView inherits VerticalLayout {
         }
     }
 
-    // Section (c): Session
+    // Section (d): Session
     VerticalLayout {
         spacing: 10px;
 
@@ -271,7 +317,7 @@ export component SettingsView inherits VerticalLayout {
         }
     }
 
-    // Section (d): About
+    // Section (e): About
     VerticalLayout {
         spacing: 10px;
 
