@@ -129,37 +129,6 @@ impl Shelf {
     }
 }
 
-/// Paginated container for catalog query results.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SearchPage<T> {
-    pub items: Vec<T>,
-    pub total: usize,
-    pub offset: usize,
-    pub limit: usize,
-}
-
-impl<T> SearchPage<T> {
-    pub fn new(items: Vec<T>, total: usize, offset: usize, limit: usize) -> Self {
-        Self { items, total, offset, limit }
-    }
-
-    pub fn page_items(&self) -> &[T] {
-        &self.items
-    }
-
-    pub fn has_more(&self) -> bool {
-        self.offset.saturating_add(self.items.len()) < self.total
-    }
-}
-
-/// Filters search results by the selected category.
-pub fn apply_filter(items: &[SearchResult], filter: SearchFilter) -> Vec<SearchResult> {
-    if filter == SearchFilter::All {
-        return items.to_vec();
-    }
-    items.iter().filter(|item| item.kind() == filter).cloned().collect()
-}
-
 /// Category of detail container view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DetailKind {
@@ -270,53 +239,6 @@ mod tests {
         shelf.items.push(SearchResult::Artist(Artist::new("ar1", "Artist 1", None)));
         assert!(!shelf.is_empty());
         assert_eq!(shelf.len(), 1);
-    }
-
-    #[test]
-    fn apply_filter_cases() {
-        let items = vec![
-            SearchResult::Track(Track::new("t1", "T1", "A1")),
-            SearchResult::Album(Album::new("a1", "A1", "A1", None)),
-            SearchResult::Artist(Artist::new("ar1", "A1", None)),
-            SearchResult::Playlist(Playlist::new("p1", "P1", 5, None)),
-        ];
-
-        let cases = [
-            (SearchFilter::All, 4),
-            (SearchFilter::Tracks, 1),
-            (SearchFilter::Albums, 1),
-            (SearchFilter::Artists, 1),
-            (SearchFilter::Playlists, 1),
-        ];
-
-        for (filter, expected_count) in cases {
-            let filtered = apply_filter(&items, filter);
-            assert_eq!(filtered.len(), expected_count);
-            if filter != SearchFilter::All {
-                assert!(filtered.iter().all(|item| item.kind() == filter));
-            }
-        }
-
-        assert!(apply_filter(&[], SearchFilter::All).is_empty());
-        assert!(apply_filter(&[], SearchFilter::Tracks).is_empty());
-    }
-
-    #[test]
-    fn search_page_has_more_edges() {
-        let cases = [
-            (10, 10, 0, false),
-            (5, 10, 0, true),
-            (5, 10, 5, false),
-            (0, 0, 0, false),
-            (0, 10, 12, false),
-        ];
-
-        for (len, total, offset, expected_has_more) in cases {
-            let items = vec![0; len];
-            let page = SearchPage::new(items, total, offset, 10);
-            assert_eq!(page.page_items().len(), len);
-            assert_eq!(page.has_more(), expected_has_more);
-        }
     }
 
     #[test]

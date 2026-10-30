@@ -1,4 +1,4 @@
-//! Theme domain models: ThemeId, Palette, and DesignTokens.
+//! Theme domain models: ThemeId and Palette.
 //!
 //! Invariant: this module performs no I/O and contains no egui/rendering types.
 //! Color palette data uses plain [u8; 3] RGB values.
@@ -126,85 +126,6 @@ impl Palette {
     }
 }
 
-/// Design tokens defining spatial scale, corner radii, typography sizes, and focus strokes.
-///
-/// Multiples of 4 for spacing scale and corner radii; perceptual type scale with uniform discipline.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct DesignTokens {
-    pub space_xxs: f32,
-    pub space_xs: f32,
-    pub space_sm: f32,
-    pub space_md: f32,
-    pub space_lg: f32,
-    pub space_xl: f32,
-
-    pub radius_none: f32,
-    pub radius_sm: f32,
-    pub radius_md: f32,
-    pub radius_lg: f32,
-    pub radius_xl: f32,
-
-    pub font_caption: f32,
-    pub font_body: f32,
-    pub font_title_sm: f32,
-    pub font_title_lg: f32,
-    pub font_display: f32,
-
-    pub focus_ring_width: f32,
-}
-
-impl DesignTokens {
-    pub const SPACE_XXS: f32 = 4.0;
-    pub const SPACE_XS: f32 = 8.0;
-    pub const SPACE_SM: f32 = 12.0;
-    pub const SPACE_MD: f32 = 16.0;
-    pub const SPACE_LG: f32 = 24.0;
-    pub const SPACE_XL: f32 = 32.0;
-
-    pub const RADIUS_NONE: f32 = 0.0;
-    pub const RADIUS_SM: f32 = 4.0;
-    pub const RADIUS_MD: f32 = 8.0;
-    pub const RADIUS_LG: f32 = 12.0;
-    pub const RADIUS_XL: f32 = 16.0;
-
-    pub const FONT_CAPTION: f32 = 12.0;
-    pub const FONT_BODY: f32 = 14.0;
-    pub const FONT_TITLE_SM: f32 = 16.0;
-    pub const FONT_TITLE_LG: f32 = 20.0;
-    pub const FONT_DISPLAY: f32 = 28.0;
-
-    pub const FOCUS_RING_WIDTH: f32 = 2.0;
-
-    /// Standard desktop design tokens instance.
-    pub const fn desktop() -> Self {
-        Self {
-            space_xxs: Self::SPACE_XXS,
-            space_xs: Self::SPACE_XS,
-            space_sm: Self::SPACE_SM,
-            space_md: Self::SPACE_MD,
-            space_lg: Self::SPACE_LG,
-            space_xl: Self::SPACE_XL,
-            radius_none: Self::RADIUS_NONE,
-            radius_sm: Self::RADIUS_SM,
-            radius_md: Self::RADIUS_MD,
-            radius_lg: Self::RADIUS_LG,
-            radius_xl: Self::RADIUS_XL,
-            font_caption: Self::FONT_CAPTION,
-            font_body: Self::FONT_BODY,
-            font_title_sm: Self::FONT_TITLE_SM,
-            font_title_lg: Self::FONT_TITLE_LG,
-            font_display: Self::FONT_DISPLAY,
-            focus_ring_width: Self::FOCUS_RING_WIDTH,
-        }
-    }
-}
-
-impl Default for DesignTokens {
-    fn default() -> Self {
-        Self::desktop()
-    }
-}
-
 impl ThemeId {
     /// Returns the color palette definition for this theme.
     pub fn palette(&self) -> Palette {
@@ -213,11 +134,6 @@ impl ThemeId {
             Self::BlackOled => Palette::black_oled(),
             Self::Mono => Palette::mono(),
         }
-    }
-
-    /// Returns the design tokens definition for this theme.
-    pub fn tokens(&self) -> DesignTokens {
-        DesignTokens::desktop()
     }
 }
 
@@ -305,54 +221,6 @@ mod tests {
             assert_ne!(palette.border, palette.overlay);
             assert_ne!(palette.hover, palette.overlay);
         }
-    }
-
-    #[test]
-    fn test_given_design_tokens_desktop_when_read_then_values_match_multiples_of_four_and_type_scale()
-     {
-        let tokens = DesignTokens::desktop();
-        assert_eq!(tokens, DesignTokens::default());
-        assert_eq!(tokens, ThemeId::White.tokens());
-
-        // Spacing multiples of 4
-        assert_eq!(tokens.space_xxs, 4.0);
-        assert_eq!(tokens.space_xs, 8.0);
-        assert_eq!(tokens.space_sm, 12.0);
-        assert_eq!(tokens.space_md, 16.0);
-        assert_eq!(tokens.space_lg, 24.0);
-        assert_eq!(tokens.space_xl, 32.0);
-
-        // Corner radii
-        assert_eq!(tokens.radius_none, 0.0);
-        assert_eq!(tokens.radius_sm, 4.0);
-        assert_eq!(tokens.radius_md, 8.0);
-        assert_eq!(tokens.radius_lg, 12.0);
-        assert_eq!(tokens.radius_xl, 16.0);
-
-        // Typography scale
-        assert_eq!(tokens.font_caption, 12.0);
-        assert_eq!(tokens.font_body, 14.0);
-        assert_eq!(tokens.font_title_sm, 16.0);
-        assert_eq!(tokens.font_title_lg, 20.0);
-        assert_eq!(tokens.font_display, 28.0);
-
-        // Focus ring width
-        assert_eq!(tokens.focus_ring_width, 2.0);
-    }
-
-    #[test]
-    fn test_given_palette_and_design_tokens_when_serde_round_trip_then_preserves_equality() {
-        let palette = ThemeId::White.palette();
-        let serialized_palette = serde_json::to_string(&palette).expect("palette serialization");
-        let deserialized_palette: Palette =
-            serde_json::from_str(&serialized_palette).expect("palette deserialization");
-        assert_eq!(palette, deserialized_palette);
-
-        let tokens = DesignTokens::desktop();
-        let serialized_tokens = serde_json::to_string(&tokens).expect("tokens serialization");
-        let deserialized_tokens: DesignTokens =
-            serde_json::from_str(&serialized_tokens).expect("tokens deserialization");
-        assert_eq!(tokens, deserialized_tokens);
     }
 
     #[test]
