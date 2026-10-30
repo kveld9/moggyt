@@ -9,8 +9,8 @@ use std::sync::{Arc, Mutex};
 use slint::ComponentHandle;
 
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, LyricOverrideDir, LyricsSource, MetaStore, QueueStore,
-    Scrobbler, SessionStore, Settings, SettingsStore, SingleInstanceGuard, SkipStore, TrayHandle,
+    AudioBackend, Catalog, CoverCache, LyricOverrideDir, LyricsSource, QueueStore, Scrobbler,
+    SessionStore, Settings, SettingsStore, SingleInstanceGuard, SkipStore, TrayHandle,
 };
 
 pub use crate::slint_shell::covers::{
@@ -44,7 +44,6 @@ pub struct AppDependencies<C, A, S, L, K> {
     pub settings_store: Box<dyn SettingsStore>,
     pub queue_store: Box<dyn QueueStore>,
     pub skip_store: Box<dyn SkipStore>,
-    pub meta_store: Box<dyn MetaStore>,
     pub scrobbler: Box<dyn Scrobbler>,
     pub secondary_scrobbler: Option<Box<dyn Scrobbler>>,
     pub lyric_overrides: Option<LyricOverrideDir>,
@@ -77,7 +76,6 @@ where
         settings_store,
         queue_store,
         skip_store,
-        meta_store,
         scrobbler,
         secondary_scrobbler,
         lyric_overrides,
@@ -112,7 +110,6 @@ where
     state.queue_store = queue_store;
 
     state.skip_store = skip_store;
-    state.meta_store = meta_store;
 
     state.scrobbler = Arc::new(Mutex::new(scrobbler));
     state.secondary_scrobbler = secondary_scrobbler.map(|s| Arc::new(Mutex::new(s)));

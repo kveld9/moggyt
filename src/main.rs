@@ -6,9 +6,9 @@
 //! in [`moggyt::infra`].
 
 use moggyt::infra::{
-    DiskMetaStore, DiskQueueStore, DiskSettingsStore, DiskSkipStore, KeyringSessionStore,
-    LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir, Scrobbler, SettingsStore,
-    SingleInstanceGuard, TrayHandle, default_config_dir,
+    DiskQueueStore, DiskSettingsStore, DiskSkipStore, KeyringSessionStore, LastFmClient,
+    LiveCatalog, LrclibClient, LyricOverrideDir, Scrobbler, SettingsStore, SingleInstanceGuard,
+    TrayHandle, default_config_dir,
 };
 use moggyt::slint_shell::app::AppDependencies;
 use moggyt::slint_shell::init::{
@@ -59,8 +59,7 @@ fn main() -> anyhow::Result<()> {
     let tray = init_tray();
 
     let queue_store = DiskQueueStore::new(config_dir.clone());
-    let skip_store = DiskSkipStore::new(config_dir.clone());
-    let meta_store = DiskMetaStore::new(config_dir);
+    let skip_store = DiskSkipStore::new(config_dir);
 
     let scrobbler = init_lastfm_scrobbler(settings.lastfm_enabled);
     tracing::debug!("last.fm scrobbler live: {}", scrobbler.is_live());
@@ -80,7 +79,6 @@ fn main() -> anyhow::Result<()> {
         settings_store: Box::new(settings_store),
         queue_store: Box::new(queue_store),
         skip_store: Box::new(skip_store),
-        meta_store: Box::new(meta_store),
         scrobbler: Box::new(scrobbler),
         secondary_scrobbler: secondary_scrobbler.map(|c| Box::new(c) as Box<dyn Scrobbler>),
         lyric_overrides,
