@@ -98,9 +98,8 @@ jobs:
       - name: Lint with Clippy (all features)
         run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
-      - name: Report cognitive complexity (advisory, non-blocking)
-        continue-on-error: true
-        run: cargo clippy --locked --all-targets --all-features -- -W clippy::cognitive_complexity
+      - name: Check cognitive complexity (production targets)
+        run: cargo clippy --locked --lib --bins --all-features -- -D clippy::cognitive_complexity
 
       - name: Run tests
         run: cargo test --locked --all-features

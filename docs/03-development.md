@@ -35,9 +35,24 @@ Enforced automatically by `./scripts/check-repo.sh`:
 ## Complexity limits
 
 Functions target cognitive complexity CC <= 5 (hard limit 10), using guard clauses first.
-CI runs an advisory step (`cargo clippy --locked --all-targets --all-features -- -W clippy::cognitive_complexity`)
-that reports annotations without failing the build (`continue-on-error: true`) because legacy hotspots exist.
-The plan is to switch this gate to deny once existing hotspots are refactored.
+The blocking CI gate runs on production targets only:
+
+```bash
+cargo clippy --locked --lib --bins --all-features -- -D clippy::cognitive_complexity
+```
+
+Test modules are exempt because `--lib --bins` excludes test harnesses; test suites are assertion tables
+rather than application logic.
+
+Clippy's `cognitive_complexity` counts control flow expanded from macros (notably `tracing`), so functions
+whose count is an expansion artifact carry an explicit `#[allow(clippy::cognitive_complexity)]` with a NOTE
+recording the real branch count. Upstream references:
+
+- rust-clippy#14417: <https://github.com/rust-lang/rust-clippy/issues/14417>
+- rust-clippy#7905: <https://github.com/rust-lang/rust-clippy/issues/7905>
+- tokio-rs/tracing#553: <https://github.com/tokio-rs/tracing/issues/553>
+
+Rule for new code: refactor first, annotate only when the count is provably an expansion artifact.
 
 ## Branches and commits
 
