@@ -88,12 +88,34 @@ pub(crate) fn load_explore_async<
     });
 }
 
+/// Re-dispatches explore cover fetches when Explore is re-entered with shelves already
+/// loaded. Idempotent: `request_explore_covers` only dispatches URLs missing from the
+/// UI cover cache. Returns false when there is nothing to refresh.
+pub(crate) fn refresh_explore_covers_if_loaded<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    st: &SlintAppState<C, A, S, L, K>,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) -> bool {
+    if !st.explore_loaded || st.explore_shelves.is_empty() {
+        return false;
+    }
+    request_explore_covers(st, tx);
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::domain::{Album, Track};
     use crate::infra::CatalogStub;
     use crate::slint_shell::page::SlintPage;
+    use crate::slint_shell::playback_worker::thumbnail_variant_for_row;
+    use crate::slint_shell::search::SearchRow;
     use crate::slint_shell::test_support::test_wired;
 
     #[test]
@@ -147,5 +169,53 @@ mod tests {
             Some(&SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", None)))
         );
         assert_eq!(explore_item_at(&shelves, 3), None);
+    }
+
+    #[test]
+    fn test_refresh_explore_covers_if_loaded_behavior() {
+        let mut state = test_wired();
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        // 1. Returns false and dispatches nothing when explore_loaded is false.
+        assert!(!state.explore_loaded);
+        assert!(!refresh_explore_covers_if_loaded(&state, &tx));
+        assert!(rx.try_recv().is_err());
+
+        // 2. Returns true and dispatches exactly two FetchCover commands when loaded with 2 artwork items.
+        let url1 = "https://lh3.googleusercontent.com/track-large";
+        let url2 = "https://lh3.googleusercontent.com/album-large";
+        let item1 = SearchResult::Track(Track::new("t1", "Track 1", "Artist 1").with_artwork(url1));
+        let item2 =
+            SearchResult::Album(Album::new("a1", "Album 1", "Artist 1", Some(url2.to_string())));
+        let expected_url1 =
+            thumbnail_variant_for_row(SearchRow::from(&item1).artwork_url.as_deref().unwrap());
+        let expected_url2 =
+            thumbnail_variant_for_row(SearchRow::from(&item2).artwork_url.as_deref().unwrap());
+
+        state.explore_loaded = true;
+        state.explore_generation = 42;
+        state.explore_shelves = vec![
+            Shelf { title: "Shelf 1".to_string(), items: vec![item1] },
+            Shelf { title: "Shelf 2".to_string(), items: vec![item2] },
+        ];
+
+        assert!(refresh_explore_covers_if_loaded(&state, &tx));
+
+        let mut received = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, generation } = cmd {
+                received.push((url, generation));
+            }
+        }
+        assert_eq!(received.len(), 2);
+        assert_eq!(received[0], (expected_url1.clone(), 42));
+        assert_eq!(received[1], (expected_url2.clone(), 42));
+
+        // 3. Returns true but dispatches no command when both thumbnails are already in search_covers.
+        state.search_covers.insert(expected_url1, slint::Image::default());
+        state.search_covers.insert(expected_url2, slint::Image::default());
+
+        assert!(refresh_explore_covers_if_loaded(&state, &tx));
+        assert!(rx.try_recv().is_err());
     }
 }

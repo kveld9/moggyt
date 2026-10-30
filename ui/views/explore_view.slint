@@ -1,8 +1,43 @@
-import { Theme, ShelfData } from "../theme.slint";
-import { TrackRow } from "../components/rows.slint";
+import { Theme, ExploreCardData, ExploreShelfData } from "../theme.slint";
+import { MediaCard } from "../components/cards.slint";
+
+component ShelfCarousel inherits VerticalLayout {
+    in property <string> shelf-title;
+    in property <[ExploreCardData]> cards;
+    callback card-clicked(int);
+
+    spacing: 8px;
+    alignment: start;
+
+    if root.shelf-title != "" : Text {
+        text: root.shelf-title;
+        color: Theme.text;
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    Flickable {
+        height: 202px;
+        viewport-width: root.cards.length * 168px;
+        viewport-height: 202px;
+
+        HorizontalLayout {
+            spacing: 12px;
+            alignment: start;
+
+            for card in root.cards : MediaCard {
+                title: card.title;
+                subtitle: card.subtitle;
+                has-cover: card.has_cover;
+                cover: card.cover;
+                clicked => { root.card-clicked(card.index); }
+            }
+        }
+    }
+}
 
 export component ExploreView inherits VerticalLayout {
-    in property <[ShelfData]> shelves: [];
+    in property <[ExploreShelfData]> shelves: [];
     in property <bool> is-loading: false;
     in property <string> loading-text: "Loading explore...";
     in property <string> empty-text: "No sections found in Explore.";
@@ -35,27 +70,9 @@ export component ExploreView inherits VerticalLayout {
         }
     }
 
-    for shelf in root.shelves : VerticalLayout {
-        spacing: 8px;
-        alignment: start;
-
-        Text {
-            text: shelf.title;
-            color: Theme.text;
-            font-size: 18px;
-            font-weight: 700;
-        }
-
-        for track in shelf.tracks : TrackRow {
-            title: track.title;
-            artist: track.artist;
-            album: track.album;
-            duration: track.duration;
-            kind: track.kind;
-            cover: track.cover;
-            clicked => {
-                root.track-selected(track.index);
-            }
-        }
+    for shelf in root.shelves : ShelfCarousel {
+        shelf-title: shelf.title;
+        cards: shelf.cards;
+        card-clicked(idx) => { root.track-selected(idx); }
     }
 }

@@ -1,4 +1,11 @@
-import { Theme, ShelfData, TrackRowData, LyricLineData, LibraryItemData } from "../theme.slint";
+import {
+    Theme,
+    ShelfData,
+    TrackRowData,
+    LyricLineData,
+    LibraryItemData,
+    ExploreShelfData,
+} from "../theme.slint";
 import { IconBack, IconSettings } from "../icons.slint";
 import { SearchView } from "./search_view.slint";
 import { ExploreView } from "./explore_view.slint";
@@ -39,7 +46,7 @@ export component ContentArea inherits Rectangle {
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Up to date";
-    in property <[ShelfData]> explore-shelves: [];
+    in property <[ExploreShelfData]> explore-shelves: [];
     in property <bool> explore-loading: false;
     in property <string> search-placeholder: "Search songs...";
     in property <string> search-button-label: "Search";
