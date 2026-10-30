@@ -101,6 +101,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Artists", "Artistas"),
     ("Black OLED", "Negro OLED"),
     ("Classic", "Clásica"),
+    ("Clear history", "Borrar todo el historial"),
     ("Detail", "Detalle"),
     ("English", "Inglés"),
     ("Explore", "Explorar"),
@@ -117,6 +118,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No cover", "Sin portada"),
     ("No details available.", "No hay detalles disponibles."),
     ("No playlists found.", "No hay listas de reproducción."),
+    ("No recent searches.", "Aún no hay búsquedas recientes."),
     ("No results found.", "No se encontraron resultados."),
     ("No sections found in Explore.", "No se encontraron secciones en Explorar."),
     ("No songs available.", "No hay canciones disponibles."),
@@ -132,6 +134,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Playlists", "Listas de reproducción"),
     ("Queue", "Cola"),
     ("Queue ({count})", "Cola ({count})"),
+    ("Recent searches", "Búsquedas recientes"),
     ("Search", "Buscar"),
     ("Search Results", "Resultados de búsqueda"),
     ("Search songs...", "Buscar canciones..."),
@@ -209,6 +212,9 @@ mod tests {
         // Sentinels
         assert_eq!(tr(Locale::Spanish, "No track playing"), "Sin reproducción");
         assert_eq!(tr(Locale::Spanish, "Search Results"), "Resultados de búsqueda");
+        assert_eq!(tr(Locale::Spanish, "Recent searches"), "Búsquedas recientes");
+        assert_eq!(tr(Locale::Spanish, "No recent searches."), "Aún no hay búsquedas recientes.");
+        assert_eq!(tr(Locale::Spanish, "Clear history"), "Borrar todo el historial");
         assert_eq!(
             tr(Locale::Spanish, "No sections found in Explore."),
             "No se encontraron secciones en Explorar."

@@ -25,7 +25,8 @@ use crate::slint_shell::player_bar::mode_from_index;
 use crate::slint_shell::search::iter_shelf_items;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{
-    explore_columns_for_width, sync_explore_shelves, sync_shelves_and_queue, sync_window,
+    explore_columns_for_width, persist_recent_searches, sync_explore_shelves, sync_recent_searches,
+    sync_shelves_and_queue, sync_window,
 };
 use crate::slint_shell::theme::{apply_theme, theme_from_index};
 use crate::slint_shell::window::{
@@ -152,6 +153,35 @@ pub(crate) fn wire_window_callbacks<
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         submit_search_async(&win, &mut st, q.as_str(), &tx);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
+    window.on_recent_search_selected(move |q| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        submit_search_async(&win, &mut st, q.as_str(), &tx);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_recent_search_removed(move |q| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.recent_searches.remove(q.as_str());
+        persist_recent_searches(&st);
+        sync_recent_searches(&win, &st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_recent_searches_cleared(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.recent_searches.clear();
+        persist_recent_searches(&st);
+        sync_recent_searches(&win, &st);
     });
 
     let s = Rc::clone(&state_rc);

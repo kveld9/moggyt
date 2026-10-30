@@ -15,13 +15,18 @@ The interface consists of three primary regions:
 
 ### Search Page
 
-The search view presents curated home shelves and accepts queries for tracks, artists, and albums:
+The search view accepts queries for tracks, artists, and albums, and maintains a persistent recent-search history:
 
-- **Home Shelves**: displays categorized carousels (albums, artists, playlists) loaded lazily on open. Click `Refresh`
-  to clear the cache and refetch home shelves from the catalog. Click `Open` to view full container tracklistings.
-- Type your search terms into the single-line input field.
-- Press `Enter` or click the `Search` button.
-- Catalog hits are queried through the catalog adapter and the top hit is enqueued automatically.
+- **Idle State**: when no search has been submitted yet, the page displays only the search input field and the
+  recent-search list. Filter chips, result shelves, and discovery content remain hidden until a search is executed.
+- **Recent Searches**: displays up to 10 recent searches (newest first, case-insensitively deduplicated), persisted
+  across restarts.
+  - Clicking any recent search entry populates the search query and executes the search immediately.
+  - Each entry features a delete button (`X`) on the right that removes only that entry from history.
+  - Below the list, a `Clear history` button removes all entries at once. When history is empty, a placeholder
+    indicates no recent searches.
+- **Search Execution**: type your query into the input field and press `Enter` or click `Search` to view filtered
+  search results.
 
 ### Detail Page
 

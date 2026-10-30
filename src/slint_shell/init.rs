@@ -167,110 +167,28 @@ pub(crate) fn check_updater_status<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{
-        Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
-    };
-    use crate::i18n::Locale;
-    use crate::infra::{AudioStub, LrclibStub, MemoryCoverCache, MemorySessionStore, Settings};
-    use crate::slint_shell::test_support::LocaleTrackingCatalog;
-    use std::sync::{Arc, Mutex};
 
     #[test]
-    fn test_startup_settings_refetches_home_shelves_with_settings_locale() {
-        let (catalog, locales, fetch_locales) = LocaleTrackingCatalog::new();
-        let audio = AudioStub::new();
-        let session = MemorySessionStore::new();
-        let lyrics = LrclibStub::new();
-        let covers = MemoryCoverCache::new();
+    fn test_ensure_data_dir_creates_directory_when_missing() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-init-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
 
-        let mut state = SlintAppState::new(catalog, audio, session, lyrics, covers);
-        assert_eq!(state.home_shelves[0].title, "Home English");
+        ensure_data_dir(&temp_dir).expect("ensure_data_dir should succeed");
+        assert!(temp_dir.is_dir());
 
-        let settings = Settings { locale: Locale::Spanish, ..Settings::default() };
-
-        state.locale = settings.locale;
-        if let Ok(mut c) = state.catalog.lock() {
-            c.set_locale(settings.locale);
-            let refreshed = c.home_shelves();
-            if refreshed.is_empty() {
-                tracing::warn!(
-                    "failed to re-fetch home shelves for locale {:?}; retaining fallback shelves",
-                    settings.locale
-                );
-            } else {
-                state.home_shelves = refreshed;
-            }
-        }
-
-        assert_eq!(*locales.lock().unwrap(), vec![Locale::English, Locale::Spanish]);
-        assert_eq!(*fetch_locales.lock().unwrap(), vec![Locale::English, Locale::Spanish]);
-        assert_eq!(state.home_shelves.len(), 1);
-        assert_eq!(state.home_shelves[0].title, "Home Spanish");
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
-    fn test_startup_settings_refetch_preserves_old_shelves_on_empty_or_failure() {
-        #[derive(Debug, Clone)]
-        struct FailingCatalog {
-            call_count: Arc<Mutex<usize>>,
-        }
+    fn test_app_data_dir_ends_with_expected_folder_name() {
+        let dir = app_data_dir();
+        assert!(dir.ends_with("moggyt") || dir.ends_with(".moggyt"));
+    }
 
-        impl Catalog for FailingCatalog {
-            fn search(&self, _query: &str) -> Vec<Track> {
-                Vec::new()
-            }
-            fn search_filtered(&self, _query: &SearchQuery) -> Vec<SearchResult> {
-                Vec::new()
-            }
-            fn radio(&self, _track_id: &str) -> Vec<Track> {
-                Vec::new()
-            }
-            fn home_shelves(&self) -> Vec<Shelf> {
-                let mut count = self.call_count.lock().unwrap();
-                *count += 1;
-                if *count == 1 { vec![Shelf::new("Fallback Placeholder")] } else { Vec::new() }
-            }
-            fn playlists(&self) -> Vec<Playlist> {
-                Vec::new()
-            }
-            fn liked_tracks(&self) -> Vec<Track> {
-                Vec::new()
-            }
-            fn saved_albums(&self) -> Vec<Album> {
-                Vec::new()
-            }
-            fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
-            fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
-                None
-            }
-        }
-
-        let count = Arc::new(Mutex::new(0));
-        let catalog = FailingCatalog { call_count: Arc::clone(&count) };
-        let audio = AudioStub::new();
-        let session = MemorySessionStore::new();
-        let lyrics = LrclibStub::new();
-        let covers = MemoryCoverCache::new();
-
-        let mut state = SlintAppState::new(catalog, audio, session, lyrics, covers);
-        assert_eq!(state.home_shelves[0].title, "Fallback Placeholder");
-
-        let settings = Settings { locale: Locale::Spanish, ..Settings::default() };
-        state.locale = settings.locale;
-        if let Ok(mut c) = state.catalog.lock() {
-            c.set_locale(settings.locale);
-            let refreshed = c.home_shelves();
-            if refreshed.is_empty() {
-                tracing::warn!(
-                    "failed to re-fetch home shelves for locale {:?}; retaining fallback shelves",
-                    settings.locale
-                );
-            } else {
-                state.home_shelves = refreshed;
-            }
-        }
-
-        assert_eq!(state.home_shelves.len(), 1);
-        assert_eq!(state.home_shelves[0].title, "Fallback Placeholder");
+    #[test]
+    fn test_init_secondary_lastfm_scrobbler_disabled_returns_none() {
+        let scrobbler = init_secondary_lastfm_scrobbler(false);
+        assert!(scrobbler.is_none());
     }
 }

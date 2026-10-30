@@ -111,7 +111,7 @@ Extended backlog requirements (milestones and port mappings):
 
 V1 (MVP):
 
-- Search with filters; home shelves with prefetch on intent; artist, album, playlist detail pages.
+- Search with filters; idle state with recent-search history; artist, album, playlist detail pages.
 - Transport (play, pause, next, previous, seek, volume) plus a persistent player bar.
 - Playback queue with reorder, shuffle, and repeat modes; radio and autoplay queues.
 - Library read access (playlists, liked tracks, saved albums) behind optional sign-in.
@@ -129,8 +129,10 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 
 ## 4 Functional requirements
 
-- FR-1: search the catalog with type filters (tracks, albums, artists, playlists).
-- FR-2: render home shelves; prefetch detail content on hover or focus intent.
+- FR-1: search the catalog with type filters (tracks, albums, artists, playlists), featuring an idle state with
+  persistent recent-search history (capped at 10 entries, case-insensitive deduplication, per-entry deletion, and full
+  clear).
+- FR-2: render search result shelves for active queries; prefetch detail content on hover or focus intent.
 - FR-3: show track, album, artist, and playlist detail views from cached plus fresh data.
 - FR-4: queue operations (add, remove, reorder, clear, shuffle, repeat off / all / one).
 - FR-5: transport controls with seek and volume, including keyboard shortcuts.

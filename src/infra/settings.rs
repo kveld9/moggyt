@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::audio::clamp_speed;
 use super::stream::AudioQuality;
-use crate::domain::{PlayerBarMode, ThemeId};
+use crate::domain::{PlayerBarMode, RecentSearches, ThemeId};
 use crate::i18n::Locale;
 
 const fn default_true() -> bool {
@@ -88,6 +88,9 @@ pub struct Settings {
     /// Whether volume slider is shown in the player bar.
     #[serde(default = "default_true")]
     pub player_bar_show_volume: bool,
+    /// Recent search queries (capped, newest first).
+    #[serde(default)]
+    pub recent_searches: RecentSearches,
 }
 
 impl Default for Settings {
@@ -113,6 +116,7 @@ impl Default for Settings {
             player_bar_show_skip_seconds: false,
             player_bar_show_queue: true,
             player_bar_show_volume: true,
+            recent_searches: RecentSearches::default(),
         }
     }
 }
@@ -140,6 +144,7 @@ impl Settings {
             player_bar_show_skip_seconds: false,
             player_bar_show_queue: true,
             player_bar_show_volume: true,
+            recent_searches: RecentSearches::default(),
         }
     }
 }
@@ -331,6 +336,7 @@ mod tests {
             player_bar_show_skip_seconds: true,
             player_bar_show_queue: false,
             player_bar_show_volume: false,
+            recent_searches: RecentSearches::default(),
         };
 
         store.save(&modified).expect("save should succeed");
@@ -564,5 +570,27 @@ mod tests {
         assert_eq!(store.load().playback_speed, 1.0);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_recent_searches_missing_field_loads_empty() {
+        let json = r#"{"theme": "white", "locale": "en"}"#;
+        let loaded: Settings = serde_json::from_str(json).expect("deserialization succeeds");
+        assert!(loaded.recent_searches.is_empty());
+        assert_eq!(loaded.recent_searches.len(), 0);
+    }
+
+    #[test]
+    fn test_recent_searches_round_trips_preserving_order() {
+        let mut recents = RecentSearches::default();
+        recents.record("first");
+        recents.record("second");
+        recents.record("third");
+
+        let settings = Settings { recent_searches: recents.clone(), ..Settings::default() };
+        let json = serde_json::to_string(&settings).expect("serialize settings");
+        let loaded: Settings = serde_json::from_str(&json).expect("deserialize settings");
+        assert_eq!(loaded.recent_searches, recents);
+        assert_eq!(loaded.recent_searches.entries(), &["third", "second", "first"]);
     }
 }
