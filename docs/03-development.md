@@ -27,8 +27,6 @@ Enforced automatically by `./scripts/check-repo.sh`:
 - Slint (`.slint`): max 400 lines per component module.
 - Thin entry exemption: `ui/shell.slint` is exempt only while it stays an import-only entry under ~200 lines
   with no component definitions.
-- Grandfathered exceptions: `src/slint_shell/app.rs` and `src/infra/catalog_client.rs`
-  (while over limit) are grandfathered pending modularization.
 - Remediation path: split oversized files by concept (one view or endpoint-domain per module), landing each
   extracted unit via one small PR per module (< 400 lines diff).
 
