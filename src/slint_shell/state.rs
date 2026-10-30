@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use crate::domain::{
     Album, Artist, Detail, DetailKind, PlaybackQueue, PlayerBarMode, Playlist, RecentSearches,
-    SearchFilter, SearchQuery, SearchResult, Shelf, SleepTimer, ThemeId, Track,
+    SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer, ThemeId, Track,
     extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
@@ -74,6 +74,7 @@ pub struct SlintAppState<
     pub last_presence_key: Option<(String, String)>,
     pub started_at: Option<(Instant, u64)>,
     pub last_skip_target: Option<(String, u32)>,
+    pub cached_skip_ranges: Option<(String, Option<SkipRanges>)>,
     pub sleep_timer: SleepTimer,
     pub sleep_timer_accumulated: u64,
     pub sleep_timer_base_offset: u64,
@@ -163,6 +164,7 @@ impl<
             last_presence_key: None,
             started_at: None,
             last_skip_target: None,
+            cached_skip_ranges: None,
             sleep_timer: SleepTimer::new(),
             sleep_timer_accumulated: 0,
             sleep_timer_base_offset: 0,
