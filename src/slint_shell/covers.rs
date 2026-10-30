@@ -5,12 +5,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::domain::{SearchResult, Shelf, Track};
+use crate::domain::{SearchResult, Shelf};
 use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
-use crate::slint_shell::TrackRowData;
 pub(crate) use crate::slint_shell::cover_pool::spawn_cover_fetch_pool;
 use crate::slint_shell::playback_worker::{PlaybackWorkerCommand, thumbnail_variant_for_row};
-use crate::slint_shell::search::format_duration;
 use crate::slint_shell::state::SlintAppState;
 
 /// Helper extracting artwork URLs across shelves for pre-fetching.
@@ -219,30 +217,12 @@ pub fn request_queue_track_cover(
     dispatch_cover_with_generation_if_needed(url, generation, covers, worker_tx, &mut seen);
 }
 
-/// Converts a domain track to Slint TrackRowData with cached cover art if available.
-pub(crate) fn track_to_row_data(
-    index: usize,
-    track: &Track,
-    covers: &HashMap<String, slint::Image>,
-) -> TrackRowData {
-    let cover = resolve_row_cover_image(track.artwork.as_deref(), covers);
-    TrackRowData {
-        index: index as i32,
-        title: track.title.clone().into(),
-        artist: track.artist.clone().into(),
-        album: track.album.clone().unwrap_or_default().into(),
-        duration: format_duration(track.duration_secs).into(),
-        kind: "track".into(),
-        cover,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::*;
-    use crate::domain::{Album, Artist, Detail, DetailKind, Playlist};
+    use crate::domain::{Album, Artist, Detail, DetailKind, Playlist, Track};
     use crate::infra::MemoryCoverCache;
     use crate::slint_shell::detail::{detail_has_artwork, resolve_detail_cover_url};
     use crate::slint_shell::platform::rgba_to_image;
@@ -413,19 +393,6 @@ mod tests {
         assert_eq!(received_urls[1], "https://lh3.googleusercontent.com/album-small");
         assert_eq!(received_urls[2], "https://lh3.googleusercontent.com/artist-thumb");
         assert_eq!(received_urls[3], "https://i.ytimg.com/vi/playlist-id/mqdefault.jpg");
-    }
-
-    #[test]
-    fn test_track_to_row_data_uses_thumbnail_variant() {
-        let track = Track::new("t1", "Title", "Artist")
-            .with_artwork("https://lh3.googleusercontent.com/test-thumb-large");
-        let covers = HashMap::new();
-
-        let row_data = track_to_row_data(0, &track, &covers);
-        assert_eq!(row_data.index, 0);
-        assert_eq!(row_data.title.as_str(), "Title");
-        assert_eq!(row_data.artist.as_str(), "Artist");
-        assert_eq!(row_data.kind.as_str(), "track");
     }
 
     #[test]
