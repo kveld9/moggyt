@@ -1,6 +1,8 @@
-import { Theme } from "../theme.slint";
-import { StyledInputField } from "../components/controls.slint";
-import { SettingsModeButton, SettingsToggleRow } from "../components/settings_rows.slint";
+import { ThemeSettings } from "../components/settings/theme_settings.slint";
+import { PlayerBarSettings } from "../components/settings/player_bar_settings.slint";
+import { PlaybackSettings } from "../components/settings/playback_settings.slint";
+import { SessionSettings } from "../components/settings/session_settings.slint";
+import { AboutSettings } from "../components/settings/about_settings.slint";
 
 export component SettingsView inherits VerticalLayout {
     in property <int> active-theme-index: 0;
@@ -25,7 +27,6 @@ export component SettingsView inherits VerticalLayout {
     in property <string> section-about-label: "About";
     in property <string> app-version-label: "App version";
     in property <string> update-status-label: "Update status";
-
     in property <int> player-bar-mode: 0;
     in property <bool> player-bar-show-artwork: true;
     in property <bool> player-bar-show-like: true;
@@ -34,7 +35,6 @@ export component SettingsView inherits VerticalLayout {
     in property <bool> player-bar-show-skip-seconds: false;
     in property <bool> player-bar-show-queue: true;
     in property <bool> player-bar-show-volume: true;
-
     in property <string> section-player-bar-label: "Player bar";
     in property <string> player-bar-classic-label: "Classic";
     in property <string> player-bar-floating-label: "Floating";
@@ -56,320 +56,64 @@ export component SettingsView inherits VerticalLayout {
     spacing: 20px;
     alignment: start;
 
-    // Section (a): Theme
-    VerticalLayout {
-        spacing: 10px;
-
-        Text {
-            text: root.section-theme-label;
-            color: Theme.text;
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        HorizontalLayout {
-            spacing: 12px;
-
-            SettingsModeButton {
-                label: root.theme-white-label;
-                is-active: root.active-theme-index == 0;
-                clicked => { root.theme-selected(0); }
-            }
-
-            SettingsModeButton {
-                label: root.theme-black-oled-label;
-                is-active: root.active-theme-index == 1;
-                clicked => { root.theme-selected(1); }
-            }
-
-            SettingsModeButton {
-                label: root.theme-mono-label;
-                is-active: root.active-theme-index == 2;
-                clicked => { root.theme-selected(2); }
-            }
-        }
+    theme-panel := ThemeSettings {
+        active-theme-index: root.active-theme-index;
+        section-theme-label: root.section-theme-label;
+        theme-white-label: root.theme-white-label;
+        theme-black-oled-label: root.theme-black-oled-label;
+        theme-mono-label: root.theme-mono-label;
+        theme-selected(idx) => { root.theme-selected(idx); }
     }
 
-    // Section (b): Player bar
-    VerticalLayout {
-        spacing: 10px;
-
-        Text {
-            text: root.section-player-bar-label;
-            color: Theme.text;
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        Rectangle {
-            border-radius: 8px;
-            background: Theme.panel;
-
-            VerticalLayout {
-                padding: 16px;
-                spacing: 12px;
-
-                HorizontalLayout {
-                    spacing: 12px;
-
-                    SettingsModeButton {
-                        label: root.player-bar-classic-label;
-                        is-active: root.player-bar-mode == 0;
-                        clicked => { root.player-bar-mode-selected(0); }
-                    }
-
-                    SettingsModeButton {
-                        label: root.player-bar-floating-label;
-                        is-active: root.player-bar-mode == 1;
-                        clicked => { root.player-bar-mode-selected(1); }
-                    }
-                }
-
-                SettingsToggleRow {
-                    label: root.player-bar-artwork-label;
-                    checked: root.player-bar-show-artwork;
-                    toggled => { root.player-bar-option-toggled(0); }
-                }
-
-                SettingsToggleRow {
-                    label: root.player-bar-like-label;
-                    checked: root.player-bar-show-like;
-                    toggled => { root.player-bar-option-toggled(1); }
-                }
-
-                SettingsToggleRow {
-                    label: root.player-bar-shuffle-label;
-                    checked: root.player-bar-show-shuffle;
-                    toggled => { root.player-bar-option-toggled(2); }
-                }
-
-                SettingsToggleRow {
-                    label: root.player-bar-repeat-label;
-                    checked: root.player-bar-show-repeat;
-                    toggled => { root.player-bar-option-toggled(3); }
-                }
-
-                SettingsToggleRow {
-                    label: root.player-bar-skip-label;
-                    checked: root.player-bar-show-skip-seconds;
-                    toggled => { root.player-bar-option-toggled(4); }
-                }
-
-                SettingsToggleRow {
-                    label: root.player-bar-queue-label;
-                    checked: root.player-bar-show-queue;
-                    toggled => { root.player-bar-option-toggled(5); }
-                }
-
-                SettingsToggleRow {
-                    label: root.player-bar-volume-label;
-                    checked: root.player-bar-show-volume;
-                    toggled => { root.player-bar-option-toggled(6); }
-                }
-            }
-        }
+    playback-panel := PlaybackSettings {
+        playback-speed-text: root.playback-speed-text;
+        section-playback-label: root.section-playback-label;
+        playback-speed-label: root.playback-speed-label;
+        cycle-playback-speed => { root.cycle-playback-speed(); }
     }
 
-    // Section (c): Playback
-    VerticalLayout {
-        spacing: 10px;
-
-        Text {
-            text: root.section-playback-label;
-            color: Theme.text;
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        Rectangle {
-            border-radius: 8px;
-            background: Theme.panel;
-
-            HorizontalLayout {
-                padding: 16px;
-                alignment: space-between;
-
-                Text {
-                    text: root.playback-speed-label;
-                    color: Theme.text;
-                    font-size: 14px;
-                    vertical-alignment: center;
-                }
-
-                Rectangle {
-                    width: 90px;
-                    height: 32px;
-                    border-radius: 8px;
-                    background: speed-touch.pressed ? Theme.overlay : (speed-touch.has-hover ? Theme.hover : Theme.surface);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    speed-touch := TouchArea {
-                        clicked => { root.cycle-playback-speed(); }
-                    }
-
-                    Text {
-                        text: root.playback-speed-text;
-                        color: Theme.accent;
-                        font-size: 12px;
-                        font-weight: 700;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-        }
+    session-panel := SessionSettings {
+        signed-in: root.signed-in;
+        cookie-text <=> root.cookie-text;
+        section-session-label: root.section-session-label;
+        status-signed-in-label: root.status-signed-in-label;
+        sign-out-label: root.sign-out-label;
+        status-anonymous-label: root.status-anonymous-label;
+        session-cookie-placeholder: root.session-cookie-placeholder;
+        sign-in-label: root.sign-in-label;
+        sign-in-submitted(text) => { root.sign-in-submitted(text); }
+        sign-out => { root.sign-out(); }
     }
 
-    // Section (d): Session
-    VerticalLayout {
-        spacing: 10px;
-
-        Text {
-            text: root.section-session-label;
-            color: Theme.text;
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        Rectangle {
-            border-radius: 8px;
-            background: Theme.panel;
-
-            VerticalLayout {
-                padding: 16px;
-                spacing: 12px;
-
-                if root.signed-in : HorizontalLayout {
-                    alignment: space-between;
-
-                    Text {
-                        text: root.status-signed-in-label;
-                        color: Theme.accent;
-                        font-size: 14px;
-                        font-weight: 600;
-                        vertical-alignment: center;
-                    }
-
-                    Rectangle {
-                        width: 90px;
-                        height: 32px;
-                        border-radius: 8px;
-                        background: sign-out-touch.pressed ? Theme.overlay : (sign-out-touch.has-hover ? Theme.hover : Theme.surface);
-                        animate background { duration: 150ms; easing: ease-in-out; }
-
-                        sign-out-touch := TouchArea {
-                            clicked => { root.sign-out(); }
-                        }
-
-                        Text {
-                            text: root.sign-out-label;
-                            color: Theme.text;
-                            font-size: 12px;
-                            font-weight: 700;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-
-                if !root.signed-in : VerticalLayout {
-                    spacing: 10px;
-
-                    Text {
-                        text: root.status-anonymous-label;
-                        color: Theme.secondary;
-                        font-size: 14px;
-                    }
-
-                    HorizontalLayout {
-                        spacing: 8px;
-                        height: 32px;
-
-                        StyledInputField {
-                            text <=> root.cookie-text;
-                            placeholder-text: root.session-cookie-placeholder;
-                            input-type: InputType.password;
-                            accepted(t) => { root.sign-in-submitted(t); }
-                        }
-
-                        Rectangle {
-                            width: 90px;
-                            border-radius: 8px;
-                            background: sign-in-touch.pressed ? Theme.overlay : (sign-in-touch.has-hover ? Theme.hover : Theme.accent);
-                            animate background { duration: 150ms; easing: ease-in-out; }
-
-                            sign-in-touch := TouchArea {
-                                clicked => { root.sign-in-submitted(root.cookie-text); }
-                            }
-
-                            Text {
-                                text: root.sign-in-label;
-                                color: sign-in-touch.has-hover ? Theme.text : Theme.window;
-                                font-size: 12px;
-                                font-weight: 700;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    player-bar-panel := PlayerBarSettings {
+        player-bar-mode: root.player-bar-mode;
+        player-bar-show-artwork: root.player-bar-show-artwork;
+        player-bar-show-like: root.player-bar-show-like;
+        player-bar-show-shuffle: root.player-bar-show-shuffle;
+        player-bar-show-repeat: root.player-bar-show-repeat;
+        player-bar-show-skip-seconds: root.player-bar-show-skip-seconds;
+        player-bar-show-queue: root.player-bar-show-queue;
+        player-bar-show-volume: root.player-bar-show-volume;
+        section-player-bar-label: root.section-player-bar-label;
+        player-bar-classic-label: root.player-bar-classic-label;
+        player-bar-floating-label: root.player-bar-floating-label;
+        player-bar-artwork-label: root.player-bar-artwork-label;
+        player-bar-like-label: root.player-bar-like-label;
+        player-bar-shuffle-label: root.player-bar-shuffle-label;
+        player-bar-repeat-label: root.player-bar-repeat-label;
+        player-bar-skip-label: root.player-bar-skip-label;
+        player-bar-queue-label: root.player-bar-queue-label;
+        player-bar-volume-label: root.player-bar-volume-label;
+        player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
+        player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
     }
 
-    // Section (e): About
-    VerticalLayout {
-        spacing: 10px;
-
-        Text {
-            text: root.section-about-label;
-            color: Theme.text;
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        Rectangle {
-            border-radius: 8px;
-            background: Theme.panel;
-
-            VerticalLayout {
-                padding: 16px;
-                spacing: 12px;
-
-                HorizontalLayout {
-                    alignment: space-between;
-
-                    Text {
-                        text: root.app-version-label;
-                        color: Theme.secondary;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: root.app-version;
-                        color: Theme.text;
-                        font-size: 13px;
-                        font-weight: 600;
-                    }
-                }
-
-                HorizontalLayout {
-                    alignment: space-between;
-
-                    Text {
-                        text: root.update-status-label;
-                        color: Theme.secondary;
-                        font-size: 13px;
-                    }
-
-                    Text {
-                        text: root.update-status-text;
-                        color: root.has-update ? Theme.accent : Theme.secondary;
-                        font-size: 13px;
-                        font-weight: 600;
-                    }
-                }
-            }
-        }
+    about-panel := AboutSettings {
+        app-version: root.app-version;
+        update-status-text: root.update-status-text;
+        has-update: root.has-update;
+        section-about-label: root.section-about-label;
+        app-version-label: root.app-version-label;
+        update-status-label: root.update-status-label;
     }
 }

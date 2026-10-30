@@ -1,0 +1,63 @@
+import { Theme } from "../../theme.slint";
+
+export component AboutSettings inherits VerticalLayout {
+    in property <string> app-version: "0.1.0";
+    in property <string> update-status-text: "Up to date";
+    in property <bool> has-update: false;
+    in property <string> section-about-label: "About";
+    in property <string> app-version-label: "App version";
+    in property <string> update-status-label: "Update status";
+
+    spacing: 10px;
+
+    Text {
+        text: root.section-about-label;
+        color: Theme.text;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    Rectangle {
+        border-radius: 8px;
+        background: Theme.panel;
+
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                alignment: space-between;
+
+                Text {
+                    text: root.app-version-label;
+                    color: Theme.secondary;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: root.app-version;
+                    color: Theme.text;
+                    font-size: 13px;
+                    font-weight: 600;
+                }
+            }
+
+            HorizontalLayout {
+                alignment: space-between;
+
+                Text {
+                    text: root.update-status-label;
+                    color: Theme.secondary;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: root.update-status-text;
+                    color: root.has-update ? Theme.accent : Theme.secondary;
+                    font-size: 13px;
+                    font-weight: 600;
+                }
+            }
+        }
+    }
+}
