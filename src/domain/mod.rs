@@ -4,7 +4,6 @@
 //! randomness stay behind ports in `crate::infra` or parameters.
 
 mod library;
-mod metadata;
 mod playlist_import;
 mod queue;
 mod search;
@@ -15,7 +14,6 @@ mod theme;
 pub use library::{
     Album, Artist, Detail, DetailKind, Playlist, SearchPage, SearchResult, Shelf, apply_filter,
 };
-pub use metadata::MetadataOverride;
 pub use playlist_import::extract_playlist_id;
 pub use queue::{PlaybackQueue, RepeatMode};
 pub use search::{

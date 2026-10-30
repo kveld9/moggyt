@@ -30,7 +30,6 @@ mod library_backup;
 mod lyric_overrides;
 mod lyrics;
 mod lyrics_lrclib;
-mod meta_store;
 mod presence;
 mod presence_desktop;
 mod presence_discord;
@@ -84,7 +83,6 @@ pub use lyrics_lrclib::{
     duration_similarity, lrclib_get_url, match_confidence, normalize_text, parse_lrc,
     payload_matches, text_similarity,
 };
-pub use meta_store::{DiskMetaStore, MemoryMetaStore, MetaStore};
 pub use presence::{NoopPresence, Presence};
 pub use presence_desktop::{DesktopPresence, MediaKeyAction, action_for, metadata_for, status_for};
 pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts};
