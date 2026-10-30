@@ -1,0 +1,110 @@
+import { Theme } from "../../theme.slint";
+import { StyledInputField } from "../controls.slint";
+
+export component SessionSettings inherits VerticalLayout {
+    in property <bool> signed-in: false;
+    in-out property <string> cookie-text: "";
+    in property <string> section-session-label: "Session";
+    in property <string> status-signed-in-label: "Status: Signed in";
+    in property <string> sign-out-label: "Sign out";
+    in property <string> status-anonymous-label: "Status: Anonymous";
+    in property <string> session-cookie-placeholder: "Paste session cookies...";
+    in property <string> sign-in-label: "Sign in";
+
+    callback sign-in-submitted(string);
+    callback sign-out();
+
+    spacing: 10px;
+
+    Text {
+        text: root.section-session-label;
+        color: Theme.text;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    Rectangle {
+        border-radius: 8px;
+        background: Theme.panel;
+
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+
+            if root.signed-in : HorizontalLayout {
+                alignment: space-between;
+
+                Text {
+                    text: root.status-signed-in-label;
+                    color: Theme.accent;
+                    font-size: 14px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 90px;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: sign-out-touch.pressed ? Theme.overlay : (sign-out-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    sign-out-touch := TouchArea {
+                        clicked => { root.sign-out(); }
+                    }
+
+                    Text {
+                        text: root.sign-out-label;
+                        color: Theme.text;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            if !root.signed-in : VerticalLayout {
+                spacing: 10px;
+
+                Text {
+                    text: root.status-anonymous-label;
+                    color: Theme.secondary;
+                    font-size: 14px;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    height: 32px;
+
+                    StyledInputField {
+                        text <=> root.cookie-text;
+                        placeholder-text: root.session-cookie-placeholder;
+                        input-type: InputType.password;
+                        accepted(t) => { root.sign-in-submitted(t); }
+                    }
+
+                    Rectangle {
+                        width: 90px;
+                        border-radius: 8px;
+                        background: sign-in-touch.pressed ? Theme.overlay : (sign-in-touch.has-hover ? Theme.hover : Theme.accent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        sign-in-touch := TouchArea {
+                            clicked => { root.sign-in-submitted(root.cookie-text); }
+                        }
+
+                        Text {
+                            text: root.sign-in-label;
+                            color: sign-in-touch.has-hover ? Theme.text : Theme.window;
+                            font-size: 12px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

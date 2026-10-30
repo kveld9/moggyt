@@ -1,0 +1,56 @@
+import { Theme } from "../../theme.slint";
+
+export component PlaybackSettings inherits VerticalLayout {
+    in property <string> playback-speed-text: "1.00x";
+    in property <string> section-playback-label: "Playback";
+    in property <string> playback-speed-label: "Playback speed";
+
+    callback cycle-playback-speed();
+
+    spacing: 10px;
+
+    Text {
+        text: root.section-playback-label;
+        color: Theme.text;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    Rectangle {
+        border-radius: 8px;
+        background: Theme.panel;
+
+        HorizontalLayout {
+            padding: 16px;
+            alignment: space-between;
+
+            Text {
+                text: root.playback-speed-label;
+                color: Theme.text;
+                font-size: 14px;
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                width: 90px;
+                height: 32px;
+                border-radius: 8px;
+                background: speed-touch.pressed ? Theme.overlay : (speed-touch.has-hover ? Theme.hover : Theme.surface);
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                speed-touch := TouchArea {
+                    clicked => { root.cycle-playback-speed(); }
+                }
+
+                Text {
+                    text: root.playback-speed-text;
+                    color: Theme.accent;
+                    font-size: 12px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
