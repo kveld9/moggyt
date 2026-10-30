@@ -319,6 +319,33 @@ export component IconSpeaker inherits Rectangle {
     }
 }
 
+export component IconSpeakerMuted inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: root.tint;
+        commands: "M 4 9.5 L 8 9.5 L 13 5.5 L 13 18.5 L 8 14.5 L 4 14.5 Z";
+    }
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 16 17 L 21 7";
+    }
+}
+
 export component IconLibrary inherits Rectangle {
     in property <color> tint: Theme.text;
     in property <length> size: 20px;

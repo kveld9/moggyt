@@ -98,7 +98,8 @@ Users can customize the player bar appearance and element visibility under **Set
   - `Show skip 10s buttons`: Toggles the `-10s` and `+10s` jump chips next to the play/pause button (disabled by
     default for a minimal bar layout).
   - `Show queue button`: Toggles the queue button on the right displaying active queue count.
-  - `Show volume slider`: Toggles the speaker icon and volume slider on the right.
+  - `Show volume slider`: Toggles the speaker icon and volume slider on the right. The speaker icon switches to a muted
+    icon at volume 0 and serves as a mute toggle.
 
 ### Transport and Playback Controls
 
@@ -110,7 +111,8 @@ Users can customize the player bar appearance and element visibility under **Set
 - **Seek Controls**:
   - `-10s`: rewinds current playback position by 10 seconds (clamped at 0).
   - `+10s`: advances playback position forward by 10 seconds.
-- **Volume Slider**: interactive slider setting audio volume from 0 to 100.
+- **Volume Slider**: interactive slider setting audio volume from 0 to 100. The speaker icon switches to a muted icon
+  at volume 0, and clicking the icon mutes playback or restores the previous level (falling back to 50 when zero).
 - **Position Display**: shows elapsed seconds against total duration (`<elapsed>s / <duration>s` or `<elapsed>s`).
 
 ## Keyboard Shortcuts
