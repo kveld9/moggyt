@@ -28,6 +28,7 @@ export component PlayerBar inherits Rectangle {
     in property <int> duration-secs: 0;
     in property <int> queue-count: 0;
     in property <string> queue-button-text: "Queue";
+    in property <bool> is-queue-open: false;
 
     property <int> last-audible-volume: 100;
 
@@ -40,7 +41,7 @@ export component PlayerBar inherits Rectangle {
     callback toggle-like();
     callback toggle-shuffle();
     callback cycle-repeat();
-    callback open-queue();
+    callback toggle-queue-panel();
 
     border-radius: root.mode == 1 ? 20px : 0px;
     border-width: root.mode == 1 ? 1px : 0px;
@@ -176,7 +177,7 @@ export component PlayerBar inherits Rectangle {
                     animate background { duration: 150ms; easing: ease-in-out; }
 
                     q-touch := TouchArea {
-                        clicked => { root.open-queue(); }
+                        clicked => { root.toggle-queue-panel(); }
                     }
 
                     HorizontalLayout {
@@ -187,7 +188,7 @@ export component PlayerBar inherits Rectangle {
                             alignment: center;
                             IconQueue {
                                 size: 16px;
-                                tint: q-touch.has-hover ? Theme.accent : Theme.secondary;
+                                tint: q-touch.has-hover || root.is-queue-open ? Theme.accent : Theme.secondary;
                             }
                         }
 

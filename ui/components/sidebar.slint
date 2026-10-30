@@ -97,22 +97,22 @@ export component Sidebar inherits Rectangle {
         NavItem {
             text: root.nav-explore-label;
             icon-name: "explore";
-            is-active: root.active-page == 6;
-            clicked => { root.page-selected(6); }
+            is-active: root.active-page == 5;
+            clicked => { root.page-selected(5); }
         }
 
         NavItem {
             text: root.nav-library-label;
             icon-name: "library";
-            is-active: root.active-page == 3;
-            clicked => { root.page-selected(3); }
+            is-active: root.active-page == 2;
+            clicked => { root.page-selected(2); }
         }
 
         NavItem {
             text: root.nav-now-playing-label;
             icon-name: "music";
-            is-active: root.active-page == 2;
-            clicked => { root.page-selected(2); }
+            is-active: root.active-page == 1;
+            clicked => { root.page-selected(1); }
         }
     }
 }
