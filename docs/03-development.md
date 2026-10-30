@@ -80,3 +80,13 @@ guessing; every rule here was verified against a build or the official documenta
   recompute that chunking from a `changed width => { ... }` handler on the `Window`, which
   Slint fires on every resize and is the only way to reflow without a scroll offset.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/horizontallayout/>.
+- `FlexboxLayout` (`flex-wrap` defaults to `wrap`) is the documented element for a grid that
+  must wrap, but it is not a drop-in inside this app's explore `Flickable`: on slint 1.18.1
+  the four wrapping containers reported their exact heights (844/630/1486/844px) and the
+  `ExploreView` reported 3980px, while the enclosing scroll layout kept 4735px for children
+  summing 4013px, so the page ended with about 640px (three card rows) of dead scroll space
+  after a window resize. Confirmed with `debug()` on `changed height` handlers, no
+  `GridLayout` involved. Keep the fixed-width cards plus width-derived chunking until this
+  is fixed upstream, and re-run the bottom-of-scroll check before switching to
+  `FlexboxLayout`.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/flexboxlayout/>.
