@@ -34,6 +34,7 @@ pub use MoggytWindow as AppWindow;
 
 pub mod app;
 pub mod callbacks;
+pub mod cover_pool;
 pub mod covers;
 pub mod detail;
 pub mod explore;
