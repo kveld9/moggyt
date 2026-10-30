@@ -50,6 +50,8 @@ pub fn init_rodio_backend(data_dir: &Path) -> anyhow::Result<RodioBackend> {
 }
 
 /// Initializes audio backend with live rodio playback, falling back to muted stub on any failure.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 pub fn init_live_audio(data_dir: &Path) -> LiveAudio {
     match init_rodio_backend(data_dir) {
         Ok(backend) => LiveAudio::Live(backend),
@@ -61,6 +63,8 @@ pub fn init_live_audio(data_dir: &Path) -> LiveAudio {
 }
 
 /// Initializes the disk cover cache in `data_dir/covers`, falling back to a temporary directory.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 pub fn init_cover_cache(data_dir: &Path) -> DiskCoverCache {
     let primary = data_dir.join("covers");
     if let Ok(cache) = DiskCoverCache::new(&primary) {
@@ -111,6 +115,8 @@ pub fn tracing_subscriber_setup() {
 }
 
 /// Parses CLI arguments and executes single-instance URL/handoff import commands.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 pub(crate) fn handle_cli_args<
     C: Catalog + Send + 'static,
     A: AudioBackend + Send + 'static,
@@ -137,6 +143,8 @@ pub(crate) fn handle_cli_args<
 }
 
 /// Checks GitHub Releases for newer version tags and records update availability.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 pub(crate) fn check_updater_status<
     C: Catalog + Send + 'static,
     A: AudioBackend + Send + 'static,

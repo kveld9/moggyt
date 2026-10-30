@@ -58,6 +58,8 @@ impl KeyringSessionStore {
 }
 
 impl SessionStore for KeyringSessionStore {
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn save(&mut self, cookies: &str) {
         let Some(cleaned) = sanitize_cookie_input(cookies) else {
             self.clear();
@@ -77,6 +79,8 @@ impl SessionStore for KeyringSessionStore {
         }
     }
 
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn load(&self) -> Option<String> {
         let entry = match self.entry() {
             Ok(entry) => entry,
@@ -103,6 +107,8 @@ impl SessionStore for KeyringSessionStore {
         }
     }
 
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn clear(&mut self) {
         let entry = match self.entry() {
             Ok(entry) => entry,

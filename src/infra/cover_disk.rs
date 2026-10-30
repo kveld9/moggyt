@@ -77,6 +77,8 @@ impl CoverCache for DiskCoverCache {
         std::fs::read(path).ok()
     }
 
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn put(&mut self, url: &str, bytes: Vec<u8>) {
         self.memory.put(url, bytes.clone());
         if let Err(err) = self.write_to_disk(url, &bytes) {

@@ -91,6 +91,8 @@ impl LastFmClient {
         self.session_key.as_deref()
     }
 
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn send_signed_post(&self, params: &[(&str, &str)]) {
         let sig = api_signature(params, &self.secret);
         let mut form = params.to_vec();
@@ -303,12 +305,16 @@ impl KeyringCredentialStore {
         keyring::Entry::new(&self.service, account).map_err(Into::into)
     }
 
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn open_entry(&self, account: &str, op: &str) -> Option<keyring::Entry> {
         self.entry(account)
             .map_err(|err| tracing::warn!(error = %err, "failed to open OS keyring entry for {op}"))
             .ok()
     }
 
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn save_entry(&self, account: &str, secret: &str) -> bool {
         let Some(entry) = self.open_entry(account, "save") else {
             return false;
@@ -319,6 +325,8 @@ impl KeyringCredentialStore {
         true
     }
 
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn load_entry(&self, account: &str) -> Option<String> {
         let entry = self.open_entry(account, "load")?;
         let bytes = entry
@@ -336,6 +344,8 @@ impl KeyringCredentialStore {
         }
     }
 
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
     fn clear_entry(&self, account: &str) {
         let Some(entry) = self.open_entry(account, "clear") else {
             return;

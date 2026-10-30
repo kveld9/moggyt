@@ -43,6 +43,8 @@ fn acquire_single_instance() -> Option<SingleInstanceGuard> {
     guard
 }
 
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 fn attach_tray<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K: CoverCache>(
     state: &mut SlintAppState<C, A, S, L, K>,
 ) {
@@ -58,6 +60,8 @@ fn attach_tray<C: Catalog, A: AudioBackend, S: SessionStore, L: LyricsSource, K:
 /// TODO Gap: Settings modal: DiskSettingsStore persists volume, speed, quality, DSP
 /// toggles, and Last.fm credentials; playback speed and volume are fully wired, but
 /// ui/shell.slint lacks an interactive settings dialog for DSP and credential management.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
 pub fn run() -> anyhow::Result<()> {
     let Some(_instance) = acquire_single_instance() else {
         return Ok(());
