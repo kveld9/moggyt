@@ -256,7 +256,27 @@ pub(crate) fn sync_library_and_detail<
     }
 }
 
-const EXPLORE_GRID_COLUMNS: usize = 5;
+/// Card width in logical pixels; must match `width` in `ui/components/cards.slint`.
+pub(crate) const EXPLORE_CARD_WIDTH: i32 = 150;
+/// Horizontal gap between cards in logical pixels.
+pub(crate) const EXPLORE_CARD_GAP: i32 = 12;
+/// Sidebar width plus content padding in logical pixels.
+pub(crate) const EXPLORE_CHROME_WIDTH: i32 = 248;
+/// Column bounds: never fewer than 2, never more than 12.
+const MIN_EXPLORE_COLUMNS: usize = 2;
+const MAX_EXPLORE_COLUMNS: usize = 12;
+/// Columns used until the window reports its real width.
+pub(crate) const DEFAULT_EXPLORE_COLUMNS: usize = 5;
+
+/// Number of cards that fit in one row for a given window width.
+pub(crate) fn explore_columns_for_width(window_width: i32) -> usize {
+    let usable = window_width - EXPLORE_CHROME_WIDTH + EXPLORE_CARD_GAP;
+    let per_card = EXPLORE_CARD_WIDTH + EXPLORE_CARD_GAP;
+    if usable <= 0 {
+        return MIN_EXPLORE_COLUMNS;
+    }
+    ((usable / per_card) as usize).clamp(MIN_EXPLORE_COLUMNS, MAX_EXPLORE_COLUMNS)
+}
 
 /// Muted tile palette used for explore items that carry no artwork.
 const TILE_PALETTE: [[u8; 3]; 8] = [
@@ -289,32 +309,33 @@ fn spacer_card() -> ExploreCardData {
     }
 }
 
-fn pad_row_with_spacers(mut row: Vec<ExploreCardData>) -> ExploreCardRow {
-    let padding = EXPLORE_GRID_COLUMNS.saturating_sub(row.len());
+fn pad_row_with_spacers(mut row: Vec<ExploreCardData>, columns: usize) -> ExploreCardRow {
+    let padding = columns.saturating_sub(row.len());
     row.extend(std::iter::repeat_with(spacer_card).take(padding));
     ExploreCardRow { cards: ModelRc::new(VecModel::from(row)) }
 }
 
 /// Splits cards into fixed-width rows, padding the last row with invisible spacers.
-pub(crate) fn chunk_card_rows(cards: Vec<ExploreCardData>) -> Vec<ExploreCardRow> {
+pub(crate) fn chunk_card_rows(cards: Vec<ExploreCardData>, columns: usize) -> Vec<ExploreCardRow> {
     if cards.is_empty() {
         return Vec::new();
     }
+    let cols = columns.max(1);
     let mut rows = Vec::new();
-    let mut current_row = Vec::with_capacity(EXPLORE_GRID_COLUMNS);
+    let mut current_row = Vec::with_capacity(cols);
     for card in cards {
         current_row.push(card);
-        if current_row.len() == EXPLORE_GRID_COLUMNS {
+        if current_row.len() == cols {
             rows.push(ExploreCardRow {
                 cards: ModelRc::new(VecModel::from(std::mem::replace(
                     &mut current_row,
-                    Vec::with_capacity(EXPLORE_GRID_COLUMNS),
+                    Vec::with_capacity(cols),
                 ))),
             });
         }
     }
     if !current_row.is_empty() {
-        rows.push(pad_row_with_spacers(current_row));
+        rows.push(pad_row_with_spacers(current_row, cols));
     }
     rows
 }
@@ -323,6 +344,7 @@ fn explore_shelf_to_card_data(
     shelf: &Shelf,
     covers: &HashMap<String, slint::Image>,
     global_idx: &mut i32,
+    columns: usize,
 ) -> ExploreShelfData {
     let mut cards = Vec::with_capacity(shelf.items.len());
     for item in &shelf.items {
@@ -342,7 +364,7 @@ fn explore_shelf_to_card_data(
     }
     ExploreShelfData {
         title: shelf.title.clone().into(),
-        rows: ModelRc::new(VecModel::from(chunk_card_rows(cards))),
+        rows: ModelRc::new(VecModel::from(chunk_card_rows(cards, columns))),
     }
 }
 
@@ -350,9 +372,13 @@ fn explore_shelf_to_card_data(
 pub(crate) fn explore_card_shelves(
     shelves: &[Shelf],
     covers: &HashMap<String, slint::Image>,
+    columns: usize,
 ) -> Vec<ExploreShelfData> {
     let mut global_idx = 0;
-    shelves.iter().map(|s| explore_shelf_to_card_data(s, covers, &mut global_idx)).collect()
+    shelves
+        .iter()
+        .map(|s| explore_shelf_to_card_data(s, covers, &mut global_idx, columns))
+        .collect()
 }
 
 /// Synchronizes explore shelves with Slint window models.
@@ -369,6 +395,7 @@ pub(crate) fn sync_explore_shelves<
     window.set_explore_shelves(ModelRc::new(VecModel::from(explore_card_shelves(
         &state.explore_shelves,
         &state.search_covers,
+        state.explore_columns,
     ))));
 }
 
@@ -420,14 +447,52 @@ mod tests {
     }
 
     #[test]
+    fn test_explore_columns_for_width() {
+        assert_eq!(explore_columns_for_width(1900), 10);
+        assert_eq!(explore_columns_for_width(940), 4);
+        assert_eq!(explore_columns_for_width(800), 3);
+        assert_eq!(explore_columns_for_width(500), 2);
+        assert_eq!(explore_columns_for_width(4000), 12);
+    }
+
+    #[test]
+    fn test_chunk_card_rows_custom_columns() {
+        // 0 cards -> no rows
+        let rows_0 = chunk_card_rows(Vec::new(), 4);
+        assert_eq!(rows_0.len(), 0);
+
+        // 3 cards at 4 columns -> one row [0, 1, 2, -1]
+        let cards_3 = vec![make_test_card(0), make_test_card(1), make_test_card(2)];
+        let rows_1 = chunk_card_rows(cards_3, 4);
+        assert_eq!(rows_1.len(), 1);
+        assert_eq!(rows_1[0].cards.row_count(), 4);
+        let indices_1: Vec<i32> =
+            (0..4).map(|i| rows_1[0].cards.row_data(i).unwrap().index).collect();
+        assert_eq!(indices_1, vec![0, 1, 2, -1]);
+
+        // 7 cards at 4 columns -> two rows, second row padded to 4
+        let cards_7: Vec<_> = (0..7).map(make_test_card).collect();
+        let rows_2 = chunk_card_rows(cards_7, 4);
+        assert_eq!(rows_2.len(), 2);
+        assert_eq!(rows_2[0].cards.row_count(), 4);
+        assert_eq!(rows_2[1].cards.row_count(), 4);
+        let row0_indices: Vec<i32> =
+            (0..4).map(|i| rows_2[0].cards.row_data(i).unwrap().index).collect();
+        let row1_indices: Vec<i32> =
+            (0..4).map(|i| rows_2[1].cards.row_data(i).unwrap().index).collect();
+        assert_eq!(row0_indices, vec![0, 1, 2, 3]);
+        assert_eq!(row1_indices, vec![4, 5, 6, -1]);
+    }
+
+    #[test]
     fn test_chunk_card_rows_padding_and_empty() {
         // 0 cards -> 0 rows
-        let rows_0 = chunk_card_rows(Vec::new());
+        let rows_0 = chunk_card_rows(Vec::new(), 5);
         assert_eq!(rows_0.len(), 0);
 
         // 3 cards -> 1 row of 5 with indexes [0, 1, 2, -1, -1]
         let cards_3 = vec![make_test_card(0), make_test_card(1), make_test_card(2)];
-        let rows_1 = chunk_card_rows(cards_3);
+        let rows_1 = chunk_card_rows(cards_3, 5);
         assert_eq!(rows_1.len(), 1);
         assert_eq!(rows_1[0].cards.row_count(), 5);
         let indices_1: Vec<i32> =
@@ -436,7 +501,7 @@ mod tests {
 
         // 7 cards -> 2 rows of 5 with the second row padded
         let cards_7: Vec<_> = (0..7).map(make_test_card).collect();
-        let rows_2 = chunk_card_rows(cards_7);
+        let rows_2 = chunk_card_rows(cards_7, 5);
         assert_eq!(rows_2.len(), 2);
         assert_eq!(rows_2[0].cards.row_count(), 5);
         assert_eq!(rows_2[1].cards.row_count(), 5);
@@ -464,7 +529,7 @@ mod tests {
             },
         ];
         let covers = HashMap::new();
-        let result = explore_card_shelves(&shelves, &covers);
+        let result = explore_card_shelves(&shelves, &covers, 5);
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].title.as_str(), "Shelf 1");
@@ -500,7 +565,7 @@ mod tests {
             ],
         }];
         let covers = HashMap::new();
-        let result = explore_card_shelves(&shelves, &covers);
+        let result = explore_card_shelves(&shelves, &covers, 5);
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].rows.row_count(), 1);
@@ -528,7 +593,7 @@ mod tests {
 
         // Map is empty: has_cover false for playlist, true for album; album cover empty image
         let empty_covers = HashMap::new();
-        let res_empty = explore_card_shelves(&shelves, &empty_covers);
+        let res_empty = explore_card_shelves(&shelves, &empty_covers, 5);
         let row_empty = res_empty[0].rows.row_data(0).unwrap();
         let pl_card = row_empty.cards.row_data(0).unwrap();
         let alb_card_empty = row_empty.cards.row_data(1).unwrap();
@@ -544,7 +609,7 @@ mod tests {
         let thumb_url = thumbnail_variant_for_row(art_url);
         populated_covers.insert(thumb_url, real_img);
 
-        let res_populated = explore_card_shelves(&shelves, &populated_covers);
+        let res_populated = explore_card_shelves(&shelves, &populated_covers, 5);
         let row_pop = res_populated[0].rows.row_data(0).unwrap();
         let alb_card_populated = row_pop.cards.row_data(1).unwrap();
 
@@ -593,7 +658,7 @@ mod tests {
             items: vec![SearchResult::Playlist(Playlist::new("PL1", "Energize", 0, None))],
         }];
         let covers = HashMap::new();
-        let result = explore_card_shelves(&shelves, &covers);
+        let result = explore_card_shelves(&shelves, &covers, 5);
 
         assert_eq!(result.len(), 1);
         let row0 = result[0].rows.row_data(0).unwrap();

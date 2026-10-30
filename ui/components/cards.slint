@@ -10,6 +10,7 @@ export component MediaCard inherits Rectangle {
     callback clicked();
 
     height: 202px;
+    width: 150px;
     border-radius: 10px;
     opacity: root.index < 0 ? 0 : 1;
     background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent);

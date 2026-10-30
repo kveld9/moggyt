@@ -23,7 +23,9 @@ use crate::slint_shell::playback::{
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::iter_shelf_items;
 use crate::slint_shell::state::{SharedState, SlintAppState};
-use crate::slint_shell::sync::{sync_shelves_and_queue, sync_window};
+use crate::slint_shell::sync::{
+    explore_columns_for_width, sync_explore_shelves, sync_shelves_and_queue, sync_window,
+};
 use crate::slint_shell::theme::{apply_theme, theme_from_index};
 use crate::slint_shell::window::{
     open_detail_async, refresh_library_async, submit_search_async, trigger_playback,
@@ -465,6 +467,21 @@ pub(crate) fn wire_window_callbacks<
         let mut st = s.borrow_mut();
         let speed = st.cycle_playback_speed();
         win.set_playback_speed_text(format_playback_speed(speed).into());
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_width_changed(move |width| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        let columns = explore_columns_for_width(width);
+        if st.explore_columns == columns {
+            return;
+        }
+        st.explore_columns = columns;
+        if st.explore_loaded {
+            sync_explore_shelves(&win, &st);
+        }
     });
 }
 
