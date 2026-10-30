@@ -16,11 +16,11 @@ use crate::domain::{
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, GithubUpdater, LyricLine,
+    AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, LyricLine,
     LyricOverrideDir, LyricsSource, MediaKeyAction, MemoryMetaStore, MemoryQueueStore,
-    MemorySettingsStore, MemorySkipStore, MetaStore, QueueStore, Scrobbler, SessionStore,
-    SettingsStore, SkipStore, StubScrobbler, TrayAction, TrayHandle, decode_cover, decode_handoff,
-    fetch_artwork, sanitize_cookie_input,
+    MemorySettingsStore, MemorySkipStore, MetaStore, QueueStore, ReleaseInfo, Scrobbler,
+    SessionStore, SettingsStore, SkipStore, StubScrobbler, TrayAction, TrayHandle, decode_cover,
+    decode_handoff, fetch_artwork, sanitize_cookie_input,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
@@ -52,7 +52,7 @@ pub struct SlintAppState<
     pub queue_store: Box<dyn QueueStore>,
     pub skip_store: Box<dyn SkipStore>,
     pub meta_store: Box<dyn MetaStore>,
-    pub updater: GithubUpdater,
+    pub updater_rx: Option<std::sync::mpsc::Receiver<Option<ReleaseInfo>>>,
 
     pub page: SlintPage,
     pub queue_panel_open: bool,
@@ -143,7 +143,7 @@ impl<
             queue_store: Box::new(MemoryQueueStore::default()),
             skip_store: Box::new(MemorySkipStore::new()),
             meta_store: Box::new(MemoryMetaStore::new()),
-            updater: GithubUpdater::new(),
+            updater_rx: None,
             page: SlintPage::Search,
             queue_panel_open: false,
             queue: PlaybackQueue::new(),

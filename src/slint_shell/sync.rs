@@ -46,11 +46,8 @@ pub(crate) fn sync_window<
     let speed = state.audio.try_lock().map(|a| a.speed()).unwrap_or(1.0);
     window.set_playback_speed_text(format_playback_speed(speed).into());
     window.set_signed_in(state.signed_in);
-    window.set_has_update(state.update_available);
     window.set_app_version(GithubUpdater::current_version().into());
-    let update_status =
-        format_update_status(state.locale, state.update_available, state.latest_version.as_deref());
-    window.set_update_status_text(update_status.into());
+    sync_update_status(window, state);
 
     window.set_is_shuffle(state.is_shuffle);
     window.set_repeat_mode(repeat_mode_to_int(state.queue.repeat()));
@@ -95,6 +92,23 @@ pub(crate) fn sync_window<
     sync_shelves_and_queue(window, state);
     sync_library_and_detail(window, state);
     sync_explore_shelves(window, state);
+}
+
+/// Synchronizes update availability and status text with Slint window.
+pub(crate) fn sync_update_status<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    window: &MoggytWindow,
+    state: &SlintAppState<C, A, S, L, K>,
+) {
+    window.set_has_update(state.update_available);
+    let update_status =
+        format_update_status(state.locale, state.update_available, state.latest_version.as_deref());
+    window.set_update_status_text(update_status.into());
 }
 
 /// Synchronizes cover art texture and synced lyrics lines with Slint window from pre-decoded state.

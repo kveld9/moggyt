@@ -21,6 +21,7 @@ use crate::slint_shell::covers::{
     spawn_cover_fetch_pool,
 };
 use crate::slint_shell::format::format_queue_label;
+use crate::slint_shell::init::apply_updater_release;
 use crate::slint_shell::platform::dispatch_to_ui;
 use crate::slint_shell::playback::{format_track_duration, is_track_liked};
 use crate::slint_shell::playback_control::apply_play_track_completion;
@@ -32,7 +33,7 @@ use crate::slint_shell::playback_worker::{
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{
     persist_recent_searches, sync_library_and_detail, sync_playback_tick, sync_recent_searches,
-    sync_shelves_and_queue, sync_window,
+    sync_shelves_and_queue, sync_update_status, sync_window,
 };
 
 thread_local! {
@@ -402,9 +403,53 @@ pub(crate) fn setup_app_timer<
         state.check_auto_skip();
         state.continue_autoplay_if_ended();
         state.poll_sleep_timer();
+        drain_updater_check(&win, &mut state);
         sync_playback_tick(&win, &mut state);
     });
     timer
+}
+
+/// Drains pending update check result without blocking, updating window properties if ready.
+pub(crate) fn drain_updater_check<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    window: &MoggytWindow,
+    state: &mut SlintAppState<C, A, S, L, K>,
+) {
+    if poll_updater_check(state) {
+        sync_update_status(window, state);
+    }
+}
+
+/// Polls pending update check channel, applying any received release info to state.
+pub(crate) fn poll_updater_check<
+    C: Catalog + Send + 'static,
+    A: AudioBackend + Send + 'static,
+    S: SessionStore + 'static,
+    L: LyricsSource + Send + Sync + 'static,
+    K: CoverCache + Send + 'static,
+>(
+    state: &mut SlintAppState<C, A, S, L, K>,
+) -> bool {
+    let Some(ref rx) = state.updater_rx else {
+        return false;
+    };
+    match rx.try_recv() {
+        Ok(info) => {
+            state.updater_rx = None;
+            apply_updater_release(state, info);
+            true
+        }
+        Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+            state.updater_rx = None;
+            false
+        }
+        Err(std::sync::mpsc::TryRecvError::Empty) => false,
+    }
 }
 
 #[cfg(test)]
@@ -468,5 +513,50 @@ mod tests {
             },
         );
         assert_eq!(result, Some(true));
+    }
+
+    #[test]
+    fn test_polling_applies_exactly_one_queued_result_and_leaves_state_unchanged() {
+        let mut state = test_wired();
+        let (tx, rx) = std::sync::mpsc::channel();
+        state.updater_rx = Some(rx);
+
+        tx.send(Some(crate::infra::ReleaseInfo {
+            version: "v99.0.0".to_string(),
+            url: "https://github.com/example/releases/tag/v99.0.0".to_string(),
+        }))
+        .unwrap();
+
+        assert!(!state.update_available);
+        assert_eq!(state.latest_version, None);
+        assert!(state.updater_rx.is_some());
+
+        // First poll: applies the queued result and clears the channel
+        let applied = poll_updater_check(&mut state);
+        assert!(applied);
+        assert!(state.update_available);
+        assert_eq!(state.latest_version.as_deref(), Some("v99.0.0"));
+        assert!(state.updater_rx.is_none());
+
+        // Subsequent poll: state unchanged
+        let second_poll = poll_updater_check(&mut state);
+        assert!(!second_poll);
+        assert!(state.update_available);
+        assert_eq!(state.latest_version.as_deref(), Some("v99.0.0"));
+        assert!(state.updater_rx.is_none());
+    }
+
+    #[test]
+    fn test_polling_disconnected_channel_clears_receiver_without_modifying_state() {
+        let mut state = test_wired();
+        let (tx, rx) = std::sync::mpsc::channel::<Option<crate::infra::ReleaseInfo>>();
+        state.updater_rx = Some(rx);
+        drop(tx);
+
+        let applied = poll_updater_check(&mut state);
+        assert!(!applied);
+        assert!(!state.update_available);
+        assert_eq!(state.latest_version, None);
+        assert!(state.updater_rx.is_none());
     }
 }
