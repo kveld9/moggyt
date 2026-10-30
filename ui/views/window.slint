@@ -40,6 +40,7 @@ export component MoggytWindow inherits Window {
     in-out property <bool> show-settings: false;
     in-out property <int> active-theme-index: 0;
     in-out property <string> playback-speed-text: "1.00x";
+    in-out property <string> sleep-timer-status-text: "Timer: Off"; in-out property <int> active-sleep-timer-index: 0;
     in-out property <string> settings-cookie-text: "";
     in-out property <string> app-version: "0.1.0";
     in-out property <string> update-status-text: "Up to date";
@@ -118,6 +119,7 @@ export component MoggytWindow inherits Window {
     in-out property <string> theme-mono-label: "Mono";
     in-out property <string> section-playback-label: "Playback";
     in-out property <string> playback-speed-label: "Playback speed";
+    in-out property <string> sleep-timer-label: "Sleep timer"; in-out property <string> sleep-timer-off-label: "Off"; in-out property <string> sleep-timer-15m-label: "15m"; in-out property <string> sleep-timer-30m-label: "30m"; in-out property <string> sleep-timer-45m-label: "45m"; in-out property <string> sleep-timer-60m-label: "60m"; in-out property <string> sleep-timer-end-of-track-label: "End of track";
     in-out property <string> section-session-label: "Session";
     in-out property <string> status-signed-in-label: "Status: Signed in";
     in-out property <string> status-anonymous-label: "Status: Anonymous";
@@ -147,6 +149,7 @@ export component MoggytWindow inherits Window {
     callback back-pressed();
     callback theme-selected(int);
     callback cycle-playback-speed();
+    callback sleep-timer-preset-selected(int);
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
@@ -255,6 +258,8 @@ export component MoggytWindow inherits Window {
                 theme-mono-label: root.theme-mono-label;
                 section-playback-label: root.section-playback-label;
                 playback-speed-label: root.playback-speed-label;
+                sleep-timer-label: root.sleep-timer-label; sleep-timer-off-label: root.sleep-timer-off-label; sleep-timer-15m-label: root.sleep-timer-15m-label; sleep-timer-30m-label: root.sleep-timer-30m-label; sleep-timer-45m-label: root.sleep-timer-45m-label; sleep-timer-60m-label: root.sleep-timer-60m-label; sleep-timer-end-of-track-label: root.sleep-timer-end-of-track-label;
+                sleep-timer-status-text: root.sleep-timer-status-text; active-sleep-timer-index: root.active-sleep-timer-index;
                 section-session-label: root.section-session-label;
                 status-signed-in-label: root.status-signed-in-label;
                 status-anonymous-label: root.status-anonymous-label;
@@ -293,6 +298,7 @@ export component MoggytWindow inherits Window {
                 sign-in-submitted(t) => { root.sign-in-submitted(t); } sign-out() => { root.sign-out(); }
                 theme-selected(idx) => { root.theme-selected(idx); }
                 cycle-playback-speed => { root.cycle-playback-speed(); }
+                sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
                 back-pressed => { root.back-pressed(); }
                 player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
                 player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }

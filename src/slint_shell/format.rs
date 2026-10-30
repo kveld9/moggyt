@@ -2,6 +2,7 @@
 //!
 //! Hexagonal invariant: pure in-memory functions with zero I/O and zero async runtimes.
 
+use crate::domain::TimerPreset;
 use crate::i18n::{Locale, tr};
 
 /// Returns current UTC timestamp in seconds since UNIX epoch, or 0 on clock failure.
@@ -56,6 +57,52 @@ pub fn format_queue_label(locale: Locale, count: usize) -> String {
     }
 }
 
+/// Maps an integer index (0..=5) from Slint UI selection to standard `TimerPreset`.
+pub fn timer_preset_from_index(idx: i32) -> TimerPreset {
+    match idx {
+        1 => TimerPreset::Minutes15,
+        2 => TimerPreset::Minutes30,
+        3 => TimerPreset::Minutes45,
+        4 => TimerPreset::Minutes60,
+        5 => TimerPreset::StopAfterTrack,
+        _ => TimerPreset::Off,
+    }
+}
+
+/// Maps a `TimerPreset` to its corresponding Slint UI integer index (0..=5).
+pub fn timer_preset_to_index(preset: TimerPreset) -> i32 {
+    match preset {
+        TimerPreset::Off => 0,
+        TimerPreset::Minutes15 => 1,
+        TimerPreset::Minutes30 => 2,
+        TimerPreset::Minutes45 => 3,
+        TimerPreset::Minutes60 => 4,
+        TimerPreset::StopAfterTrack => 5,
+    }
+}
+
+/// Formats the sleep timer status line for display in UI settings.
+pub fn format_sleep_timer_status(
+    locale: Locale,
+    preset: TimerPreset,
+    remaining_secs: Option<u64>,
+) -> String {
+    match preset {
+        TimerPreset::Off => tr(locale, "Timer: Off").to_string(),
+        TimerPreset::StopAfterTrack => tr(locale, "Timer: End of track").to_string(),
+        TimerPreset::Minutes15
+        | TimerPreset::Minutes30
+        | TimerPreset::Minutes45
+        | TimerPreset::Minutes60 => {
+            let secs = remaining_secs.unwrap_or(0);
+            let mins = secs / 60;
+            let rem_s = secs % 60;
+            let time_str = format!("{mins}:{rem_s:02}");
+            tr(locale, "Timer: {time}").replace("{time}", &time_str)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,5 +154,56 @@ mod tests {
         assert_eq!(format_queue_label(Locale::Spanish, 0), "Cola");
         assert_eq!(format_queue_label(Locale::Spanish, 1), "Cola (1)");
         assert_eq!(format_queue_label(Locale::Spanish, 42), "Cola (42)");
+    }
+
+    #[test]
+    fn test_timer_preset_index_mapping_all_six_values() {
+        let cases = [
+            (0, TimerPreset::Off),
+            (1, TimerPreset::Minutes15),
+            (2, TimerPreset::Minutes30),
+            (3, TimerPreset::Minutes45),
+            (4, TimerPreset::Minutes60),
+            (5, TimerPreset::StopAfterTrack),
+        ];
+        for (idx, preset) in cases {
+            assert_eq!(timer_preset_from_index(idx), preset);
+            assert_eq!(timer_preset_to_index(preset), idx);
+        }
+        assert_eq!(timer_preset_from_index(-1), TimerPreset::Off);
+        assert_eq!(timer_preset_from_index(6), TimerPreset::Off);
+    }
+
+    #[test]
+    fn test_format_sleep_timer_status() {
+        // Non-zero remaining time
+        assert_eq!(
+            format_sleep_timer_status(Locale::English, TimerPreset::Minutes30, Some(754)),
+            "Timer: 12:34"
+        );
+        assert_eq!(
+            format_sleep_timer_status(Locale::Spanish, TimerPreset::Minutes30, Some(754)),
+            "Temporizador: 12:34"
+        );
+
+        // Off
+        assert_eq!(
+            format_sleep_timer_status(Locale::English, TimerPreset::Off, None),
+            "Timer: Off"
+        );
+        assert_eq!(
+            format_sleep_timer_status(Locale::Spanish, TimerPreset::Off, None),
+            "Temporizador: Desactivado"
+        );
+
+        // End of track
+        assert_eq!(
+            format_sleep_timer_status(Locale::English, TimerPreset::StopAfterTrack, None),
+            "Timer: End of track"
+        );
+        assert_eq!(
+            format_sleep_timer_status(Locale::Spanish, TimerPreset::StopAfterTrack, None),
+            "Temporizador: Fin de la canción"
+        );
     }
 }

@@ -49,6 +49,13 @@ pub struct StaticLabels {
     pub theme_mono: &'static str,
     pub section_playback: &'static str,
     pub playback_speed: &'static str,
+    pub sleep_timer_label: &'static str,
+    pub sleep_timer_off_label: &'static str,
+    pub sleep_timer_15m_label: &'static str,
+    pub sleep_timer_30m_label: &'static str,
+    pub sleep_timer_45m_label: &'static str,
+    pub sleep_timer_60m_label: &'static str,
+    pub sleep_timer_end_of_track_label: &'static str,
     pub section_session: &'static str,
     pub status_signed_in: &'static str,
     pub status_anonymous: &'static str,
@@ -117,6 +124,13 @@ impl StaticLabels {
             theme_mono: tr(locale, "Mono"),
             section_playback: tr(locale, "Playback"),
             playback_speed: tr(locale, "Playback speed"),
+            sleep_timer_label: tr(locale, "Sleep timer"),
+            sleep_timer_off_label: tr(locale, "Off"),
+            sleep_timer_15m_label: tr(locale, "15m"),
+            sleep_timer_30m_label: tr(locale, "30m"),
+            sleep_timer_45m_label: tr(locale, "45m"),
+            sleep_timer_60m_label: tr(locale, "60m"),
+            sleep_timer_end_of_track_label: tr(locale, "End of track"),
             section_session: tr(locale, "Session"),
             status_signed_in: tr(locale, "Status: Signed in"),
             status_anonymous: tr(locale, "Status: Anonymous"),
@@ -187,6 +201,13 @@ impl StaticLabels {
         window.set_theme_mono_label(self.theme_mono.into());
         window.set_section_playback_label(self.section_playback.into());
         window.set_playback_speed_label(self.playback_speed.into());
+        window.set_sleep_timer_label(self.sleep_timer_label.into());
+        window.set_sleep_timer_off_label(self.sleep_timer_off_label.into());
+        window.set_sleep_timer_15m_label(self.sleep_timer_15m_label.into());
+        window.set_sleep_timer_30m_label(self.sleep_timer_30m_label.into());
+        window.set_sleep_timer_45m_label(self.sleep_timer_45m_label.into());
+        window.set_sleep_timer_60m_label(self.sleep_timer_60m_label.into());
+        window.set_sleep_timer_end_of_track_label(self.sleep_timer_end_of_track_label.into());
         window.set_section_session_label(self.section_session.into());
         window.set_status_signed_in_label(self.status_signed_in.into());
         window.set_status_anonymous_label(self.status_anonymous.into());
@@ -277,6 +298,13 @@ mod tests {
         assert_eq!(es.theme_mono, "Monocromo");
         assert_eq!(es.section_playback, "Reproducción");
         assert_eq!(es.playback_speed, "Velocidad de reproducción");
+        assert_eq!(es.sleep_timer_label, "Temporizador de apagado");
+        assert_eq!(es.sleep_timer_off_label, "Desactivado");
+        assert_eq!(es.sleep_timer_15m_label, "15 min");
+        assert_eq!(es.sleep_timer_30m_label, "30 min");
+        assert_eq!(es.sleep_timer_45m_label, "45 min");
+        assert_eq!(es.sleep_timer_60m_label, "60 min");
+        assert_eq!(es.sleep_timer_end_of_track_label, "Fin de la canción");
         assert_eq!(es.section_session, "Sesión");
         assert_eq!(es.status_signed_in, "Estado: Sesión iniciada");
         assert_eq!(es.status_anonymous, "Estado: Anónimo");
@@ -338,6 +366,13 @@ mod tests {
         assert_eq!(en.theme_mono, "Mono");
         assert_eq!(en.section_playback, "Playback");
         assert_eq!(en.playback_speed, "Playback speed");
+        assert_eq!(en.sleep_timer_label, "Sleep timer");
+        assert_eq!(en.sleep_timer_off_label, "Off");
+        assert_eq!(en.sleep_timer_15m_label, "15m");
+        assert_eq!(en.sleep_timer_30m_label, "30m");
+        assert_eq!(en.sleep_timer_45m_label, "45m");
+        assert_eq!(en.sleep_timer_60m_label, "60m");
+        assert_eq!(en.sleep_timer_end_of_track_label, "End of track");
         assert_eq!(en.section_session, "Session");
         assert_eq!(en.status_signed_in, "Status: Signed in");
         assert_eq!(en.status_anonymous, "Status: Anonymous");

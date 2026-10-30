@@ -1,11 +1,23 @@
 import { Theme } from "../../theme.slint";
+import { SettingsModeButton } from "../settings_rows.slint";
 
 export component PlaybackSettings inherits VerticalLayout {
     in property <string> playback-speed-text: "1.00x";
     in property <string> section-playback-label: "Playback";
     in property <string> playback-speed-label: "Playback speed";
 
+    in property <string> sleep-timer-label: "Sleep timer";
+    in property <string> sleep-timer-off-label: "Off";
+    in property <string> sleep-timer-15m-label: "15m";
+    in property <string> sleep-timer-30m-label: "30m";
+    in property <string> sleep-timer-45m-label: "45m";
+    in property <string> sleep-timer-60m-label: "60m";
+    in property <string> sleep-timer-end-of-track-label: "End of track";
+    in property <string> sleep-timer-status-text: "Timer: Off";
+    in property <int> active-sleep-timer-index: 0;
+
     callback cycle-playback-speed();
+    callback sleep-timer-preset-selected(int);
 
     spacing: 10px;
 
@@ -20,35 +32,107 @@ export component PlaybackSettings inherits VerticalLayout {
         border-radius: 8px;
         background: Theme.panel;
 
-        HorizontalLayout {
+        VerticalLayout {
             padding: 16px;
-            alignment: space-between;
+            spacing: 16px;
 
-            Text {
-                text: root.playback-speed-label;
-                color: Theme.text;
-                font-size: 14px;
-                vertical-alignment: center;
+            HorizontalLayout {
+                alignment: space-between;
+
+                Text {
+                    text: root.playback-speed-label;
+                    color: Theme.text;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 90px;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: speed-touch.pressed ? Theme.overlay : (speed-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    speed-touch := TouchArea {
+                        clicked => { root.cycle-playback-speed(); }
+                    }
+
+                    Text {
+                        text: root.playback-speed-text;
+                        color: Theme.accent;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
             }
 
             Rectangle {
-                width: 90px;
-                height: 32px;
-                border-radius: 8px;
-                background: speed-touch.pressed ? Theme.overlay : (speed-touch.has-hover ? Theme.hover : Theme.surface);
-                animate background { duration: 150ms; easing: ease-in-out; }
+                height: 1px;
+                background: Theme.border;
+            }
 
-                speed-touch := TouchArea {
-                    clicked => { root.cycle-playback-speed(); }
+            VerticalLayout {
+                spacing: 12px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: root.sleep-timer-label;
+                        color: Theme.text;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: root.sleep-timer-status-text;
+                        color: root.active-sleep-timer-index != 0 ? Theme.accent : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
                 }
 
-                Text {
-                    text: root.playback-speed-text;
-                    color: Theme.accent;
-                    font-size: 12px;
-                    font-weight: 700;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    SettingsModeButton {
+                        label: root.sleep-timer-off-label;
+                        is-active: root.active-sleep-timer-index == 0;
+                        clicked => { root.sleep-timer-preset-selected(0); }
+                    }
+
+                    SettingsModeButton {
+                        label: root.sleep-timer-15m-label;
+                        is-active: root.active-sleep-timer-index == 1;
+                        clicked => { root.sleep-timer-preset-selected(1); }
+                    }
+
+                    SettingsModeButton {
+                        label: root.sleep-timer-30m-label;
+                        is-active: root.active-sleep-timer-index == 2;
+                        clicked => { root.sleep-timer-preset-selected(2); }
+                    }
+
+                    SettingsModeButton {
+                        label: root.sleep-timer-45m-label;
+                        is-active: root.active-sleep-timer-index == 3;
+                        clicked => { root.sleep-timer-preset-selected(3); }
+                    }
+
+                    SettingsModeButton {
+                        label: root.sleep-timer-60m-label;
+                        is-active: root.active-sleep-timer-index == 4;
+                        clicked => { root.sleep-timer-preset-selected(4); }
+                    }
+
+                    SettingsModeButton {
+                        label: root.sleep-timer-end-of-track-label;
+                        is-active: root.active-sleep-timer-index == 5;
+                        clicked => { root.sleep-timer-preset-selected(5); }
+                    }
                 }
             }
         }

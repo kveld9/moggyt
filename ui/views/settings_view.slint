@@ -18,6 +18,15 @@ export component SettingsView inherits VerticalLayout {
     in property <string> theme-mono-label: "Mono";
     in property <string> section-playback-label: "Playback";
     in property <string> playback-speed-label: "Playback speed";
+    in property <string> sleep-timer-label: "Sleep timer";
+    in property <string> sleep-timer-off-label: "Off";
+    in property <string> sleep-timer-15m-label: "15m";
+    in property <string> sleep-timer-30m-label: "30m";
+    in property <string> sleep-timer-45m-label: "45m";
+    in property <string> sleep-timer-60m-label: "60m";
+    in property <string> sleep-timer-end-of-track-label: "End of track";
+    in property <string> sleep-timer-status-text: "Timer: Off";
+    in property <int> active-sleep-timer-index: 0;
     in property <string> section-session-label: "Session";
     in property <string> status-signed-in-label: "Status: Signed in";
     in property <string> sign-out-label: "Sign out";
@@ -48,6 +57,7 @@ export component SettingsView inherits VerticalLayout {
 
     callback theme-selected(int);
     callback cycle-playback-speed();
+    callback sleep-timer-preset-selected(int);
     callback sign-in-submitted(string);
     callback sign-out();
     callback player-bar-mode-selected(int);
@@ -69,7 +79,17 @@ export component SettingsView inherits VerticalLayout {
         playback-speed-text: root.playback-speed-text;
         section-playback-label: root.section-playback-label;
         playback-speed-label: root.playback-speed-label;
+        sleep-timer-label: root.sleep-timer-label;
+        sleep-timer-off-label: root.sleep-timer-off-label;
+        sleep-timer-15m-label: root.sleep-timer-15m-label;
+        sleep-timer-30m-label: root.sleep-timer-30m-label;
+        sleep-timer-45m-label: root.sleep-timer-45m-label;
+        sleep-timer-60m-label: root.sleep-timer-60m-label;
+        sleep-timer-end-of-track-label: root.sleep-timer-end-of-track-label;
+        sleep-timer-status-text: root.sleep-timer-status-text;
+        active-sleep-timer-index: root.active-sleep-timer-index;
         cycle-playback-speed => { root.cycle-playback-speed(); }
+        sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
     }
 
     session-panel := SessionSettings {
