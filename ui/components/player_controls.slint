@@ -26,11 +26,12 @@ export component PlayerCenterControls inherits VerticalLayout {
     callback cycle-repeat();
 
     horizontal-stretch: 1;
+    min-width: 240px;
     alignment: center;
     spacing: 4px;
 
     HorizontalLayout {
-        spacing: 8px;
+        spacing: 6px;
         alignment: center;
 
         if root.show-shuffle : Rectangle {
@@ -68,6 +69,7 @@ export component PlayerCenterControls inherits VerticalLayout {
         }
 
         if root.show-skip-seconds : Rectangle {
+            min-width: 32px;
             height: 26px;
             border-radius: 13px;
             background: s10m-touch.pressed ? Theme.overlay : (s10m-touch.has-hover ? Theme.hover : transparent);
@@ -78,8 +80,8 @@ export component PlayerCenterControls inherits VerticalLayout {
             }
 
             HorizontalLayout {
-                padding-left: 8px;
-                padding-right: 8px;
+                padding-left: 6px;
+                padding-right: 6px;
                 alignment: center;
 
                 Text {
@@ -115,6 +117,7 @@ export component PlayerCenterControls inherits VerticalLayout {
         }
 
         if root.show-skip-seconds : Rectangle {
+            min-width: 32px;
             height: 26px;
             border-radius: 13px;
             background: s10p-touch.pressed ? Theme.overlay : (s10p-touch.has-hover ? Theme.hover : transparent);
@@ -125,8 +128,8 @@ export component PlayerCenterControls inherits VerticalLayout {
             }
 
             HorizontalLayout {
-                padding-left: 8px;
-                padding-right: 8px;
+                padding-left: 6px;
+                padding-right: 6px;
                 alignment: center;
 
                 Text {
@@ -179,9 +182,12 @@ export component PlayerCenterControls inherits VerticalLayout {
         }
     }
 
+    // Slint layout rule: avoid `alignment: center` on the progress layout;
+    // default stretch alignment allows ThemedSlider (horizontal-stretch: 1) to expand
+    // across all remaining space while timestamp labels remain pinned at the edges.
     HorizontalLayout {
+        min-width: 180px;
         spacing: 8px;
-        alignment: center;
 
         Text {
             text: root.position-text;
@@ -192,6 +198,7 @@ export component PlayerCenterControls inherits VerticalLayout {
 
         ThemedSlider {
             horizontal-stretch: 1;
+            min-width: 120px;
             minimum: 0;
             maximum: max(1, root.duration-secs);
             value: min(root.position-secs, max(1, root.duration-secs));

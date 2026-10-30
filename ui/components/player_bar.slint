@@ -54,15 +54,21 @@ export component PlayerBar inherits Rectangle {
         background: Theme.border;
     }
 
+    // Slint layout rule (https://docs.slint.dev/latest/docs/slint/src/language/builtins/layouts):
+    // Layouts default to `alignment: stretch`. When an explicit alignment (such as
+    // `space-between`) is set, children are sized only to their preferred/minimum
+    // sizes and remaining space is distributed into gaps, preventing children with
+    // `horizontal-stretch: 1` from expanding. Omitting `alignment` restores default
+    // stretch distribution so the center zone fills the space between fixed edge zones.
     HorizontalLayout {
         padding-left: root.mode == 1 ? 18px : 20px;
         padding-right: root.mode == 1 ? 18px : 20px;
         spacing: 16px;
-        alignment: space-between;
 
         // LEFT ZONE: Artwork, Title + Artist, Like toggle
         HorizontalLayout {
             width: root.mode == 1 ? 220px : 260px;
+            horizontal-stretch: 0;
             spacing: 12px;
             alignment: start;
 
@@ -129,6 +135,7 @@ export component PlayerBar inherits Rectangle {
 
         // CENTER ZONE: Reused center controls
         PlayerCenterControls {
+            horizontal-stretch: 1;
             is-playing: root.is-playing;
             is-shuffle: root.is-shuffle;
             repeat-mode: root.repeat-mode;
@@ -152,6 +159,7 @@ export component PlayerBar inherits Rectangle {
         // RIGHT ZONE: Queue button, Volume Slider
         HorizontalLayout {
             width: 200px;
+            horizontal-stretch: 0;
             alignment: end;
             spacing: 10px;
 
