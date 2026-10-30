@@ -12,7 +12,10 @@ use crate::infra::{AudioBackend, Catalog, CoverCache, GithubUpdater, LyricsSourc
 use crate::slint_shell::covers::resolve_row_cover_image;
 use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::explore::explore_card_shelves;
-use crate::slint_shell::format::{format_playback_speed, format_queue_label, format_update_status};
+use crate::slint_shell::format::{
+    format_playback_speed, format_queue_label, format_sleep_timer_status, format_update_status,
+    timer_preset_to_index,
+};
 use crate::slint_shell::labels::sync_static_labels;
 use crate::slint_shell::playback::{
     format_position, format_track_duration, is_track_liked, progress_fraction, repeat_mode_to_int,
@@ -92,6 +95,7 @@ pub(crate) fn sync_window<
     sync_shelves_and_queue(window, state);
     sync_library_and_detail(window, state);
     sync_explore_shelves(window, state);
+    sync_sleep_timer(window, state);
 }
 
 /// Synchronizes update availability and status text with Slint window.
@@ -361,6 +365,26 @@ pub(crate) fn sync_playback_tick<
     window.set_playback_progress(progress_fraction(pos_secs, dur_secs));
     window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
     window.set_is_playing(is_playing);
+    sync_sleep_timer(window, state);
+}
+
+/// Synchronizes sleep timer preset selection index and formatted status text with Slint window.
+pub(crate) fn sync_sleep_timer<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    window: &MoggytWindow,
+    state: &SlintAppState<C, A, S, L, K>,
+) {
+    let preset = state.sleep_timer.preset();
+    let idx = timer_preset_to_index(preset);
+    let status =
+        format_sleep_timer_status(state.locale, preset, state.sleep_timer.remaining_secs());
+    window.set_active_sleep_timer_index(idx);
+    window.set_sleep_timer_status_text(status.into());
 }
 
 /// Converts a domain track to Slint TrackRowData with cached cover art if available.

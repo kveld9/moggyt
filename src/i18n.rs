@@ -88,6 +88,10 @@ pub fn tr(locale: Locale, key: &str) -> &str {
 /// Static lookup table of English source keys to Spanish UI strings.
 /// Permitted exception: User-facing Spanish UI string literals are permitted in this table.
 static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
+    ("15m", "15 min"),
+    ("30m", "30 min"),
+    ("45m", "45 min"),
+    ("60m", "60 min"),
     ("About", "Acerca de"),
     ("Album", "ÁLBUM"),
     ("Albums", "Álbumes"),
@@ -104,6 +108,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Clear history", "Borrar todo el historial"),
     ("Detail", "Detalle"),
     ("English", "Inglés"),
+    ("End of track", "Fin de la canción"),
     ("Explore", "Explorar"),
     ("Failed to play track", "Error al reproducir la canción"),
     ("Floating", "Flotante"),
@@ -125,6 +130,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No track playing", "Sin reproducción"),
     ("No tracks available.", "No hay canciones disponibles."),
     ("Now Playing", "Sonando"),
+    ("Off", "Desactivado"),
     ("Paste session cookies...", "Pegar cookies de sesión..."),
     ("Player bar", "Barra de reproducción"),
     ("Play", "Reproducir"),
@@ -152,6 +158,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Sign in", "Iniciar sesión"),
     ("Sign out", "Cerrar sesión"),
     ("Signed in: library unlocked", "Sesión iniciada: biblioteca desbloqueada"),
+    ("Sleep timer", "Temporizador de apagado"),
     ("Songs", "Canciones"),
     ("Spanish", "Español"),
     ("Status: Anonymous", "Estado: Anónimo"),
@@ -162,6 +169,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ),
     ("The queue is empty.", "La cola está vacía."),
     ("Theme", "Tema"),
+    ("Timer:", "Temporizador:"),
+    ("Timer: End of track", "Temporizador: Fin de la canción"),
+    ("Timer: Off", "Temporizador: Desactivado"),
+    ("Timer: {time}", "Temporizador: {time}"),
     ("Up to date", "Actualizado"),
     ("Update available", "Actualización disponible"),
     ("Update available: {ver}", "Actualización disponible: {ver}"),
@@ -298,6 +309,29 @@ mod tests {
 
         for (input, expected) in cases {
             assert_eq!(parse_env_lang(input), expected, "failed for input: {input}");
+        }
+    }
+
+    #[test]
+    fn test_sleep_timer_i18n_strings_exist_and_differ() {
+        let keys = [
+            "Sleep timer",
+            "Off",
+            "15m",
+            "30m",
+            "45m",
+            "60m",
+            "End of track",
+            "Timer:",
+            "Timer: Off",
+            "Timer: End of track",
+            "Timer: {time}",
+        ];
+        for key in keys {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
         }
     }
 }

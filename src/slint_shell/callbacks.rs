@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::domain::{DetailKind, SearchFilter, SearchResult};
+use crate::domain::{DetailKind, SearchFilter, SearchResult, TimerPreset};
 use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::request_queue_track_cover;
@@ -15,7 +15,7 @@ use crate::slint_shell::explore::{
     explore_columns_for_width, explore_item_at, load_explore_async,
     refresh_explore_covers_if_loaded,
 };
-use crate::slint_shell::format::format_playback_speed;
+use crate::slint_shell::format::{format_playback_speed, timer_preset_from_index};
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
     cycle_repeat_mode, format_position, progress_fraction, repeat_mode_to_int, should_seek,
@@ -27,7 +27,7 @@ use crate::slint_shell::search::iter_shelf_items;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{
     persist_recent_searches, sync_explore_shelves, sync_recent_searches, sync_shelves_and_queue,
-    sync_window,
+    sync_sleep_timer, sync_window,
 };
 use crate::slint_shell::theme::{apply_theme, theme_from_index};
 use crate::slint_shell::window::{
@@ -616,6 +616,15 @@ fn wire_settings_callbacks<
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    window.on_sleep_timer_preset_selected(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        handle_sleep_timer_selection(&mut st, idx);
+        sync_sleep_timer(&win, &st);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
     window.on_width_changed(move |width| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
@@ -628,6 +637,31 @@ fn wire_settings_callbacks<
             sync_explore_shelves(&win, &st);
         }
     });
+}
+
+/// Handles sleep timer preset selection, arming or canceling the timer.
+pub(crate) fn handle_sleep_timer_selection<
+    C: Catalog,
+    A: AudioBackend,
+    S: SessionStore,
+    L: LyricsSource,
+    K: CoverCache,
+>(
+    state: &mut SlintAppState<C, A, S, L, K>,
+    idx: i32,
+) {
+    let preset = timer_preset_from_index(idx);
+    let track_id = state.queue.current().map(|t| t.id.clone());
+    if preset == TimerPreset::Off {
+        state.sleep_timer.cancel();
+        state.sleep_timer_accumulated = 0;
+        state.sleep_timer_base_offset = 0;
+    } else {
+        state.sleep_timer.set_preset_with_track(preset, track_id.as_deref());
+        let pos = state.audio.try_lock().map(|a| a.position_secs()).unwrap_or(0);
+        state.sleep_timer_accumulated = 0;
+        state.sleep_timer_base_offset = pos;
+    }
 }
 
 #[cfg(test)]
@@ -700,5 +734,30 @@ mod tests {
         state.play_track_at_index_in_memory(0);
         assert_eq!(state.queue.len(), 2);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+    }
+
+    #[test]
+    fn test_sleep_timer_selection_callback_path() {
+        let mut state = test_wired();
+        assert!(!state.sleep_timer.is_armed());
+        assert_eq!(state.sleep_timer.preset(), TimerPreset::Off);
+
+        // Picking 30m (index 2) arms the timer in state
+        handle_sleep_timer_selection(&mut state, 2);
+        assert!(state.sleep_timer.is_armed());
+        assert_eq!(state.sleep_timer.preset(), TimerPreset::Minutes30);
+        assert_eq!(state.sleep_timer.remaining_secs(), Some(1800));
+
+        // Picking Off (index 0) cancels it
+        handle_sleep_timer_selection(&mut state, 0);
+        assert!(!state.sleep_timer.is_armed());
+        assert_eq!(state.sleep_timer.preset(), TimerPreset::Off);
+        assert_eq!(state.sleep_timer.remaining_secs(), None);
+
+        // Picking End of track (index 5) with a track arms it with current track
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        handle_sleep_timer_selection(&mut state, 5);
+        assert!(state.sleep_timer.is_armed());
+        assert_eq!(state.sleep_timer.preset(), TimerPreset::StopAfterTrack);
     }
 }

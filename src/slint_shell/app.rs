@@ -20,7 +20,8 @@ pub use crate::slint_shell::covers::{
 pub use crate::slint_shell::explore::execute_explore;
 pub use crate::slint_shell::format::{
     PLAYBACK_SPEED_PRESETS, current_unix_secs, cycle_playback_speed_preset, format_playback_speed,
-    format_queue_label, format_update_status,
+    format_queue_label, format_sleep_timer_status, format_update_status, timer_preset_from_index,
+    timer_preset_to_index,
 };
 pub use crate::slint_shell::labels::{StaticLabels, sync_static_labels};
 pub use crate::slint_shell::page::SlintPage;
