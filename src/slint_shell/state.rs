@@ -54,6 +54,7 @@ pub struct SlintAppState<
     pub updater: GithubUpdater,
 
     pub page: SlintPage,
+    pub queue_panel_open: bool,
     pub queue: PlaybackQueue,
     pub home_shelves: Vec<Shelf>,
     pub search_query: String,
@@ -139,6 +140,7 @@ impl<
             meta_store: Box::new(MemoryMetaStore::new()),
             updater: GithubUpdater::new(),
             page: SlintPage::Search,
+            queue_panel_open: false,
             queue: PlaybackQueue::new(),
             home_shelves: shelves,
             search_query: String::new(),
@@ -214,6 +216,16 @@ impl<
         let next = cycle_playback_speed_preset(current);
         self.set_playback_speed(next);
         next
+    }
+
+    /// Toggles the queue side panel open or closed.
+    pub fn toggle_queue_panel(&mut self) {
+        self.queue_panel_open = !self.queue_panel_open;
+    }
+
+    /// Closes the queue side panel.
+    pub fn close_queue_panel(&mut self) {
+        self.queue_panel_open = false;
     }
 
     /// Selects active navigation page and refreshes content when entering Library or Explore view.
@@ -468,6 +480,34 @@ mod tests {
         assert!(!state.is_shuffle);
         assert_eq!(state.search_query, "");
         assert_eq!(state.explore_columns, crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS);
+        assert!(!state.queue_panel_open);
+    }
+
+    #[test]
+    fn test_queue_panel_open_close_and_toggle_lifecycle() {
+        let mut state = test_wired();
+        assert!(!state.queue_panel_open);
+        assert_eq!(state.page, SlintPage::Search);
+
+        state.toggle_queue_panel();
+        assert!(state.queue_panel_open);
+        state.toggle_queue_panel();
+        assert!(!state.queue_panel_open);
+
+        assert_eq!(state.page, SlintPage::Search);
+
+        state.close_queue_panel();
+        assert!(!state.queue_panel_open);
+
+        state.select_page(SlintPage::NowPlaying);
+        assert_eq!(state.page, SlintPage::NowPlaying);
+        state.toggle_queue_panel();
+        assert!(state.queue_panel_open);
+        assert_eq!(state.page, SlintPage::NowPlaying);
+
+        state.close_queue_panel();
+        assert!(!state.queue_panel_open);
+        assert_eq!(state.page, SlintPage::NowPlaying);
     }
 
     #[test]

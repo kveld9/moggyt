@@ -224,8 +224,8 @@ Wall-clock time enters only as injected parameters so tests stay deterministic.
 
 ## 8 UI design
 
-Pages: Search, Library, Queue, Now Playing, plus a persistent bottom player bar; a right-side
-panel layout follows once the bottom bar is stable. Shelf and track lists are virtualized;
+Pages: Search, Library, Now Playing, Detail, Settings, Explore, a persistent bottom player bar,
+and a collapsible right-side queue panel. Shelf and track lists are virtualized;
 image decoding runs off the UI thread with placeholders. Theming is a single native
 `Theme { background, surface, accent, text }` struct (YouTube red accent), not CSS.
 

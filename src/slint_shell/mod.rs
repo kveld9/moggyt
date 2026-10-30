@@ -3,14 +3,11 @@
 //! Hexagonal architecture invariant: this module operates purely in-memory
 //! with zero I/O, zero network, zero audio, and zero async runtimes.
 //!
-//! Tranche 2 wiring points (domain types to bind in subsequent tranches):
+//! Page wiring points:
 //! - SlintPage::Search:
 //!     - crate::domain::Shelf (catalog home shelves and carousels)
 //!     - crate::domain::Track (search query result items)
 //!     - crate::domain::SearchFilter (catalog filter categories)
-//! - SlintPage::Queue:
-//!     - crate::domain::PlaybackQueue (cursor, track list, queue reordering)
-//!     - crate::domain::RepeatMode (repeat state: Off, All, One)
 //! - SlintPage::NowPlaying:
 //!     - crate::domain::Track (active track metadata, duration, cover art URL)
 //!     - crate::domain::SkipRanges (auto-skip sponsor and silence segments)
@@ -21,6 +18,11 @@
 //! - SlintPage::Detail:
 //!     - crate::domain::Detail (container model for album, artist, or playlist)
 //!     - crate::domain::DetailKind (Album, Artist, Playlist discriminator)
+//! - SlintPage::Settings:
+//!     - crate::domain::ThemeId (active UI palette)
+//!     - crate::domain::PlayerBarMode (player bar presentation mode)
+//! - SlintPage::Explore:
+//!     - crate::domain::Shelf (explore category carousels and genre items)
 
 #[allow(clippy::cognitive_complexity)]
 mod generated {
@@ -61,6 +63,7 @@ pub use detail::{
     detail_track_rows, resolve_detail_cover_url,
 };
 pub use library::{LibraryItemRow, LibraryState, album_row, artist_row, playlist_row};
+pub use page::SlintPage;
 pub use platform::{
     CoverArtData, LyricDisplayLine, LyricsState, PlatformState, PresenceSnapshot, Transport,
     TransportCommand, TransportStub, dispatch_to_ui, lyrics_display_lines, rgba_to_image,
@@ -73,63 +76,6 @@ pub use playback_worker::{
 pub use player_bar::{PLAYER_BAR_OPTION_COUNT, PlayerBarPrefs, mode_from_index, mode_to_index};
 pub use search::{SearchState, TrackDisplayRow, canned_shelves, format_duration, shelf_tracks};
 pub use theme::{ThemeColors, apply_theme, palette_for, rgb_to_slint};
-
-/// Navigation pages of the Slint UI shell, matching domain Page order.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum SlintPage {
-    /// Search catalog and browse home shelves.
-    #[default]
-    Search,
-    /// Inspect and manage playback queue.
-    Queue,
-    /// Active playback and lyrics display.
-    NowPlaying,
-    /// User library containing playlists, albums, and tracks.
-    Library,
-    /// Detailed album, artist, or playlist view.
-    Detail,
-}
-
-impl SlintPage {
-    /// Resolves page from index, falling back to Search for out-of-bounds values.
-    pub fn from_index(index: i32) -> Self {
-        match index {
-            0 => Self::Search,
-            1 => Self::Queue,
-            2 => Self::NowPlaying,
-            3 => Self::Library,
-            4 => Self::Detail,
-            _ => Self::Search,
-        }
-    }
-
-    /// Converts page variant to its 0-based integer index.
-    pub fn to_index(self) -> i32 {
-        match self {
-            Self::Search => 0,
-            Self::Queue => 1,
-            Self::NowPlaying => 2,
-            Self::Library => 3,
-            Self::Detail => 4,
-        }
-    }
-
-    /// Returns human-readable page title for display in the shell header.
-    pub fn title(self) -> &'static str {
-        match self {
-            Self::Search => "Search",
-            Self::Queue => "Queue",
-            Self::NowPlaying => "Now Playing",
-            Self::Library => "Library",
-            Self::Detail => "Detail",
-        }
-    }
-
-    /// Returns localized page title for display in the shell header.
-    pub fn title_with_locale(self, locale: crate::i18n::Locale) -> &'static str {
-        crate::i18n::tr(locale, self.title())
-    }
-}
 
 /// Pure in-memory UI shell state for navigation.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -162,16 +108,17 @@ mod tests {
     #[test]
     fn test_slint_page_from_index_transitions() {
         assert_eq!(SlintPage::from_index(0), SlintPage::Search);
-        assert_eq!(SlintPage::from_index(1), SlintPage::Queue);
-        assert_eq!(SlintPage::from_index(2), SlintPage::NowPlaying);
-        assert_eq!(SlintPage::from_index(3), SlintPage::Library);
-        assert_eq!(SlintPage::from_index(4), SlintPage::Detail);
+        assert_eq!(SlintPage::from_index(1), SlintPage::NowPlaying);
+        assert_eq!(SlintPage::from_index(2), SlintPage::Library);
+        assert_eq!(SlintPage::from_index(3), SlintPage::Detail);
+        assert_eq!(SlintPage::from_index(4), SlintPage::Settings);
+        assert_eq!(SlintPage::from_index(5), SlintPage::Explore);
     }
 
     #[test]
     fn test_slint_page_from_index_out_of_bounds_fallback() {
         assert_eq!(SlintPage::from_index(-1), SlintPage::Search);
-        assert_eq!(SlintPage::from_index(5), SlintPage::Search);
+        assert_eq!(SlintPage::from_index(6), SlintPage::Search);
         assert_eq!(SlintPage::from_index(100), SlintPage::Search);
         assert_eq!(SlintPage::from_index(i32::MIN), SlintPage::Search);
         assert_eq!(SlintPage::from_index(i32::MAX), SlintPage::Search);
@@ -180,22 +127,23 @@ mod tests {
     #[test]
     fn test_slint_page_to_index_mapping() {
         assert_eq!(SlintPage::Search.to_index(), 0);
-        assert_eq!(SlintPage::Queue.to_index(), 1);
-        assert_eq!(SlintPage::NowPlaying.to_index(), 2);
-        assert_eq!(SlintPage::Library.to_index(), 3);
-        assert_eq!(SlintPage::Detail.to_index(), 4);
+        assert_eq!(SlintPage::NowPlaying.to_index(), 1);
+        assert_eq!(SlintPage::Library.to_index(), 2);
+        assert_eq!(SlintPage::Detail.to_index(), 3);
+        assert_eq!(SlintPage::Settings.to_index(), 4);
+        assert_eq!(SlintPage::Explore.to_index(), 5);
     }
 
     #[test]
     fn test_slint_page_title_mapping() {
         assert_eq!(SlintPage::Search.title(), "Search");
-        assert_eq!(SlintPage::Queue.title(), "Queue");
         assert_eq!(SlintPage::NowPlaying.title(), "Now Playing");
         assert_eq!(SlintPage::Library.title(), "Library");
         assert_eq!(SlintPage::Detail.title(), "Detail");
+        assert_eq!(SlintPage::Settings.title(), "Settings");
+        assert_eq!(SlintPage::Explore.title(), "Explore");
 
         assert_eq!(SlintPage::Search.title_with_locale(crate::i18n::Locale::Spanish), "Buscar");
-        assert_eq!(SlintPage::Queue.title_with_locale(crate::i18n::Locale::Spanish), "Cola");
         assert_eq!(
             SlintPage::NowPlaying.title_with_locale(crate::i18n::Locale::Spanish),
             "Sonando"
@@ -205,6 +153,8 @@ mod tests {
             "Biblioteca"
         );
         assert_eq!(SlintPage::Detail.title_with_locale(crate::i18n::Locale::Spanish), "Detalle");
+        assert_eq!(SlintPage::Settings.title_with_locale(crate::i18n::Locale::Spanish), "Ajustes");
+        assert_eq!(SlintPage::Explore.title_with_locale(crate::i18n::Locale::Spanish), "Explorar");
     }
 
     #[test]
@@ -221,9 +171,6 @@ mod tests {
         let mut state = SlintShellState::new();
         assert_eq!(state.page, SlintPage::Search);
 
-        state.select_page(SlintPage::Queue);
-        assert_eq!(state.page, SlintPage::Queue);
-
         state.select_page(SlintPage::NowPlaying);
         assert_eq!(state.page, SlintPage::NowPlaying);
 
@@ -232,6 +179,12 @@ mod tests {
 
         state.select_page(SlintPage::Detail);
         assert_eq!(state.page, SlintPage::Detail);
+
+        state.select_page(SlintPage::Settings);
+        assert_eq!(state.page, SlintPage::Settings);
+
+        state.select_page(SlintPage::Explore);
+        assert_eq!(state.page, SlintPage::Explore);
 
         state.select_page(SlintPage::Search);
         assert_eq!(state.page, SlintPage::Search);
@@ -242,10 +195,16 @@ mod tests {
         let mut state = SlintShellState::new();
 
         state.select_page_from_index(1);
-        assert_eq!(state.page, SlintPage::Queue);
+        assert_eq!(state.page, SlintPage::NowPlaying);
 
-        state.select_page_from_index(3);
+        state.select_page_from_index(2);
         assert_eq!(state.page, SlintPage::Library);
+
+        state.select_page_from_index(4);
+        assert_eq!(state.page, SlintPage::Settings);
+
+        state.select_page_from_index(5);
+        assert_eq!(state.page, SlintPage::Explore);
 
         state.select_page_from_index(999);
         assert_eq!(state.page, SlintPage::Search);

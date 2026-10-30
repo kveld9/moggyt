@@ -418,10 +418,19 @@ pub(crate) fn wire_window_callbacks<
 
     let s = Rc::clone(&state_rc);
     let w = window.as_weak();
-    window.on_open_queue(move || {
+    window.on_toggle_queue_panel(move || {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.select_page(SlintPage::Queue);
+        st.toggle_queue_panel();
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(&state_rc);
+    let w = window.as_weak();
+    window.on_close_queue_panel(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.close_queue_panel();
         sync_window(&win, &mut st);
     });
 

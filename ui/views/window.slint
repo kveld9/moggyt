@@ -8,6 +8,7 @@ import {
 } from "../theme.slint";
 import { Sidebar } from "../components/sidebar.slint";
 import { PlayerBar } from "../components/player_bar.slint";
+import { QueuePanel } from "../components/queue_panel.slint";
 import { ContentArea } from "./content_area.slint";
 
 export component MoggytWindow inherits Window {
@@ -30,6 +31,7 @@ export component MoggytWindow inherits Window {
     in-out property <color> theme-overlay <=> Theme.overlay;
     in-out property <bool> theme-dark <=> Theme.dark;
 
+    in-out property <bool> queue-panel-open: false;
     in-out property <int> active-page: 0;
     in-out property <string> header-title: "Search";
     in-out property <string> nav-explore-label: "Explore";
@@ -84,6 +86,7 @@ export component MoggytWindow inherits Window {
     in-out property <string> filter-artists-label: "Artists";
     in-out property <string> filter-playlists-label: "Playlists";
     in-out property <string> search-empty-text: "No results found.";
+    in-out property <string> queue-title-label: "Queue";
     in-out property <string> queue-button-text: "Queue";
     in-out property <string> queue-empty-text: "The queue is empty.";
     in-out property <string> no-cover-text: "No cover";
@@ -159,7 +162,8 @@ export component MoggytWindow inherits Window {
     callback toggle-like();
     callback toggle-shuffle();
     callback cycle-repeat();
-    callback open-queue();
+    callback toggle-queue-panel();
+    callback close-queue-panel();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
 
@@ -189,7 +193,6 @@ export component MoggytWindow inherits Window {
                 active-page: root.active-page; header-title: root.header-title; query <=> root.query; shelves: root.shelves;
                 search-filter: root.search-filter;
                 cookie-text <=> root.cookie-text; signed-in: root.signed-in;
-                queue-tracks: root.queue-tracks; queue-selected-index: root.queue-selected-index;
                 active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
                 position-text: root.position-text; duration-text: root.duration-text; playback-progress: root.playback-progress;
                 cover-image: root.cover-image; has-cover: root.has-cover;
@@ -215,7 +218,6 @@ export component MoggytWindow inherits Window {
                 filter-artists-label: root.filter-artists-label;
                 filter-playlists-label: root.filter-playlists-label;
                 search-empty-text: root.search-empty-text;
-                queue-empty-text: root.queue-empty-text;
                 no-cover-text: root.no-cover-text;
                 lyrics-unavailable-text: root.lyrics-unavailable-text;
                 lyrics-hint-text: root.lyrics-hint-text;
@@ -264,11 +266,10 @@ export component MoggytWindow inherits Window {
                 player-bar-skip-label: root.player-bar-skip-label;
                 player-bar-queue-label: root.player-bar-queue-label;
                 player-bar-volume-label: root.player-bar-volume-label;
-                open-settings => { root.page-selected(5); }
+                open-settings => { root.page-selected(4); }
                 query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
                 explore-track-selected(idx) => { root.explore-track-selected(idx); }
-                queue-track-selected(idx) => { root.queue-track-selected(idx); }
                 playlist-selected(idx) => { root.playlist-selected(idx); } album-selected(idx) => { root.album-selected(idx); }
                 artist-selected(idx) => { root.artist-selected(idx); } detail-track-selected(idx) => { root.detail-track-selected(idx); }
                 detail-play => { root.detail-play(); }
@@ -279,6 +280,23 @@ export component MoggytWindow inherits Window {
                 back-pressed => { root.back-pressed(); }
                 player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
                 player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
+            }
+
+            Rectangle {
+                width: root.queue-panel-open ? 340px : 0px;
+                clip: true;
+                animate width { duration: 180ms; easing: ease-in-out; }
+
+                QueuePanel {
+                    width: 340px;
+                    height: parent.height;
+                    tracks: root.queue-tracks;
+                    selected-index: root.queue-selected-index;
+                    empty-text: root.queue-empty-text;
+                    title-label: root.queue-title-label;
+                    track-selected(idx) => { root.queue-track-selected(idx); }
+                    close-panel => { root.close-queue-panel(); }
+                }
             }
         }
 
@@ -327,7 +345,8 @@ export component MoggytWindow inherits Window {
                 toggle-like => { root.toggle-like(); }
                 toggle-shuffle => { root.toggle-shuffle(); }
                 cycle-repeat => { root.cycle-repeat(); }
-                open-queue => { root.open-queue(); }
+                is-queue-open: root.queue-panel-open;
+                toggle-queue-panel => { root.toggle-queue-panel(); }
             }
         }
     }

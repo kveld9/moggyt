@@ -40,6 +40,7 @@ pub(crate) fn sync_window<
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_active_page(state.page.to_index());
     window.set_header_title(tr(state.locale, state.page.title()).into());
+    window.set_queue_panel_open(state.queue_panel_open);
     let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
     window.set_is_playing(is_playing);
     let volume = state.audio.try_lock().map(|a| a.volume()).unwrap_or(100);

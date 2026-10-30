@@ -1,0 +1,105 @@
+import { Theme, TrackRowData } from "../theme.slint";
+import { TrackRow } from "./rows.slint";
+import { IconClose } from "../icons.slint";
+
+export component QueuePanel inherits Rectangle {
+    in property <[TrackRowData]> tracks: [];
+    in property <int> selected-index: -1;
+    in property <string> empty-text: "The queue is empty.";
+    in property <string> title-label: "Queue";
+    callback track-selected(int);
+    callback close-panel();
+
+    background: Theme.panel;
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: 1px;
+        height: parent.height;
+        background: Theme.border;
+    }
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 16px;
+
+        HorizontalLayout {
+            alignment: space-between;
+            vertical-stretch: 0;
+
+            Text {
+                text: root.title-label;
+                color: Theme.text;
+                font-size: 16px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                width: 28px;
+                height: 28px;
+                border-radius: 14px;
+                background: close-touch.pressed ? Theme.overlay : (close-touch.has-hover ? Theme.hover : transparent);
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                close-touch := TouchArea {
+                    clicked => { root.close-panel(); }
+                }
+
+                IconClose {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    size: 16px;
+                    tint: close-touch.has-hover ? Theme.text : Theme.secondary;
+                }
+            }
+        }
+
+        if root.tracks.length == 0 : VerticalLayout {
+            vertical-stretch: 1;
+            padding-top: 24px;
+            alignment: center;
+
+            Text {
+                text: root.empty-text;
+                color: Theme.secondary;
+                font-size: 14px;
+                horizontal-alignment: center;
+            }
+        }
+
+        if root.tracks.length > 0 : flick := Flickable {
+            vertical-stretch: 1;
+
+            TouchArea {
+                x: 0;
+                y: -flick.viewport-y;
+                width: flick.width;
+                height: flick.height;
+
+                scroll-event(event) => {
+                    let min-y = min(0px, flick.height - flick.viewport-height);
+                    flick.viewport-y = min(0px, max(min-y, flick.viewport-y + event.delta-y * 3.5));
+                    return EventResult.accept;
+                }
+            }
+
+            VerticalLayout {
+                spacing: 8px;
+                alignment: start;
+
+                for track in root.tracks : TrackRow {
+                    title: track.title;
+                    artist: track.artist;
+                    album: track.album;
+                    duration: track.duration;
+                    kind: track.kind;
+                    cover: track.cover;
+                    is-active: track.index == root.selected-index;
+                    clicked => { root.track-selected(track.index); }
+                }
+            }
+        }
+    }
+}
