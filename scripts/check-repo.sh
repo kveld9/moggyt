@@ -128,30 +128,14 @@ check_file "scripts/check-i18n.sh" true
 echo -e "\n${BOLD}7. Source Modularity & File Size Limits${RESET}"
 
 # Modularity caps:
-# - Rust (.rs): max 900 lines (adjusted from suggested 800 lines because clean
-#   baseline src/infra/ytm.rs is 891 lines; setting 900 avoids grandfathering
-#   ytm.rs and strictly limits exceptions to the 3 known monoliths).
+# - Rust (.rs): max 900 lines (the 900-line cap was raised once to fit
+#   src/infra/ytm.rs (891 lines) and no file is exempt any more).
 # - Slint (.slint): max 400 lines per component module.
 # - Thin entry (ui/shell.slint): max 200 lines, exempt only while it stays an
 #   import-only entry under ~200 lines with no component definitions.
 MAX_RUST_LINES=900
 MAX_SLINT_LINES=400
 MAX_SHELL_SLINT_LINES=200
-
-# Grandfathered monoliths pending modularization:
-# - src/slint_shell/app.rs (3885 lines, pending domain/bridge split)
-# - src/infra/catalog_client.rs (2695 lines, pending API endpoint split)
-is_grandfathered() {
-  local target="$1"
-  case "${target}" in
-    src/slint_shell/app.rs|src/infra/catalog_client.rs)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
 
 while IFS= read -r file; do
   file="${file%$'\r'}"
@@ -192,23 +176,13 @@ while IFS= read -r file; do
   lines=${lines:-0}
 
   if (( lines > max_lines )); then
-    if is_grandfathered "${clean_file}"; then
-      echo -e "  [${YELLOW}WARN${RESET}] ${clean_file} (${lines} lines > ${max_lines} max; grandfathered pending modularization)"
-      PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-      echo -e "  [${RED}FAIL${RESET}] ${clean_file} (${lines} lines > ${max_lines} max; modularity limit exceeded)"
-      FAILED_CHECKS=$((FAILED_CHECKS + 1))
-    fi
+    echo -e "  [${RED}FAIL${RESET}] ${clean_file} (${lines} lines > ${max_lines} max; modularity limit exceeded)"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
   else
     # Exemption condition: ui/shell.slint must be import-only with no component definitions
     if [[ "${clean_file}" == "ui/shell.slint" ]] && grep -qE '^[[:space:]]*(export[[:space:]]+)?component[[:space:]]' "${full_path}"; then
-      if is_grandfathered "${clean_file}"; then
-        echo -e "  [${YELLOW}WARN${RESET}] ${clean_file} (${lines} lines; contains component definitions; grandfathered pending modularization)"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-      else
-        echo -e "  [${RED}FAIL${RESET}] ${clean_file} (thin entry must be import-only with no component definitions)"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
-      fi
+      echo -e "  [${RED}FAIL${RESET}] ${clean_file} (thin entry must be import-only with no component definitions)"
+      FAILED_CHECKS=$((FAILED_CHECKS + 1))
     else
       echo -e "  [${GREEN}OK${RESET}] ${clean_file} (${lines} lines <= ${max_lines} max)"
       PASSED_CHECKS=$((PASSED_CHECKS + 1))
