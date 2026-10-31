@@ -1,11 +1,10 @@
+import { Labels } from "../labels.slint";
 import { Theme, ExploreShelfData } from "../theme.slint";
 import { MediaCard } from "../components/cards.slint";
 
 export component ExploreView inherits VerticalLayout {
     in property <[ExploreShelfData]> shelves: [];
     in property <bool> is-loading: false;
-    in property <string> loading-text: "Loading explore...";
-    in property <string> empty-text: "No sections found in Explore.";
     callback track-selected(int);
 
     spacing: 16px;
@@ -16,7 +15,7 @@ export component ExploreView inherits VerticalLayout {
         alignment: center;
 
         Text {
-            text: root.loading-text;
+            text: Labels.explore-loading-text;
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
@@ -28,7 +27,7 @@ export component ExploreView inherits VerticalLayout {
         alignment: center;
 
         Text {
-            text: root.empty-text;
+            text: Labels.explore-empty-text;
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;

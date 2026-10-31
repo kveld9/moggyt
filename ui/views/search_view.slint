@@ -1,3 +1,4 @@
+import { Labels } from "../labels.slint";
 import { Theme, ShelfData } from "../theme.slint";
 import { FilterChip } from "../components/controls.slint";
 import { TrackRow } from "../components/rows.slint";
@@ -7,19 +8,8 @@ export component SearchView inherits VerticalLayout {
     in-out property <string> query: "";
     in property <[ShelfData]> shelves: [];
     in property <int> active-filter: 0;
-    in property <string> placeholder-text: "Search songs...";
-    in property <string> search-button-label: "Search";
-    in property <string> filter-all-label: "All";
-    in property <string> filter-songs-label: "Songs";
-    in property <string> filter-albums-label: "Albums";
-    in property <string> filter-artists-label: "Artists";
-    in property <string> filter-playlists-label: "Playlists";
-    in property <string> empty-text: "No results found.";
     in property <[string]> recent-searches: [];
     in property <bool> search-active: false;
-    in property <string> recent-title-label: "Recent searches";
-    in property <string> recent-empty-label: "No recent searches.";
-    in property <string> clear-history-label: "Clear history";
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
@@ -78,7 +68,7 @@ export component SearchView inherits VerticalLayout {
                     if root.query == "" && !input.has-focus : Text {
                         width: parent.width;
                         height: parent.height;
-                        text: root.placeholder-text;
+                        text: Labels.search-placeholder;
                         color: Theme.secondary;
                         vertical-alignment: center;
 
@@ -135,7 +125,7 @@ export component SearchView inherits VerticalLayout {
                 }
 
                 Text {
-                    text: root.search-button-label;
+                    text: Labels.search-button-label;
                     color: btn-touch.has-hover ? Theme.text : Theme.window;
                     font-size: 13px;
                     font-weight: 700;
@@ -150,27 +140,27 @@ export component SearchView inherits VerticalLayout {
         alignment: start;
 
         FilterChip {
-            text: root.filter-all-label;
+            text: Labels.filter-all-label;
             is-active: root.active-filter == 0;
             clicked => { root.filter-selected(0); }
         }
         FilterChip {
-            text: root.filter-songs-label;
+            text: Labels.filter-songs-label;
             is-active: root.active-filter == 1;
             clicked => { root.filter-selected(1); }
         }
         FilterChip {
-            text: root.filter-albums-label;
+            text: Labels.filter-albums-label;
             is-active: root.active-filter == 2;
             clicked => { root.filter-selected(2); }
         }
         FilterChip {
-            text: root.filter-artists-label;
+            text: Labels.filter-artists-label;
             is-active: root.active-filter == 3;
             clicked => { root.filter-selected(3); }
         }
         FilterChip {
-            text: root.filter-playlists-label;
+            text: Labels.filter-playlists-label;
             is-active: root.active-filter == 4;
             clicked => { root.filter-selected(4); }
         }
@@ -181,7 +171,7 @@ export component SearchView inherits VerticalLayout {
         alignment: center;
 
         Text {
-            text: root.empty-text;
+            text: Labels.search-empty-text;
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
@@ -222,7 +212,7 @@ export component SearchView inherits VerticalLayout {
         alignment: start;
 
         Text {
-            text: root.recent-title-label;
+            text: Labels.recent-title-label;
             color: Theme.text;
             font-size: 18px;
             font-weight: 700;
@@ -233,7 +223,7 @@ export component SearchView inherits VerticalLayout {
             alignment: center;
 
             Text {
-                text: root.recent-empty-label;
+                text: Labels.recent-empty-label;
                 color: Theme.secondary;
                 font-size: 14px;
             }
@@ -305,7 +295,7 @@ export component SearchView inherits VerticalLayout {
                     padding-bottom: 6px;
 
                     Text {
-                        text: root.clear-history-label;
+                        text: Labels.clear-history-label;
                         color: clear-btn-touch.has-hover ? Theme.accent : Theme.secondary;
                         font-size: 13px;
                         font-weight: 600;

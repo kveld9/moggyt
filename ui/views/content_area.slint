@@ -17,8 +17,6 @@ import { SettingsView } from "./settings_view.slint";
 export component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
     in property <string> header-title: "Search";
-    in property <string> explore-loading-text: "Loading explore...";
-    in property <string> explore-empty-text: "No sections found in Explore.";
     in property <bool> has-update: false;
     in-out property <string> query: "";
     in-out property <string> cookie-text: "";
@@ -46,19 +44,8 @@ export component ContentArea inherits Rectangle {
     in property <string> update-status-text: "Up to date";
     in property <[ExploreShelfData]> explore-shelves: [];
     in property <bool> explore-loading: false;
-    in property <string> search-placeholder: "Search songs...";
-    in property <string> search-button-label: "Search";
-    in property <string> filter-all-label: "All";
-    in property <string> filter-songs-label: "Songs";
-    in property <string> filter-albums-label: "Albums";
-    in property <string> filter-artists-label: "Artists";
-    in property <string> filter-playlists-label: "Playlists";
-    in property <string> search-empty-text: "No results found.";
     in property <[string]> recent-searches: [];
     in property <bool> search-active: false;
-    in property <string> recent-title-label: "Recent searches";
-    in property <string> recent-empty-label: "No recent searches.";
-    in property <string> clear-history-label: "Clear history";
     in property <string> no-cover-text: "No cover";
     in property <string> lyrics-unavailable-text: "Lyrics unavailable";
     in property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
@@ -226,19 +213,8 @@ export component ContentArea inherits Rectangle {
                 query <=> root.query;
                 shelves: root.shelves;
                 active-filter: root.search-filter;
-                placeholder-text: root.search-placeholder;
-                search-button-label: root.search-button-label;
-                filter-all-label: root.filter-all-label;
-                filter-songs-label: root.filter-songs-label;
-                filter-albums-label: root.filter-albums-label;
-                filter-artists-label: root.filter-artists-label;
-                filter-playlists-label: root.filter-playlists-label;
-                empty-text: root.search-empty-text;
                 recent-searches: root.recent-searches;
                 search-active: root.search-active;
-                recent-title-label: root.recent-title-label;
-                recent-empty-label: root.recent-empty-label;
-                clear-history-label: root.clear-history-label;
                 query-submitted(q) => { root.query-submitted(q); }
                 track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
@@ -358,8 +334,6 @@ export component ContentArea inherits Rectangle {
             if root.active-page == 5 : ExploreView {
                 shelves: root.explore-shelves;
                 is-loading: root.explore-loading;
-                loading-text: root.explore-loading-text;
-                empty-text: root.explore-empty-text;
                 track-selected(idx) => { root.explore-track-selected(idx); }
             }
         }

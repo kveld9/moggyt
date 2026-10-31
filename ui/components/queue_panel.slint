@@ -1,3 +1,4 @@
+import { Labels } from "../labels.slint";
 import { Theme, TrackRowData } from "../theme.slint";
 import { TrackRow } from "./rows.slint";
 import { IconClose } from "../icons.slint";
@@ -5,8 +6,6 @@ import { IconClose } from "../icons.slint";
 export component QueuePanel inherits Rectangle {
     in property <[TrackRowData]> tracks: [];
     in property <int> selected-index: -1;
-    in property <string> empty-text: "The queue is empty.";
-    in property <string> title-label: "Queue";
     callback track-selected(int);
     callback close-panel();
 
@@ -29,7 +28,7 @@ export component QueuePanel inherits Rectangle {
             vertical-stretch: 0;
 
             Text {
-                text: root.title-label;
+                text: Labels.queue-title-label;
                 color: Theme.text;
                 font-size: 16px;
                 font-weight: 700;
@@ -62,7 +61,7 @@ export component QueuePanel inherits Rectangle {
             alignment: center;
 
             Text {
-                text: root.empty-text;
+                text: Labels.queue-empty-text;
                 color: Theme.secondary;
                 font-size: 14px;
                 horizontal-alignment: center;
