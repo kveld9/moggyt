@@ -202,7 +202,7 @@ jobs:
           ARCH=x86_64 ./appimagetool.AppImage AppDir "dist/moggyt-${VERSION}-x86_64.AppImage"
 
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-asset-${{ matrix.target-os }}
           path: dist/*
