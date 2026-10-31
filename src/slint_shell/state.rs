@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::domain::{
-    Album, Artist, Detail, DetailKind, PlaybackQueue, PlayerBarMode, Playlist, RecentSearches,
+    Album, Detail, DetailKind, PlaybackQueue, PlayerBarMode, Playlist, RecentSearches,
     SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer, ThemeId, Track,
     extract_playlist_id,
 };
@@ -61,7 +61,6 @@ pub struct SlintAppState {
     pub search_results: Vec<Track>,
     pub library_playlists: Vec<Playlist>,
     pub library_albums: Vec<Album>,
-    pub library_artists: Vec<Artist>,
     pub detail: Option<Detail>,
     pub detail_return: SlintPage,
     pub lyrics_lines: Vec<LyricLine>,
@@ -177,7 +176,6 @@ impl SlintAppState {
         };
         self.library_playlists = playlists;
         self.library_albums = albums;
-        self.library_artists = Vec::new();
     }
 
     /// Submits search query to catalog and wraps hits in a shelf.

@@ -43,7 +43,8 @@ export component MoggytWindow inherits Window {
     in-out property <bool> show-settings: false;
     in-out property <int> active-theme-index: 0;
     in-out property <string> playback-speed-text: "1.00x";
-    in-out property <string> sleep-timer-status-text: "Timer: Off"; in-out property <int> active-sleep-timer-index: 0;
+    in-out property <string> sleep-timer-status-text: "Timer: Off";
+    in-out property <int> active-sleep-timer-index: 0;
     in-out property <string> settings-cookie-text: "";
     in-out property <string> app-version: "0.1.0";
     in-out property <string> update-status-text: "Up to date";
@@ -73,9 +74,15 @@ export component MoggytWindow inherits Window {
     in-out property <int> queue-count: 0;
     in-out property <[LyricLineData]> lyrics-lines: [];
     in-out property <int> active-lyric-index: -1;
-    in-out property <[LibraryItemData]> library-playlists: []; in-out property <[LibraryItemData]> library-albums: []; in-out property <[LibraryItemData]> library-artists: [];
-    in-out property <bool> detail-has-detail: false; in-out property <bool> detail-has-artwork: false; in-out property <string> detail-title: ""; in-out property <string> detail-subtitle: ""; in-out property <string> detail-description: "";
-    in-out property <string> detail-kind-label: ""; in-out property <[TrackRowData]> detail-tracks: [];
+    in-out property <[LibraryItemData]> library-playlists: [];
+    in-out property <[LibraryItemData]> library-albums: [];
+    in-out property <bool> detail-has-detail: false;
+    in-out property <bool> detail-has-artwork: false;
+    in-out property <string> detail-title: "";
+    in-out property <string> detail-subtitle: "";
+    in-out property <string> detail-description: "";
+    in-out property <string> detail-kind-label: "";
+    in-out property <[TrackRowData]> detail-tracks: [];
     in-out property <image> detail-cover;
     in-out property <[ExploreShelfData]> explore-shelves: [];
     in-out property <bool> explore-loading: false;
@@ -125,7 +132,9 @@ export component MoggytWindow inherits Window {
     callback explore-track-selected(int);
     callback width-changed(int);
     callback queue-track-selected(int);
-    callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
+    callback playlist-selected(int);
+    callback album-selected(int);
+    callback detail-track-selected(int);
     callback detail-play();
     callback detail-shuffle();
     callback sign-in-submitted(string);
@@ -174,16 +183,32 @@ export component MoggytWindow inherits Window {
 
             ContentArea {
                 horizontal-stretch: 1;
-                active-page: root.active-page; header-title: root.header-title; query <=> root.query; shelves: root.shelves;
+                active-page: root.active-page;
+                header-title: root.header-title;
+                query <=> root.query;
+                shelves: root.shelves;
                 search-filter: root.search-filter;
-                cookie-text <=> root.cookie-text; signed-in: root.signed-in;
-                active-track-title: root.active-track-title; active-track-artist: root.active-track-artist;
-                position-text: root.position-text; duration-text: root.duration-text; playback-progress: root.playback-progress;
-                cover-image: root.cover-image; has-cover: root.has-cover;
-                lyrics-lines: root.lyrics-lines; active-lyric-index: root.active-lyric-index;
-                library-playlists: root.library-playlists; library-albums: root.library-albums; library-artists: root.library-artists;
-                detail-has-detail: root.detail-has-detail; detail-has-artwork: root.detail-has-artwork; detail-title: root.detail-title; detail-subtitle: root.detail-subtitle; detail-description: root.detail-description;
-                detail-kind-label: root.detail-kind-label; detail-cover: root.detail-cover; detail-tracks: root.detail-tracks;
+                cookie-text <=> root.cookie-text;
+                signed-in: root.signed-in;
+                active-track-title: root.active-track-title;
+                active-track-artist: root.active-track-artist;
+                position-text: root.position-text;
+                duration-text: root.duration-text;
+                playback-progress: root.playback-progress;
+                cover-image: root.cover-image;
+                has-cover: root.has-cover;
+                lyrics-lines: root.lyrics-lines;
+                active-lyric-index: root.active-lyric-index;
+                library-playlists: root.library-playlists;
+                library-albums: root.library-albums;
+                detail-has-detail: root.detail-has-detail;
+                detail-has-artwork: root.detail-has-artwork;
+                detail-title: root.detail-title;
+                detail-subtitle: root.detail-subtitle;
+                detail-description: root.detail-description;
+                detail-kind-label: root.detail-kind-label;
+                detail-cover: root.detail-cover;
+                detail-tracks: root.detail-tracks;
                 explore-shelves: root.explore-shelves;
                 explore-loading: root.explore-loading;
                 has-update: root.has-update;
@@ -194,7 +219,8 @@ export component MoggytWindow inherits Window {
                 update-status-text: root.update-status-text;
                 recent-searches: root.recent-searches;
                 search-active: root.search-active;
-                sleep-timer-status-text: root.sleep-timer-status-text; active-sleep-timer-index: root.active-sleep-timer-index;
+                sleep-timer-status-text: root.sleep-timer-status-text;
+                active-sleep-timer-index: root.active-sleep-timer-index;
                 player-bar-mode: root.player-bar-mode;
                 player-bar-show-artwork: root.player-bar-show-artwork;
                 player-bar-show-like: root.player-bar-show-like;
@@ -204,17 +230,20 @@ export component MoggytWindow inherits Window {
                 player-bar-show-queue: root.player-bar-show-queue;
                 player-bar-show-volume: root.player-bar-show-volume;
                 open-settings => { root.page-selected(4); }
-                query-submitted(q) => { root.query-submitted(q); } track-selected(idx) => { root.track-selected(idx); }
+                query-submitted(q) => { root.query-submitted(q); }
+                track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
                 recent-search-selected(q) => { root.recent-search-selected(q); }
                 recent-search-removed(q) => { root.recent-search-removed(q); }
                 recent-searches-cleared => { root.recent-searches-cleared(); }
                 explore-track-selected(idx) => { root.explore-track-selected(idx); }
-                playlist-selected(idx) => { root.playlist-selected(idx); } album-selected(idx) => { root.album-selected(idx); }
-                artist-selected(idx) => { root.artist-selected(idx); } detail-track-selected(idx) => { root.detail-track-selected(idx); }
+                playlist-selected(idx) => { root.playlist-selected(idx); }
+                album-selected(idx) => { root.album-selected(idx); }
+                detail-track-selected(idx) => { root.detail-track-selected(idx); }
                 detail-play => { root.detail-play(); }
                 detail-shuffle => { root.detail-shuffle(); }
-                sign-in-submitted(t) => { root.sign-in-submitted(t); } sign-out() => { root.sign-out(); }
+                sign-in-submitted(t) => { root.sign-in-submitted(t); }
+                sign-out() => { root.sign-out(); }
                 theme-selected(idx) => { root.theme-selected(idx); }
                 cycle-playback-speed => { root.cycle-playback-speed(); }
                 sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }

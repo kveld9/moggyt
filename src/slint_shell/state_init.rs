@@ -67,7 +67,6 @@ impl SlintAppState {
             search_results: Vec::new(),
             library_playlists: Vec::new(),
             library_albums: Vec::new(),
-            library_artists: Vec::new(),
             detail: None,
             detail_return: SlintPage::Search,
             lyrics_lines: Vec::new(),

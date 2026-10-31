@@ -39,8 +39,6 @@ pub struct StaticLabels {
     pub empty_playlists: &'static str,
     pub section_albums: &'static str,
     pub empty_albums: &'static str,
-    pub section_artists: &'static str,
-    pub empty_artists: &'static str,
     pub empty_detail: &'static str,
     pub play_button: &'static str,
     pub shuffle_button: &'static str,
@@ -140,8 +138,6 @@ impl StaticLabels {
             empty_playlists: tr(locale, "No playlists found."),
             section_albums: tr(locale, "Albums"),
             empty_albums: tr(locale, "No albums found."),
-            section_artists: tr(locale, "Artists"),
-            empty_artists: tr(locale, "No artists found."),
             empty_detail: tr(locale, "No details available."),
             play_button: tr(locale, "Play"),
             shuffle_button: tr(locale, "Shuffle"),
@@ -245,8 +241,6 @@ impl StaticLabels {
         labels.set_empty_playlists_text(self.empty_playlists.into());
         labels.set_section_albums_label(self.section_albums.into());
         labels.set_empty_albums_text(self.empty_albums.into());
-        labels.set_section_artists_label(self.section_artists.into());
-        labels.set_empty_artists_text(self.empty_artists.into());
 
         labels.set_empty_detail_text(self.empty_detail.into());
         labels.set_play_button_label(self.play_button.into());
@@ -370,8 +364,6 @@ mod tests {
         assert_eq!(es.empty_playlists, "No hay listas de reproducción.");
         assert_eq!(es.section_albums, "Álbumes");
         assert_eq!(es.empty_albums, "No hay álbumes.");
-        assert_eq!(es.section_artists, "Artistas");
-        assert_eq!(es.empty_artists, "No hay artistas.");
         assert_eq!(es.empty_detail, "No hay detalles disponibles.");
         assert_eq!(es.play_button, "Reproducir");
         assert_eq!(es.shuffle_button, "Aleatorio");
@@ -467,8 +459,6 @@ mod tests {
         assert_eq!(en.empty_playlists, "No playlists found.");
         assert_eq!(en.section_albums, "Albums");
         assert_eq!(en.empty_albums, "No albums found.");
-        assert_eq!(en.section_artists, "Artists");
-        assert_eq!(en.empty_artists, "No artists found.");
         assert_eq!(en.empty_detail, "No details available.");
         assert_eq!(en.play_button, "Play");
         assert_eq!(en.shuffle_button, "Shuffle");

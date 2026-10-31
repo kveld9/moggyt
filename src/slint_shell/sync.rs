@@ -218,19 +218,6 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
         .collect();
     window.set_library_albums(ModelRc::new(VecModel::from(albums)));
 
-    let artists: Vec<LibraryItemData> = state
-        .library_artists
-        .iter()
-        .enumerate()
-        .map(|(i, a)| LibraryItemData {
-            index: i as i32,
-            title: a.name.clone().into(),
-            subtitle: "Artist".into(),
-            cover: resolve_row_cover_image(a.artwork.as_deref(), &state.search_covers),
-        })
-        .collect();
-    window.set_library_artists(ModelRc::new(VecModel::from(artists)));
-
     if let Some(detail) = &state.detail {
         window.set_detail_has_detail(true);
         window.set_detail_has_artwork(detail_has_artwork(detail));

@@ -8,10 +8,8 @@ export component LibraryView inherits VerticalLayout {
     in property <bool> signed-in: false;
     in property <[LibraryItemData]> playlists: [];
     in property <[LibraryItemData]> albums: [];
-    in property <[LibraryItemData]> artists: [];
     callback playlist-selected(int);
     callback album-selected(int);
-    callback artist-selected(int);
     callback sign-in-submitted(string);
     callback sign-out();
     callback import-requested();
@@ -142,12 +140,5 @@ export component LibraryView inherits VerticalLayout {
         Text { text: Labels.section-albums-label; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.albums.length == 0 : Text { text: Labels.empty-albums-text; color: Theme.secondary; font-size: 13px; }
         for item in root.albums : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.album-selected(item.index); } }
-    }
-
-    VerticalLayout {
-        spacing: 6px;
-        Text { text: Labels.section-artists-label; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.artists.length == 0 : Text { text: Labels.empty-artists-text; color: Theme.secondary; font-size: 13px; }
-        for item in root.artists : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.artist-selected(item.index); } }
     }
 }
