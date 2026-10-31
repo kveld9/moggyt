@@ -1,3 +1,4 @@
+import { Labels } from "../labels.slint";
 import { Theme, TrackRowData } from "../theme.slint";
 import { TrackRow } from "../components/rows.slint";
 import { IconPlay, IconShuffle } from "../icons.slint";
@@ -11,11 +12,6 @@ export component DetailView inherits VerticalLayout {
     in property <string> kind-label: "";
     in property <image> cover;
     in property <[TrackRowData]> tracks: [];
-    in property <string> empty-text: "No details available.";
-    in property <string> no-cover-text: "No cover";
-    in property <string> play-button-label: "Play";
-    in property <string> shuffle-button-label: "Shuffle";
-    in property <string> empty-songs-text: "No songs available.";
     callback track-selected(int);
     callback play();
     callback shuffle();
@@ -26,7 +22,7 @@ export component DetailView inherits VerticalLayout {
         padding-top: 24px;
         alignment: center;
         Text {
-            text: root.empty-text;
+            text: Labels.empty-detail-text;
             color: Theme.secondary;
             font-size: 14px;
             horizontal-alignment: center;
@@ -60,7 +56,7 @@ export component DetailView inherits VerticalLayout {
                     image-fit: ImageFit.cover;
                 }
                 if root.cover.width == 0 && (root.detail-has-artwork || root.tracks.length == 0 || root.tracks[0].cover.width == 0) : Text {
-                    text: root.kind-label != "" ? root.kind-label : root.no-cover-text;
+                    text: root.kind-label != "" ? root.kind-label : Labels.no-cover-text;
                     color: Theme.secondary;
                     font-size: 12px;
                     font-weight: 700;
@@ -134,7 +130,7 @@ export component DetailView inherits VerticalLayout {
                             }
 
                             Text {
-                                text: root.play-button-label;
+                                text: Labels.play-button-label;
                                 color: play-touch.has-hover ? Theme.text : Theme.window;
                                 font-size: 13px;
                                 font-weight: 700;
@@ -168,7 +164,7 @@ export component DetailView inherits VerticalLayout {
                             }
 
                             Text {
-                                text: root.shuffle-button-label;
+                                text: Labels.shuffle-button-label;
                                 color: shuf-touch.has-hover ? Theme.accent : Theme.text;
                                 font-size: 13px;
                                 font-weight: 700;
@@ -189,7 +185,7 @@ export component DetailView inherits VerticalLayout {
             padding-top: 16px;
             alignment: center;
             Text {
-                text: root.empty-songs-text;
+                text: Labels.empty-songs-text;
                 color: Theme.secondary;
                 font-size: 13px;
                 horizontal-alignment: center;

@@ -1,3 +1,4 @@
+import { Labels } from "../labels.slint";
 import { Theme, LyricLineData } from "../theme.slint";
 
 export component NowPlayingView inherits VerticalLayout {
@@ -10,9 +11,6 @@ export component NowPlayingView inherits VerticalLayout {
     in property <bool> has-cover: false;
     in property <[LyricLineData]> lyrics-lines: [];
     in property <int> active-lyric-index: -1;
-    in property <string> no-cover-text: "No cover";
-    in property <string> lyrics-unavailable-text: "Lyrics unavailable";
-    in property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
 
     spacing: 16px; alignment: start;
 
@@ -26,7 +24,7 @@ export component NowPlayingView inherits VerticalLayout {
                 image-fit: cover;
             }
             if !root.has-cover : Text {
-                text: root.no-cover-text; color: Theme.secondary; font-size: 12px;
+                text: Labels.no-cover-text; color: Theme.secondary; font-size: 12px;
                 horizontal-alignment: center; vertical-alignment: center;
             }
         }
@@ -52,8 +50,8 @@ export component NowPlayingView inherits VerticalLayout {
         height: 140px; border-radius: 8px; background: Theme.panel;
         VerticalLayout {
             alignment: center; spacing: 4px;
-            Text { text: root.lyrics-unavailable-text; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
-            Text { text: root.lyrics-hint-text; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
+            Text { text: Labels.lyrics-unavailable-text; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
+            Text { text: Labels.lyrics-hint-text; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
         }
     }
 

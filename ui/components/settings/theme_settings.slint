@@ -1,19 +1,16 @@
+import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
 import { SettingsModeButton } from "../settings_rows.slint";
 
 export component ThemeSettings inherits VerticalLayout {
     in property <int> active-theme-index: 0;
-    in property <string> section-theme-label: "Theme";
-    in property <string> theme-white-label: "White";
-    in property <string> theme-black-oled-label: "Black OLED";
-    in property <string> theme-mono-label: "Mono";
 
     callback theme-selected(int);
 
     spacing: 10px;
 
     Text {
-        text: root.section-theme-label;
+        text: Labels.section-theme-label;
         color: Theme.text;
         font-size: 16px;
         font-weight: 700;
@@ -23,19 +20,19 @@ export component ThemeSettings inherits VerticalLayout {
         spacing: 12px;
 
         SettingsModeButton {
-            label: root.theme-white-label;
+            label: Labels.theme-white-label;
             is-active: root.active-theme-index == 0;
             clicked => { root.theme-selected(0); }
         }
 
         SettingsModeButton {
-            label: root.theme-black-oled-label;
+            label: Labels.theme-black-oled-label;
             is-active: root.active-theme-index == 1;
             clicked => { root.theme-selected(1); }
         }
 
         SettingsModeButton {
-            label: root.theme-mono-label;
+            label: Labels.theme-mono-label;
             is-active: root.active-theme-index == 2;
             clicked => { root.theme-selected(2); }
         }

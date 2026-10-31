@@ -1,18 +1,9 @@
+import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
 import { SettingsModeButton } from "../settings_rows.slint";
 
 export component PlaybackSettings inherits VerticalLayout {
     in property <string> playback-speed-text: "1.00x";
-    in property <string> section-playback-label: "Playback";
-    in property <string> playback-speed-label: "Playback speed";
-
-    in property <string> sleep-timer-label: "Sleep timer";
-    in property <string> sleep-timer-off-label: "Off";
-    in property <string> sleep-timer-15m-label: "15m";
-    in property <string> sleep-timer-30m-label: "30m";
-    in property <string> sleep-timer-45m-label: "45m";
-    in property <string> sleep-timer-60m-label: "60m";
-    in property <string> sleep-timer-end-of-track-label: "End of track";
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
 
@@ -22,7 +13,7 @@ export component PlaybackSettings inherits VerticalLayout {
     spacing: 10px;
 
     Text {
-        text: root.section-playback-label;
+        text: Labels.section-playback-label;
         color: Theme.text;
         font-size: 16px;
         font-weight: 700;
@@ -40,7 +31,7 @@ export component PlaybackSettings inherits VerticalLayout {
                 alignment: space-between;
 
                 Text {
-                    text: root.playback-speed-label;
+                    text: Labels.playback-speed-label;
                     color: Theme.text;
                     font-size: 14px;
                     vertical-alignment: center;
@@ -80,7 +71,7 @@ export component PlaybackSettings inherits VerticalLayout {
                     alignment: space-between;
 
                     Text {
-                        text: root.sleep-timer-label;
+                        text: Labels.sleep-timer-label;
                         color: Theme.text;
                         font-size: 14px;
                         vertical-alignment: center;
@@ -99,37 +90,37 @@ export component PlaybackSettings inherits VerticalLayout {
                     spacing: 8px;
 
                     SettingsModeButton {
-                        label: root.sleep-timer-off-label;
+                        label: Labels.sleep-timer-off-label;
                         is-active: root.active-sleep-timer-index == 0;
                         clicked => { root.sleep-timer-preset-selected(0); }
                     }
 
                     SettingsModeButton {
-                        label: root.sleep-timer-15m-label;
+                        label: Labels.sleep-timer-15m-label;
                         is-active: root.active-sleep-timer-index == 1;
                         clicked => { root.sleep-timer-preset-selected(1); }
                     }
 
                     SettingsModeButton {
-                        label: root.sleep-timer-30m-label;
+                        label: Labels.sleep-timer-30m-label;
                         is-active: root.active-sleep-timer-index == 2;
                         clicked => { root.sleep-timer-preset-selected(2); }
                     }
 
                     SettingsModeButton {
-                        label: root.sleep-timer-45m-label;
+                        label: Labels.sleep-timer-45m-label;
                         is-active: root.active-sleep-timer-index == 3;
                         clicked => { root.sleep-timer-preset-selected(3); }
                     }
 
                     SettingsModeButton {
-                        label: root.sleep-timer-60m-label;
+                        label: Labels.sleep-timer-60m-label;
                         is-active: root.active-sleep-timer-index == 4;
                         clicked => { root.sleep-timer-preset-selected(4); }
                     }
 
                     SettingsModeButton {
-                        label: root.sleep-timer-end-of-track-label;
+                        label: Labels.sleep-timer-end-of-track-label;
                         is-active: root.active-sleep-timer-index == 5;
                         clicked => { root.sleep-timer-preset-selected(5); }
                     }

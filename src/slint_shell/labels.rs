@@ -229,57 +229,6 @@ impl StaticLabels {
         labels.set_player_bar_skip_label(self.player_bar_skip.into());
         labels.set_player_bar_queue_label(self.player_bar_queue.into());
         labels.set_player_bar_volume_label(self.player_bar_volume.into());
-
-        window.set_no_cover_text(self.no_cover.into());
-        window.set_lyrics_unavailable_text(self.lyrics_unavailable.into());
-        window.set_lyrics_hint_text(self.lyrics_hint.into());
-
-        window.set_session_anonymous_hint(self.session_anonymous_hint.into());
-        window.set_session_cookie_placeholder(self.session_cookie_placeholder.into());
-        window.set_sign_in_label(self.sign_in.into());
-        window.set_session_signed_in_hint(self.session_signed_in_hint.into());
-        window.set_sign_out_label(self.sign_out.into());
-        window.set_section_playlists_label(self.section_playlists.into());
-        window.set_empty_playlists_text(self.empty_playlists.into());
-        window.set_section_albums_label(self.section_albums.into());
-        window.set_empty_albums_text(self.empty_albums.into());
-        window.set_section_artists_label(self.section_artists.into());
-        window.set_empty_artists_text(self.empty_artists.into());
-
-        window.set_empty_detail_text(self.empty_detail.into());
-        window.set_play_button_label(self.play_button.into());
-        window.set_shuffle_button_label(self.shuffle_button.into());
-        window.set_empty_songs_text(self.empty_songs.into());
-
-        window.set_section_theme_label(self.section_theme.into());
-        window.set_theme_white_label(self.theme_white.into());
-        window.set_theme_black_oled_label(self.theme_black_oled.into());
-        window.set_theme_mono_label(self.theme_mono.into());
-        window.set_section_playback_label(self.section_playback.into());
-        window.set_playback_speed_label(self.playback_speed.into());
-        window.set_sleep_timer_label(self.sleep_timer_label.into());
-        window.set_sleep_timer_off_label(self.sleep_timer_off_label.into());
-        window.set_sleep_timer_15m_label(self.sleep_timer_15m_label.into());
-        window.set_sleep_timer_30m_label(self.sleep_timer_30m_label.into());
-        window.set_sleep_timer_45m_label(self.sleep_timer_45m_label.into());
-        window.set_sleep_timer_60m_label(self.sleep_timer_60m_label.into());
-        window.set_sleep_timer_end_of_track_label(self.sleep_timer_end_of_track_label.into());
-        window.set_section_session_label(self.section_session.into());
-        window.set_status_signed_in_label(self.status_signed_in.into());
-        window.set_status_anonymous_label(self.status_anonymous.into());
-        window.set_section_about_label(self.section_about.into());
-        window.set_app_version_label(self.app_version.into());
-        window.set_update_status_label(self.update_status.into());
-        window.set_section_player_bar_label(self.section_player_bar.into());
-        window.set_player_bar_classic_label(self.player_bar_classic.into());
-        window.set_player_bar_floating_label(self.player_bar_floating.into());
-        window.set_player_bar_artwork_label(self.player_bar_artwork.into());
-        window.set_player_bar_like_label(self.player_bar_like.into());
-        window.set_player_bar_shuffle_label(self.player_bar_shuffle.into());
-        window.set_player_bar_repeat_label(self.player_bar_repeat.into());
-        window.set_player_bar_skip_label(self.player_bar_skip.into());
-        window.set_player_bar_queue_label(self.player_bar_queue.into());
-        window.set_player_bar_volume_label(self.player_bar_volume.into());
     }
 }
 
