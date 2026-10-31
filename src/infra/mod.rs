@@ -29,6 +29,8 @@ mod instance;
 mod lyric_overrides;
 mod lyrics;
 mod lyrics_lrclib;
+mod playlist_store;
+mod playlist_store_disk;
 mod presence;
 mod presence_desktop;
 mod presence_discord;
@@ -80,6 +82,10 @@ pub use lyrics_lrclib::{
     LyricsCandidate, PARTIAL_MATCH_SCORE, WEIGHT_ARTIST, WEIGHT_DURATION, WEIGHT_TITLE,
     duration_similarity, lrclib_get_url, match_confidence, normalize_text, parse_lrc,
     payload_matches, text_similarity,
+};
+pub use playlist_store::{MemoryPlaylistStore, PlaylistStore};
+pub use playlist_store_disk::{
+    DiskPlaylistStore, PLAYLISTS_FILE, PLAYLISTS_SCHEMA_VERSION, PlaylistFile,
 };
 pub use presence::{NoopPresence, Presence};
 pub use presence_desktop::{DesktopPresence, MediaKeyAction, action_for, metadata_for, status_for};
