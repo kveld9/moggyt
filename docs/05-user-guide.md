@@ -82,6 +82,102 @@ The library view manages account authentication, release update actions, and sav
 - **Liked Songs**: lists liked tracks. Each row provides track details and an `Unlike` button.
 - **Saved Albums**: lists saved albums by title and artist. Shows `No saved albums` when empty.
 
+### Spotify Import
+
+`moggyt` allows importing playlists and albums from Spotify directly into your local library, resolving tracks against
+YouTube Music audio streams without requiring Spotify accounts or developer API keys.
+
+#### Launching Import
+
+Click the `Import` button located in the `Library` view to open the Spotify import modal.
+
+#### Import Sources
+
+The modal provides two tabs for supplying playlist metadata:
+
+- **From link (`From link`)**: Paste a public Spotify playlist or album web link or Spotify URI:
+  - Standard URLs: `https://open.spotify.com/playlist/<id>` and `https://open.spotify.com/album/<id>`
+  - Localized URLs: `https://open.spotify.com/intl-en/playlist/<id>`
+  - Embed URLs: `https://open.spotify.com/embed/playlist/<id>`
+  - Legacy user URLs: `https://open.spotify.com/user/<user>/playlist/<id>`
+  - Desktop URIs: `spotify:playlist:<id>` and `spotify:album:<id>`
+  Spotify identifiers must be valid 22-character alphanumeric IDs.
+- **From file (`From file`)**: Specify the path to an exported playlist file:
+  - **Exportify CSV**: 19-column CSV file exported from Exportify containing `Track Name`, `Artist Name(s)`,
+    `Album Name`, `Track Duration (ms)`, `ISRC`, and `Track URI` columns.
+  - **Spotify JSON Backup**: Standard JSON playlist backup file containing track and artist metadata.
+
+#### Embed 100-Track Limit & CSV Alternative
+
+Spotify embed pages limit returned tracklists to the first 100 tracks. For public playlists with over 100 tracks, or
+for private playlists, export the playlist using Exportify or a Spotify backup tool, and import the resulting CSV or
+JSON file using the **From file** tab to import all tracks without truncation.
+
+#### Progress Overlay
+
+Clicking `Start import` initiates the matching process and displays the progress overlay:
+
+- **Progress Bar**: Shows real-time progress (`done / total` tracks).
+- **Status Tallies**:
+  - **Matched**: Number of high-confidence matches found.
+  - **Needs review**: Number of medium-confidence matches requiring visual verification.
+  - **Unresolved**: Number of tracks where no candidate scored above the minimum threshold (0.50) or the track is
+    absent from YouTube Music.
+- **Cancel Button**: Clicking `Cancel` stops matching at any time; processed tracks are retained and forwarded to the
+  review screen.
+
+#### Review Step & Confidence Badges
+
+After matching completes or is cancelled, the review screen presents each Spotify track alongside its matched YouTube
+Music candidate:
+
+- **High Confidence (`Matched` badge)**: Score `>= 0.85`. High-confidence match where title, artist, and duration align
+  closely with official audio tracks.
+- **Medium Confidence (`Needs review` badge)**: Score in `[0.60, 0.85)`. Acceptable match that may differ slightly in
+  version, release edition, or artist attribution.
+- **Unresolved**: No candidate reached the 0.50 threshold. Displays the original Spotify title and artist; omitted from
+  the imported playlist unless manually swapped.
+
+#### Swapping Matches
+
+If a matched track is incorrect or a better alternative exists:
+
+1. Click the `Swap` button on the track row to open the alternative picker.
+2. The picker presents up to three ranked alternative candidates found during search, ordered by match score.
+3. Select an alternative to replace the candidate for that row.
+
+#### Saving and Persistence
+
+- Click `Save playlist` to persist the imported playlist, or `Discard` to cancel without saving.
+- Saved playlists are written atomically to `playlists.json` in the configuration directory (`~/.config/moggyt/` on
+  Linux, `%APPDATA%\moggyt` on Windows).
+- Saved playlists are assigned identifiers prefixed with `local:` (e.g. `local:<id>`) and appear in the `Library` page
+  under the `Playlists` section.
+- Clicking an imported playlist opens the `Detail` view, allowing playback without contacting YouTube Music for catalog
+  resolution.
+
+#### Headless CLI Usage
+
+You can also import playlists headlessly from the terminal without opening the graphical interface:
+
+```bash
+# Import from a Spotify link
+moggyt --import-spotify <URL> --headless
+
+# Import from an Exportify CSV or JSON file
+moggyt --import-csv <PATH> --headless
+
+# Emit machine-readable JSON output to stdout
+moggyt --import-spotify <URL> --headless --json
+moggyt --import-csv <PATH> --headless --json
+```
+
+In headless mode:
+
+- Matching progress is streamed to `stderr`.
+- A summary report is printed to `stdout` upon completion (JSON format when `--json` is passed, plain text otherwise).
+- Successfully imported playlists are saved directly to `playlists.json` and become available in the library.
+
 ## Persistent Player Bar
 
 The bottom player bar remains visible across all pages and provides continuous transport controls.
