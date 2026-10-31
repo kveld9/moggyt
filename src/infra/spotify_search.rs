@@ -10,6 +10,31 @@ use super::catalog_requests::{client_context, search_url};
 use crate::domain::{MatchCandidate, MusicVideoType};
 use crate::i18n::Locale;
 
+/// Typed failure when searching songs on InnerTube.
+#[derive(Debug)]
+pub enum SearchFailure {
+    RateLimited,
+    Unavailable(anyhow::Error),
+}
+
+impl std::fmt::Display for SearchFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RateLimited => write!(f, "rate limited"),
+            Self::Unavailable(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for SearchFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::RateLimited => None,
+            Self::Unavailable(err) => Some(err.as_ref()),
+        }
+    }
+}
+
 /// Filter params restricting YouTube Music InnerTube search to songs.
 pub const SONGS_FILTER_PARAMS: &str = "EgWKAQIIAWoKEAkQBRAKEAMQBA==";
 
@@ -43,6 +68,17 @@ pub fn classify_status(status: u16) -> SearchStatus {
         400..=499 => SearchStatus::ClientError,
         500..=599 => SearchStatus::ServerError,
         _ => SearchStatus::Ok,
+    }
+}
+
+/// Classifies an HTTP status code into an optional [`SearchFailure`].
+pub fn classify_failure(status: u16) -> Option<SearchFailure> {
+    match classify_status(status) {
+        SearchStatus::Ok => None,
+        SearchStatus::RateLimited => Some(SearchFailure::RateLimited),
+        SearchStatus::ClientError | SearchStatus::ServerError => {
+            Some(SearchFailure::Unavailable(anyhow::anyhow!("search failed with HTTP {status}")))
+        }
     }
 }
 
@@ -245,7 +281,7 @@ impl SpotifySongSearch {
     }
 
     /// Searches YouTube Music for `query` restricted to songs.
-    pub fn search(&self, query: &str, locale: Locale) -> anyhow::Result<Vec<SongCandidate>> {
+    pub fn search(&self, query: &str, locale: Locale) -> Result<Vec<SongCandidate>, SearchFailure> {
         let url = search_url();
         let body = songs_search_body(query, locale);
         let response = self
@@ -253,17 +289,17 @@ impl SpotifySongSearch {
             .post(&url)
             .json(&body)
             .send()
-            .context("transport failure during songs search")?;
+            .context("transport failure during songs search")
+            .map_err(SearchFailure::Unavailable)?;
         let status = response.status();
         let code = status.as_u16();
-        if classify_status(code) == SearchStatus::RateLimited {
-            anyhow::bail!("rate limited by InnerTube (HTTP {code}); back off before retrying");
+        if let Some(failure) = classify_failure(code) {
+            return Err(failure);
         }
-        if !status.is_success() {
-            anyhow::bail!("InnerTube songs search failed with HTTP status {code}");
-        }
-        let payload: Value =
-            response.json().context("failed to parse InnerTube search response as JSON")?;
+        let payload: Value = response
+            .json()
+            .context("failed to parse InnerTube search response as JSON")
+            .map_err(SearchFailure::Unavailable)?;
         Ok(parse_song_candidates(&payload))
     }
 }
@@ -464,6 +500,35 @@ mod tests {
         assert_eq!(match_candidate.channel, "Test Artist");
         assert_eq!(match_candidate.duration_secs, Some(180));
         assert_eq!(match_candidate.video_type, MusicVideoType::Atv);
+    }
+
+    #[test]
+    fn test_classify_failure_variants() {
+        assert!(classify_failure(200).is_none());
+        assert!(matches!(classify_failure(429), Some(SearchFailure::RateLimited)));
+        assert!(matches!(classify_failure(503), Some(SearchFailure::RateLimited)));
+
+        let err_400 = classify_failure(400);
+        match err_400 {
+            Some(SearchFailure::Unavailable(err)) => {
+                assert!(err.to_string().contains("400"));
+            }
+            other => panic!("expected Unavailable for 400, got {other:?}"),
+        }
+
+        let err_500 = classify_failure(500);
+        match err_500 {
+            Some(SearchFailure::Unavailable(_)) => {}
+            other => panic!("expected Unavailable for 500, got {other:?}"),
+        }
+
+        let rate_limited = SearchFailure::RateLimited;
+        assert_eq!(rate_limited.to_string(), "rate limited");
+        use std::error::Error;
+        assert!(rate_limited.source().is_none());
+
+        let unavail = SearchFailure::Unavailable(anyhow::anyhow!("backend unreachable"));
+        assert!(unavail.source().is_some());
     }
 
     #[test]

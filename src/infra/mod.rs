@@ -104,8 +104,9 @@ pub use spotify_embed::{
     extract_next_data, parse_embed_html,
 };
 pub use spotify_search::{
-    SEARCH_TIMEOUT_SECS, SONGS_FILTER_PARAMS, SearchStatus, SongCandidate, SpotifySongSearch,
-    classify_status, parse_song_candidates, songs_search_body, video_type_from,
+    SEARCH_TIMEOUT_SECS, SONGS_FILTER_PARAMS, SearchFailure, SearchStatus, SongCandidate,
+    SpotifySongSearch, classify_failure, classify_status, parse_song_candidates, songs_search_body,
+    video_type_from,
 };
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
 pub use tray::{TrayAction, TrayHandle};
