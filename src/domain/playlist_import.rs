@@ -17,9 +17,14 @@
 //! - `OLAK`: YouTube Music official album release playlists.
 //! - `RD`: YouTube Music radio mixes and automix continuation playlists.
 
+use serde::{Deserialize, Serialize};
+
 const ALLOWED_HOSTS: &[&str] = &["music.youtube.com", "www.youtube.com", "youtube.com", "youtu.be"];
 
 const ALLOWED_PREFIXES: &[&str] = &["PL", "VL", "OLAK", "RD"];
+
+const SPOTIFY_HOST: &str = "open.spotify.com";
+const SPOTIFY_ID_LEN: usize = 22;
 
 fn split_scheme(raw: &str) -> Option<(&str, &str)> {
     if raw.len() >= 8 && raw[..8].eq_ignore_ascii_case("https://") {
@@ -108,6 +113,125 @@ pub fn extract_playlist_id(url: &str) -> Option<String> {
     Some(id.to_owned())
 }
 
+/// Spotify resource kinds accepted by the importer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SpotifyRef {
+    Playlist(String),
+    Album(String),
+}
+
+fn is_spotify_host(host: &str) -> bool {
+    let clean = strip_port(host);
+    clean.eq_ignore_ascii_case(SPOTIFY_HOST)
+}
+
+fn is_valid_spotify_id(id: &str) -> bool {
+    id.len() == SPOTIFY_ID_LEN && id.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+fn parse_spotify_kind(kind: &str, id: &str) -> Option<SpotifyRef> {
+    if !is_valid_spotify_id(id) {
+        return None;
+    }
+    if kind.eq_ignore_ascii_case("playlist") {
+        return Some(SpotifyRef::Playlist(id.to_owned()));
+    }
+    if kind.eq_ignore_ascii_case("album") {
+        return Some(SpotifyRef::Album(id.to_owned()));
+    }
+    None
+}
+
+fn strip_query_and_fragment(raw: &str) -> &str {
+    let without_frag = match raw.find('#') {
+        Some(idx) => &raw[..idx],
+        None => raw,
+    };
+    match without_frag.find('?') {
+        Some(idx) => &without_frag[..idx],
+        None => without_frag,
+    }
+}
+
+fn is_intl_segment(segment: &str) -> bool {
+    segment.len() > 5
+        && segment[..5].eq_ignore_ascii_case("intl-")
+        && segment[5..].chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+fn is_user_playlist_segments(segments: &[&str]) -> bool {
+    segments[0].eq_ignore_ascii_case("user")
+        && !segments[1].is_empty()
+        && segments[2].eq_ignore_ascii_case("playlist")
+}
+
+fn parse_spotify_segments(slice: &[&str]) -> Option<SpotifyRef> {
+    if slice.len() == 2 {
+        return parse_spotify_kind(slice[0], slice[1]);
+    }
+    if slice.len() == 3 && slice[0].eq_ignore_ascii_case("embed") {
+        return parse_spotify_kind(slice[1], slice[2]);
+    }
+    if slice.len() == 4 && is_user_playlist_segments(slice) {
+        return parse_spotify_kind("playlist", slice[3]);
+    }
+    None
+}
+
+fn resolve_path_slice<'a>(segments: &'a [&'a str]) -> &'a [&'a str] {
+    if let Some((first, rest)) = segments.split_first() {
+        if is_intl_segment(first) {
+            return rest;
+        }
+    }
+    segments
+}
+
+fn parse_spotify_url(after_scheme: &str) -> Option<SpotifyRef> {
+    let (host, rest) = split_host_and_rest(after_scheme);
+    if !is_spotify_host(host) {
+        return None;
+    }
+    let path = strip_query_and_fragment(rest);
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    let slice = resolve_path_slice(&segments);
+    parse_spotify_segments(slice)
+}
+
+fn is_spotify_uri_scheme(raw: &str) -> bool {
+    raw.len() >= 8 && raw[..8].eq_ignore_ascii_case("spotify:")
+}
+
+fn parse_spotify_uri(after_scheme: &str) -> Option<SpotifyRef> {
+    let clean = strip_query_and_fragment(after_scheme).trim_end_matches('/');
+    let parts: Vec<&str> = clean.split(':').collect();
+    if parts.len() == 2 {
+        return parse_spotify_kind(parts[0], parts[1]);
+    }
+    if parts.len() == 4 && is_user_playlist_segments(&parts) {
+        return parse_spotify_kind("playlist", parts[3]);
+    }
+    None
+}
+
+/// Extracts a Spotify playlist or album id from a user-supplied link or URI.
+///
+/// Accepts both web URLs (`open.spotify.com`) and Spotify URIs (`spotify:...`).
+/// Spotify identifiers are expected to be 22-character base62 (ASCII alphanumeric) strings.
+/// Returns [`None`] if the link is malformed, uses an unsupported host or scheme,
+/// points to an unhandled resource kind (such as a track or artist), or has an invalid identifier.
+pub fn parse_spotify_ref(raw: &str) -> Option<SpotifyRef> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if is_spotify_uri_scheme(trimmed) {
+        return parse_spotify_uri(&trimmed[8..]);
+    }
+    let (_scheme, after_scheme) = split_scheme(trimmed)?;
+    parse_spotify_url(after_scheme)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +300,171 @@ mod tests {
 
         for url in cases {
             assert_eq!(extract_playlist_id(url), None, "expected rejection for: {url}");
+        }
+    }
+
+    #[test]
+    fn spotify_accepted_shapes_table() {
+        let valid_id = "37i9dQZF1DXcBWIGoYBM5M";
+        let cases = [
+            (
+                "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/album/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Album(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/intl-es/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/intl-en/album/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Album(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/intl-pt-BR/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/user/spotify_user/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/embed/album/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Album(valid_id.to_string()),
+            ),
+            (
+                "http://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "http://open.spotify.com/album/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Album(valid_id.to_string()),
+            ),
+            (
+                "http://open.spotify.com/intl-es/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "http://open.spotify.com/user/spotify_user/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "http://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "http://open.spotify.com/embed/album/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Album(valid_id.to_string()),
+            ),
+            ("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M", SpotifyRef::Playlist(valid_id.to_string())),
+            ("spotify:album:37i9dQZF1DXcBWIGoYBM5M", SpotifyRef::Album(valid_id.to_string())),
+            (
+                "spotify:user:spotify_user:playlist:37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "  https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M \n\t ",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "HTTPS://OPEN.SPOTIFY.COM/PLAYLIST/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com:443/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=e8c07e21a8684a0c",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M#section",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M/",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M/",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M?si=123",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M#heading",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+            (
+                "SPOTIFY:USER:ALICE:PLAYLIST:37i9dQZF1DXcBWIGoYBM5M",
+                SpotifyRef::Playlist(valid_id.to_string()),
+            ),
+        ];
+
+        for (raw, expected) in cases {
+            assert_eq!(
+                parse_spotify_ref(raw),
+                Some(expected),
+                "failed to parse expected ref for: {raw}"
+            );
+        }
+    }
+
+    #[test]
+    fn spotify_rejected_shapes_table() {
+        let cases = [
+            "",
+            "   ",
+            "\t\n",
+            "spotify:",
+            "spotify:   ",
+            "spotify:track:37i9dQZF1DXcBWIGoYBM5M",
+            "spotify:artist:37i9dQZF1DXcBWIGoYBM5M",
+            "spotify:show:37i9dQZF1DXcBWIGoYBM5M",
+            "spotify:episode:37i9dQZF1DXcBWIGoYBM5M",
+            "https://spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+            "https://evil-open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+            "https://open.spotify.com.attacker.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+            "ftp://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+            "file:///open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+            "javascript:alert(1)",
+            "https://open.spotify.com/track/37i9dQZF1DXcBWIGoYBM5M",
+            "https://open.spotify.com/artist/37i9dQZF1DXcBWIGoYBM5M",
+            "https://open.spotify.com/show/37i9dQZF1DXcBWIGoYBM5M",
+            "https://open.spotify.com/episode/37i9dQZF1DXcBWIGoYBM5M",
+            "https://open.spotify.com/playlist/",
+            "https://open.spotify.com/playlist",
+            "https://open.spotify.com/",
+            "https://open.spotify.com/intl-es",
+            "https://open.spotify.com/user/alice",
+            "https://open.spotify.com/user/alice/playlist",
+            "https://open.spotify.com/user//playlist/37i9dQZF1DXcBWIGoYBM5M",
+            "spotify:user::playlist:37i9dQZF1DXcBWIGoYBM5M",
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5",
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M1",
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5_",
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5-",
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5$",
+            "spotify:playlist:37i9dQZF1DXcBWIGoYBM5_",
+            "spotify:playlist:",
+            "spotify:playlist:short",
+            "spotify:playlist:too_long_identifier_value_1234",
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M/extra",
+            "https://open.spotify.com/user/alice/album/37i9dQZF1DXcBWIGoYBM5M",
+        ];
+
+        for raw in cases {
+            assert_eq!(parse_spotify_ref(raw), None, "expected rejection for: {raw}");
         }
     }
 }
