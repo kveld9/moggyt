@@ -12,9 +12,6 @@ pub const EXPLORE_BROWSE_ID: &str = "FEmusic_explore";
 /// Library playlists browse identifier for YouTube Music.
 pub const LIBRARY_PLAYLISTS_BROWSE_ID: &str = "FEmusic_liked_playlists";
 
-/// Library liked songs browse identifier for YouTube Music.
-pub const LIBRARY_LIKED_BROWSE_ID: &str = "FEmusic_liked_videos";
-
 /// Library saved albums browse identifier for YouTube Music.
 pub const LIBRARY_ALBUMS_BROWSE_ID: &str = "FEmusic_liked_albums";
 
@@ -90,32 +87,6 @@ pub fn browse_body(browse_id: &str, locale: Locale) -> Value {
     })
 }
 
-/// Returns the catalog API like endpoint URL.
-pub fn like_url(liked: bool) -> String {
-    let action = if liked { "like" } else { "removelike" };
-    format!(
-        "https://music.youtube.com/youtubei/v1/like/{}?key={}&prettyPrint=false",
-        action, CATALOG_API_KEY
-    )
-}
-
-/// Builds the minimal WEB_REMIX like/removelike payload for `video_id` with `locale`.
-pub fn like_body(video_id: &str, locale: Locale) -> Value {
-    serde_json::json!({
-        "context": {
-            "client": client_context(locale),
-        },
-        "target": {
-            "videoId": video_id,
-        }
-    })
-}
-
-/// Validates if a catalog API mutation response succeeded (no error object).
-pub fn parse_mutation_response(value: &Value) -> bool {
-    value.get("error").is_none()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,21 +157,6 @@ mod tests {
             assert_eq!(body["context"]["client"]["hl"], expected_hl);
             assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
         }
-    }
-
-    #[test]
-    fn like_endpoints_and_mutation_parsing() {
-        assert!(like_url(true).contains("/like/like?key="));
-        assert!(like_url(false).contains("/like/removelike?key="));
-        for (locale, expected_hl) in [(Locale::English, "en"), (Locale::Spanish, "es")] {
-            let body = like_body("lib-t1", locale);
-            assert_eq!(body["target"]["videoId"], "lib-t1");
-            assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
-            assert_eq!(body["context"]["client"]["hl"], expected_hl);
-            assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
-        }
-        assert!(parse_mutation_response(&serde_json::json!({})));
-        assert!(!parse_mutation_response(&serde_json::json!({"error": {"code": 401}})));
     }
 
     #[test]

@@ -10,17 +10,6 @@
 
 use crate::domain::{SearchFilter, SearchResult, Shelf};
 
-/// Parts required to construct a [`SearchRow`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SearchRowParts {
-    pub id: String,
-    pub kind: String,
-    pub title: String,
-    pub subtitle: String,
-    pub album: String,
-    pub duration: String,
-}
-
 /// Flattened display and navigation row for all catalog item kinds in the search view.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchRow {
@@ -34,19 +23,6 @@ pub struct SearchRow {
 }
 
 impl SearchRow {
-    /// Creates a search row from bundled parts with no artwork.
-    pub fn from_parts(parts: SearchRowParts) -> Self {
-        Self {
-            id: parts.id,
-            kind: parts.kind,
-            title: parts.title,
-            subtitle: parts.subtitle,
-            album: parts.album,
-            duration: parts.duration,
-            artwork_url: None,
-        }
-    }
-
     /// Sets optional artwork thumbnail URL, consuming self.
     pub fn with_artwork(mut self, artwork_url: impl Into<String>) -> Self {
         self.artwork_url = Some(artwork_url.into());
@@ -214,25 +190,5 @@ mod tests {
         let playlist = Playlist::new("p0", "Empty Playlist", 0, None);
         let pl_row = SearchRow::from(&SearchResult::Playlist(playlist));
         assert_eq!(pl_row.subtitle, "");
-    }
-
-    #[test]
-    fn test_search_row_from_parts() {
-        let parts = SearchRowParts {
-            id: "id-1".into(),
-            kind: "track".into(),
-            title: "Title".into(),
-            subtitle: "Artist".into(),
-            album: "Album".into(),
-            duration: "3:45".into(),
-        };
-        let row = SearchRow::from_parts(parts).with_artwork("https://artwork.local/test");
-        assert_eq!(row.id, "id-1");
-        assert_eq!(row.kind, "track");
-        assert_eq!(row.title, "Title");
-        assert_eq!(row.subtitle, "Artist");
-        assert_eq!(row.album, "Album");
-        assert_eq!(row.duration, "3:45");
-        assert_eq!(row.artwork_url.as_deref(), Some("https://artwork.local/test"));
     }
 }

@@ -82,11 +82,6 @@ impl SkipRanges {
         self.0 = segments.into_iter().fold(Vec::new(), merge_segment_into);
     }
 
-    /// Removes a segment at `index`, returning the removed segment if valid.
-    pub fn remove(&mut self, index: usize) -> Option<SkipSegment> {
-        if index < self.0.len() { Some(self.0.remove(index)) } else { None }
-    }
-
     /// Returns jump target if `pos_secs` falls strictly inside any range: `start <= pos < end`.
     pub fn jump_target(&self, pos_secs: u32) -> Option<u32> {
         self.0
@@ -164,20 +159,5 @@ mod tests {
 
         // Boundary: strictly after range -> does not seek
         assert_eq!(ranges.jump_target(21), None);
-    }
-
-    #[test]
-    fn test_remove_at_index_and_out_of_bounds() {
-        let mut ranges = SkipRanges::new();
-        ranges.insert(SkipSegment::new(0, 10).unwrap());
-        ranges.insert(SkipSegment::new(20, 30).unwrap());
-
-        assert_eq!(ranges.remove(5), None);
-        assert_eq!(ranges.len(), 2);
-
-        let removed = ranges.remove(0);
-        assert_eq!(removed, Some(SkipSegment { start_secs: 0, end_secs: 10 }));
-        assert_eq!(ranges.len(), 1);
-        assert_eq!(ranges.segments(), &[SkipSegment { start_secs: 20, end_secs: 30 }]);
     }
 }

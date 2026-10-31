@@ -26,10 +26,6 @@ impl Scrobbler for StubScrobbler {
     fn scrobble(&mut self, artist: &str, title: &str, timestamp_secs: u64) {
         self.scrobble_calls.push((artist.to_string(), title.to_string(), timestamp_secs));
     }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }
 
 #[cfg(test)]

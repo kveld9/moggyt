@@ -7,16 +7,9 @@ use crate::domain::{
 };
 
 /// Fixed-data stub: keeps UI and tests deterministic until the real API lands.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CatalogStub {
-    liked_ids: Vec<String>,
     last_session_cookies: Option<String>,
-}
-
-impl Default for CatalogStub {
-    fn default() -> Self {
-        Self { liked_ids: vec!["stub-1".to_owned()], last_session_cookies: None }
-    }
 }
 
 const STUB_ARTWORK_URL: &str = "https://artwork.local/stub-1";
@@ -35,13 +28,6 @@ impl CatalogStub {
     fn fixed_hits(query: &str) -> Vec<Track> {
         vec![
             Track::new("stub-1", query, "Stub Artist").with_artwork(STUB_ARTWORK_URL),
-            Track::new("stub-2", "B-side", "Stub Artist"),
-        ]
-    }
-
-    fn stub_liked_hits() -> Vec<Track> {
-        vec![
-            Track::new("stub-1", "Liked Song", "Stub Artist").with_artwork(STUB_ARTWORK_URL),
             Track::new("stub-2", "B-side", "Stub Artist"),
         ]
     }
@@ -178,29 +164,8 @@ impl Catalog for CatalogStub {
         Self::stub_playlists()
     }
 
-    fn liked_tracks(&self) -> Vec<Track> {
-        Self::stub_liked_hits()
-            .into_iter()
-            .filter(|track| self.liked_ids.iter().any(|id| id == &track.id))
-            .collect()
-    }
-
     fn saved_albums(&self) -> Vec<Album> {
         vec![Self::stub_album()]
-    }
-
-    fn set_liked(&mut self, track_id: &str, liked: bool) {
-        let trimmed = track_id.trim();
-        if trimmed.is_empty() {
-            return;
-        }
-        if liked {
-            if !self.liked_ids.iter().any(|id| id == trimmed) {
-                self.liked_ids.push(trimmed.to_owned());
-            }
-        } else {
-            self.liked_ids.retain(|id| id != trimmed);
-        }
     }
 
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
@@ -284,52 +249,6 @@ mod tests {
         let albums = catalog.saved_albums();
         assert_eq!(albums.len(), 1);
         assert_eq!(albums[0].id, "stub-album-1");
-
-        let liked = catalog.liked_tracks();
-        assert_eq!(liked.len(), 1);
-        assert_eq!(liked[0].id, "stub-1");
-        assert_eq!(liked[0].title, "Liked Song");
-    }
-
-    #[test]
-    fn stub_library_mutation_and_filtering() {
-        let mut catalog = CatalogStub::new();
-
-        // Initial default state: stub-1 liked.
-        assert_eq!(catalog.liked_tracks().len(), 1);
-
-        // Add stub-2 -> 2 liked tracks ("stub-1", "stub-2").
-        catalog.set_liked("stub-2", true);
-        let liked_both = catalog.liked_tracks();
-        assert_eq!(liked_both.len(), 2);
-        let ids: Vec<_> = liked_both.iter().map(|t| t.id.as_str()).collect();
-        assert_eq!(ids, vec!["stub-1", "stub-2"]);
-
-        // Duplicate insert keeps exactly 1 entry for that id.
-        catalog.set_liked("stub-2", true);
-        assert_eq!(catalog.liked_tracks().len(), 2);
-        assert_eq!(catalog.liked_tracks().iter().filter(|t| t.id == "stub-2").count(), 1);
-
-        // Remove stub-1 -> only stub-2 remains.
-        catalog.set_liked("stub-1", false);
-        let liked_one = catalog.liked_tracks();
-        assert_eq!(liked_one.len(), 1);
-        assert_eq!(liked_one[0].id, "stub-2");
-
-        // Remove stub-2 -> empty.
-        catalog.set_liked("stub-2", false);
-        assert!(catalog.liked_tracks().is_empty());
-
-        // Blank and whitespace-only ids are ignored.
-        catalog.set_liked("", true);
-        catalog.set_liked("   ", true);
-        catalog.set_liked("", false);
-        catalog.set_liked("   ", false);
-        assert!(catalog.liked_tracks().is_empty());
-
-        // Unknown id is ignored by stub_liked_hits membership filter.
-        catalog.set_liked("unknown-id", true);
-        assert!(catalog.liked_tracks().is_empty());
     }
 
     #[test]

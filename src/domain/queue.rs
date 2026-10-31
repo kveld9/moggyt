@@ -112,38 +112,10 @@ impl PlaybackQueue {
         self.cursor = self.cursor.saturating_sub(1);
     }
 
-    /// Removes the track at `index`, adjusting the cursor.
-    /// Returns `None` when `index` is out of bounds.
-    pub fn remove_at(&mut self, index: usize) -> Option<Track> {
-        if index >= self.tracks.len() {
-            return None;
-        }
-        let removed = self.tracks.remove(index);
-        self.adjust_cursor_after_removal(index);
-        Some(removed)
-    }
-
     /// Clears all tracks and resets the cursor to 0, retaining repeat mode.
     pub fn clear(&mut self) {
         self.tracks.clear();
         self.cursor = 0;
-    }
-
-    /// Moves a track from index `from` to index `to`.
-    ///
-    /// Returns `false` on out-of-bounds indices, `true` on success.
-    /// Preserves current-track identity under movements.
-    pub fn move_track(&mut self, from: usize, to: usize) -> bool {
-        if from >= self.tracks.len() || to >= self.tracks.len() {
-            return false;
-        }
-        if from == to {
-            return true;
-        }
-        let track = self.tracks.remove(from);
-        self.tracks.insert(to, track);
-        self.cursor = next_cursor_after_move(self.cursor, from, to);
-        true
     }
 
     /// Reorders tracks according to the provided index permutation.
@@ -166,16 +138,6 @@ impl PlaybackQueue {
         self.tracks =
             order.iter().filter_map(|&idx| lookup.get_mut(idx).and_then(Option::take)).collect();
     }
-
-    fn adjust_cursor_after_removal(&mut self, index: usize) {
-        if self.tracks.is_empty() {
-            self.cursor = 0;
-            return;
-        }
-        if index < self.cursor || self.cursor >= self.tracks.len() {
-            self.cursor = self.cursor.saturating_sub(1);
-        }
-    }
 }
 
 fn is_valid_permutation(order: &[usize], len: usize) -> bool {
@@ -197,24 +159,6 @@ fn mark_seen(seen: &mut [bool], idx: usize) -> bool {
     }
     seen[idx] = true;
     true
-}
-
-fn next_cursor_after_move(cursor: usize, from: usize, to: usize) -> usize {
-    if from == cursor {
-        to
-    } else if from < cursor {
-        adjust_when_moved_from_left(cursor, to)
-    } else {
-        adjust_when_moved_from_right(cursor, to)
-    }
-}
-
-fn adjust_when_moved_from_left(cursor: usize, to: usize) -> usize {
-    if to >= cursor { cursor - 1 } else { cursor }
-}
-
-fn adjust_when_moved_from_right(cursor: usize, to: usize) -> usize {
-    if to <= cursor { cursor + 1 } else { cursor }
 }
 
 #[cfg(test)]
@@ -275,60 +219,12 @@ mod tests {
     }
 
     #[test]
-    fn removal_and_clear() {
-        // Out of bounds and empty
-        let mut empty = PlaybackQueue::new();
-        assert_eq!(empty.remove_at(0), None);
-        let mut q = queue_from(&["a"], 0, RepeatMode::Off);
-        assert_eq!(q.remove_at(1), None);
-        assert_eq!(q.remove_at(99), None);
-
-        // (initial_tracks, start_cursor, remove_idx, expected_tracks, expected_current)
-        let cases = [
-            (&["a", "b", "c"][..], 1, 0, &["b", "c"][..], Some("b")), // before cursor shifts back
-            (&["a", "b", "c"][..], 0, 2, &["a", "b"][..], Some("a")), // after cursor leaves cursor
-            (&["a", "b", "c"][..], 1, 1, &["a", "c"][..], Some("c")), // current non-tail clamps same
-            (&["a", "b", "c"][..], 2, 2, &["a", "b"][..], Some("b")), // current tail clamps to new tail
-            (&["a"][..], 0, 0, &[][..], None), // last track empties with cursor 0
-        ];
-        for (tracks, start, idx, expected_tracks, expected_cur) in cases {
-            let mut q = queue_from(tracks, start, RepeatMode::Off);
-            let removed = q.remove_at(idx);
-            assert_eq!(removed.map(|t| t.id), Some(tracks[idx].to_owned()));
-            assert_eq!(track_ids(&q), expected_tracks);
-            assert_eq!(current_id(&q), expected_cur);
-        }
-
-        // Clear preserves repeat
+    fn clear_preserves_repeat() {
         let mut q = queue_from(&["a", "b"], 1, RepeatMode::All);
         q.clear();
         assert!(q.is_empty());
         assert_eq!(current_id(&q), None);
         assert_eq!(q.repeat(), RepeatMode::All);
-    }
-
-    #[test]
-    fn move_track() {
-        let mut q = queue_from(&["a", "b"], 0, RepeatMode::Off);
-        assert!(!q.move_track(0, 2));
-        assert!(!q.move_track(2, 0));
-        assert!(!q.move_track(5, 10));
-        assert!(q.move_track(1, 1)); // noop
-
-        // (start_cursor, from, to, expected_tracks, expected_current)
-        let cases = [
-            (1, 1, 3, &["a", "c", "d", "b"][..], Some("b")), // current moves and follows
-            (2, 0, 3, &["b", "c", "d", "a"][..], Some("c")), // before to after shifts left
-            (1, 3, 0, &["d", "a", "b", "c"][..], Some("b")), // after to before shifts right
-            (2, 0, 1, &["b", "a", "c", "d"][..], Some("c")), // both before preserves
-            (1, 2, 3, &["a", "b", "d", "c"][..], Some("b")), // both after preserves
-        ];
-        for (start, from, to, expected_tracks, expected_cur) in cases {
-            let mut q = queue_from(&["a", "b", "c", "d"], start, RepeatMode::Off);
-            assert!(q.move_track(from, to));
-            assert_eq!(track_ids(&q), expected_tracks);
-            assert_eq!(current_id(&q), expected_cur);
-        }
     }
 
     #[test]

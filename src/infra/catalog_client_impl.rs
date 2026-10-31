@@ -4,17 +4,14 @@ use super::catalog_model::{RawTrack, SearchHits};
 use super::catalog_parse_detail::parse_detail_all;
 use super::catalog_parse_explore::parse_explore_all;
 use super::catalog_parse_home::parse_home_all;
-use super::catalog_parse_library::{
-    parse_library_albums, parse_library_liked_tracks, parse_library_playlists,
-};
+use super::catalog_parse_library::{parse_library_albums, parse_library_playlists};
 use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::{parse_search_all, parse_search_tracks};
 use super::catalog_requests::{
     CATALOG_API_KEY, EXPLORE_BROWSE_ID, HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID,
-    LIBRARY_LIKED_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_url, like_body,
-    like_url, next_body, next_url, parse_mutation_response, search_body,
+    LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_url, next_body, next_url, search_body,
 };
-use crate::domain::{Album, Detail, DetailKind, Playlist, Shelf, Track};
+use crate::domain::{Album, Detail, DetailKind, Playlist, Shelf};
 use crate::i18n::Locale;
 use serde_json::Value;
 use std::time::Duration;
@@ -194,16 +191,6 @@ impl CatalogClient {
             .map_or_else(|_| Vec::new(), |p| parse_library_playlists(&p))
     }
 
-    /// Queries the browse endpoint for user's liked tracks.
-    /// Returns an empty vector when unauthenticated or on network/parse failure.
-    pub fn library_liked_tracks(&self) -> Vec<Track> {
-        if !self.is_authenticated() {
-            return Vec::new();
-        }
-        self.library_browse_payload(LIBRARY_LIKED_BROWSE_ID)
-            .map_or_else(|_| Vec::new(), |p| parse_library_liked_tracks(&p))
-    }
-
     /// Queries the browse endpoint for user's saved albums.
     /// Returns an empty vector when unauthenticated or on network/parse failure.
     pub fn library_saved_albums(&self) -> Vec<Album> {
@@ -212,34 +199,6 @@ impl CatalogClient {
         }
         self.library_browse_payload(LIBRARY_ALBUMS_BROWSE_ID)
             .map_or_else(|_| Vec::new(), |p| parse_library_albums(&p))
-    }
-
-    /// Executes authenticated like/removelike mutation for `video_id`.
-    pub fn set_liked_payload(&self, video_id: &str, liked: bool) -> anyhow::Result<Value> {
-        let Some(cookie) = &self.cookies else {
-            anyhow::bail!("Unauthenticated CatalogClient cannot execute library mutations");
-        };
-        let url = like_url(liked);
-        let body = like_body(video_id, self.locale);
-        let response = self.client.post(&url).header("Cookie", cookie).json(&body).send()?;
-        let status = response.status();
-        if !status.is_success() {
-            anyhow::bail!("CatalogClient like mutation failed with status: {status}");
-        }
-        let payload: Value = response.json()?;
-        if !parse_mutation_response(&payload) {
-            anyhow::bail!("CatalogClient like mutation response reported an error");
-        }
-        Ok(payload)
-    }
-
-    /// Sets liked status on `video_id`. No-op when unauthenticated, blank id, or on network failure.
-    pub fn set_liked(&self, video_id: &str, liked: bool) {
-        let trimmed = video_id.trim();
-        if trimmed.is_empty() || !self.is_authenticated() {
-            return;
-        }
-        let _ = self.set_liked_payload(trimmed, liked);
     }
 
     /// Converts this catalog API client into a [`LiveCatalog`](super::catalog_live::LiveCatalog) adapter.
@@ -290,8 +249,6 @@ mod tests {
 
         let anon = CatalogClient::new();
         assert!(anon.library_playlists().is_empty());
-        assert!(anon.library_liked_tracks().is_empty());
         assert!(anon.library_saved_albums().is_empty());
-        anon.set_liked("lib-t1", true);
     }
 }

@@ -142,19 +142,9 @@ impl Catalog for LiveCatalog {
         self.client.library_playlists()
     }
 
-    /// Returns liked tracks. Returns empty when unauthenticated or on failure.
-    fn liked_tracks(&self) -> Vec<Track> {
-        self.client.library_liked_tracks()
-    }
-
     /// Returns saved albums. Returns empty when unauthenticated or on failure.
     fn saved_albums(&self) -> Vec<Album> {
         self.client.library_saved_albums()
-    }
-
-    /// Sets liked status. No-op when unauthenticated, on blank id, or on failure.
-    fn set_liked(&mut self, track_id: &str, liked: bool) {
-        self.client.set_liked(track_id, liked);
     }
 
     /// Returns detail view for `browse_id` and `kind`. Network failures map to None.
@@ -273,20 +263,10 @@ mod tests {
 
     #[test]
     fn live_catalog_unauthenticated_returns_empty_without_network() {
-        let mut catalog = LiveCatalog::new();
+        let catalog = LiveCatalog::new();
 
         assert!(catalog.playlists().is_empty());
         assert!(catalog.saved_albums().is_empty());
-        assert!(catalog.liked_tracks().is_empty());
-
-        // Anonymous mutation is a documented no-op and does not issue network calls.
-        catalog.set_liked("stub-1", true);
-        catalog.set_liked("stub-1", false);
-        catalog.set_liked("", true);
-
-        assert!(catalog.playlists().is_empty());
-        assert!(catalog.saved_albums().is_empty());
-        assert!(catalog.liked_tracks().is_empty());
     }
 
     #[test]
