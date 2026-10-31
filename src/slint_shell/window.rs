@@ -258,7 +258,6 @@ pub(crate) fn refresh_library_async(
                     let local = current_store().map(|s| s.list()).unwrap_or_default();
                     st.library_playlists = merge_local_library(&playlists, &local);
                     st.library_albums = albums;
-                    st.library_artists = Vec::new();
                     request_library_covers(st, &tx);
                     sync_library_and_detail(&win, st);
                 }

@@ -32,13 +32,20 @@ export component ContentArea inherits Rectangle {
     in property <bool> has-cover: false;
     in property <[LyricLineData]> lyrics-lines: [];
     in property <int> active-lyric-index: -1;
-    in property <[LibraryItemData]> library-playlists: []; in property <[LibraryItemData]> library-albums: []; in property <[LibraryItemData]> library-artists: [];
-    in property <bool> detail-has-detail: false; in property <bool> detail-has-artwork: false; in property <string> detail-title: ""; in property <string> detail-subtitle: ""; in property <string> detail-description: "";
-    in property <string> detail-kind-label: ""; in property <[TrackRowData]> detail-tracks: [];
+    in property <[LibraryItemData]> library-playlists: [];
+    in property <[LibraryItemData]> library-albums: [];
+    in property <bool> detail-has-detail: false;
+    in property <bool> detail-has-artwork: false;
+    in property <string> detail-title: "";
+    in property <string> detail-subtitle: "";
+    in property <string> detail-description: "";
+    in property <string> detail-kind-label: "";
+    in property <[TrackRowData]> detail-tracks: [];
     in property <image> detail-cover;
     in property <int> active-theme-index: 0;
     in property <string> playback-speed-text: "1.00x";
-    in property <string> sleep-timer-status-text: "Timer: Off"; in property <int> active-sleep-timer-index: 0;
+    in property <string> sleep-timer-status-text: "Timer: Off";
+    in property <int> active-sleep-timer-index: 0;
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Up to date";
@@ -62,7 +69,9 @@ export component ContentArea inherits Rectangle {
     callback recent-search-removed(string);
     callback recent-searches-cleared();
     callback explore-track-selected(int);
-    callback playlist-selected(int); callback album-selected(int); callback artist-selected(int); callback detail-track-selected(int);
+    callback playlist-selected(int);
+    callback album-selected(int);
+    callback detail-track-selected(int);
     callback detail-play();
     callback detail-shuffle();
     callback sign-in-submitted(string);
@@ -197,10 +206,10 @@ export component ContentArea inherits Rectangle {
             if root.active-page == 2 : LibraryView {
                 cookie-text <=> root.cookie-text;
                 signed-in: root.signed-in;
-                playlists: root.library-playlists; albums: root.library-albums; artists: root.library-artists;
+                playlists: root.library-playlists;
+                albums: root.library-albums;
                 playlist-selected(idx) => { root.playlist-selected(idx); }
                 album-selected(idx) => { root.album-selected(idx); }
-                artist-selected(idx) => { root.artist-selected(idx); }
                 sign-in-submitted(t) => { root.sign-in-submitted(t); }
                 sign-out() => { root.sign-out(); }
             }
@@ -227,7 +236,8 @@ export component ContentArea inherits Rectangle {
                 app-version: root.app-version;
                 update-status-text: root.update-status-text;
                 has-update: root.has-update;
-                sleep-timer-status-text: root.sleep-timer-status-text; active-sleep-timer-index: root.active-sleep-timer-index;
+                sleep-timer-status-text: root.sleep-timer-status-text;
+                active-sleep-timer-index: root.active-sleep-timer-index;
                 player-bar-mode: root.player-bar-mode;
                 player-bar-show-artwork: root.player-bar-show-artwork;
                 player-bar-show-like: root.player-bar-show-like;

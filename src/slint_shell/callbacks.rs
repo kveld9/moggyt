@@ -285,17 +285,6 @@ fn wire_library_callbacks(
             open_detail_async(&win, &mut st, &a.id, DetailKind::Album, &tx);
         }
     });
-
-    let s = Rc::clone(state_rc);
-    let w = window.as_weak();
-    let tx = worker_tx.clone();
-    window.on_artist_selected(move |idx| {
-        let Some(win) = w.upgrade() else { return };
-        let mut st = s.borrow_mut();
-        if let Some(a) = st.library_artists.get(idx as usize).cloned() {
-            open_detail_async(&win, &mut st, &a.id, DetailKind::Artist, &tx);
-        }
-    });
 }
 
 /// Runs `f` with the upgraded window and the borrowed app state, ignoring stale handles.

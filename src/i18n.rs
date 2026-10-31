@@ -141,7 +141,6 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Mono", "Monocromo"),
     ("Needs review", "Requieren revision"),
     ("No albums found.", "No hay álbumes."),
-    ("No artists found.", "No hay artistas."),
     ("No cover", "Sin portada"),
     ("No details available.", "No hay detalles disponibles."),
     ("No match", "Sin coincidencia"),
