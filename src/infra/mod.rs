@@ -41,6 +41,8 @@ mod session;
 mod session_keyring;
 mod settings;
 mod skip_store;
+mod spotify_csv;
+mod spotify_embed;
 mod stream;
 mod stream_reader;
 mod stream_reqwest;
@@ -93,6 +95,13 @@ pub use settings::{
     DiskSettingsStore, MemorySettingsStore, Settings, SettingsStore, default_config_dir,
 };
 pub use skip_store::{DiskSkipStore, MemorySkipStore, SkipStore};
+pub use spotify_csv::{
+    REQUIRED_CSV_COLUMNS, parse_backup_json, parse_csv_records, parse_exportify_csv,
+};
+pub use spotify_embed::{
+    EMBED_BASE_URL, EMBED_MAX_TRACKS, EMBED_TIMEOUT_SECS, SpotifyEmbedClient, embed_url,
+    extract_next_data, parse_embed_html,
+};
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
