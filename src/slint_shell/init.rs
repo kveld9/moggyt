@@ -3,14 +3,17 @@
 //! Hexagonal invariant: provides platform concrete adapters to the composition root.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::Context;
 
 use crate::infra::{
-    CredentialStore, DiskCoverCache, GithubUpdater, KeyringCredentialStore, LastFmClient,
-    LiveAudio, ReleaseInfo, RodioBackend, Updater, client_from_credentials, ensure_sidecar,
-    is_newer,
+    CredentialStore, DiskCoverCache, DiskPlaylistStore, GithubUpdater, KeyringCredentialStore,
+    LastFmClient, LiveAudio, ReleaseInfo, RodioBackend, Updater, client_from_credentials,
+    default_config_dir, ensure_sidecar, is_newer,
 };
+use crate::slint_shell::import_cli::{ImportCli, parse_import_args, report_to_json, run_headless};
+use crate::slint_shell::import_searcher::LiveTrackSearcher;
 use crate::slint_shell::state::SlintAppState;
 
 /// Resolves the application data directory using standard platform conventions.
@@ -114,24 +117,64 @@ pub fn tracing_subscriber_setup() {
     let _ = fmt().with_env_filter(filter).try_init();
 }
 
-/// Parses CLI arguments and executes single-instance URL/handoff import commands.
+fn run_cli_import(cli: &ImportCli) -> i32 {
+    let searcher = Arc::new(LiveTrackSearcher::new());
+    let store = DiskPlaylistStore::new(default_config_dir());
+    let mut progress = |msg: &str| eprintln!("{msg}");
+    match run_headless(cli, searcher, &store, &mut progress) {
+        Ok(report) => {
+            if cli.json {
+                print!("{}", report_to_json(&report));
+            } else {
+                println!(
+                    "Imported '{}' ({} / {} matched) into {}",
+                    report.playlist_title, report.matched, report.total, report.playlist_id
+                );
+            }
+            0
+        }
+        Err(err) => {
+            eprintln!("{err:#}");
+            1
+        }
+    }
+}
+
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-pub(crate) fn handle_cli_args(state: &mut SlintAppState) {
-    let mut args = std::env::args().skip(1);
-    let Some(first_arg) = args.next() else { return };
+fn handle_legacy_cli_args(state: &mut SlintAppState, raw_args: &[String]) {
+    let Some(first_arg) = raw_args.first() else { return };
     if first_arg.starts_with("moggyt:") || first_arg.starts_with("handoff:") {
-        if state.import_handoff(&first_arg) {
+        if state.import_handoff(first_arg) {
             tracing::info!("successfully imported session handoff from CLI argument");
         } else {
             tracing::warn!("failed to import session handoff from CLI argument");
         }
     } else if first_arg.contains("list=") {
-        match state.import_playlist_url(&first_arg) {
+        match state.import_playlist_url(first_arg) {
             Ok(count) => tracing::info!("enqueued {count} tracks from CLI playlist URL"),
             Err(err) => tracing::warn!("failed to import playlist from CLI URL: {err:#}"),
         }
     }
+}
+
+/// Parses CLI arguments and executes single-instance URL/handoff import commands.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+pub(crate) fn handle_cli_args(state: &mut SlintAppState) {
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+    match parse_import_args(&raw_args) {
+        Ok(Some(cli)) => {
+            let code = run_cli_import(&cli);
+            std::process::exit(code);
+        }
+        Err(err) => {
+            eprintln!("{err:#}");
+            std::process::exit(2);
+        }
+        Ok(None) => {}
+    }
+    handle_legacy_cli_args(state, &raw_args);
 }
 
 /// Applies release info to application state without performing any I/O.
@@ -230,5 +273,15 @@ mod tests {
         apply_updater_release(&mut state, None);
         assert!(!state.update_available);
         assert_eq!(state.latest_version, None);
+    }
+
+    #[test]
+    fn test_handle_legacy_cli_args_empty_or_unrecognized_noop() {
+        let mut state = test_wired();
+        handle_legacy_cli_args(&mut state, &[]);
+        assert!(state.queue.is_empty());
+
+        handle_legacy_cli_args(&mut state, &["--unknown-flag".to_string()]);
+        assert!(state.queue.is_empty());
     }
 }
