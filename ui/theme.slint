@@ -43,6 +43,21 @@ export struct LyricLineData {
     text: string,
 }
 
+export struct ImportRowData {
+    index: int,
+    source: string,
+    matched: string,
+    state: string,
+    confidence: string,
+    has-match: bool,
+}
+
+export struct ImportAlternativeData {
+    index: int,
+    title: string,
+    artist: string,
+}
+
 export global Theme {
     in-out property <color> window;
     in-out property <color> panel;
