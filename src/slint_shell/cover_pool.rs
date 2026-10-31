@@ -34,6 +34,36 @@ pub(crate) fn handle_fetch_cover_command(
     });
 }
 
+/// Which views a freshly fetched cover belongs to, keyed by generation match.
+#[derive(Clone, Copy)]
+struct CoverTargets {
+    shelves_and_queue: bool,
+    library_and_detail: bool,
+    explore: bool,
+}
+
+impl CoverTargets {
+    /// True when the cover belongs to at least one live view.
+    fn any(self) -> bool {
+        self.shelves_and_queue || self.library_and_detail || self.explore
+    }
+}
+
+/// Maps the current generation counters to the views that must be resynced.
+fn cover_targets(st: &SlintAppState, generation: u64) -> CoverTargets {
+    let is_search = st.search_generation == generation;
+    let is_detail = st.detail_generation == generation;
+    let is_library = st.library_generation == generation;
+    let is_play = st.play_generation == generation;
+    let is_explore = st.explore_generation == generation;
+
+    CoverTargets {
+        shelves_and_queue: is_search || is_play,
+        library_and_detail: is_detail || is_library,
+        explore: is_explore,
+    }
+}
+
 /// Applies decoded cover art to UI state, triggering shelf card and search row resync.
 pub(crate) fn apply_fetched_cover_to_state(
     win: &MoggytWindow,
@@ -44,21 +74,16 @@ pub(crate) fn apply_fetched_cover_to_state(
     let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) else {
         return;
     };
-    let is_search = st.search_generation == generation;
-    let is_detail = st.detail_generation == generation;
-    let is_library = st.library_generation == generation;
-    let is_play = st.play_generation == generation;
-    let is_explore = st.explore_generation == generation;
-
-    if is_search || is_detail || is_library || is_play || is_explore {
+    let targets = cover_targets(st, generation);
+    if targets.any() {
         st.search_covers.insert(cover.url.clone(), img.clone());
-        if is_search || is_play {
+        if targets.shelves_and_queue {
             sync_shelves_and_queue(win, st);
         }
-        if is_detail || is_library {
+        if targets.library_and_detail {
             sync_library_and_detail(win, st);
         }
-        if is_explore {
+        if targets.explore {
             sync_explore_shelves(win, st);
         }
     }
@@ -128,6 +153,7 @@ pub(crate) fn run_cover_fetch_worker_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::slint_shell::test_support::test_wired;
 
     #[test]
     fn test_cover_fetch_pool_concurrency_bound_constant_integration() {
@@ -143,5 +169,57 @@ mod tests {
             received += 1;
         }
         assert_eq!(received, COVER_FETCH_CONCURRENCY_LIMIT);
+    }
+
+    #[test]
+    fn test_cover_targets_generation_matching() {
+        let mut st = test_wired();
+        st.search_generation = 10;
+        st.play_generation = 20;
+        st.detail_generation = 30;
+        st.library_generation = 40;
+        st.explore_generation = 50;
+
+        // Matching search generation
+        let search_targets = cover_targets(&st, 10);
+        assert!(search_targets.any());
+        assert!(search_targets.shelves_and_queue);
+        assert!(!search_targets.library_and_detail);
+        assert!(!search_targets.explore);
+
+        // Matching play generation
+        let play_targets = cover_targets(&st, 20);
+        assert!(play_targets.any());
+        assert!(play_targets.shelves_and_queue);
+        assert!(!play_targets.library_and_detail);
+        assert!(!play_targets.explore);
+
+        // Matching detail generation
+        let detail_targets = cover_targets(&st, 30);
+        assert!(detail_targets.any());
+        assert!(!detail_targets.shelves_and_queue);
+        assert!(detail_targets.library_and_detail);
+        assert!(!detail_targets.explore);
+
+        // Matching library generation
+        let library_targets = cover_targets(&st, 40);
+        assert!(library_targets.any());
+        assert!(!library_targets.shelves_and_queue);
+        assert!(library_targets.library_and_detail);
+        assert!(!library_targets.explore);
+
+        // Matching explore generation
+        let explore_targets = cover_targets(&st, 50);
+        assert!(explore_targets.any());
+        assert!(!explore_targets.shelves_and_queue);
+        assert!(!explore_targets.library_and_detail);
+        assert!(explore_targets.explore);
+
+        // Non-matching generation
+        let non_matching = cover_targets(&st, 999);
+        assert!(!non_matching.any());
+        assert!(!non_matching.shelves_and_queue);
+        assert!(!non_matching.library_and_detail);
+        assert!(!non_matching.explore);
     }
 }
