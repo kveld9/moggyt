@@ -290,22 +290,36 @@ pub fn clean_track_title(raw: &str) -> String {
     collapse_whitespace(&without_suffixes)
 }
 
+/// Latin diacritic fold table: inclusive char range mapped to its ASCII replacement.
+const LATIN_FOLDS: &[(char, char, &str)] = &[
+    ('\u{00E0}', '\u{00E5}', "a"),
+    ('\u{0100}', '\u{0105}', "a"),
+    ('\u{00E8}', '\u{00EB}', "e"),
+    ('\u{0112}', '\u{011B}', "e"),
+    ('\u{00EC}', '\u{00EF}', "i"),
+    ('\u{0128}', '\u{0133}', "i"),
+    ('\u{00F2}', '\u{00F6}', "o"),
+    ('\u{00F8}', '\u{00F8}', "o"),
+    ('\u{014C}', '\u{0153}', "o"),
+    ('\u{00F9}', '\u{00FC}', "u"),
+    ('\u{0168}', '\u{0173}', "u"),
+    ('\u{00F1}', '\u{00F1}', "n"),
+    ('\u{0143}', '\u{0148}', "n"),
+    ('\u{00E7}', '\u{00E7}', "c"),
+    ('\u{0106}', '\u{010D}', "c"),
+    ('\u{00FD}', '\u{00FD}', "y"),
+    ('\u{00FF}', '\u{00FF}', "y"),
+    ('\u{00DF}', '\u{00DF}', "ss"),
+    ('\u{00E6}', '\u{00E6}', "ae"),
+    ('\u{0160}', '\u{0161}', "s"),
+    ('\u{017D}', '\u{017E}', "z"),
+];
+
 fn fold_latin_diacritic(c: char) -> Option<&'static str> {
-    match c {
-        '\u{00E0}'..='\u{00E5}' | '\u{0100}'..='\u{0105}' => Some("a"),
-        '\u{00E8}'..='\u{00EB}' | '\u{0112}'..='\u{011B}' => Some("e"),
-        '\u{00EC}'..='\u{00EF}' | '\u{0128}'..='\u{0133}' => Some("i"),
-        '\u{00F2}'..='\u{00F6}' | '\u{00F8}' | '\u{014C}'..='\u{0153}' => Some("o"),
-        '\u{00F9}'..='\u{00FC}' | '\u{0168}'..='\u{0173}' => Some("u"),
-        '\u{00F1}' | '\u{0143}'..='\u{0148}' => Some("n"),
-        '\u{00E7}' | '\u{0106}'..='\u{010D}' => Some("c"),
-        '\u{00FD}' | '\u{00FF}' => Some("y"),
-        '\u{00DF}' => Some("ss"),
-        '\u{00E6}' => Some("ae"),
-        '\u{0160}' | '\u{0161}' => Some("s"),
-        '\u{017D}' | '\u{017E}' => Some("z"),
-        _ => None,
-    }
+    LATIN_FOLDS
+        .iter()
+        .find(|(low, high, _)| (*low..=*high).contains(&c))
+        .map(|(_, _, folded)| *folded)
 }
 
 fn append_normalized_char(buf: &mut String, ch: char) {
@@ -753,5 +767,16 @@ mod tests {
 
         let de: MusicVideoType = serde_json::from_str("\"ATV\"").unwrap();
         assert_eq!(de, MusicVideoType::Atv);
+    }
+
+    #[test]
+    fn fold_latin_diacritic_table_coverage() {
+        for &(low, high, expected) in LATIN_FOLDS {
+            assert_eq!(fold_latin_diacritic(low), Some(expected));
+            assert_eq!(fold_latin_diacritic(high), Some(expected));
+        }
+        assert_eq!(fold_latin_diacritic('\u{00F7}'), None);
+        assert_eq!(fold_latin_diacritic('x'), None);
+        assert_eq!(fold_latin_diacritic(' '), None);
     }
 }

@@ -196,8 +196,8 @@ fn set_executable_permissions(_path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Downloads a binary release from `url` directly to `target_path`.
-fn download_sidecar(target_path: &Path, url: &str) -> anyhow::Result<()> {
+/// Fetches the sidecar release payload from `url`.
+fn fetch_sidecar_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
     let response = reqwest::blocking::get(url)
         .with_context(|| format!("failed to request yt-dlp release from {url}"))?
         .error_for_status()
@@ -206,8 +206,13 @@ fn download_sidecar(target_path: &Path, url: &str) -> anyhow::Result<()> {
     let bytes =
         response.bytes().with_context(|| format!("failed to read payload bytes from {url}"))?;
 
+    Ok(bytes.to_vec())
+}
+
+/// Writes the payload to a temporary file, marks it executable and moves it into place.
+fn write_sidecar_atomically(target_path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
     let temp_path = target_path.with_extension("download");
-    std::fs::write(&temp_path, &bytes)
+    std::fs::write(&temp_path, bytes)
         .with_context(|| format!("failed to write payload to {temp_path:?}"))?;
 
     set_executable_permissions(&temp_path)?;
@@ -216,6 +221,12 @@ fn download_sidecar(target_path: &Path, url: &str) -> anyhow::Result<()> {
         .with_context(|| format!("failed to rename {temp_path:?} to {target_path:?}"))?;
 
     Ok(())
+}
+
+/// Downloads a binary release from `url` directly to `target_path`.
+fn download_sidecar(target_path: &Path, url: &str) -> anyhow::Result<()> {
+    let bytes = fetch_sidecar_bytes(url)?;
+    write_sidecar_atomically(target_path, &bytes)
 }
 
 /// Ensures the yt-dlp sidecar binary is provisioned and up to date in `data_dir`.
