@@ -1,15 +1,10 @@
+import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
 import { StyledInputField } from "../controls.slint";
 
 export component SessionSettings inherits VerticalLayout {
     in property <bool> signed-in: false;
     in-out property <string> cookie-text: "";
-    in property <string> section-session-label: "Session";
-    in property <string> status-signed-in-label: "Status: Signed in";
-    in property <string> sign-out-label: "Sign out";
-    in property <string> status-anonymous-label: "Status: Anonymous";
-    in property <string> session-cookie-placeholder: "Paste session cookies...";
-    in property <string> sign-in-label: "Sign in";
 
     callback sign-in-submitted(string);
     callback sign-out();
@@ -17,7 +12,7 @@ export component SessionSettings inherits VerticalLayout {
     spacing: 10px;
 
     Text {
-        text: root.section-session-label;
+        text: Labels.section-session-label;
         color: Theme.text;
         font-size: 16px;
         font-weight: 700;
@@ -35,7 +30,7 @@ export component SessionSettings inherits VerticalLayout {
                 alignment: space-between;
 
                 Text {
-                    text: root.status-signed-in-label;
+                    text: Labels.status-signed-in-label;
                     color: Theme.accent;
                     font-size: 14px;
                     font-weight: 600;
@@ -54,7 +49,7 @@ export component SessionSettings inherits VerticalLayout {
                     }
 
                     Text {
-                        text: root.sign-out-label;
+                        text: Labels.sign-out-label;
                         color: Theme.text;
                         font-size: 12px;
                         font-weight: 700;
@@ -68,7 +63,7 @@ export component SessionSettings inherits VerticalLayout {
                 spacing: 10px;
 
                 Text {
-                    text: root.status-anonymous-label;
+                    text: Labels.status-anonymous-label;
                     color: Theme.secondary;
                     font-size: 14px;
                 }
@@ -79,7 +74,7 @@ export component SessionSettings inherits VerticalLayout {
 
                     StyledInputField {
                         text <=> root.cookie-text;
-                        placeholder-text: root.session-cookie-placeholder;
+                        placeholder-text: Labels.session-cookie-placeholder;
                         input-type: InputType.password;
                         accepted(t) => { root.sign-in-submitted(t); }
                     }
@@ -95,7 +90,7 @@ export component SessionSettings inherits VerticalLayout {
                         }
 
                         Text {
-                            text: root.sign-in-label;
+                            text: Labels.sign-in-label;
                             color: sign-in-touch.has-hover ? Theme.text : Theme.window;
                             font-size: 12px;
                             font-weight: 700;

@@ -1,3 +1,4 @@
+import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
 import { SettingsModeButton, SettingsToggleRow } from "../settings_rows.slint";
 
@@ -11,24 +12,13 @@ export component PlayerBarSettings inherits VerticalLayout {
     in property <bool> player-bar-show-queue: true;
     in property <bool> player-bar-show-volume: true;
 
-    in property <string> section-player-bar-label: "Player bar";
-    in property <string> player-bar-classic-label: "Classic";
-    in property <string> player-bar-floating-label: "Floating";
-    in property <string> player-bar-artwork-label: "Show artwork";
-    in property <string> player-bar-like-label: "Show like button";
-    in property <string> player-bar-shuffle-label: "Show shuffle button";
-    in property <string> player-bar-repeat-label: "Show repeat button";
-    in property <string> player-bar-skip-label: "Show skip 10s buttons";
-    in property <string> player-bar-queue-label: "Show queue button";
-    in property <string> player-bar-volume-label: "Show volume slider";
-
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
 
     spacing: 10px;
 
     Text {
-        text: root.section-player-bar-label;
+        text: Labels.section-player-bar-label;
         color: Theme.text;
         font-size: 16px;
         font-weight: 700;
@@ -46,56 +36,56 @@ export component PlayerBarSettings inherits VerticalLayout {
                 spacing: 12px;
 
                 SettingsModeButton {
-                    label: root.player-bar-classic-label;
+                    label: Labels.player-bar-classic-label;
                     is-active: root.player-bar-mode == 0;
                     clicked => { root.player-bar-mode-selected(0); }
                 }
 
                 SettingsModeButton {
-                    label: root.player-bar-floating-label;
+                    label: Labels.player-bar-floating-label;
                     is-active: root.player-bar-mode == 1;
                     clicked => { root.player-bar-mode-selected(1); }
                 }
             }
 
             SettingsToggleRow {
-                label: root.player-bar-artwork-label;
+                label: Labels.player-bar-artwork-label;
                 checked: root.player-bar-show-artwork;
                 toggled => { root.player-bar-option-toggled(0); }
             }
 
             SettingsToggleRow {
-                label: root.player-bar-like-label;
+                label: Labels.player-bar-like-label;
                 checked: root.player-bar-show-like;
                 toggled => { root.player-bar-option-toggled(1); }
             }
 
             SettingsToggleRow {
-                label: root.player-bar-shuffle-label;
+                label: Labels.player-bar-shuffle-label;
                 checked: root.player-bar-show-shuffle;
                 toggled => { root.player-bar-option-toggled(2); }
             }
 
             SettingsToggleRow {
-                label: root.player-bar-repeat-label;
+                label: Labels.player-bar-repeat-label;
                 checked: root.player-bar-show-repeat;
                 toggled => { root.player-bar-option-toggled(3); }
             }
 
             SettingsToggleRow {
-                label: root.player-bar-skip-label;
+                label: Labels.player-bar-skip-label;
                 checked: root.player-bar-show-skip-seconds;
                 toggled => { root.player-bar-option-toggled(4); }
             }
 
             SettingsToggleRow {
-                label: root.player-bar-queue-label;
+                label: Labels.player-bar-queue-label;
                 checked: root.player-bar-show-queue;
                 toggled => { root.player-bar-option-toggled(5); }
             }
 
             SettingsToggleRow {
-                label: root.player-bar-volume-label;
+                label: Labels.player-bar-volume-label;
                 checked: root.player-bar-show-volume;
                 toggled => { root.player-bar-option-toggled(6); }
             }

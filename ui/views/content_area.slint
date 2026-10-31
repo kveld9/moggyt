@@ -46,37 +46,6 @@ export component ContentArea inherits Rectangle {
     in property <bool> explore-loading: false;
     in property <[string]> recent-searches: [];
     in property <bool> search-active: false;
-    in property <string> no-cover-text: "No cover";
-    in property <string> lyrics-unavailable-text: "Lyrics unavailable";
-    in property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
-    in property <string> session-anonymous-hint: "Anonymous session: paste cookies to unlock library";
-    in property <string> session-cookie-placeholder: "Paste session cookies...";
-    in property <string> sign-in-label: "Sign in";
-    in property <string> session-signed-in-hint: "Signed in: library unlocked";
-    in property <string> sign-out-label: "Sign out";
-    in property <string> section-playlists-label: "Playlists";
-    in property <string> empty-playlists-text: "No playlists found.";
-    in property <string> section-albums-label: "Albums";
-    in property <string> empty-albums-text: "No albums found.";
-    in property <string> section-artists-label: "Artists";
-    in property <string> empty-artists-text: "No artists found.";
-    in property <string> empty-detail-text: "No details available.";
-    in property <string> play-button-label: "Play";
-    in property <string> shuffle-button-label: "Shuffle";
-    in property <string> empty-songs-text: "No songs available.";
-    in property <string> section-theme-label: "Theme";
-    in property <string> theme-white-label: "White";
-    in property <string> theme-black-oled-label: "Black OLED";
-    in property <string> theme-mono-label: "Mono";
-    in property <string> section-playback-label: "Playback";
-    in property <string> playback-speed-label: "Playback speed";
-    in property <string> sleep-timer-label: "Sleep timer"; in property <string> sleep-timer-off-label: "Off"; in property <string> sleep-timer-15m-label: "15m"; in property <string> sleep-timer-30m-label: "30m"; in property <string> sleep-timer-45m-label: "45m"; in property <string> sleep-timer-60m-label: "60m"; in property <string> sleep-timer-end-of-track-label: "End of track";
-    in property <string> section-session-label: "Session";
-    in property <string> status-signed-in-label: "Status: Signed in";
-    in property <string> status-anonymous-label: "Status: Anonymous";
-    in property <string> section-about-label: "About";
-    in property <string> app-version-label: "App version";
-    in property <string> update-status-label: "Update status";
     in property <int> player-bar-mode: 0;
     in property <bool> player-bar-show-artwork: true;
     in property <bool> player-bar-show-like: true;
@@ -85,16 +54,6 @@ export component ContentArea inherits Rectangle {
     in property <bool> player-bar-show-skip-seconds: false;
     in property <bool> player-bar-show-queue: true;
     in property <bool> player-bar-show-volume: true;
-    in property <string> section-player-bar-label: "Player bar";
-    in property <string> player-bar-classic-label: "Classic";
-    in property <string> player-bar-floating-label: "Floating";
-    in property <string> player-bar-artwork-label: "Show artwork";
-    in property <string> player-bar-like-label: "Show like button";
-    in property <string> player-bar-shuffle-label: "Show shuffle button";
-    in property <string> player-bar-repeat-label: "Show repeat button";
-    in property <string> player-bar-skip-label: "Show skip 10s buttons";
-    in property <string> player-bar-queue-label: "Show queue button";
-    in property <string> player-bar-volume-label: "Show volume slider";
 
     callback query-submitted(string);
     callback track-selected(int);
@@ -233,25 +192,11 @@ export component ContentArea inherits Rectangle {
                 has-cover: root.has-cover;
                 lyrics-lines: root.lyrics-lines;
                 active-lyric-index: root.active-lyric-index;
-                no-cover-text: root.no-cover-text;
-                lyrics-unavailable-text: root.lyrics-unavailable-text;
-                lyrics-hint-text: root.lyrics-hint-text;
             }
 
             if root.active-page == 2 : LibraryView {
                 cookie-text <=> root.cookie-text;
                 signed-in: root.signed-in;
-                session-anonymous-hint: root.session-anonymous-hint;
-                session-cookie-placeholder: root.session-cookie-placeholder;
-                sign-in-label: root.sign-in-label;
-                session-signed-in-hint: root.session-signed-in-hint;
-                sign-out-label: root.sign-out-label;
-                section-playlists-label: root.section-playlists-label;
-                empty-playlists-text: root.empty-playlists-text;
-                section-albums-label: root.section-albums-label;
-                empty-albums-text: root.empty-albums-text;
-                section-artists-label: root.section-artists-label;
-                empty-artists-text: root.empty-artists-text;
                 playlists: root.library-playlists; albums: root.library-albums; artists: root.library-artists;
                 playlist-selected(idx) => { root.playlist-selected(idx); }
                 album-selected(idx) => { root.album-selected(idx); }
@@ -269,11 +214,6 @@ export component ContentArea inherits Rectangle {
                 kind-label: root.detail-kind-label;
                 cover: root.detail-cover;
                 tracks: root.detail-tracks;
-                empty-text: root.empty-detail-text;
-                no-cover-text: root.no-cover-text;
-                play-button-label: root.play-button-label;
-                shuffle-button-label: root.shuffle-button-label;
-                empty-songs-text: root.empty-songs-text;
                 track-selected(idx) => { root.detail-track-selected(idx); }
                 play => { root.detail-play(); }
                 shuffle => { root.detail-shuffle(); }
@@ -287,23 +227,7 @@ export component ContentArea inherits Rectangle {
                 app-version: root.app-version;
                 update-status-text: root.update-status-text;
                 has-update: root.has-update;
-                section-theme-label: root.section-theme-label;
-                theme-white-label: root.theme-white-label;
-                theme-black-oled-label: root.theme-black-oled-label;
-                theme-mono-label: root.theme-mono-label;
-                section-playback-label: root.section-playback-label;
-                playback-speed-label: root.playback-speed-label;
-                sleep-timer-label: root.sleep-timer-label; sleep-timer-off-label: root.sleep-timer-off-label; sleep-timer-15m-label: root.sleep-timer-15m-label; sleep-timer-30m-label: root.sleep-timer-30m-label; sleep-timer-45m-label: root.sleep-timer-45m-label; sleep-timer-60m-label: root.sleep-timer-60m-label; sleep-timer-end-of-track-label: root.sleep-timer-end-of-track-label;
                 sleep-timer-status-text: root.sleep-timer-status-text; active-sleep-timer-index: root.active-sleep-timer-index;
-                section-session-label: root.section-session-label;
-                status-signed-in-label: root.status-signed-in-label;
-                sign-out-label: root.sign-out-label;
-                status-anonymous-label: root.status-anonymous-label;
-                session-cookie-placeholder: root.session-cookie-placeholder;
-                sign-in-label: root.sign-in-label;
-                section-about-label: root.section-about-label;
-                app-version-label: root.app-version-label;
-                update-status-label: root.update-status-label;
                 player-bar-mode: root.player-bar-mode;
                 player-bar-show-artwork: root.player-bar-show-artwork;
                 player-bar-show-like: root.player-bar-show-like;
@@ -312,16 +236,6 @@ export component ContentArea inherits Rectangle {
                 player-bar-show-skip-seconds: root.player-bar-show-skip-seconds;
                 player-bar-show-queue: root.player-bar-show-queue;
                 player-bar-show-volume: root.player-bar-show-volume;
-                section-player-bar-label: root.section-player-bar-label;
-                player-bar-classic-label: root.player-bar-classic-label;
-                player-bar-floating-label: root.player-bar-floating-label;
-                player-bar-artwork-label: root.player-bar-artwork-label;
-                player-bar-like-label: root.player-bar-like-label;
-                player-bar-shuffle-label: root.player-bar-shuffle-label;
-                player-bar-repeat-label: root.player-bar-repeat-label;
-                player-bar-skip-label: root.player-bar-skip-label;
-                player-bar-queue-label: root.player-bar-queue-label;
-                player-bar-volume-label: root.player-bar-volume-label;
                 theme-selected(idx) => { root.theme-selected(idx); }
                 cycle-playback-speed => { root.cycle-playback-speed(); }
                 sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }

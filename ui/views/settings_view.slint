@@ -12,30 +12,8 @@ export component SettingsView inherits VerticalLayout {
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Up to date";
     in property <bool> has-update: false;
-    in property <string> section-theme-label: "Theme";
-    in property <string> theme-white-label: "White";
-    in property <string> theme-black-oled-label: "Black OLED";
-    in property <string> theme-mono-label: "Mono";
-    in property <string> section-playback-label: "Playback";
-    in property <string> playback-speed-label: "Playback speed";
-    in property <string> sleep-timer-label: "Sleep timer";
-    in property <string> sleep-timer-off-label: "Off";
-    in property <string> sleep-timer-15m-label: "15m";
-    in property <string> sleep-timer-30m-label: "30m";
-    in property <string> sleep-timer-45m-label: "45m";
-    in property <string> sleep-timer-60m-label: "60m";
-    in property <string> sleep-timer-end-of-track-label: "End of track";
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
-    in property <string> section-session-label: "Session";
-    in property <string> status-signed-in-label: "Status: Signed in";
-    in property <string> sign-out-label: "Sign out";
-    in property <string> status-anonymous-label: "Status: Anonymous";
-    in property <string> session-cookie-placeholder: "Paste session cookies...";
-    in property <string> sign-in-label: "Sign in";
-    in property <string> section-about-label: "About";
-    in property <string> app-version-label: "App version";
-    in property <string> update-status-label: "Update status";
     in property <int> player-bar-mode: 0;
     in property <bool> player-bar-show-artwork: true;
     in property <bool> player-bar-show-like: true;
@@ -44,16 +22,6 @@ export component SettingsView inherits VerticalLayout {
     in property <bool> player-bar-show-skip-seconds: false;
     in property <bool> player-bar-show-queue: true;
     in property <bool> player-bar-show-volume: true;
-    in property <string> section-player-bar-label: "Player bar";
-    in property <string> player-bar-classic-label: "Classic";
-    in property <string> player-bar-floating-label: "Floating";
-    in property <string> player-bar-artwork-label: "Show artwork";
-    in property <string> player-bar-like-label: "Show like button";
-    in property <string> player-bar-shuffle-label: "Show shuffle button";
-    in property <string> player-bar-repeat-label: "Show repeat button";
-    in property <string> player-bar-skip-label: "Show skip 10s buttons";
-    in property <string> player-bar-queue-label: "Show queue button";
-    in property <string> player-bar-volume-label: "Show volume slider";
 
     callback theme-selected(int);
     callback cycle-playback-speed();
@@ -68,24 +36,11 @@ export component SettingsView inherits VerticalLayout {
 
     theme-panel := ThemeSettings {
         active-theme-index: root.active-theme-index;
-        section-theme-label: root.section-theme-label;
-        theme-white-label: root.theme-white-label;
-        theme-black-oled-label: root.theme-black-oled-label;
-        theme-mono-label: root.theme-mono-label;
         theme-selected(idx) => { root.theme-selected(idx); }
     }
 
     playback-panel := PlaybackSettings {
         playback-speed-text: root.playback-speed-text;
-        section-playback-label: root.section-playback-label;
-        playback-speed-label: root.playback-speed-label;
-        sleep-timer-label: root.sleep-timer-label;
-        sleep-timer-off-label: root.sleep-timer-off-label;
-        sleep-timer-15m-label: root.sleep-timer-15m-label;
-        sleep-timer-30m-label: root.sleep-timer-30m-label;
-        sleep-timer-45m-label: root.sleep-timer-45m-label;
-        sleep-timer-60m-label: root.sleep-timer-60m-label;
-        sleep-timer-end-of-track-label: root.sleep-timer-end-of-track-label;
         sleep-timer-status-text: root.sleep-timer-status-text;
         active-sleep-timer-index: root.active-sleep-timer-index;
         cycle-playback-speed => { root.cycle-playback-speed(); }
@@ -95,12 +50,6 @@ export component SettingsView inherits VerticalLayout {
     session-panel := SessionSettings {
         signed-in: root.signed-in;
         cookie-text <=> root.cookie-text;
-        section-session-label: root.section-session-label;
-        status-signed-in-label: root.status-signed-in-label;
-        sign-out-label: root.sign-out-label;
-        status-anonymous-label: root.status-anonymous-label;
-        session-cookie-placeholder: root.session-cookie-placeholder;
-        sign-in-label: root.sign-in-label;
         sign-in-submitted(text) => { root.sign-in-submitted(text); }
         sign-out => { root.sign-out(); }
     }
@@ -114,16 +63,6 @@ export component SettingsView inherits VerticalLayout {
         player-bar-show-skip-seconds: root.player-bar-show-skip-seconds;
         player-bar-show-queue: root.player-bar-show-queue;
         player-bar-show-volume: root.player-bar-show-volume;
-        section-player-bar-label: root.section-player-bar-label;
-        player-bar-classic-label: root.player-bar-classic-label;
-        player-bar-floating-label: root.player-bar-floating-label;
-        player-bar-artwork-label: root.player-bar-artwork-label;
-        player-bar-like-label: root.player-bar-like-label;
-        player-bar-shuffle-label: root.player-bar-shuffle-label;
-        player-bar-repeat-label: root.player-bar-repeat-label;
-        player-bar-skip-label: root.player-bar-skip-label;
-        player-bar-queue-label: root.player-bar-queue-label;
-        player-bar-volume-label: root.player-bar-volume-label;
         player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
         player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
     }
@@ -132,8 +71,5 @@ export component SettingsView inherits VerticalLayout {
         app-version: root.app-version;
         update-status-text: root.update-status-text;
         has-update: root.has-update;
-        section-about-label: root.section-about-label;
-        app-version-label: root.app-version-label;
-        update-status-label: root.update-status-label;
     }
 }
