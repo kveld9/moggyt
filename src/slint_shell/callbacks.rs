@@ -8,7 +8,6 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 
 use crate::domain::{DetailKind, SearchFilter, SearchResult, TimerPreset};
-use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::explore::{
@@ -35,15 +34,9 @@ use crate::slint_shell::window::{
 };
 
 /// Maps a clicked search result item to playback or container detail view.
-pub(crate) fn handle_filtered_item_click<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn handle_filtered_item_click(
     window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
+    state: &mut SlintAppState,
     item: SearchResult,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
@@ -75,15 +68,9 @@ pub(crate) fn handle_filtered_item_click<
 }
 
 /// Non-blocking handler for playback toggle (pause, resume, or start head track).
-pub(crate) fn handle_toggle_play<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn handle_toggle_play(
     window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
+    state: &mut SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let audio_arc = std::sync::Arc::clone(&state.audio);
@@ -109,15 +96,9 @@ pub(crate) fn handle_toggle_play<
 }
 
 /// Wires user event callbacks between MoggytWindow and the application state without blocking.
-pub(crate) fn wire_window_callbacks<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn wire_window_callbacks(
     window: &MoggytWindow,
-    state_rc: SharedState<C, A, S, L, K>,
+    state_rc: SharedState,
     worker_tx: std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     wire_navigation_callbacks(window, &state_rc, &worker_tx);
@@ -129,15 +110,9 @@ pub(crate) fn wire_window_callbacks<
 }
 
 /// Wires page navigation, back navigation, and queue panel drawer visibility callbacks.
-fn wire_navigation_callbacks<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+fn wire_navigation_callbacks(
     window: &MoggytWindow,
-    state_rc: &SharedState<C, A, S, L, K>,
+    state_rc: &SharedState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let s = Rc::clone(state_rc);
@@ -187,15 +162,9 @@ fn wire_navigation_callbacks<
 }
 
 /// Wires search query, filter selection, and result interaction callbacks.
-fn wire_search_callbacks<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+fn wire_search_callbacks(
     window: &MoggytWindow,
-    state_rc: &SharedState<C, A, S, L, K>,
+    state_rc: &SharedState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let s = Rc::clone(state_rc);
@@ -279,15 +248,9 @@ fn wire_search_callbacks<
 }
 
 /// Wires library container and queue selection callbacks.
-fn wire_library_callbacks<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+fn wire_library_callbacks(
     window: &MoggytWindow,
-    state_rc: &SharedState<C, A, S, L, K>,
+    state_rc: &SharedState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let s = Rc::clone(state_rc);
@@ -336,15 +299,9 @@ fn wire_library_callbacks<
 }
 
 /// Wires detail view track selection and playback action callbacks.
-fn wire_detail_callbacks<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+fn wire_detail_callbacks(
     window: &MoggytWindow,
-    state_rc: &SharedState<C, A, S, L, K>,
+    state_rc: &SharedState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let s = Rc::clone(state_rc);
@@ -427,15 +384,9 @@ fn wire_detail_callbacks<
 }
 
 /// Wires playback transport, track stepping, seek, volume, and preference callbacks.
-fn wire_playback_callbacks<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+fn wire_playback_callbacks(
     window: &MoggytWindow,
-    state_rc: &SharedState<C, A, S, L, K>,
+    state_rc: &SharedState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let s = Rc::clone(state_rc);
@@ -548,15 +499,9 @@ fn wire_playback_callbacks<
 }
 
 /// Wires settings, account authentication, player bar preferences, and resize callbacks.
-fn wire_settings_callbacks<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+fn wire_settings_callbacks(
     window: &MoggytWindow,
-    state_rc: &SharedState<C, A, S, L, K>,
+    state_rc: &SharedState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let s = Rc::clone(state_rc);
@@ -640,16 +585,7 @@ fn wire_settings_callbacks<
 }
 
 /// Handles sleep timer preset selection, arming or canceling the timer.
-pub(crate) fn handle_sleep_timer_selection<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    state: &mut SlintAppState<C, A, S, L, K>,
-    idx: i32,
-) {
+pub(crate) fn handle_sleep_timer_selection(state: &mut SlintAppState, idx: i32) {
     let preset = timer_preset_from_index(idx);
     let track_id = state.queue.current().map(|t| t.id.clone());
     if preset == TimerPreset::Off {

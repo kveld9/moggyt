@@ -3,7 +3,6 @@
 //! Hexagonal invariant: adapter composition root connecting Slint UI events and callbacks
 //! to application state without direct domain business rules.
 
-use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -13,7 +12,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::domain::{Detail, DetailKind, SearchResult, Shelf};
 use crate::i18n::tr;
-use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
+use crate::infra::{AudioBackend, CoverCache, LyricsSource};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::callbacks::wire_window_callbacks;
 use crate::slint_shell::covers::{
@@ -37,52 +36,28 @@ use crate::slint_shell::sync::{
 };
 
 thread_local! {
-    static ACTIVE_STATE: RefCell<Option<Box<dyn Any>>> = RefCell::new(None);
+    static ACTIVE_STATE: RefCell<Option<SharedState>> = const { RefCell::new(None) };
 }
 
-pub(crate) fn set_ui_state<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state_rc: &SharedState<C, A, S, L, K>,
-) {
+pub(crate) fn set_ui_state(state_rc: &SharedState) {
     ACTIVE_STATE.with(|cell| {
-        *cell.borrow_mut() = Some(Box::new(Rc::clone(state_rc)));
+        *cell.borrow_mut() = Some(Rc::clone(state_rc));
     });
 }
 
-pub(crate) fn with_ui_state<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
-    R,
->(
-    f: impl FnOnce(&mut SlintAppState<C, A, S, L, K>) -> R,
-) -> Option<R> {
+pub(crate) fn with_ui_state<R>(f: impl FnOnce(&mut SlintAppState) -> R) -> Option<R> {
     ACTIVE_STATE.with(|cell| {
         let borrow = cell.borrow();
-        let any = borrow.as_ref()?;
-        let rc = any.downcast_ref::<SharedState<C, A, S, L, K>>()?;
+        let rc = borrow.as_ref()?;
         let mut st = rc.borrow_mut();
         Some(f(&mut st))
     })
 }
 
 /// Triggers asynchronous track playback on the background worker thread.
-pub(crate) fn trigger_playback<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn trigger_playback(
     window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
+    state: &mut SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let Some(track) = state.queue.current().cloned() else {
@@ -143,15 +118,9 @@ pub(crate) fn trigger_playback<
 }
 
 /// Dispatches asynchronous search query off the UI thread.
-pub(crate) fn submit_search_async<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn submit_search_async(
     window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
+    state: &mut SlintAppState,
     query: &str,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
@@ -185,7 +154,7 @@ pub(crate) fn submit_search_async<
         let (g, q_res, shelves) = execute_search(generation, &q, &cat, loc);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
-            with_ui_state::<C, A, S, L, K, _>(|st| {
+            with_ui_state(|st| {
                 if st.search_generation == g {
                     st.search_query = q_res;
                     st.home_shelves = shelves;
@@ -208,15 +177,9 @@ pub(crate) fn submit_search_async<
 }
 
 /// Dispatches asynchronous container detail lookup off the UI thread.
-pub(crate) fn open_detail_async<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn open_detail_async(
     window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
+    state: &mut SlintAppState,
     browse_id: &str,
     kind: DetailKind,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
@@ -243,7 +206,7 @@ pub(crate) fn open_detail_async<
         let (g, detail) = execute_detail(generation, &id, kind, &cat);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
-            with_ui_state::<C, A, S, L, K, _>(|st| {
+            with_ui_state(|st| {
                 if st.detail_generation == g {
                     st.detail = detail;
                     request_detail_covers(st, &tx);
@@ -255,15 +218,9 @@ pub(crate) fn open_detail_async<
 }
 
 /// Dispatches asynchronous library refresh off the UI thread.
-pub(crate) fn refresh_library_async<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn refresh_library_async(
     window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
+    state: &mut SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     state.library_generation = state.library_generation.wrapping_add(1);
@@ -276,7 +233,7 @@ pub(crate) fn refresh_library_async<
         let (g, playlists, albums) = execute_refresh_library(generation, &cat);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
-            with_ui_state::<C, A, S, L, K, _>(|st| {
+            with_ui_state(|st| {
                 if st.library_generation == g {
                     st.library_playlists = playlists;
                     st.library_albums = albums;
@@ -290,20 +247,17 @@ pub(crate) fn refresh_library_async<
 }
 
 /// Spawns the dedicated playback worker thread processing play and scrobble commands.
-pub(crate) fn spawn_playback_worker<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn spawn_playback_worker(
     window: &MoggytWindow,
-    adapters: PlaybackWorkerAdapters<A, L, K>,
+    adapters: PlaybackWorkerAdapters<
+        Box<dyn AudioBackend + Send>,
+        Box<dyn LyricsSource + Send + Sync>,
+        Box<dyn CoverCache + Send>,
+    >,
     rx: std::sync::mpsc::Receiver<PlaybackWorkerCommand>,
 ) {
     let weak = window.as_weak();
-    let cover_tx =
-        spawn_cover_fetch_pool::<C, A, S, L, K>(Arc::clone(&adapters.covers), weak.clone());
+    let cover_tx = spawn_cover_fetch_pool(Arc::clone(&adapters.covers), weak.clone());
 
     std::thread::Builder::new()
         .name("moggyt-playback".into())
@@ -315,7 +269,7 @@ pub(crate) fn spawn_playback_worker<
                         let w = weak.clone();
                         let _ = dispatch_to_ui(move || {
                             let Some(win) = w.upgrade() else { return };
-                            with_ui_state::<C, A, S, L, K, _>(|st| {
+                            with_ui_state(|st| {
                                 if st.play_generation == res.generation {
                                     apply_play_track_completion(&win, st, res);
                                 }
@@ -344,15 +298,7 @@ pub(crate) fn spawn_playback_worker<
 }
 
 /// Builds and configures MoggytWindow wired to SlintAppState with callbacks and background timer.
-pub fn build_window<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state: SlintAppState<C, A, S, L, K>,
-) -> anyhow::Result<(MoggytWindow, slint::Timer)> {
+pub fn build_window(state: SlintAppState) -> anyhow::Result<(MoggytWindow, slint::Timer)> {
     let window = MoggytWindow::new().context("failed to instantiate MoggytWindow")?;
     let state_rc = Rc::new(RefCell::new(state));
     set_ui_state(&state_rc);
@@ -366,7 +312,7 @@ pub fn build_window<
     );
 
     let (worker_tx, worker_rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
-    spawn_playback_worker::<C, A, S, L, K>(&window, adapters, worker_rx);
+    spawn_playback_worker(&window, adapters, worker_rx);
     request_shelf_covers(&state_rc.borrow(), &worker_tx);
 
     state_rc.borrow_mut().worker_tx = Some(worker_tx.clone());
@@ -379,16 +325,7 @@ pub fn build_window<
 }
 
 /// Sets up periodic background timer for tray events, media keys, auto-skip, and tick sync.
-pub(crate) fn setup_app_timer<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    window: &MoggytWindow,
-    state_rc: SharedState<C, A, S, L, K>,
-) -> slint::Timer {
+pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> slint::Timer {
     let weak = window.as_weak();
     let timer = slint::Timer::default();
     timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
@@ -410,31 +347,14 @@ pub(crate) fn setup_app_timer<
 }
 
 /// Drains pending update check result without blocking, updating window properties if ready.
-pub(crate) fn drain_updater_check<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn drain_updater_check(window: &MoggytWindow, state: &mut SlintAppState) {
     if poll_updater_check(state) {
         sync_update_status(window, state);
     }
 }
 
 /// Polls pending update check channel, applying any received release info to state.
-pub(crate) fn poll_updater_check<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state: &mut SlintAppState<C, A, S, L, K>,
-) -> bool {
+pub(crate) fn poll_updater_check(state: &mut SlintAppState) -> bool {
     let Some(ref rx) = state.updater_rx else {
         return false;
     };
@@ -459,7 +379,6 @@ mod tests {
 
     use super::*;
     use crate::domain::Track;
-    use crate::infra::{AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, MemorySessionStore};
     use crate::slint_shell::test_support::test_wired;
 
     #[test]
@@ -468,29 +387,13 @@ mod tests {
         let rc = Rc::new(RefCell::new(state));
         set_ui_state(&rc);
 
-        let initial_len = with_ui_state(
-            |st: &mut SlintAppState<
-                CatalogStub,
-                AudioStub,
-                MemorySessionStore,
-                LrclibStub,
-                MemoryCoverCache,
-            >| {
-                st.queue.push(Track::new("t1", "Track One", "Artist One"));
-                st.queue.len()
-            },
-        );
+        let initial_len = with_ui_state(|st: &mut SlintAppState| {
+            st.queue.push(Track::new("t1", "Track One", "Artist One"));
+            st.queue.len()
+        });
         assert_eq!(initial_len, Some(1));
 
-        let updated_len = with_ui_state(
-            |st: &mut SlintAppState<
-                CatalogStub,
-                AudioStub,
-                MemorySessionStore,
-                LrclibStub,
-                MemoryCoverCache,
-            >| { st.queue.len() },
-        );
+        let updated_len = with_ui_state(|st: &mut SlintAppState| st.queue.len());
         assert_eq!(updated_len, Some(1));
     }
 
@@ -500,18 +403,10 @@ mod tests {
         let rc = Rc::new(RefCell::new(state));
         set_ui_state(&rc);
 
-        let result = with_ui_state(
-            |st: &mut SlintAppState<
-                CatalogStub,
-                AudioStub,
-                MemorySessionStore,
-                LrclibStub,
-                MemoryCoverCache,
-            >| {
-                st.is_shuffle = true;
-                st.is_shuffle
-            },
-        );
+        let result = with_ui_state(|st: &mut SlintAppState| {
+            st.is_shuffle = true;
+            st.is_shuffle
+        });
         assert_eq!(result, Some(true));
     }
 

@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::domain::{SearchResult, Shelf};
-use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
+use crate::infra::Catalog;
 use crate::slint_shell::covers::{request_explore_covers, resolve_row_cover_image};
 use crate::slint_shell::platform::dispatch_to_ui;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
@@ -20,7 +20,10 @@ use crate::slint_shell::window::with_ui_state;
 use crate::slint_shell::{ExploreCardData, ExploreCardRow, ExploreShelfData, MoggytWindow};
 
 /// Queries catalog for explore shelves asynchronously off the UI thread.
-pub fn execute_explore<C: Catalog>(generation: u64, catalog: &Arc<Mutex<C>>) -> (u64, Vec<Shelf>) {
+pub fn execute_explore<T: ?Sized + Catalog>(
+    generation: u64,
+    catalog: &Arc<Mutex<T>>,
+) -> (u64, Vec<Shelf>) {
     let shelves = match catalog.lock() {
         Ok(guard) => guard.explore_shelves(),
         Err(_) => Vec::new(),
@@ -34,15 +37,9 @@ pub(crate) fn explore_item_at(shelves: &[Shelf], index: usize) -> Option<&Search
 }
 
 /// Applies completed explore shelves fetch to state and UI on main thread.
-pub(crate) fn apply_explore_completion<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn apply_explore_completion(
     win: &MoggytWindow,
-    st: &mut SlintAppState<C, A, S, L, K>,
+    st: &mut SlintAppState,
     generation: u64,
     shelves: Vec<Shelf>,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
@@ -59,15 +56,9 @@ pub(crate) fn apply_explore_completion<
 }
 
 /// Dispatches asynchronous explore shelves loading off the UI thread.
-pub(crate) fn load_explore_async<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn load_explore_async(
     window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
+    state: &mut SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     state.explore_generation = state.explore_generation.wrapping_add(1);
@@ -83,7 +74,7 @@ pub(crate) fn load_explore_async<
         let (g, shelves) = execute_explore(generation, &cat);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
-            with_ui_state::<C, A, S, L, K, _>(|st| {
+            with_ui_state(|st| {
                 apply_explore_completion(&win, st, g, shelves, &tx);
             });
         });
@@ -93,14 +84,8 @@ pub(crate) fn load_explore_async<
 /// Re-dispatches explore cover fetches when Explore is re-entered with shelves already
 /// loaded. Idempotent: `request_explore_covers` only dispatches URLs missing from the
 /// UI cover cache. Returns false when there is nothing to refresh.
-pub(crate) fn refresh_explore_covers_if_loaded<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    st: &SlintAppState<C, A, S, L, K>,
+pub(crate) fn refresh_explore_covers_if_loaded(
+    st: &SlintAppState,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) -> bool {
     if !st.explore_loaded || st.explore_shelves.is_empty() {
