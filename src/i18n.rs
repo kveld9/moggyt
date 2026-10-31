@@ -104,20 +104,35 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Artist", "ARTISTA"),
     ("Artists", "Artistas"),
     ("Black OLED", "Negro OLED"),
+    ("CSV file path", "Ruta del archivo CSV"),
+    ("Cancel", "Cancelar"),
     ("Classic", "Clásica"),
     ("Clear history", "Borrar todo el historial"),
+    ("Close", "Cerrar"),
     ("Detail", "Detalle"),
+    (
+        "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
+        "Las importaciones por enlace se limitan a 100 canciones. Exporta un CSV para playlists mas largas.",
+    ),
     ("English", "Inglés"),
     ("End of track", "Fin de la canción"),
     ("Explore", "Explorar"),
     ("Failed to play track", "Error al reproducir la canción"),
     ("Floating", "Flotante"),
+    ("From file", "Desde archivo"),
+    ("From link", "Desde enlace"),
+    ("Import", "Importar"),
+    ("Import from Spotify", "Importar desde Spotify"),
+    ("Import progress", "Progreso de importacion"),
+    ("Importing matches...", "Importando coincidencias..."),
     ("Language", "Idioma"),
     ("Library", "Biblioteca"),
     ("Loading...", "Cargando..."),
     ("Loading explore...", "Cargando exploracion..."),
     ("Lyrics unavailable", "Letras no disponibles"),
+    ("Matched", "Coincidencias"),
     ("Mono", "Monocromo"),
+    ("Needs review", "Requieren revision"),
     ("No albums found.", "No hay álbumes."),
     ("No artists found.", "No hay artistas."),
     ("No cover", "Sin portada"),
@@ -161,6 +176,8 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Sleep timer", "Temporizador de apagado"),
     ("Songs", "Canciones"),
     ("Spanish", "Español"),
+    ("Spotify playlist or album link", "Enlace de playlist o album de Spotify"),
+    ("Start import", "Iniciar importacion"),
     ("Status: Anonymous", "Estado: Anónimo"),
     ("Status: Signed in", "Estado: Sesión iniciada"),
     (
@@ -173,6 +190,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Timer: End of track", "Temporizador: Fin de la canción"),
     ("Timer: Off", "Temporizador: Desactivado"),
     ("Timer: {time}", "Temporizador: {time}"),
+    ("Unresolved", "Sin resolver"),
     ("Up to date", "Actualizado"),
     ("Update available", "Actualización disponible"),
     ("Update available: {ver}", "Actualización disponible: {ver}"),
@@ -331,6 +349,38 @@ mod tests {
             let en = tr(Locale::English, key);
             let es = tr(Locale::Spanish, key);
             assert_eq!(en, key, "English must return source key");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_spotify_import_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Import from Spotify", "Importar desde Spotify"),
+            ("Import", "Importar"),
+            ("From link", "Desde enlace"),
+            ("From file", "Desde archivo"),
+            ("Spotify playlist or album link", "Enlace de playlist o album de Spotify"),
+            ("CSV file path", "Ruta del archivo CSV"),
+            ("Start import", "Iniciar importacion"),
+            ("Cancel", "Cancelar"),
+            ("Importing matches...", "Importando coincidencias..."),
+            ("Matched", "Coincidencias"),
+            ("Needs review", "Requieren revision"),
+            ("Unresolved", "Sin resolver"),
+            ("Import progress", "Progreso de importacion"),
+            (
+                "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
+                "Las importaciones por enlace se limitan a 100 canciones. Exporta un CSV para playlists mas largas.",
+            ),
+            ("Close", "Cerrar"),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
             assert_ne!(en, es, "Spanish must differ from English for '{key}'");
         }
     }

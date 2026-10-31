@@ -10,6 +10,8 @@ import { Sidebar } from "../components/sidebar.slint";
 import { PlayerBar } from "../components/player_bar.slint";
 import { QueuePanel } from "../components/queue_panel.slint";
 import { ContentArea } from "./content_area.slint";
+import { ImportModal } from "./import_modal.slint";
+import { ImportProgress } from "./import_progress.slint";
 
 export component MoggytWindow inherits Window {
     title: "Moggyt";
@@ -84,6 +86,17 @@ export component MoggytWindow inherits Window {
     in-out property <bool> player-bar-show-skip-seconds: false;
     in-out property <bool> player-bar-show-queue: true;
     in-out property <bool> player-bar-show-volume: true;
+    in-out property <bool> show-import-modal: false;
+    in-out property <int> import-tab: 0;
+    in-out property <string> import-link-text: "";
+    in-out property <string> import-file-path: "";
+    in-out property <bool> import-running: false;
+    in-out property <string> import-status-text: "";
+    in-out property <int> import-done: 0;
+    in-out property <int> import-total: 0;
+    in-out property <int> import-high: 0;
+    in-out property <int> import-review: 0;
+    in-out property <int> import-unresolved: 0;
 
     callback page-selected(int);
     callback back-pressed();
@@ -251,5 +264,24 @@ export component MoggytWindow inherits Window {
                 toggle-queue-panel => { root.toggle-queue-panel(); }
             }
         }
+    }
+
+    ImportModal {
+        visible: root.show-import-modal;
+        active-tab <=> root.import-tab;
+        link-text <=> root.import-link-text;
+        file-path <=> root.import-file-path;
+        close-requested => { root.show-import-modal = false; }
+    }
+
+    ImportProgress {
+        visible: root.import-running;
+        status-text: root.import-status-text;
+        done: root.import-done;
+        total: root.import-total;
+        high: root.import-high;
+        review: root.import-review;
+        unresolved: root.import-unresolved;
+        cancel-requested => { root.import-running = false; }
     }
 }

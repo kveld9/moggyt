@@ -1,0 +1,167 @@
+import { Labels } from "../labels.slint";
+import { Theme } from "../theme.slint";
+
+export component ImportProgress inherits Rectangle {
+    in-out property <string> status-text: "";
+    in-out property <int> done: 0;
+    in-out property <int> total: 0;
+    in-out property <int> high: 0;
+    in-out property <int> review: 0;
+    in-out property <int> unresolved: 0;
+
+    callback cancel-requested();
+
+    background: Theme.overlay;
+
+    TouchArea {
+        // Absorbs backdrop clicks
+    }
+
+    Rectangle {
+        width: min(root.width - 48px, 480px);
+        background: Theme.panel;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.border;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+
+            Text {
+                text: Labels.import-progress-title;
+                color: Theme.text;
+                font-size: 18px;
+                font-weight: 700;
+            }
+
+            Text {
+                text: root.status-text;
+                color: Theme.secondary;
+                font-size: 13px;
+            }
+
+            Rectangle {
+                height: 6px;
+                border-radius: 3px;
+                background: Theme.surface;
+
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    height: parent.height;
+                    width: root.total > 0
+                        ? parent.width * clamp(root.done / root.total, 0.0, 1.0)
+                        : 0px;
+                    border-radius: 3px;
+                    background: Theme.accent;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: center;
+
+                Rectangle {
+                    height: 28px;
+                    border-radius: 14px;
+                    background: Theme.surface;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 6px;
+                        alignment: center;
+                        Text {
+                            text: Labels.import-matched-label;
+                            color: Theme.secondary;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "\{root.high}";
+                            color: Theme.accent;
+                            font-size: 12px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 28px;
+                    border-radius: 14px;
+                    background: Theme.surface;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 6px;
+                        alignment: center;
+                        Text {
+                            text: Labels.import-review-label;
+                            color: Theme.secondary;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "\{root.review}";
+                            color: Theme.text;
+                            font-size: 12px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 28px;
+                    border-radius: 14px;
+                    background: Theme.surface;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 6px;
+                        alignment: center;
+                        Text {
+                            text: Labels.import-unresolved-label;
+                            color: Theme.secondary;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "\{root.unresolved}";
+                            color: Theme.secondary;
+                            font-size: 12px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: end;
+                height: 36px;
+
+                Rectangle {
+                    width: 100px;
+                    border-radius: 8px;
+                    background: cancel-btn.pressed ? Theme.overlay : (cancel-btn.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    cancel-btn := TouchArea {
+                        clicked => { root.cancel-requested(); }
+                    }
+                    Text {
+                        text: Labels.import-cancel-label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

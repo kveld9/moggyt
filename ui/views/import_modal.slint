@@ -1,0 +1,214 @@
+import { Labels } from "../labels.slint";
+import { Theme } from "../theme.slint";
+import { StyledInputField } from "../components/controls.slint";
+
+export component ImportModal inherits Rectangle {
+    in-out property <int> active-tab: 0;
+    in-out property <string> link-text: "";
+    in-out property <string> file-path: "";
+
+    callback tab-selected(int);
+    callback link-edited(string);
+    callback file-path-edited(string);
+    callback browse-requested();
+    callback start-requested();
+    callback close-requested();
+
+    changed link-text => { root.link-edited(root.link-text); }
+    changed file-path => { root.file-path-edited(root.file-path); }
+
+    background: Theme.overlay;
+
+    TouchArea {
+        // Absorbs backdrop clicks
+    }
+
+    Rectangle {
+        width: min(root.width - 48px, 560px);
+        background: Theme.panel;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.border;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 20px;
+
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: Labels.import-title-label;
+                    color: Theme.text;
+                    font-size: 18px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 64px;
+                    height: 28px;
+                    border-radius: 6px;
+                    background: close-btn.pressed ? Theme.overlay : (close-btn.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    close-btn := TouchArea {
+                        clicked => { root.close-requested(); }
+                    }
+                    Text {
+                        text: Labels.import-close-label;
+                        color: close-btn.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                height: 36px;
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 8px;
+                    background: root.active-tab == 0
+                        ? (tab0-touch.pressed ? Theme.overlay : Theme.accent)
+                        : (tab0-touch.pressed ? Theme.overlay : (tab0-touch.has-hover ? Theme.hover : Theme.surface));
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    tab0-touch := TouchArea {
+                        clicked => {
+                            root.active-tab = 0;
+                            root.tab-selected(0);
+                        }
+                    }
+                    Text {
+                        text: Labels.import-tab-link-label;
+                        color: root.active-tab == 0
+                            ? (tab0-touch.has-hover ? Theme.text : Theme.window)
+                            : (tab0-touch.has-hover ? Theme.text : Theme.secondary);
+                        font-size: 13px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 8px;
+                    background: root.active-tab == 1
+                        ? (tab1-touch.pressed ? Theme.overlay : Theme.accent)
+                        : (tab1-touch.pressed ? Theme.overlay : (tab1-touch.has-hover ? Theme.hover : Theme.surface));
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    tab1-touch := TouchArea {
+                        clicked => {
+                            root.active-tab = 1;
+                            root.tab-selected(1);
+                        }
+                    }
+                    Text {
+                        text: Labels.import-tab-file-label;
+                        color: root.active-tab == 1
+                            ? (tab1-touch.has-hover ? Theme.text : Theme.window)
+                            : (tab1-touch.has-hover ? Theme.text : Theme.secondary);
+                        font-size: 13px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            if root.active-tab == 0 : VerticalLayout {
+                spacing: 8px;
+                StyledInputField {
+                    height: 36px;
+                    text <=> root.link-text;
+                    placeholder-text: Labels.import-link-placeholder;
+                    accepted => { root.start-requested(); }
+                }
+                Text {
+                    text: Labels.import-cap-hint;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+            }
+
+            if root.active-tab == 1 : VerticalLayout {
+                spacing: 8px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    height: 36px;
+                    StyledInputField {
+                        horizontal-stretch: 1;
+                        text <=> root.file-path;
+                        placeholder-text: Labels.import-file-placeholder;
+                        accepted => { root.start-requested(); }
+                    }
+                    Rectangle {
+                        width: 72px;
+                        border-radius: 8px;
+                        background: browse-btn.pressed ? Theme.overlay : (browse-btn.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+                        browse-btn := TouchArea {
+                            clicked => { root.browse-requested(); }
+                        }
+                        Text {
+                            text: "\{"..."}";
+                            color: browse-btn.has-hover ? Theme.text : Theme.secondary;
+                            font-size: 14px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: end;
+                spacing: 12px;
+                height: 36px;
+
+                Rectangle {
+                    width: 100px;
+                    border-radius: 8px;
+                    background: cancel-btn.pressed ? Theme.overlay : (cancel-btn.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    cancel-btn := TouchArea {
+                        clicked => { root.close-requested(); }
+                    }
+                    Text {
+                        text: Labels.import-cancel-label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    width: 130px;
+                    border-radius: 8px;
+                    background: start-btn.pressed ? Theme.overlay : (start-btn.has-hover ? Theme.hover : Theme.accent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    start-btn := TouchArea {
+                        clicked => { root.start-requested(); }
+                    }
+                    Text {
+                        text: Labels.import-start-label;
+                        color: start-btn.has-hover ? Theme.text : Theme.window;
+                        font-size: 13px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
