@@ -26,7 +26,6 @@ mod cover_art;
 mod cover_disk;
 mod handoff;
 mod instance;
-mod library_backup;
 mod lyric_overrides;
 mod lyrics;
 mod lyrics_lrclib;
@@ -69,10 +68,6 @@ pub use handoff::{
     CHECKSUM_HEX_LEN, HANDOFF_PREFIX, MAX_HANDOFF_COOKIES, decode_handoff, encode_handoff,
 };
 pub use instance::{SingleInstanceGuard, instance_lock_name};
-pub use library_backup::{
-    BackupSummary, CURRENT_BACKUP_VERSION, LibraryBackup, apply_backup, export_backup,
-    read_backup_file, write_backup_file,
-};
 pub use lyric_overrides::{
     LyricOverrideDir, MAX_OVERRIDE_BYTES, default_lyrics_dir, sanitize_id, sanitize_video_id,
 };
