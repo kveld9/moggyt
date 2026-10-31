@@ -13,8 +13,7 @@ use crate::infra::{
 use crate::slint_shell::state::SlintAppState;
 
 /// Constructs a SlintAppState wired with memory-only test stub adapters.
-pub fn test_wired()
--> SlintAppState<CatalogStub, AudioStub, MemorySessionStore, LrclibStub, MemoryCoverCache> {
+pub fn test_wired() -> SlintAppState {
     let catalog = CatalogStub::new();
     let audio = AudioStub::new();
     let session = MemorySessionStore::new();

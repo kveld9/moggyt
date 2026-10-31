@@ -17,10 +17,9 @@ use crate::domain::{
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, LyricLine,
-    LyricOverrideDir, LyricsSource, MediaKeyAction, MemoryQueueStore, MemorySettingsStore,
-    MemorySkipStore, QueueStore, ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipStore,
-    StubScrobbler, TrayAction, TrayHandle, decode_cover, decode_handoff, fetch_artwork,
-    sanitize_cookie_input,
+    LyricOverrideDir, LyricsSource, MediaKeyAction, QueueStore, ReleaseInfo, Scrobbler,
+    SessionStore, SettingsStore, SkipStore, TrayAction, TrayHandle, decode_cover, decode_handoff,
+    fetch_artwork, sanitize_cookie_input,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
@@ -29,19 +28,18 @@ use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
 
+pub type SharedCatalog = Arc<Mutex<Box<dyn Catalog + Send>>>;
+pub type SharedAudio = Arc<Mutex<Box<dyn AudioBackend + Send>>>;
+pub type SharedLyrics = Arc<Box<dyn LyricsSource + Send + Sync>>;
+pub type SharedCovers = Arc<Mutex<Box<dyn CoverCache + Send>>>;
+
 /// In-memory state and collaborator wiring for the Slint UI shell.
-pub struct SlintAppState<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
-> {
-    pub catalog: Arc<Mutex<C>>,
-    pub audio: Arc<Mutex<A>>,
-    pub session: S,
-    pub lyrics: Arc<L>,
-    pub covers: Arc<Mutex<K>>,
+pub struct SlintAppState {
+    pub catalog: SharedCatalog,
+    pub audio: SharedAudio,
+    pub session: Box<dyn SessionStore>,
+    pub lyrics: SharedLyrics,
+    pub covers: SharedCovers,
     pub lyric_overrides: Option<LyricOverrideDir>,
     pub tray: Option<TrayHandle>,
     pub presence: DesktopPresence,
@@ -106,92 +104,9 @@ pub struct SlintAppState<
 }
 
 /// Shared reference-counted wrapper for [`SlintAppState`].
-pub type SharedState<C, A, S, L, K> = Rc<RefCell<SlintAppState<C, A, S, L, K>>>;
+pub type SharedState = Rc<RefCell<SlintAppState>>;
 
-impl<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
-> SlintAppState<C, A, S, L, K>
-{
-    /// Creates the Slint application state with injected collaborators.
-    pub fn new(mut catalog: C, audio: A, session: S, lyrics: L, covers: K) -> Self {
-        catalog.set_locale(Locale::default());
-        let stored_session = session.load();
-        let signed_in = stored_session.is_some();
-        if let Some(ref cookies) = stored_session {
-            catalog.set_session_cookies(Some(cookies));
-        }
-        let settings_store = Box::new(MemorySettingsStore::default());
-        let recent_searches = settings_store.load().recent_searches;
-        Self {
-            catalog: Arc::new(Mutex::new(catalog)),
-            audio: Arc::new(Mutex::new(audio)),
-            session,
-            lyrics: Arc::new(lyrics),
-            covers: Arc::new(Mutex::new(covers)),
-            lyric_overrides: None,
-            tray: None,
-            presence: DesktopPresence::new(),
-            discord: DiscordPresence::new(),
-            scrobbler: Arc::new(Mutex::new(Box::new(StubScrobbler::new()))),
-            secondary_scrobbler: None,
-            settings_store,
-            queue_store: Box::new(MemoryQueueStore::default()),
-            skip_store: Box::new(MemorySkipStore::new()),
-            updater_rx: None,
-            page: SlintPage::Search,
-            queue_panel_open: false,
-            queue: PlaybackQueue::new(),
-            home_shelves: Vec::new(),
-            search_query: String::new(),
-            search_active: false,
-            recent_searches,
-            search_results: Vec::new(),
-            library_playlists: Vec::new(),
-            library_albums: Vec::new(),
-            library_artists: Vec::new(),
-            detail: None,
-            detail_return: SlintPage::Search,
-            lyrics_lines: Vec::new(),
-            lyrics_key: None,
-            cover_key: None,
-            current_cover_image: None,
-            last_presence_key: None,
-            started_at: None,
-            last_skip_target: None,
-            cached_skip_ranges: None,
-            sleep_timer: SleepTimer::new(),
-            sleep_timer_accumulated: 0,
-            sleep_timer_base_offset: 0,
-            autoplay: false,
-            hi_res_covers: false,
-            signed_in,
-            theme: ThemeId::default(),
-            locale: Locale::default(),
-            player_bar: PlayerBarPrefs::default(),
-            search_filter: SearchFilter::All,
-            search_covers: HashMap::new(),
-            liked_ids: HashSet::new(),
-            now_playing_cover: None,
-            is_shuffle: false,
-            update_available: false,
-            latest_version: None,
-            play_generation: 0,
-            search_generation: 0,
-            detail_generation: 0,
-            library_generation: 0,
-            explore_generation: 0,
-            explore_shelves: Vec::new(),
-            explore_loaded: false,
-            explore_loading: false,
-            explore_columns: crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS,
-            worker_tx: None,
-        }
-    }
-
+impl SlintAppState {
     /// Updates active UI theme and persists preference to disk settings store.
     pub fn set_theme(&mut self, theme: ThemeId) {
         self.theme = theme;
@@ -375,7 +290,7 @@ impl<
         if idx == 0 { -1 } else { (idx - 1) as i32 }
     }
 
-    fn cover_bytes_or_fetch(covers: &Arc<Mutex<K>>, url: &str) -> Option<Vec<u8>> {
+    fn cover_bytes_or_fetch(covers: &SharedCovers, url: &str) -> Option<Vec<u8>> {
         if let Some(cached) = covers.lock().ok()?.get(url) {
             return Some(cached);
         }
@@ -471,10 +386,117 @@ impl<
     }
 }
 
+impl<T: ?Sized + Catalog> Catalog for Box<T> {
+    fn search(&self, q: &str) -> Vec<Track> {
+        (**self).search(q)
+    }
+    fn search_filtered(&self, q: &SearchQuery) -> Vec<SearchResult> {
+        (**self).search_filtered(q)
+    }
+    fn search_by_lyrics(&self, s: &crate::domain::LyricsSnippet) -> Vec<Track> {
+        (**self).search_by_lyrics(s)
+    }
+    fn radio(&self, id: &str) -> Vec<Track> {
+        (**self).radio(id)
+    }
+    fn home_shelves(&self) -> Vec<Shelf> {
+        (**self).home_shelves()
+    }
+    fn explore_shelves(&self) -> Vec<Shelf> {
+        (**self).explore_shelves()
+    }
+    fn playlists(&self) -> Vec<Playlist> {
+        (**self).playlists()
+    }
+    fn liked_tracks(&self) -> Vec<Track> {
+        (**self).liked_tracks()
+    }
+    fn saved_albums(&self) -> Vec<Album> {
+        (**self).saved_albums()
+    }
+    fn set_liked(&mut self, id: &str, l: bool) {
+        (**self).set_liked(id, l);
+    }
+    fn detail(&self, id: &str, k: DetailKind) -> Option<Detail> {
+        (**self).detail(id, k)
+    }
+    fn set_session_cookies(&mut self, c: Option<&str>) {
+        (**self).set_session_cookies(c);
+    }
+    fn set_locale(&mut self, l: Locale) {
+        (**self).set_locale(l);
+    }
+}
+
+impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
+    fn play(&mut self, id: &str) {
+        (**self).play(id);
+    }
+    fn pause(&mut self) {
+        (**self).pause();
+    }
+    fn resume_play(&mut self) {
+        (**self).resume_play();
+    }
+    fn seek(&mut self, pos: u64) {
+        (**self).seek(pos);
+    }
+    fn set_volume(&mut self, v: u8) {
+        (**self).set_volume(v);
+    }
+    fn volume(&self) -> u8 {
+        (**self).volume()
+    }
+    fn position_secs(&self) -> u64 {
+        (**self).position_secs()
+    }
+    fn is_playing(&self) -> bool {
+        (**self).is_playing()
+    }
+    fn last_requested(&self) -> Option<&str> {
+        (**self).last_requested()
+    }
+    fn set_quality(&mut self, q: crate::infra::AudioQuality) {
+        (**self).set_quality(q);
+    }
+    fn set_skip_silence(&mut self, on: bool) {
+        (**self).set_skip_silence(on);
+    }
+    fn set_loudness_normalization(&mut self, on: bool) {
+        (**self).set_loudness_normalization(on);
+    }
+    fn set_speed(&mut self, s: f32) {
+        (**self).set_speed(s);
+    }
+    fn speed(&self) -> f32 {
+        (**self).speed()
+    }
+}
+
+impl<T: ?Sized + LyricsSource> LyricsSource for Box<T> {
+    fn lookup(
+        &self,
+        artist: &str,
+        title: &str,
+        duration_secs: Option<u64>,
+    ) -> Option<crate::infra::SyncedLyrics> {
+        (**self).lookup(artist, title, duration_secs)
+    }
+}
+
+impl<T: ?Sized + CoverCache> CoverCache for Box<T> {
+    fn get(&self, url: &str) -> Option<Vec<u8>> {
+        (**self).get(url)
+    }
+    fn put(&mut self, url: &str, bytes: Vec<u8>) {
+        (**self).put(url, bytes);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::slint_shell::test_support::{LocaleTrackingCatalog, test_wired};
+    use crate::slint_shell::test_support::test_wired;
 
     #[test]
     fn test_initial_state_defaults() {
@@ -688,23 +710,6 @@ mod tests {
     }
 
     #[test]
-    fn test_slint_app_state_new_configures_locale_and_initializes_empty_shelves() {
-        let (catalog, locales, fetch_locales) = LocaleTrackingCatalog::new();
-        let audio = crate::infra::AudioStub::new();
-        let session = crate::infra::MemorySessionStore::new();
-        let lyrics = crate::infra::LrclibStub::new();
-        let covers = crate::infra::MemoryCoverCache::new();
-
-        let state = SlintAppState::new(catalog, audio, session, lyrics, covers);
-
-        assert_eq!(*locales.lock().unwrap(), vec![Locale::English]);
-        assert!(fetch_locales.lock().unwrap().is_empty());
-        assert!(state.home_shelves.is_empty());
-        assert!(!state.search_active);
-        assert!(state.recent_searches.is_empty());
-    }
-
-    #[test]
     fn test_cover_max_px_resolution() {
         let mut state = test_wired();
         state.hi_res_covers = false;
@@ -717,13 +722,8 @@ mod tests {
     fn test_cover_bytes_or_fetch_cache_hit() {
         let state = test_wired();
         state.covers.lock().unwrap().put("https://example.com/art.jpg", vec![1, 2, 3]);
-        let cached = SlintAppState::<
-            crate::infra::CatalogStub,
-            crate::infra::AudioStub,
-            crate::infra::MemorySessionStore,
-            crate::infra::LrclibStub,
-            crate::infra::MemoryCoverCache,
-        >::cover_bytes_or_fetch(&state.covers, "https://example.com/art.jpg");
+        let cached =
+            SlintAppState::cover_bytes_or_fetch(&state.covers, "https://example.com/art.jpg");
         assert_eq!(cached, Some(vec![1, 2, 3]));
     }
 }

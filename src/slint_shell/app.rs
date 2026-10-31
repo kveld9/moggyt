@@ -27,7 +27,9 @@ pub use crate::slint_shell::labels::{StaticLabels, sync_static_labels};
 pub use crate::slint_shell::page::SlintPage;
 pub use crate::slint_shell::playback_control::apply_play_track_completion;
 pub use crate::slint_shell::player_bar::PlayerBarPrefs;
-pub use crate::slint_shell::state::{SharedState, SlintAppState};
+pub use crate::slint_shell::state::{
+    SharedAudio, SharedCatalog, SharedCovers, SharedLyrics, SharedState, SlintAppState,
+};
 pub use crate::slint_shell::window::build_window;
 use crate::slint_shell::window::with_ui_state;
 
@@ -58,14 +60,15 @@ pub struct AppDependencies<C, A, S, L, K> {
 /// ui/shell.slint lacks an interactive settings dialog for DSP and credential management.
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-pub fn run<C, A, S, L, K>(deps: AppDependencies<C, A, S, L, K>) -> anyhow::Result<()>
-where
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
-{
+pub fn run(
+    deps: AppDependencies<
+        impl Catalog + Send + 'static,
+        impl AudioBackend + Send + 'static,
+        impl SessionStore + 'static,
+        impl LyricsSource + Send + Sync + 'static,
+        impl CoverCache + Send + 'static,
+    >,
+) -> anyhow::Result<()> {
     let AppDependencies {
         instance: _instance,
         catalog,
@@ -121,7 +124,7 @@ where
     let (window, _timer) = build_window(state)?;
     window.run().map_err(|err| anyhow::anyhow!("Slint execution failed: {err}"))?;
 
-    let _ = with_ui_state::<C, A, S, L, K, _>(|st| {
+    let _ = with_ui_state(|st| {
         let _ = persist_state_on_exit(st);
     });
 
@@ -129,16 +132,7 @@ where
 }
 
 /// Persists the active playback queue to storage on application exit.
-pub fn persist_state_on_exit<C, A, S, L, K>(
-    state: &SlintAppState<C, A, S, L, K>,
-) -> anyhow::Result<()>
-where
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
-{
+pub fn persist_state_on_exit(state: &SlintAppState) -> anyhow::Result<()> {
     state.queue_store.save(&state.queue)
 }
 

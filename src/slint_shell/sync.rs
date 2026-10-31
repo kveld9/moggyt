@@ -8,7 +8,7 @@ use slint::{ModelRc, VecModel};
 
 use crate::domain::{SearchFilter, Track};
 use crate::i18n::tr;
-use crate::infra::{AudioBackend, Catalog, CoverCache, GithubUpdater, LyricsSource, SessionStore};
+use crate::infra::GithubUpdater;
 use crate::slint_shell::covers::resolve_row_cover_image;
 use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::explore::explore_card_shelves;
@@ -27,16 +27,7 @@ use crate::slint_shell::theme::{apply_theme, theme_to_index};
 use crate::slint_shell::{LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData};
 
 /// Synchronizes state with Slint window properties without performing blocking I/O.
-pub(crate) fn sync_window<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     apply_theme(window, state.theme);
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_active_page(state.page.to_index());
@@ -99,16 +90,7 @@ pub(crate) fn sync_window<
 }
 
 /// Synchronizes update availability and status text with Slint window.
-pub(crate) fn sync_update_status<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    window: &MoggytWindow,
-    state: &SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_update_status(window: &MoggytWindow, state: &SlintAppState) {
     window.set_has_update(state.update_available);
     let update_status =
         format_update_status(state.locale, state.update_available, state.latest_version.as_deref());
@@ -116,16 +98,7 @@ pub(crate) fn sync_update_status<
 }
 
 /// Synchronizes cover art texture and synced lyrics lines with Slint window from pre-decoded state.
-pub(crate) fn sync_cover_and_lyrics<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_cover_and_lyrics(window: &MoggytWindow, state: &mut SlintAppState) {
     if let Some(img) = &state.now_playing_cover {
         window.set_now_playing_cover(img.clone());
     } else if let Some(img) = state
@@ -157,16 +130,7 @@ pub(crate) fn sync_cover_and_lyrics<
 }
 
 /// Synchronizes catalog shelves and playback queue rows with Slint window.
-pub(crate) fn sync_shelves_and_queue<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    window: &MoggytWindow,
-    state: &SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_shelves_and_queue(window: &MoggytWindow, state: &SlintAppState) {
     let mut shelf_models = Vec::new();
     let mut global_idx = 0;
     for shelf in &state.home_shelves {
@@ -208,16 +172,7 @@ pub(crate) fn sync_shelves_and_queue<
 }
 
 /// Synchronizes recent search queries and search-active state with Slint window.
-pub(crate) fn sync_recent_searches<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    window: &MoggytWindow,
-    state: &SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_recent_searches(window: &MoggytWindow, state: &SlintAppState) {
     let rows: Vec<slint::SharedString> = state
         .recent_searches
         .entries()
@@ -229,31 +184,14 @@ pub(crate) fn sync_recent_searches<
 }
 
 /// Persists current recent searches to the settings store, ignoring save errors.
-pub(crate) fn persist_recent_searches<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    state: &SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn persist_recent_searches(state: &SlintAppState) {
     let mut settings = state.settings_store.load();
     settings.recent_searches = state.recent_searches.clone();
     let _ = state.settings_store.save(&settings);
 }
 
 /// Synchronizes library collections and detail view models with Slint window.
-pub(crate) fn sync_library_and_detail<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    window: &MoggytWindow,
-    state: &SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppState) {
     let playlists: Vec<LibraryItemData> = state
         .library_playlists
         .iter()
@@ -323,16 +261,7 @@ pub(crate) fn sync_library_and_detail<
 pub(crate) const DEFAULT_EXPLORE_COLUMNS: usize = 5;
 
 /// Synchronizes explore shelves with Slint window models.
-pub(crate) fn sync_explore_shelves<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    window: &MoggytWindow,
-    state: &SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_explore_shelves(window: &MoggytWindow, state: &SlintAppState) {
     window.set_explore_shelves(ModelRc::new(VecModel::from(explore_card_shelves(
         &state.explore_shelves,
         &state.search_covers,
@@ -341,16 +270,7 @@ pub(crate) fn sync_explore_shelves<
 }
 
 /// Periodic playback tick syncing elapsed timestamps, progress, and lyrics line without blocking.
-pub(crate) fn sync_playback_tick<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppState) {
     let Ok(audio) = state.audio.try_lock() else {
         return;
     };
@@ -369,16 +289,7 @@ pub(crate) fn sync_playback_tick<
 }
 
 /// Synchronizes sleep timer preset selection index and formatted status text with Slint window.
-pub(crate) fn sync_sleep_timer<
-    C: Catalog,
-    A: AudioBackend,
-    S: SessionStore,
-    L: LyricsSource,
-    K: CoverCache,
->(
-    window: &MoggytWindow,
-    state: &SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn sync_sleep_timer(window: &MoggytWindow, state: &SlintAppState) {
     let preset = state.sleep_timer.preset();
     let idx = timer_preset_to_index(preset);
     let status =

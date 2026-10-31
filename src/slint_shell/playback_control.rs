@@ -9,9 +9,7 @@ use std::time::Instant;
 use slint::{ModelRc, VecModel};
 
 use crate::i18n::tr;
-use crate::infra::{
-    AudioBackend, Catalog, CoverCache, LyricsSource, Presence, SessionStore, should_scrobble,
-};
+use crate::infra::{AudioBackend, Catalog, Presence, should_scrobble};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::current_unix_secs;
 use crate::slint_shell::platform::rgba_to_image;
@@ -19,14 +17,7 @@ use crate::slint_shell::playback_worker::PlayTrackResult;
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::{LyricLineData, MoggytWindow};
 
-impl<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
-> SlintAppState<C, A, S, L, K>
-{
+impl SlintAppState {
     /// Advances or retreats queue cursor in-memory to target index without triggering playback.
     pub fn play_track_at_index_in_memory(&mut self, index: usize) {
         if index >= self.queue.len() {
@@ -276,15 +267,9 @@ impl<
 }
 
 /// Applies completed playback worker results back to the Slint window on the event loop.
-pub fn apply_play_track_completion<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub fn apply_play_track_completion(
     window: &MoggytWindow,
-    state: &mut SlintAppState<C, A, S, L, K>,
+    state: &mut SlintAppState,
     res: PlayTrackResult,
 ) {
     if !res.success {

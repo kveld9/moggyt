@@ -7,9 +7,9 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, CredentialStore, DiskCoverCache, GithubUpdater,
-    KeyringCredentialStore, LastFmClient, LiveAudio, LyricsSource, ReleaseInfo, RodioBackend,
-    SessionStore, Updater, client_from_credentials, ensure_sidecar, is_newer,
+    CredentialStore, DiskCoverCache, GithubUpdater, KeyringCredentialStore, LastFmClient,
+    LiveAudio, ReleaseInfo, RodioBackend, Updater, client_from_credentials, ensure_sidecar,
+    is_newer,
 };
 use crate::slint_shell::state::SlintAppState;
 
@@ -117,15 +117,7 @@ pub fn tracing_subscriber_setup() {
 /// Parses CLI arguments and executes single-instance URL/handoff import commands.
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-pub(crate) fn handle_cli_args<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state: &mut SlintAppState<C, A, S, L, K>,
-) {
+pub(crate) fn handle_cli_args(state: &mut SlintAppState) {
     let mut args = std::env::args().skip(1);
     let Some(first_arg) = args.next() else { return };
     if first_arg.starts_with("moggyt:") || first_arg.starts_with("handoff:") {
@@ -145,16 +137,7 @@ pub(crate) fn handle_cli_args<
 /// Applies release info to application state without performing any I/O.
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-pub(crate) fn apply_updater_release<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state: &mut SlintAppState<C, A, S, L, K>,
-    info: Option<ReleaseInfo>,
-) {
+pub(crate) fn apply_updater_release(state: &mut SlintAppState, info: Option<ReleaseInfo>) {
     let Some(info) = info else {
         return;
     };

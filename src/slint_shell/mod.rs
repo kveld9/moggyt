@@ -49,6 +49,7 @@ pub mod playback_worker;
 pub mod player_bar;
 pub mod search;
 pub mod state;
+pub mod state_init;
 pub mod sync;
 #[cfg(test)]
 pub mod test_support;

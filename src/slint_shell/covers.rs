@@ -6,7 +6,6 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::domain::{SearchResult, Shelf};
-use crate::infra::{AudioBackend, Catalog, CoverCache, LyricsSource, SessionStore};
 pub(crate) use crate::slint_shell::cover_pool::spawn_cover_fetch_pool;
 use crate::slint_shell::playback_worker::{PlaybackWorkerCommand, thumbnail_variant_for_row};
 use crate::slint_shell::state::SlintAppState;
@@ -49,15 +48,9 @@ pub(crate) fn dispatch_cover_with_generation_if_needed(
 }
 
 /// Dispatches a single cover fetch command if not already in UI cache or pending set.
-pub(crate) fn dispatch_shelf_cover_if_needed<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+pub(crate) fn dispatch_shelf_cover_if_needed(
     url: &str,
-    state: &SlintAppState<C, A, S, L, K>,
+    state: &SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
     seen: &mut HashSet<String>,
 ) {
@@ -71,14 +64,8 @@ pub(crate) fn dispatch_shelf_cover_if_needed<
 }
 
 /// Requests background cover decoding for all uncached artwork URLs in shelves.
-pub(crate) fn request_shelf_covers<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state: &SlintAppState<C, A, S, L, K>,
+pub(crate) fn request_shelf_covers(
+    state: &SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let mut seen = HashSet::new();
@@ -88,14 +75,8 @@ pub(crate) fn request_shelf_covers<
 }
 
 /// Requests background cover decoding for all uncached artwork URLs in detail view.
-pub fn request_detail_covers<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state: &SlintAppState<C, A, S, L, K>,
+pub fn request_detail_covers(
+    state: &SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let Some(detail) = &state.detail else {
@@ -124,16 +105,9 @@ pub fn request_detail_covers<
     }
 }
 
-fn dispatch_library_cover_urls<
-    'a,
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
+fn dispatch_library_cover_urls<'a>(
     urls: impl Iterator<Item = Option<&'a str>>,
-    state: &SlintAppState<C, A, S, L, K>,
+    state: &SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
     seen: &mut HashSet<String>,
 ) {
@@ -149,14 +123,8 @@ fn dispatch_library_cover_urls<
 }
 
 /// Requests background cover decoding for all uncached artwork URLs in user library.
-pub fn request_library_covers<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state: &SlintAppState<C, A, S, L, K>,
+pub fn request_library_covers(
+    state: &SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let mut seen = HashSet::new();
@@ -181,14 +149,8 @@ pub fn request_library_covers<
 }
 
 /// Requests background cover decoding for all uncached artwork URLs in explore shelves.
-pub fn request_explore_covers<
-    C: Catalog + Send + 'static,
-    A: AudioBackend + Send + 'static,
-    S: SessionStore + 'static,
-    L: LyricsSource + Send + Sync + 'static,
-    K: CoverCache + Send + 'static,
->(
-    state: &SlintAppState<C, A, S, L, K>,
+pub fn request_explore_covers(
+    state: &SlintAppState,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let mut seen = HashSet::new();
@@ -223,7 +185,7 @@ mod tests {
 
     use super::*;
     use crate::domain::{Album, Artist, Detail, DetailKind, Playlist, Track};
-    use crate::infra::MemoryCoverCache;
+    use crate::infra::{CoverCache, MemoryCoverCache};
     use crate::slint_shell::detail::{detail_has_artwork, resolve_detail_cover_url};
     use crate::slint_shell::platform::rgba_to_image;
     use crate::slint_shell::test_support::test_wired;
