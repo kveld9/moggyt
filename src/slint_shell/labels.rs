@@ -2,8 +2,10 @@
 //!
 //! Hexagonal invariant: pure in-memory label resolution and Slint window property dispatch.
 
+use slint::ComponentHandle;
+
 use crate::i18n::{Locale, tr};
-use crate::slint_shell::MoggytWindow;
+use crate::slint_shell::{Labels, MoggytWindow};
 
 /// Localized static user interface labels for navigation, views, and settings chrome.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -152,8 +154,82 @@ impl StaticLabels {
         }
     }
 
-    /// Pushes all resolved static labels into Slint window properties.
+    /// Pushes all resolved static labels into Slint window properties and the global labels store.
     pub fn apply(&self, window: &MoggytWindow) {
+        let labels = window.global::<Labels>();
+        labels.set_nav_search_label(self.nav_search.into());
+        labels.set_nav_explore_label(self.nav_explore.into());
+        labels.set_nav_library_label(self.nav_library.into());
+        labels.set_nav_now_playing_label(self.nav_now_playing.into());
+
+        labels.set_search_placeholder(self.search_placeholder.into());
+        labels.set_search_button_label(self.search_button.into());
+        labels.set_filter_all_label(self.filter_all.into());
+        labels.set_filter_songs_label(self.filter_songs.into());
+        labels.set_filter_albums_label(self.filter_albums.into());
+        labels.set_filter_artists_label(self.filter_artists.into());
+        labels.set_filter_playlists_label(self.filter_playlists.into());
+        labels.set_search_empty_text(self.search_empty.into());
+        labels.set_recent_title_label(self.recent_searches_title.into());
+        labels.set_recent_empty_label(self.recent_searches_empty.into());
+        labels.set_clear_history_label(self.clear_history.into());
+
+        labels.set_queue_title_label(self.queue_title.into());
+        labels.set_queue_empty_text(self.queue_empty.into());
+
+        labels.set_no_cover_text(self.no_cover.into());
+        labels.set_lyrics_unavailable_text(self.lyrics_unavailable.into());
+        labels.set_lyrics_hint_text(self.lyrics_hint.into());
+
+        labels.set_session_anonymous_hint(self.session_anonymous_hint.into());
+        labels.set_session_cookie_placeholder(self.session_cookie_placeholder.into());
+        labels.set_sign_in_label(self.sign_in.into());
+        labels.set_session_signed_in_hint(self.session_signed_in_hint.into());
+        labels.set_sign_out_label(self.sign_out.into());
+        labels.set_section_playlists_label(self.section_playlists.into());
+        labels.set_empty_playlists_text(self.empty_playlists.into());
+        labels.set_section_albums_label(self.section_albums.into());
+        labels.set_empty_albums_text(self.empty_albums.into());
+        labels.set_section_artists_label(self.section_artists.into());
+        labels.set_empty_artists_text(self.empty_artists.into());
+
+        labels.set_empty_detail_text(self.empty_detail.into());
+        labels.set_play_button_label(self.play_button.into());
+        labels.set_shuffle_button_label(self.shuffle_button.into());
+        labels.set_empty_songs_text(self.empty_songs.into());
+
+        labels.set_section_theme_label(self.section_theme.into());
+        labels.set_theme_white_label(self.theme_white.into());
+        labels.set_theme_black_oled_label(self.theme_black_oled.into());
+        labels.set_theme_mono_label(self.theme_mono.into());
+        labels.set_section_playback_label(self.section_playback.into());
+        labels.set_playback_speed_label(self.playback_speed.into());
+        labels.set_sleep_timer_label(self.sleep_timer_label.into());
+        labels.set_sleep_timer_off_label(self.sleep_timer_off_label.into());
+        labels.set_sleep_timer_15m_label(self.sleep_timer_15m_label.into());
+        labels.set_sleep_timer_30m_label(self.sleep_timer_30m_label.into());
+        labels.set_sleep_timer_45m_label(self.sleep_timer_45m_label.into());
+        labels.set_sleep_timer_60m_label(self.sleep_timer_60m_label.into());
+        labels.set_sleep_timer_end_of_track_label(self.sleep_timer_end_of_track_label.into());
+        labels.set_section_session_label(self.section_session.into());
+        labels.set_status_signed_in_label(self.status_signed_in.into());
+        labels.set_status_anonymous_label(self.status_anonymous.into());
+        labels.set_section_about_label(self.section_about.into());
+        labels.set_app_version_label(self.app_version.into());
+        labels.set_update_status_label(self.update_status.into());
+        labels.set_explore_loading_text(self.explore_loading.into());
+        labels.set_explore_empty_text(self.explore_empty.into());
+        labels.set_section_player_bar_label(self.section_player_bar.into());
+        labels.set_player_bar_classic_label(self.player_bar_classic.into());
+        labels.set_player_bar_floating_label(self.player_bar_floating.into());
+        labels.set_player_bar_artwork_label(self.player_bar_artwork.into());
+        labels.set_player_bar_like_label(self.player_bar_like.into());
+        labels.set_player_bar_shuffle_label(self.player_bar_shuffle.into());
+        labels.set_player_bar_repeat_label(self.player_bar_repeat.into());
+        labels.set_player_bar_skip_label(self.player_bar_skip.into());
+        labels.set_player_bar_queue_label(self.player_bar_queue.into());
+        labels.set_player_bar_volume_label(self.player_bar_volume.into());
+
         window.set_nav_search_label(self.nav_search.into());
         window.set_nav_explore_label(self.nav_explore.into());
         window.set_nav_library_label(self.nav_library.into());
