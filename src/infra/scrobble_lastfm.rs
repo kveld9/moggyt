@@ -112,7 +112,7 @@ pub fn api_signature(params: &[(&str, &str)], secret: &str) -> String {
     }
     buffer.push_str(secret);
     let digest = Md5::digest(buffer.as_bytes());
-    format!("{digest:x}")
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 /// Last.fm API credentials and user session key.

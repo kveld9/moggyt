@@ -167,7 +167,7 @@ fn base64_decode(input: &str) -> anyhow::Result<Vec<u8>> {
 /// Computes truncated MD5 checksum over the base64 payload.
 fn compute_checksum(payload: &str) -> String {
     let digest = Md5::digest(payload.as_bytes());
-    let hex = format!("{digest:x}");
+    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
     hex[..CHECKSUM_HEX_LEN].to_ascii_lowercase()
 }
 
