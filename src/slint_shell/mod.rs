@@ -39,6 +39,8 @@ pub mod covers;
 pub mod detail;
 pub mod explore;
 pub mod format;
+pub mod import_searcher;
+pub mod import_worker;
 pub mod init;
 pub mod labels;
 pub mod page;
@@ -60,6 +62,14 @@ pub use app::{
     SlintAppState, StaticLabels, build_window, format_queue_label, run, sync_static_labels,
 };
 pub use detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
+pub use import_searcher::{
+    CandidateHit, LiveTrackSearcher, MAX_ALTERNATIVES, MIN_ACCEPT_SCORE, best_candidate,
+    ranked_alternatives,
+};
+pub use import_worker::{
+    ImportProgressEvent, ImportStats, TrackResolution, TrackSearcher, WorkerConfig,
+    assemble_playlist, resolve_tracks, search_query, spawn_import,
+};
 pub use page::SlintPage;
 pub use platform::{CoverArtData, PresenceSnapshot, dispatch_to_ui, rgba_to_image};
 pub use playback::{format_position, format_track_duration};
