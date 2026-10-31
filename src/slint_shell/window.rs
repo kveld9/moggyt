@@ -10,9 +10,11 @@ use std::sync::Arc;
 use anyhow::Context;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::{Detail, DetailKind, SearchResult, Shelf};
+use crate::domain::{Detail, DetailKind, SearchResult, Shelf, is_local_playlist_id};
 use crate::i18n::tr;
-use crate::infra::{AudioBackend, CoverCache, LyricsSource};
+use crate::infra::{
+    AudioBackend, CoverCache, DiskPlaylistStore, LyricsSource, PlaylistStore, default_config_dir,
+};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::callbacks::wire_window_callbacks;
 use crate::slint_shell::covers::{
@@ -20,6 +22,10 @@ use crate::slint_shell::covers::{
     spawn_cover_fetch_pool,
 };
 use crate::slint_shell::format::format_queue_label;
+use crate::slint_shell::import_callbacks::{
+    current_store, install_import_callbacks, install_playlist_store, poll_import,
+};
+use crate::slint_shell::import_state::{local_detail, merge_local_library};
 use crate::slint_shell::init::apply_updater_release;
 use crate::slint_shell::platform::dispatch_to_ui;
 use crate::slint_shell::playback::{format_track_duration, is_track_liked};
@@ -176,6 +182,15 @@ pub(crate) fn submit_search_async(
     });
 }
 
+/// Resolves a local playlist detail model synchronously from the store if the id is local.
+pub fn resolve_local_detail(browse_id: &str, store: &dyn PlaylistStore) -> Option<Detail> {
+    let trimmed = browse_id.trim();
+    if !is_local_playlist_id(trimmed) {
+        return None;
+    }
+    store.get(trimmed).map(|p| local_detail(&p))
+}
+
 /// Dispatches asynchronous container detail lookup off the UI thread.
 pub(crate) fn open_detail_async(
     window: &MoggytWindow,
@@ -192,6 +207,11 @@ pub(crate) fn open_detail_async(
         state.detail_return = state.page;
     }
     state.page = crate::slint_shell::page::SlintPage::Detail;
+    if is_local_playlist_id(trimmed) {
+        state.detail = current_store().and_then(|st| resolve_local_detail(trimmed, st.as_ref()));
+        sync_window(window, state);
+        return;
+    }
     state.detail = Some(Detail::new(kind, tr(state.locale, "Loading..."), "", Vec::new()));
     sync_window(window, state);
 
@@ -235,7 +255,8 @@ pub(crate) fn refresh_library_async(
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
                 if st.library_generation == g {
-                    st.library_playlists = playlists;
+                    let local = current_store().map(|s| s.list()).unwrap_or_default();
+                    st.library_playlists = merge_local_library(&playlists, &local);
                     st.library_albums = albums;
                     st.library_artists = Vec::new();
                     request_library_covers(st, &tx);
@@ -319,6 +340,8 @@ pub fn build_window(state: SlintAppState) -> anyhow::Result<(MoggytWindow, slint
     sync_window(&window, &mut state_rc.borrow_mut());
     window.set_query(state_rc.borrow().search_query.as_str().into());
     wire_window_callbacks(&window, Rc::clone(&state_rc), worker_tx);
+    install_playlist_store(Arc::new(DiskPlaylistStore::new(default_config_dir())));
+    install_import_callbacks(&window);
     let timer = setup_app_timer(&window, Rc::clone(&state_rc));
 
     Ok((window, timer))
@@ -341,6 +364,7 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
         state.continue_autoplay_if_ended();
         state.poll_sleep_timer();
         drain_updater_check(&win, &mut state);
+        poll_import(&win);
         sync_playback_tick(&win, &mut state);
     });
     timer
@@ -453,5 +477,32 @@ mod tests {
         assert!(!state.update_available);
         assert_eq!(state.latest_version, None);
         assert!(state.updater_rx.is_none());
+    }
+
+    #[test]
+    fn test_resolve_local_detail_resolves_stored_playlist() {
+        let store = crate::infra::MemoryPlaylistStore::new();
+        let mut pl = crate::domain::LocalPlaylist::new("local:road_trip", "Road Trip");
+        pl.tracks.push(crate::domain::LocalTrack::new(
+            "v1",
+            "Song One",
+            "Artist One",
+            crate::domain::MatchConfidence::High,
+        ));
+        store.save(&pl).unwrap();
+
+        let detail = resolve_local_detail("local:road_trip", &store)
+            .expect("resolves local playlist detail");
+        assert_eq!(detail.title, "Road Trip");
+        assert_eq!(detail.kind, DetailKind::Playlist);
+        assert_eq!(detail.tracks.len(), 1);
+        assert_eq!(detail.tracks[0].id, "v1");
+    }
+
+    #[test]
+    fn test_resolve_local_detail_unknown_or_non_local_yields_none() {
+        let store = crate::infra::MemoryPlaylistStore::new();
+        assert!(resolve_local_detail("local:missing_id", &store).is_none());
+        assert!(resolve_local_detail("spotify:non_local", &store).is_none());
     }
 }

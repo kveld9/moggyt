@@ -39,8 +39,10 @@ pub mod covers;
 pub mod detail;
 pub mod explore;
 pub mod format;
+pub mod import_callbacks;
 mod import_cli;
 pub mod import_searcher;
+pub mod import_session;
 pub mod import_state;
 pub mod import_worker;
 pub mod init;
@@ -64,6 +66,9 @@ pub use app::{
     SlintAppState, StaticLabels, build_window, format_queue_label, run, sync_static_labels,
 };
 pub use detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
+pub use import_callbacks::{
+    current_store, install_import_callbacks, install_playlist_store, poll_import, with_session,
+};
 pub use import_cli::{
     ImportCli, ImportReport, ImportSourceArg, ReportTrack, build_report, parse_import_args,
     render_progress, report_to_json, run_headless,
@@ -72,8 +77,10 @@ pub use import_searcher::{
     CandidateHit, LiveTrackSearcher, MAX_ALTERNATIVES, MIN_ACCEPT_SCORE, best_candidate,
     ranked_alternatives,
 };
+pub use import_session::{DrainOutcome, ImportSession, ImportStage, progress_status};
 pub use import_state::{
-    ImportCounts, ImportReview, ImportRow, confidence_label_key, row_state_key,
+    ImportCounts, ImportReview, ImportRow, alternatives_to_slint, confidence_label_key,
+    counts_text, local_detail, merge_local_library, row_state_key, rows_to_slint,
 };
 pub use import_worker::{
     ImportProgressEvent, ImportStats, TrackResolution, TrackSearcher, WorkerConfig,

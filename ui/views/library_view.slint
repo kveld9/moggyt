@@ -14,12 +14,17 @@ export component LibraryView inherits VerticalLayout {
     callback artist-selected(int);
     callback sign-in-submitted(string);
     callback sign-out();
+    callback import-requested();
     spacing: 16px;
     alignment: start;
 
-    Rectangle {
-        border-radius: 8px;
-        background: Theme.panel;
+    HorizontalLayout {
+        spacing: 12px;
+
+        Rectangle {
+            horizontal-stretch: 1;
+            border-radius: 8px;
+            background: Theme.panel;
 
         VerticalLayout {
             padding: 12px;
@@ -102,6 +107,28 @@ export component LibraryView inherits VerticalLayout {
             }
         }
     }
+
+    Rectangle {
+        width: 90px;
+        height: 32px;
+        border-radius: 8px;
+        background: import-btn.pressed ? Theme.overlay : (import-btn.has-hover ? Theme.hover : Theme.accent);
+        animate background { duration: 150ms; easing: ease-in-out; }
+
+        import-btn := TouchArea {
+            clicked => { root.import-requested(); }
+        }
+
+        Text {
+            text: Labels.import-button-label;
+            color: import-btn.has-hover ? Theme.text : Theme.window;
+            font-size: 12px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
 
     VerticalLayout {
         spacing: 6px;

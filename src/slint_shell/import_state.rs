@@ -6,9 +6,12 @@
 use std::collections::HashSet;
 
 use crate::domain::{
-    LocalPlaylist, LocalTrack, MatchConfidence, SpotifyPlaylist, SpotifyTrack, local_playlist_id,
+    Detail, DetailKind, LocalPlaylist, LocalTrack, MatchConfidence, Playlist, SpotifyPlaylist,
+    SpotifyTrack, local_playlist_id,
 };
+use crate::i18n::{Locale, tr};
 use crate::slint_shell::import_worker::TrackResolution;
+use crate::slint_shell::{ImportAlternativeData, ImportRowData};
 
 /// One review row: the Spotify source track and the chosen local match.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -205,6 +208,88 @@ pub fn row_state_key(row: &ImportRow) -> &'static str {
         Some(MatchConfidence::Medium | MatchConfidence::Low) => "Needs review",
         None => "No match",
     }
+}
+
+fn row_matched_text(row: &ImportRow, locale: Locale) -> String {
+    if let Some(ref track) = row.chosen {
+        return format!("{} - {}", track.title, track.artist);
+    }
+    if let Some(ref reason) = row.reason {
+        return reason.clone();
+    }
+    tr(locale, "No match").to_string()
+}
+
+fn row_source_text(row: &ImportRow) -> String {
+    if row.source_artist.is_empty() {
+        row.source_title.clone()
+    } else {
+        format!("{} - {}", row.source_title, row.source_artist)
+    }
+}
+
+fn row_confidence_text(row: &ImportRow, locale: Locale) -> String {
+    row.confidence.map(|c| tr(locale, confidence_label_key(c)).to_string()).unwrap_or_default()
+}
+
+fn row_to_slint_data(row: &ImportRow, locale: Locale) -> ImportRowData {
+    ImportRowData {
+        index: row.index as i32,
+        source: row_source_text(row).into(),
+        matched: row_matched_text(row, locale).into(),
+        state: tr(locale, row_state_key(row)).into(),
+        confidence: row_confidence_text(row, locale).into(),
+        has_match: row.chosen.is_some(),
+    }
+}
+
+/// Converts an [`ImportReview`] into Slint row models.
+pub fn rows_to_slint(review: &ImportReview, locale: Locale) -> Vec<ImportRowData> {
+    review.rows.iter().map(|r| row_to_slint_data(r, locale)).collect()
+}
+
+/// Converts an [`ImportRow`]'s alternatives into Slint alternative models.
+pub fn alternatives_to_slint(row: &ImportRow) -> Vec<ImportAlternativeData> {
+    row.alternatives
+        .iter()
+        .enumerate()
+        .map(|(i, alt)| ImportAlternativeData {
+            index: i as i32,
+            title: alt.title.as_str().into(),
+            artist: alt.artist.as_str().into(),
+        })
+        .collect()
+}
+
+/// Formats review counts with localized prefixes into a summary string.
+pub fn counts_text(counts: &ImportCounts, locale: Locale) -> String {
+    let matched = tr(locale, "Matched");
+    let review = tr(locale, "Needs review");
+    let unresolved = tr(locale, "Unresolved");
+    let review_count = counts.review + counts.low;
+    format!(
+        "{matched}: {} / {review}: {} / {unresolved}: {}",
+        counts.high, review_count, counts.unresolved
+    )
+}
+
+/// Maps a stored local playlist into a domain [`Detail`] view model.
+pub fn local_detail(playlist: &LocalPlaylist) -> Detail {
+    let tracks = playlist.tracks.iter().map(|t| t.to_track(playlist.artwork.clone())).collect();
+    let mut detail = Detail::new(DetailKind::Playlist, &playlist.title, &playlist.author, tracks);
+    detail.artwork = playlist.artwork.clone();
+    detail
+}
+
+/// Merges local playlists before catalog playlists, sorting local ones by title.
+pub fn merge_local_library(catalog: &[Playlist], local: &[LocalPlaylist]) -> Vec<Playlist> {
+    let mut local_playlists: Vec<Playlist> = local
+        .iter()
+        .map(|p| Playlist::new(&p.id, &p.title, p.tracks.len(), p.artwork.clone()))
+        .collect();
+    local_playlists.sort_by(|a, b| a.title.cmp(&b.title).then_with(|| a.id.cmp(&b.id)));
+    local_playlists.extend(catalog.iter().cloned());
+    local_playlists
 }
 
 #[cfg(test)]
@@ -456,5 +541,106 @@ mod tests {
         let matched = LocalTrack::new("id", "T", "A", MatchConfidence::High);
         review.rows[0].chosen = Some(matched);
         assert!(review.has_matches());
+    }
+
+    #[test]
+    fn test_rows_to_slint_mapping() {
+        let playlist = sample_spotify_playlist();
+        let track = LocalTrack::new("vid_1", "Song 1", "Artist 1", MatchConfidence::High);
+        let resolutions = vec![
+            TrackResolution::Matched { track, alternatives: Vec::new() },
+            TrackResolution::Unresolved {
+                title: "Song 2".to_string(),
+                artist: "Artist 2".to_string(),
+                reason: "not found in catalog".to_string(),
+            },
+        ];
+        let review = ImportReview::from_resolutions(&playlist, &resolutions);
+        let rows = rows_to_slint(&review, Locale::English);
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].index, 0);
+        assert_eq!(rows[0].source, "Song 1 - Artist 1");
+        assert_eq!(rows[0].matched, "Song 1 - Artist 1");
+        assert_eq!(rows[0].state, "Matched");
+        assert_eq!(rows[0].confidence, "High confidence");
+        assert!(rows[0].has_match);
+
+        assert_eq!(rows[1].index, 1);
+        assert_eq!(rows[1].source, "Song 2 - Artist 2");
+        assert_eq!(rows[1].matched, "not found in catalog");
+        assert_eq!(rows[1].state, "No match");
+        assert_eq!(rows[1].confidence, "");
+        assert!(!rows[1].has_match);
+    }
+
+    #[test]
+    fn test_alternatives_to_slint_mapping() {
+        let alt1 = LocalTrack::new("v1", "Alt 1", "Artist 1", MatchConfidence::High);
+        let alt2 = LocalTrack::new("v2", "Alt 2", "Artist 2", MatchConfidence::Medium);
+        let row = ImportRow {
+            index: 0,
+            source_title: "Title".to_string(),
+            source_artist: "Artist".to_string(),
+            chosen: Some(alt1.clone()),
+            confidence: Some(MatchConfidence::High),
+            alternatives: vec![alt1, alt2],
+            chosen_alternative: 0,
+            reason: None,
+        };
+        let slint_alts = alternatives_to_slint(&row);
+        assert_eq!(slint_alts.len(), 2);
+        assert_eq!(slint_alts[0].index, 0);
+        assert_eq!(slint_alts[0].title, "Alt 1");
+        assert_eq!(slint_alts[0].artist, "Artist 1");
+        assert_eq!(slint_alts[1].index, 1);
+        assert_eq!(slint_alts[1].title, "Alt 2");
+        assert_eq!(slint_alts[1].artist, "Artist 2");
+    }
+
+    #[test]
+    fn test_counts_text_formatting_english_and_spanish() {
+        let counts = ImportCounts { total: 10, high: 6, review: 2, low: 1, unresolved: 1 };
+        let en = counts_text(&counts, Locale::English);
+        assert_eq!(en, "Matched: 6 / Needs review: 3 / Unresolved: 1");
+
+        let es = counts_text(&counts, Locale::Spanish);
+        assert_eq!(es, "Coincidencias: 6 / Requieren revision: 3 / Sin resolver: 1");
+    }
+
+    #[test]
+    fn test_local_detail_maps_tracks_author_and_artwork() {
+        let mut local = LocalPlaylist::new("local:123", "Road Tunes").with_author("Traveler");
+        local.artwork = Some("https://example.com/art.jpg".to_string());
+        local.tracks.push(LocalTrack::new("v1", "Track 1", "Artist 1", MatchConfidence::High));
+
+        let detail = local_detail(&local);
+        assert_eq!(detail.kind, DetailKind::Playlist);
+        assert_eq!(detail.title, "Road Tunes");
+        assert_eq!(detail.subtitle, "Traveler");
+        assert_eq!(detail.artwork.as_deref(), Some("https://example.com/art.jpg"));
+        assert_eq!(detail.tracks.len(), 1);
+        assert_eq!(detail.tracks[0].id, "v1");
+        assert_eq!(detail.tracks[0].title, "Track 1");
+        assert_eq!(detail.tracks[0].artwork.as_deref(), Some("https://example.com/art.jpg"));
+    }
+
+    #[test]
+    fn test_merge_local_library_prepends_sorted_local_before_catalog() {
+        let catalog = vec![
+            Playlist::new("cat_1", "Pop Hits", 10, None),
+            Playlist::new("cat_2", "Rock Hits", 20, None),
+        ];
+        let local =
+            vec![LocalPlaylist::new("local:z", "Zeta"), LocalPlaylist::new("local:a", "Alpha")];
+
+        let merged = merge_local_library(&catalog, &local);
+        assert_eq!(merged.len(), 4);
+        assert_eq!(merged[0].id, "local:a");
+        assert_eq!(merged[0].title, "Alpha");
+        assert_eq!(merged[1].id, "local:z");
+        assert_eq!(merged[1].title, "Zeta");
+        assert_eq!(merged[2].id, "cat_1");
+        assert_eq!(merged[3].id, "cat_2");
     }
 }

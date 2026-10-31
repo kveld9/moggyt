@@ -143,12 +143,17 @@ export component MoggytWindow inherits Window {
     callback close-queue-panel();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
+    callback import-start-requested();
+    callback import-cancel-requested();
+    callback import-close-requested();
     callback import-row-selected(int);
     callback import-swap-requested(int);
     callback import-save-requested();
     callback import-discard-requested();
     callback import-alternative-chosen(int);
     callback import-picker-dismissed();
+    callback library-import-requested();
+    library-import-requested => { root.show-import-modal = true; }
 
     changed width => { root.width-changed(self.width / 1px); }
 
@@ -290,7 +295,11 @@ export component MoggytWindow inherits Window {
         active-tab <=> root.import-tab;
         link-text <=> root.import-link-text;
         file-path <=> root.import-file-path;
-        close-requested => { root.show-import-modal = false; }
+        start-requested => { root.import-start-requested(); }
+        close-requested => {
+            root.show-import-modal = false;
+            root.import-close-requested();
+        }
     }
 
     ImportProgress {
@@ -301,7 +310,10 @@ export component MoggytWindow inherits Window {
         high: root.import-high;
         review: root.import-review;
         unresolved: root.import-unresolved;
-        cancel-requested => { root.import-running = false; }
+        cancel-requested => {
+            root.import-running = false;
+            root.import-cancel-requested();
+        }
     }
 
     ImportReviewView {
