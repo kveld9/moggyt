@@ -43,6 +43,7 @@ mod settings;
 mod skip_store;
 mod spotify_csv;
 mod spotify_embed;
+mod spotify_search;
 mod stream;
 mod stream_reader;
 mod stream_reqwest;
@@ -101,6 +102,11 @@ pub use spotify_csv::{
 pub use spotify_embed::{
     EMBED_BASE_URL, EMBED_MAX_TRACKS, EMBED_TIMEOUT_SECS, SpotifyEmbedClient, embed_url,
     extract_next_data, parse_embed_html,
+};
+pub use spotify_search::{
+    SEARCH_TIMEOUT_SECS, SONGS_FILTER_PARAMS, SearchFailure, SearchStatus, SongCandidate,
+    SpotifySongSearch, classify_failure, classify_status, parse_song_candidates, songs_search_body,
+    video_type_from,
 };
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
 pub use tray::{TrayAction, TrayHandle};
