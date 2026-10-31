@@ -150,8 +150,10 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-15 (v1.1): DSP settings for skip-silence and -14 LUFS loudness normalization in playback.
 - FR-16 (v1.1): stream-cache LRU with user-sized storage budget and JSON library backup import/export.
 - FR-17 (v1.1): search-by-lyrics lookup and non-music segment-skip by video id.
+- FR-18: import Spotify playlists and albums from web links, embed URLs, Spotify URIs, Exportify CSV files,
+  and JSON backups into local playlists with automated matching and interactive review.
 
-Anonymous use covers FR-1 through FR-6, FR-8 through FR-12, and FR-13 through FR-17. FR-7 requires sign-in.
+Anonymous use covers FR-1 through FR-6, FR-8 through FR-12, FR-13 through FR-17, and FR-18. FR-7 requires sign-in.
 
 ## 5 Non-functional requirements
 
@@ -181,6 +183,8 @@ Ports (each a trait in `infra/`, with in-memory fakes in tests):
 - `CoverCache`: memory LRU plus disk cache keyed by artwork URL hash (FR-9).
 - `Presence`: Discord status updates; a no-op implementation when disabled.
 - `Updater`: GitHub Releases check returning the latest version and asset URLs (FR-12).
+- `TrackSearcher`: InnerTube candidate search port for songs-filtered queries (FR-18).
+- `PlaylistStore`: local playlist persistence port with atomic disk storage in `playlists.json` (FR-18).
 
 Crate layout stays `src/{main.rs, lib.rs, slint_shell/, domain/, infra/}`. `main.rs` builds the
 `tokio` runtime, instantiates adapters, injects them into `SlintAppState`, and bootstraps Slint.
@@ -217,12 +221,141 @@ scraping fragility, and mostly unsynchronized text.
 Audio stack: `rodio` with `symphonia` decoding (single binary; WASAPI on Windows,
 ALSA/PulseAudio on Linux). No GStreamer dependency in v1.
 
+### 6.1 Spotify import subsystem
+
+The Spotify import subsystem imports playlists and albums into locally stored playlists without requiring Spotify
+developer API credentials or user accounts.
+
+#### 6.1.1 Ingestion adapters
+
+- **Embed Ingestion (`SpotifyEmbedClient`)**: Fetches public playlist or album embed HTML
+  (`https://open.spotify.com/embed/playlist/<id>` or `/album/<id>`) and extracts the embedded `__NEXT_DATA__` JSON
+  payload, parsing track title, artist (subtitle), duration, and metadata without requiring Spotify Web API keys.
+- **File Ingestion (`parse_exportify_csv`, `parse_spotify_backup_json`)**: Pure, allocation-light parsers. The CSV
+  adapter parses RFC 4180 files exported by Exportify, requiring `Track Name`, `Artist Name(s)`, `Album Name`,
+  `Track Duration (ms)`, `ISRC`, and `Track URI` columns. The JSON adapter processes standard Spotify JSON backup dumps.
+
+#### 6.1.2 Link and identifier parsing
+
+`parse_spotify_ref` parses input links into `SpotifyRef::Playlist(id)` or `SpotifyRef::Album(id)`. Supported formats:
+
+- Standard URLs: `https://open.spotify.com/playlist/<id>` and `/album/<id>`.
+- Localized URLs: `https://open.spotify.com/intl-<country>/playlist/<id>`.
+- Embed URLs: `https://open.spotify.com/embed/playlist/<id>` and `/embed/album/<id>`.
+- Legacy user playlist URLs: `https://open.spotify.com/user/<user>/playlist/<id>`.
+- Spotify URIs: `spotify:playlist:<id>` and `spotify:album:<id>`.
+
+Identifiers must be 22-character base62 (ASCII alphanumeric) strings. Malformed links or unsupported schemes return
+`None`.
+
+#### 6.1.3 Title sanitization and normalization
+
+Before candidate search and scoring, `clean_track_title` and `normalize_for_match` process track titles:
+
+- **Smart Punctuation**: Replaces curly quotes, dashes, and non-breaking spaces with standard ASCII equivalents.
+- **Featured Clauses**: Splits featuring clauses (`feat.`, `ft.`, `featuring` in parentheses, brackets, after hyphens,
+  or inline) into a separate artist token for multi-artist matching.
+- **Noise Stripping**: Removes version noise, remasters, deluxe qualifiers, bonus tracks, explicit tags, and 4-digit
+  year mixes (`(2011 Remaster)`, `[Remastered]`, `- 2020 Mix`).
+- **Preserved Qualifiers**: Retains version qualifiers essential to track identity: `live`, `acoustic`, `instrumental`,
+  `demo`, and `radio edit`.
+- **Fuzzy Normalization**: Folds common Latin diacritics to ASCII, strips non-alphanumeric punctuation, and collapses
+  whitespace. Non-Latin scripts pass through unaltered.
+
+#### 6.1.4 Multi-factor matching heuristics
+
+Candidates returned by InnerTube search are evaluated using multi-factor scoring (`score_candidate`):
+
+- **Title Similarity (`WEIGHT_TITLE = 0.40`)**: Combines Levenshtein character edit distance and token Jaccard
+  similarity on normalized strings.
+- **Artist Matching**: Channel attribution matching against primary artist (`WEIGHT_ARTIST_PRIMARY = 0.30`) or
+  featured artist (`WEIGHT_ARTIST_SECONDARY = 0.15`), handling `- Topic` channel suffixes.
+- **Duration Delta**: Scores duration difference between candidate and source track:
+  - `<= 2s`: `+0.15` exact match bonus.
+  - `<= 5s`: `0.0` acceptable tolerance.
+  - `<= 15s`: `-0.20` suspect duration penalty.
+  - `<= 30s`: `-0.40` wrong edit penalty.
+  - `> 30s`: `-0.60` music video duration penalty.
+- **Prism-Style Video Penalty**: Distinguishes official audio tracks from music videos and user uploads:
+  - Auto-generated topic channels: `+0.15` bonus.
+  - Audio Track Video (ATV): `+0.15` bonus.
+  - Official Music Video (OMV): `-0.40` penalty.
+  - User Generated Content (UGC): `-0.50` penalty.
+  - Title keyword penalties (`official video`, `music video`, `cover`, `reaction`): `-0.35` per keyword.
+  - Total Prism adjustment is clamped to `-0.50..=0.15`.
+- **Composite Score and Confidence Buckets**: Total composite score is clamped to `0.0..=1.0`:
+  - `High`: Score `>= 0.85`.
+  - `Medium`: Score in `[0.60, 0.85)`.
+  - `Low`: Score `< 0.60` or NaN.
+  Candidates below `MIN_ACCEPT_SCORE = 0.50` are filtered out.
+
+#### 6.1.5 Concurrency, pacing, and worker pipeline
+
+The matching worker (`import_worker.rs`, `import_searcher.rs`) executes in background threads:
+
+- **Worker Concurrency**: Uses 2 worker threads for search execution.
+- **Request Pacing**: Paced at 200 ms between network queries to avoid triggering upstream rate limits.
+- **Query Cache**: Per-run query cache avoids redundant network requests for duplicate tracks within a playlist.
+- **Backoff and Jitter**: Retries HTTP 429 and 503 rate-limit responses using exponential backoff with pseudorandom
+  jitter (base 500 ms, up to 3 retries).
+- **Atomic Cancellation**: Supports cancellation via `AtomicBool`, cleanly stopping worker execution and returning
+  partial resolutions.
+- **Ranked Alternatives**: Retains up to 3 alternative candidate hits (`MAX_ALTERNATIVES = 3`) scoring at or above
+  `0.50` for user review.
+- **Event Streaming**: Dispatches progress events (`Started`, `Track`, `Progress`, `Finished`, `Cancelled`, `Failed`)
+  to update UI overlays.
+
+#### 6.1.6 Persistence and storage
+
+Imported playlists are stored locally via `DiskPlaylistStore` (`playlist_store_disk.rs`):
+
+- **Storage Location**: Saved in `playlists.json` in the configuration directory (`~/.config/moggyt/` on Linux,
+  `%APPDATA%\moggyt` on Windows).
+- **Schema Envelope**: Uses a versioned envelope (`version: 1`, `PlaylistFile`) containing an array of `LocalPlaylist`
+  objects.
+- **Atomic Persistence**: Writes to a temporary file (`playlists.json.tmp.<pid>`) and atomically renames to guarantee
+  file integrity across crashes or abrupt process exits.
+- **Namespace Isolation**: Identifiers use a `local:` prefix (e.g. `local:<source_id>`) to prevent collisions with
+  remote catalog identifiers.
+- **Offline Resolution**: Stored playlists display in the Library page and open in the Detail view without contacting
+  YouTube Music for catalog lookups.
+
+#### 6.1.7 Command-line interface (CLI)
+
+The importer supports headless execution from the terminal:
+
+- Import from Spotify link: `moggyt --import-spotify <URL> --headless [--json]`
+- Import from CSV or JSON file: `moggyt --import-csv <PATH> --headless [--json]`
+- Streams progress diagnostics to `stderr`.
+- Outputs a machine-readable JSON summary report to `stdout` when `--json` is supplied, or human-readable summary
+  text otherwise.
+
+#### 6.1.8 Known limits
+
+- **Embed 100-Track Cap**: Spotify embed HTML documents only contain the first 100 tracks of a playlist or album.
+  Playlists exceeding 100 tracks require Exportify CSV or JSON file exports to import completely.
+- **Public Playlists Only**: Link-based import requires public playlist accessibility; private, unlisted, or
+  region-locked Spotify playlists cannot be scraped via embed and require CSV or JSON export files.
+- **Region-Unavailable Tracks**: Tracks absent from the YouTube Music catalog or restricted by licensing remain
+  unresolved, preserving their source title and artist in the review view.
+
 ## 7 Data model
 
 Immutable domain types, all serializable: `Track { id, title, artist, album, duration }`,
 `Album`, `Artist`, `Playlist`, `Shelf { title, items }`, `PlaybackQueue` (push, advance,
 retreat, shuffle, repeat modes), and `SearchQuery` (immutable value with paginated results).
 Wall-clock time enters only as injected parameters so tests stay deterministic.
+
+Import domain models:
+
+- `SpotifyTrack`: source track metadata (`title`, `artist`, optional `album`, `duration_ms`, optional `isrc`).
+- `SpotifyPlaylist`: source playlist metadata (`id`, `title`, `author`, optional `artwork`, `tracks`).
+- `SpotifyRef`: target reference enum (`Playlist(id)`, `Album(id)`).
+- `MatchConfidence`: categorical confidence levels (`High`, `Medium`, `Low`).
+- `MatchCandidate`: candidate metadata (`title`, `channel`, optional `duration_secs`, `video_type`).
+- `MatchScore`: breakdown scores (`title`, `artist`, `duration`, `prism`, `total`).
+- `LocalTrack`: resolved track (`video_id`, `title`, `artist`, optional `album`, optional `duration_secs`, `confidence`).
+- `LocalPlaylist`: persisted playlist (`id`, `title`, `author`, optional `artwork`, `tracks`).
 
 ## 8 UI design
 
