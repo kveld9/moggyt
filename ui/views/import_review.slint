@@ -1,0 +1,244 @@
+import { Labels } from "../labels.slint";
+import { Theme, ImportRowData } from "../theme.slint";
+
+export component ImportReviewView inherits VerticalLayout {
+    in-out property <string> playlist-title: "";
+    in-out property <[ImportRowData]> rows: [];
+    in-out property <int> selected: 0;
+    in-out property <string> counts-text: "";
+    in-out property <bool> can-save: false;
+
+    callback row-selected(int);
+    callback swap-requested(int);
+    callback save-requested();
+    callback discard-requested();
+
+    Rectangle {
+        vertical-stretch: 1;
+        background: Theme.window;
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+
+            HorizontalLayout {
+                spacing: 12px;
+                alignment: space-between;
+
+                VerticalLayout {
+                    spacing: 4px;
+                    alignment: center;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        Text {
+                            text: Labels.import-review-title;
+                            color: Theme.text;
+                            font-size: 20px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+
+                        if root.playlist-title != "" : Text {
+                            text: root.playlist-title;
+                            color: Theme.secondary;
+                            font-size: 16px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+
+                    if root.counts-text != "" : Text {
+                        text: root.counts-text;
+                        color: Theme.secondary;
+                        font-size: 13px;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 16px;
+                height: 24px;
+
+                Text {
+                    horizontal-stretch: 1;
+                    text: Labels.import-source-label;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    horizontal-stretch: 1;
+                    text: Labels.import-matched-track-label;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 200px;
+                    background: transparent;
+                }
+            }
+
+            Flickable {
+                vertical-stretch: 1;
+                viewport-height: rows-layout.min-height;
+
+                rows-layout := VerticalLayout {
+                    spacing: 6px;
+
+                    for row in root.rows : Rectangle {
+                        height: 52px;
+                        border-radius: 8px;
+                        background: row.index == root.selected
+                            ? (row-touch.pressed ? Theme.overlay : Theme.surface)
+                            : (row-touch.pressed ? Theme.overlay : (row-touch.has-hover ? Theme.hover : transparent));
+                        border-width: row.index == root.selected ? 1px : 0px;
+                        border-color: Theme.border;
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        row-touch := TouchArea {
+                            clicked => {
+                                root.selected = row.index;
+                                root.row-selected(row.index);
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 16px;
+
+                            Text {
+                                horizontal-stretch: 1;
+                                text: row.source;
+                                color: Theme.text;
+                                font-size: 13px;
+                                font-weight: 500;
+                                overflow: elide;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                horizontal-stretch: 1;
+                                text: row.matched;
+                                color: row.has-match ? Theme.text : Theme.secondary;
+                                font-size: 13px;
+                                font-weight: 500;
+                                overflow: elide;
+                                vertical-alignment: center;
+                            }
+
+                            Rectangle {
+                                width: 120px;
+                                height: 26px;
+                                border-radius: 13px;
+                                background: row.state == Labels.import-matched-label
+                                    ? Theme.accent
+                                    : (row.state == Labels.import-review-label ? Theme.hover : Theme.surface);
+
+                                Text {
+                                    text: row.confidence;
+                                    color: row.state == Labels.import-matched-label
+                                        ? Theme.window
+                                        : Theme.text;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                            }
+
+                            Rectangle {
+                                width: 68px;
+                                height: 28px;
+                                border-radius: 6px;
+                                background: swap-touch.pressed ? Theme.overlay : (swap-touch.has-hover ? Theme.hover : Theme.surface);
+                                animate background { duration: 150ms; easing: ease-in-out; }
+
+                                swap-touch := TouchArea {
+                                    clicked => { root.swap-requested(row.index); }
+                                }
+
+                                Text {
+                                    text: Labels.import-swap-label;
+                                    color: swap-touch.has-hover ? Theme.text : Theme.secondary;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                alignment: end;
+                height: 40px;
+
+                Rectangle {
+                    width: 100px;
+                    height: 36px;
+                    border-radius: 8px;
+                    background: discard-touch.pressed ? Theme.overlay : (discard-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    discard-touch := TouchArea {
+                        clicked => { root.discard-requested(); }
+                    }
+
+                    Text {
+                        text: Labels.import-discard-label;
+                        color: discard-touch.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    width: 130px;
+                    height: 36px;
+                    border-radius: 8px;
+                    background: !root.can-save
+                        ? Theme.surface
+                        : (save-touch.pressed ? Theme.overlay : (save-touch.has-hover ? Theme.hover : Theme.accent));
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    save-touch := TouchArea {
+                        enabled: root.can-save;
+                        clicked => {
+                            if root.can-save {
+                                root.save-requested();
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: Labels.import-save-label;
+                        color: !root.can-save
+                            ? Theme.secondary
+                            : (save-touch.has-hover ? Theme.text : Theme.window);
+                        font-size: 13px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -90,6 +90,18 @@ pub struct StaticLabels {
     pub import_unresolved_label: &'static str,
     pub import_cap_hint: &'static str,
     pub import_close_label: &'static str,
+    pub import_review_title: &'static str,
+    pub import_source_label: &'static str,
+    pub import_matched_track_label: &'static str,
+    pub import_high_confidence_label: &'static str,
+    pub import_medium_confidence_label: &'static str,
+    pub import_low_confidence_label: &'static str,
+    pub import_no_match_label: &'static str,
+    pub import_swap_label: &'static str,
+    pub import_choose_track_label: &'static str,
+    pub import_save_label: &'static str,
+    pub import_discard_label: &'static str,
+    pub import_all_matched_label: &'static str,
 }
 
 impl StaticLabels {
@@ -182,6 +194,18 @@ impl StaticLabels {
                 "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
             ),
             import_close_label: tr(locale, "Close"),
+            import_review_title: tr(locale, "Review matches"),
+            import_source_label: tr(locale, "Source"),
+            import_matched_track_label: tr(locale, "Matched track"),
+            import_high_confidence_label: tr(locale, "High confidence"),
+            import_medium_confidence_label: tr(locale, "Medium confidence"),
+            import_low_confidence_label: tr(locale, "Low confidence"),
+            import_no_match_label: tr(locale, "No match"),
+            import_swap_label: tr(locale, "Swap"),
+            import_choose_track_label: tr(locale, "Choose a track"),
+            import_save_label: tr(locale, "Save playlist"),
+            import_discard_label: tr(locale, "Discard"),
+            import_all_matched_label: tr(locale, "All matched"),
         }
     }
 
@@ -274,6 +298,18 @@ impl StaticLabels {
         labels.set_import_unresolved_label(self.import_unresolved_label.into());
         labels.set_import_cap_hint(self.import_cap_hint.into());
         labels.set_import_close_label(self.import_close_label.into());
+        labels.set_import_review_title(self.import_review_title.into());
+        labels.set_import_source_label(self.import_source_label.into());
+        labels.set_import_matched_track_label(self.import_matched_track_label.into());
+        labels.set_import_high_confidence_label(self.import_high_confidence_label.into());
+        labels.set_import_medium_confidence_label(self.import_medium_confidence_label.into());
+        labels.set_import_low_confidence_label(self.import_low_confidence_label.into());
+        labels.set_import_no_match_label(self.import_no_match_label.into());
+        labels.set_import_swap_label(self.import_swap_label.into());
+        labels.set_import_choose_track_label(self.import_choose_track_label.into());
+        labels.set_import_save_label(self.import_save_label.into());
+        labels.set_import_discard_label(self.import_discard_label.into());
+        labels.set_import_all_matched_label(self.import_all_matched_label.into());
     }
 }
 
@@ -388,6 +424,18 @@ mod tests {
             "Las importaciones por enlace se limitan a 100 canciones. Exporta un CSV para playlists mas largas."
         );
         assert_eq!(es.import_close_label, "Cerrar");
+        assert_eq!(es.import_review_title, "Revisar coincidencias");
+        assert_eq!(es.import_source_label, "Origen");
+        assert_eq!(es.import_matched_track_label, "Cancion encontrada");
+        assert_eq!(es.import_high_confidence_label, "Confianza alta");
+        assert_eq!(es.import_medium_confidence_label, "Confianza media");
+        assert_eq!(es.import_low_confidence_label, "Confianza baja");
+        assert_eq!(es.import_no_match_label, "Sin coincidencia");
+        assert_eq!(es.import_swap_label, "Cambiar");
+        assert_eq!(es.import_choose_track_label, "Elegir una cancion");
+        assert_eq!(es.import_save_label, "Guardar playlist");
+        assert_eq!(es.import_discard_label, "Descartar");
+        assert_eq!(es.import_all_matched_label, "Todo coincidio");
 
         let en = StaticLabels::resolve(Locale::English);
         assert_eq!(en.nav_search, "Search");
@@ -473,5 +521,17 @@ mod tests {
             "Embed imports are capped at 100 tracks. Export a CSV for longer playlists."
         );
         assert_eq!(en.import_close_label, "Close");
+        assert_eq!(en.import_review_title, "Review matches");
+        assert_eq!(en.import_source_label, "Source");
+        assert_eq!(en.import_matched_track_label, "Matched track");
+        assert_eq!(en.import_high_confidence_label, "High confidence");
+        assert_eq!(en.import_medium_confidence_label, "Medium confidence");
+        assert_eq!(en.import_low_confidence_label, "Low confidence");
+        assert_eq!(en.import_no_match_label, "No match");
+        assert_eq!(en.import_swap_label, "Swap");
+        assert_eq!(en.import_choose_track_label, "Choose a track");
+        assert_eq!(en.import_save_label, "Save playlist");
+        assert_eq!(en.import_discard_label, "Discard");
+        assert_eq!(en.import_all_matched_label, "All matched");
     }
 }

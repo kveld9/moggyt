@@ -40,6 +40,7 @@ pub mod detail;
 pub mod explore;
 pub mod format;
 pub mod import_searcher;
+pub mod import_state;
 pub mod import_worker;
 pub mod init;
 pub mod labels;
@@ -65,6 +66,9 @@ pub use detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url
 pub use import_searcher::{
     CandidateHit, LiveTrackSearcher, MAX_ALTERNATIVES, MIN_ACCEPT_SCORE, best_candidate,
     ranked_alternatives,
+};
+pub use import_state::{
+    ImportCounts, ImportReview, ImportRow, confidence_label_key, row_state_key,
 };
 pub use import_worker::{
     ImportProgressEvent, ImportStats, TrackResolution, TrackSearcher, WorkerConfig,

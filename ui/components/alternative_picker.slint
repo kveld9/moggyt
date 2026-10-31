@@ -1,0 +1,122 @@
+import { Labels } from "../labels.slint";
+import { Theme, ImportAlternativeData } from "../theme.slint";
+
+export component AlternativePicker inherits Rectangle {
+    in-out property <[ImportAlternativeData]> alternatives: [];
+    in-out property <int> selected: 0;
+    in-out property <string> heading: "";
+
+    callback alternative-chosen(int);
+    callback dismissed();
+
+    background: Theme.overlay;
+
+    TouchArea {
+        // Absorbs backdrop clicks
+    }
+
+    Rectangle {
+        width: min(root.width - 48px, 500px);
+        max-height: min(root.height - 64px, 460px);
+        background: Theme.panel;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.border;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        clip: true;
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 16px;
+
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: root.heading != "" ? root.heading : Labels.import-choose-track-label;
+                    color: Theme.text;
+                    font-size: 16px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 64px;
+                    height: 28px;
+                    border-radius: 6px;
+                    background: close-btn.pressed ? Theme.overlay : (close-btn.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    close-btn := TouchArea {
+                        clicked => { root.dismissed(); }
+                    }
+                    Text {
+                        text: Labels.import-close-label;
+                        color: close-btn.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Flickable {
+                vertical-stretch: 1;
+                viewport-height: alts-layout.min-height;
+
+                alts-layout := VerticalLayout {
+                    spacing: 6px;
+
+                    for alt in root.alternatives : Rectangle {
+                        height: 48px;
+                        border-radius: 8px;
+                        background: alt.index == root.selected
+                            ? (alt-touch.pressed ? Theme.overlay : Theme.accent)
+                            : (alt-touch.pressed ? Theme.overlay : (alt-touch.has-hover ? Theme.hover : Theme.surface));
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        alt-touch := TouchArea {
+                            clicked => {
+                                root.selected = alt.index;
+                                root.alternative-chosen(alt.index);
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 12px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+                                horizontal-stretch: 1;
+
+                                Text {
+                                    text: alt.title;
+                                    color: alt.index == root.selected
+                                        ? (alt-touch.has-hover ? Theme.text : Theme.window)
+                                        : Theme.text;
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: alt.artist;
+                                    color: alt.index == root.selected
+                                        ? (alt-touch.has-hover ? Theme.text : Theme.window)
+                                        : Theme.secondary;
+                                    font-size: 11px;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

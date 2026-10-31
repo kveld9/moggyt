@@ -5,13 +5,17 @@ import {
     ExploreShelfData,
     LibraryItemData,
     LyricLineData,
+    ImportRowData,
+    ImportAlternativeData,
 } from "../theme.slint";
 import { Sidebar } from "../components/sidebar.slint";
 import { PlayerBar } from "../components/player_bar.slint";
 import { QueuePanel } from "../components/queue_panel.slint";
+import { AlternativePicker } from "../components/alternative_picker.slint";
 import { ContentArea } from "./content_area.slint";
 import { ImportModal } from "./import_modal.slint";
 import { ImportProgress } from "./import_progress.slint";
+import { ImportReviewView } from "./import_review.slint";
 
 export component MoggytWindow inherits Window {
     title: "Moggyt";
@@ -97,6 +101,15 @@ export component MoggytWindow inherits Window {
     in-out property <int> import-high: 0;
     in-out property <int> import-review: 0;
     in-out property <int> import-unresolved: 0;
+    in-out property <bool> import-review-open: false;
+    in-out property <string> import-review-title: "";
+    in-out property <string> import-review-counts: "";
+    in-out property <[ImportRowData]> import-rows: [];
+    in-out property <int> import-selected-row: 0;
+    in-out property <bool> import-can-save: false;
+    in-out property <[ImportAlternativeData]> import-alternatives: [];
+    in-out property <int> import-alternative-selected: 0;
+    in-out property <bool> import-picker-open: false;
 
     callback page-selected(int);
     callback back-pressed();
@@ -130,6 +143,12 @@ export component MoggytWindow inherits Window {
     callback close-queue-panel();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
+    callback import-row-selected(int);
+    callback import-swap-requested(int);
+    callback import-save-requested();
+    callback import-discard-requested();
+    callback import-alternative-chosen(int);
+    callback import-picker-dismissed();
 
     changed width => { root.width-changed(self.width / 1px); }
 
@@ -283,5 +302,26 @@ export component MoggytWindow inherits Window {
         review: root.import-review;
         unresolved: root.import-unresolved;
         cancel-requested => { root.import-running = false; }
+    }
+
+    ImportReviewView {
+        visible: root.import-review-open;
+        playlist-title: root.import-review-title;
+        counts-text: root.import-review-counts;
+        rows: root.import-rows;
+        selected: root.import-selected-row;
+        can-save: root.import-can-save;
+        row-selected(idx) => { root.import-row-selected(idx); }
+        swap-requested(idx) => { root.import-swap-requested(idx); }
+        save-requested => { root.import-save-requested(); }
+        discard-requested => { root.import-discard-requested(); }
+    }
+
+    AlternativePicker {
+        visible: root.import-picker-open;
+        alternatives: root.import-alternatives;
+        selected: root.import-alternative-selected;
+        alternative-chosen(idx) => { root.import-alternative-chosen(idx); }
+        dismissed => { root.import-picker-dismissed(); }
     }
 }
