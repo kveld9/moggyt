@@ -110,7 +110,7 @@ fn try_connect(app_id: u64) -> Option<DiscordIpcClient> {
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
 fn connect_ipc(app_id: u64) -> Option<DiscordIpcClient> {
-    let mut client = DiscordIpcClient::new(&app_id.to_string()).ok()?;
+    let mut client = DiscordIpcClient::new(app_id.to_string());
     if let Err(err) = client.connect() {
         tracing::debug!("failed to connect to discord ipc socket: {err:#}");
         return None;
