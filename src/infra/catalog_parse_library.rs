@@ -1,8 +1,8 @@
 //! Library browse response parser for playlists, albums, and liked tracks.
 
 use super::catalog_parse_common::{best_thumbnail, parse_track_count, parse_two_row};
-use super::catalog_parse_detail::{collect_detail_tracks, detail_sections};
-use crate::domain::{Album, Playlist, Track};
+use super::catalog_parse_detail::detail_sections;
+use crate::domain::{Album, Playlist};
 use serde_json::Value;
 
 fn find_grid_items(section: &Value) -> Option<&[Value]> {
@@ -55,11 +55,6 @@ pub fn parse_library_albums(value: &Value) -> Vec<Album> {
     collect_library_items(value).into_iter().filter_map(parse_library_album_item).collect()
 }
 
-/// Parses liked tracks from catalog API browse response payload.
-pub fn parse_library_liked_tracks(value: &Value) -> Vec<Track> {
-    collect_detail_tracks(value)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,29 +75,6 @@ mod tests {
     fn parse_library_playlists_tolerates_empty_and_malformed() {
         assert!(parse_library_playlists(&serde_json::json!({})).is_empty());
         assert!(parse_library_playlists(&serde_json::json!({"contents": null})).is_empty());
-    }
-
-    #[test]
-    fn parse_library_liked_tracks_golden_fixture_and_determinism() {
-        let raw = include_str!("../../tests/fixtures/catalog_library_liked.json");
-        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
-        let first = parse_library_liked_tracks(&payload);
-        let second = parse_library_liked_tracks(&payload);
-        assert_eq!(first, second, "parsing must be deterministic");
-        assert_eq!(first.len(), 2);
-        assert_eq!(
-            first[0],
-            Track::new("lib-t1", "Liked Song 1", "Artist One")
-                .with_duration(200)
-                .with_artwork("https://img.local/t1.jpg")
-        );
-        assert_eq!(first[1], Track::new("lib-t2", "Liked Song 2", "Artist Two"));
-    }
-
-    #[test]
-    fn parse_library_liked_tracks_tolerates_empty_and_malformed() {
-        assert!(parse_library_liked_tracks(&serde_json::json!({})).is_empty());
-        assert!(parse_library_liked_tracks(&serde_json::json!({"contents": null})).is_empty());
     }
 
     #[test]

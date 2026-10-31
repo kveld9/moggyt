@@ -90,10 +90,6 @@ impl Scrobbler for LastFmClient {
         ];
         self.send_signed_post(&params);
     }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }
 
 /// Computes the Last.fm API method signature (`api_sig`).

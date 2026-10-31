@@ -17,9 +17,6 @@ pub trait Scrobbler: Send {
 
     /// Submits a completed scrobble record for a track.
     fn scrobble(&mut self, artist: &str, title: &str, timestamp_secs: u64);
-
-    /// Downcasts the trait object to a concrete type for test verification.
-    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Last.fm scrobble eligibility predicate.

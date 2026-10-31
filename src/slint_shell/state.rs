@@ -408,14 +408,8 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     fn playlists(&self) -> Vec<Playlist> {
         (**self).playlists()
     }
-    fn liked_tracks(&self) -> Vec<Track> {
-        (**self).liked_tracks()
-    }
     fn saved_albums(&self) -> Vec<Album> {
         (**self).saved_albums()
-    }
-    fn set_liked(&mut self, id: &str, l: bool) {
-        (**self).set_liked(id, l);
     }
     fn detail(&self, id: &str, k: DetailKind) -> Option<Detail> {
         (**self).detail(id, k)

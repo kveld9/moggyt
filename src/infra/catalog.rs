@@ -33,15 +33,8 @@ pub trait Catalog {
     /// Returns saved or owned playlists.
     fn playlists(&self) -> Vec<Playlist>;
 
-    /// Returns tracks saved to the user's liked collection.
-    fn liked_tracks(&self) -> Vec<Track>;
-
     /// Returns albums saved to the user's library.
     fn saved_albums(&self) -> Vec<Album>;
-
-    /// Adds (`liked = true`) or removes (`liked = false`) a track from the liked collection.
-    /// Blank identifiers are ignored.
-    fn set_liked(&mut self, track_id: &str, liked: bool);
 
     /// Returns detail view for `browse_id` and `kind` (None on blank id or failure).
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail>;
@@ -83,13 +76,9 @@ mod tests {
         fn playlists(&self) -> Vec<Playlist> {
             Vec::new()
         }
-        fn liked_tracks(&self) -> Vec<Track> {
-            Vec::new()
-        }
         fn saved_albums(&self) -> Vec<Album> {
             Vec::new()
         }
-        fn set_liked(&mut self, _track_id: &str, _liked: bool) {}
         fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
             None
         }
