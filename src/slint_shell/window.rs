@@ -51,11 +51,17 @@ pub(crate) fn set_ui_state(state_rc: &SharedState) {
     });
 }
 
+/// Runs `f` with the installed app state, if any.
+///
+/// Returns `None` when no state is installed and also when the state is already
+/// mutably borrowed, which happens when a callback or timer re-enters this
+/// helper from inside a borrow. Callers treat `None` as "skip this sync": a
+/// re-entrant UI callback must degrade, never abort the process.
 pub(crate) fn with_ui_state<R>(f: impl FnOnce(&mut SlintAppState) -> R) -> Option<R> {
     ACTIVE_STATE.with(|cell| {
         let borrow = cell.borrow();
         let rc = borrow.as_ref()?;
-        let mut st = rc.borrow_mut();
+        let mut st = rc.try_borrow_mut().ok()?;
         Some(f(&mut st))
     })
 }
@@ -352,6 +358,9 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
     let timer = slint::Timer::default();
     timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
         let Some(win) = weak.upgrade() else { return };
+        // The import poll re-enters the app state through `with_ui_state`, so it
+        // must run before this borrow is taken.
+        poll_import(&win);
         let mut state = state_rc.borrow_mut();
         if state.drain_tray_actions() {
             let _ = state.queue_store.save(&state.queue);
@@ -363,7 +372,6 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
         state.continue_autoplay_if_ended();
         state.poll_sleep_timer();
         drain_updater_check(&win, &mut state);
-        poll_import(&win);
         sync_playback_tick(&win, &mut state);
     });
     timer
@@ -431,6 +439,14 @@ mod tests {
             st.is_shuffle
         });
         assert_eq!(result, Some(true));
+    }
+
+    #[test]
+    fn test_with_ui_state_returns_none_when_already_borrowed() {
+        let state_rc: SharedState = Rc::new(RefCell::new(test_wired()));
+        set_ui_state(&state_rc);
+        let _held = state_rc.borrow_mut();
+        assert!(with_ui_state(|st: &mut SlintAppState| st.queue.len()).is_none());
     }
 
     #[test]

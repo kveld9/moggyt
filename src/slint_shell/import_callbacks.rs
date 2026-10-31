@@ -312,6 +312,22 @@ mod tests {
     use crate::domain::SpotifyTrack;
     use crate::infra::MemoryPlaylistStore;
 
+    /// Serializes the tests that touch the process-global import session.
+    ///
+    /// `SESSION` is a single `Mutex<Option<ImportSession>>` shared by the whole
+    /// process, so tests that reset or drain it race each other under the
+    /// parallel test harness. Taking this lock plus a reset makes each of them
+    /// start from a known state.
+    static SESSION_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn lock_session_tests() -> std::sync::MutexGuard<'static, ()> {
+        SESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn reset_session() {
+        with_session(|s| *s = ImportSession::new());
+    }
+
     fn sample_spotify_playlist() -> SpotifyPlaylist {
         SpotifyPlaylist {
             id: "sp_cb_test".to_string(),
@@ -338,6 +354,8 @@ mod tests {
 
     #[test]
     fn test_with_session_mutates_state() {
+        let _serial = lock_session_tests();
+        reset_session();
         with_session(|s| {
             s.start_loading();
             assert_eq!(s.stage, ImportStage::LoadingSource);
@@ -352,6 +370,8 @@ mod tests {
 
     #[test]
     fn test_reset_session_to_idle() {
+        let _serial = lock_session_tests();
+        reset_session();
         with_session(|s| {
             s.stage = ImportStage::Failed;
             s.status = "error".into();
@@ -377,6 +397,8 @@ mod tests {
 
     #[test]
     fn test_poll_import_drains_events_and_updates_status() {
+        let _serial = lock_session_tests();
+        reset_session();
         let (tx, rx) = std::sync::mpsc::channel();
         with_session(|s| {
             s.begin_matching(sample_spotify_playlist(), rx);
