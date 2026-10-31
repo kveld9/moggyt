@@ -76,6 +76,20 @@ pub struct StaticLabels {
     pub player_bar_skip: &'static str,
     pub player_bar_queue: &'static str,
     pub player_bar_volume: &'static str,
+    pub import_title_label: &'static str,
+    pub import_button_label: &'static str,
+    pub import_tab_link_label: &'static str,
+    pub import_tab_file_label: &'static str,
+    pub import_link_placeholder: &'static str,
+    pub import_file_placeholder: &'static str,
+    pub import_start_label: &'static str,
+    pub import_cancel_label: &'static str,
+    pub import_progress_title: &'static str,
+    pub import_matched_label: &'static str,
+    pub import_review_label: &'static str,
+    pub import_unresolved_label: &'static str,
+    pub import_cap_hint: &'static str,
+    pub import_close_label: &'static str,
 }
 
 impl StaticLabels {
@@ -151,6 +165,23 @@ impl StaticLabels {
             player_bar_skip: tr(locale, "Show skip 10s buttons"),
             player_bar_queue: tr(locale, "Show queue button"),
             player_bar_volume: tr(locale, "Show volume slider"),
+            import_title_label: tr(locale, "Import from Spotify"),
+            import_button_label: tr(locale, "Import"),
+            import_tab_link_label: tr(locale, "From link"),
+            import_tab_file_label: tr(locale, "From file"),
+            import_link_placeholder: tr(locale, "Spotify playlist or album link"),
+            import_file_placeholder: tr(locale, "CSV file path"),
+            import_start_label: tr(locale, "Start import"),
+            import_cancel_label: tr(locale, "Cancel"),
+            import_progress_title: tr(locale, "Import progress"),
+            import_matched_label: tr(locale, "Matched"),
+            import_review_label: tr(locale, "Needs review"),
+            import_unresolved_label: tr(locale, "Unresolved"),
+            import_cap_hint: tr(
+                locale,
+                "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
+            ),
+            import_close_label: tr(locale, "Close"),
         }
     }
 
@@ -229,6 +260,20 @@ impl StaticLabels {
         labels.set_player_bar_skip_label(self.player_bar_skip.into());
         labels.set_player_bar_queue_label(self.player_bar_queue.into());
         labels.set_player_bar_volume_label(self.player_bar_volume.into());
+        labels.set_import_title_label(self.import_title_label.into());
+        labels.set_import_button_label(self.import_button_label.into());
+        labels.set_import_tab_link_label(self.import_tab_link_label.into());
+        labels.set_import_tab_file_label(self.import_tab_file_label.into());
+        labels.set_import_link_placeholder(self.import_link_placeholder.into());
+        labels.set_import_file_placeholder(self.import_file_placeholder.into());
+        labels.set_import_start_label(self.import_start_label.into());
+        labels.set_import_cancel_label(self.import_cancel_label.into());
+        labels.set_import_progress_title(self.import_progress_title.into());
+        labels.set_import_matched_label(self.import_matched_label.into());
+        labels.set_import_review_label(self.import_review_label.into());
+        labels.set_import_unresolved_label(self.import_unresolved_label.into());
+        labels.set_import_cap_hint(self.import_cap_hint.into());
+        labels.set_import_close_label(self.import_close_label.into());
     }
 }
 
@@ -326,6 +371,23 @@ mod tests {
         assert_eq!(es.player_bar_skip, "Mostrar botones +/-10s");
         assert_eq!(es.player_bar_queue, "Mostrar botón de cola");
         assert_eq!(es.player_bar_volume, "Mostrar control de volumen");
+        assert_eq!(es.import_title_label, "Importar desde Spotify");
+        assert_eq!(es.import_button_label, "Importar");
+        assert_eq!(es.import_tab_link_label, "Desde enlace");
+        assert_eq!(es.import_tab_file_label, "Desde archivo");
+        assert_eq!(es.import_link_placeholder, "Enlace de playlist o album de Spotify");
+        assert_eq!(es.import_file_placeholder, "Ruta del archivo CSV");
+        assert_eq!(es.import_start_label, "Iniciar importacion");
+        assert_eq!(es.import_cancel_label, "Cancelar");
+        assert_eq!(es.import_progress_title, "Progreso de importacion");
+        assert_eq!(es.import_matched_label, "Coincidencias");
+        assert_eq!(es.import_review_label, "Requieren revision");
+        assert_eq!(es.import_unresolved_label, "Sin resolver");
+        assert_eq!(
+            es.import_cap_hint,
+            "Las importaciones por enlace se limitan a 100 canciones. Exporta un CSV para playlists mas largas."
+        );
+        assert_eq!(es.import_close_label, "Cerrar");
 
         let en = StaticLabels::resolve(Locale::English);
         assert_eq!(en.nav_search, "Search");
@@ -394,5 +456,22 @@ mod tests {
         assert_eq!(en.player_bar_skip, "Show skip 10s buttons");
         assert_eq!(en.player_bar_queue, "Show queue button");
         assert_eq!(en.player_bar_volume, "Show volume slider");
+        assert_eq!(en.import_title_label, "Import from Spotify");
+        assert_eq!(en.import_button_label, "Import");
+        assert_eq!(en.import_tab_link_label, "From link");
+        assert_eq!(en.import_tab_file_label, "From file");
+        assert_eq!(en.import_link_placeholder, "Spotify playlist or album link");
+        assert_eq!(en.import_file_placeholder, "CSV file path");
+        assert_eq!(en.import_start_label, "Start import");
+        assert_eq!(en.import_cancel_label, "Cancel");
+        assert_eq!(en.import_progress_title, "Import progress");
+        assert_eq!(en.import_matched_label, "Matched");
+        assert_eq!(en.import_review_label, "Needs review");
+        assert_eq!(en.import_unresolved_label, "Unresolved");
+        assert_eq!(
+            en.import_cap_hint,
+            "Embed imports are capped at 100 tracks. Export a CSV for longer playlists."
+        );
+        assert_eq!(en.import_close_label, "Close");
     }
 }
