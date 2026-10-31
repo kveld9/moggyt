@@ -230,26 +230,6 @@ impl StaticLabels {
         labels.set_player_bar_queue_label(self.player_bar_queue.into());
         labels.set_player_bar_volume_label(self.player_bar_volume.into());
 
-        window.set_nav_search_label(self.nav_search.into());
-        window.set_nav_explore_label(self.nav_explore.into());
-        window.set_nav_library_label(self.nav_library.into());
-        window.set_nav_now_playing_label(self.nav_now_playing.into());
-
-        window.set_search_placeholder(self.search_placeholder.into());
-        window.set_search_button_label(self.search_button.into());
-        window.set_filter_all_label(self.filter_all.into());
-        window.set_filter_songs_label(self.filter_songs.into());
-        window.set_filter_albums_label(self.filter_albums.into());
-        window.set_filter_artists_label(self.filter_artists.into());
-        window.set_filter_playlists_label(self.filter_playlists.into());
-        window.set_search_empty_text(self.search_empty.into());
-        window.set_recent_title_label(self.recent_searches_title.into());
-        window.set_recent_empty_label(self.recent_searches_empty.into());
-        window.set_clear_history_label(self.clear_history.into());
-
-        window.set_queue_title_label(self.queue_title.into());
-        window.set_queue_empty_text(self.queue_empty.into());
-
         window.set_no_cover_text(self.no_cover.into());
         window.set_lyrics_unavailable_text(self.lyrics_unavailable.into());
         window.set_lyrics_hint_text(self.lyrics_hint.into());
@@ -290,8 +270,6 @@ impl StaticLabels {
         window.set_section_about_label(self.section_about.into());
         window.set_app_version_label(self.app_version.into());
         window.set_update_status_label(self.update_status.into());
-        window.set_explore_loading_text(self.explore_loading.into());
-        window.set_explore_empty_text(self.explore_empty.into());
         window.set_section_player_bar_label(self.section_player_bar.into());
         window.set_player_bar_classic_label(self.player_bar_classic.into());
         window.set_player_bar_floating_label(self.player_bar_floating.into());

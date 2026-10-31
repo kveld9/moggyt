@@ -34,9 +34,6 @@ export component MoggytWindow inherits Window {
     in-out property <bool> queue-panel-open: false;
     in-out property <int> active-page: 0;
     in-out property <string> header-title: "Search";
-    in-out property <string> nav-explore-label: "Explore";
-    in-out property <string> explore-loading-text: "Loading explore...";
-    in-out property <string> explore-empty-text: "No sections found in Explore.";
     in-out property <bool> show-settings: false;
     in-out property <int> active-theme-index: 0;
     in-out property <string> playback-speed-text: "1.00x";
@@ -76,25 +73,9 @@ export component MoggytWindow inherits Window {
     in-out property <image> detail-cover;
     in-out property <[ExploreShelfData]> explore-shelves: [];
     in-out property <bool> explore-loading: false;
-    in-out property <string> nav-search-label: "Search";
-    in-out property <string> nav-library-label: "Library";
-    in-out property <string> nav-now-playing-label: "Now Playing";
-    in-out property <string> search-placeholder: "Search songs...";
-    in-out property <string> search-button-label: "Search";
-    in-out property <string> filter-all-label: "All";
-    in-out property <string> filter-songs-label: "Songs";
-    in-out property <string> filter-albums-label: "Albums";
-    in-out property <string> filter-artists-label: "Artists";
-    in-out property <string> filter-playlists-label: "Playlists";
-    in-out property <string> search-empty-text: "No results found.";
     in-out property <[string]> recent-searches: [];
     in-out property <bool> search-active: false;
-    in-out property <string> recent-title-label: "Recent searches";
-    in-out property <string> recent-empty-label: "No recent searches.";
-    in-out property <string> clear-history-label: "Clear history";
-    in-out property <string> queue-title-label: "Queue";
     in-out property <string> queue-button-text: "Queue";
-    in-out property <string> queue-empty-text: "The queue is empty.";
     in-out property <string> no-cover-text: "No cover";
     in-out property <string> lyrics-unavailable-text: "Lyrics unavailable";
     in-out property <string> lyrics-hint-text: "Synchronized lyrics will appear during playback";
@@ -192,10 +173,6 @@ export component MoggytWindow inherits Window {
             Sidebar {
                 width: 200px;
                 active-page: root.active-page;
-                nav-search-label: root.nav-search-label;
-                nav-explore-label: root.nav-explore-label;
-                nav-library-label: root.nav-library-label;
-                nav-now-playing-label: root.nav-now-playing-label;
                 page-selected(idx) => { root.page-selected(idx); }
             }
 
@@ -213,27 +190,14 @@ export component MoggytWindow inherits Window {
                 detail-kind-label: root.detail-kind-label; detail-cover: root.detail-cover; detail-tracks: root.detail-tracks;
                 explore-shelves: root.explore-shelves;
                 explore-loading: root.explore-loading;
-                explore-loading-text: root.explore-loading-text;
-                explore-empty-text: root.explore-empty-text;
                 has-update: root.has-update;
                 active-theme-index: root.active-theme-index;
                 playback-speed-text: root.playback-speed-text;
                 settings-cookie-text <=> root.settings-cookie-text;
                 app-version: root.app-version;
                 update-status-text: root.update-status-text;
-                search-placeholder: root.search-placeholder;
-                search-button-label: root.search-button-label;
-                filter-all-label: root.filter-all-label;
-                filter-songs-label: root.filter-songs-label;
-                filter-albums-label: root.filter-albums-label;
-                filter-artists-label: root.filter-artists-label;
-                filter-playlists-label: root.filter-playlists-label;
-                search-empty-text: root.search-empty-text;
                 recent-searches: root.recent-searches;
                 search-active: root.search-active;
-                recent-title-label: root.recent-title-label;
-                recent-empty-label: root.recent-empty-label;
-                clear-history-label: root.clear-history-label;
                 no-cover-text: root.no-cover-text;
                 lyrics-unavailable-text: root.lyrics-unavailable-text;
                 lyrics-hint-text: root.lyrics-hint-text;
@@ -314,8 +278,6 @@ export component MoggytWindow inherits Window {
                     height: parent.height;
                     tracks: root.queue-tracks;
                     selected-index: root.queue-selected-index;
-                    empty-text: root.queue-empty-text;
-                    title-label: root.queue-title-label;
                     track-selected(idx) => { root.queue-track-selected(idx); }
                     close-panel => { root.close-queue-panel(); }
                 }
