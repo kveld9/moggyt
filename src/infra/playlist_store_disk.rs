@@ -14,6 +14,9 @@ use crate::domain::{LocalPlaylist, is_local_playlist_id};
 /// File name used inside the config directory.
 pub const PLAYLISTS_FILE: &str = "playlists.json";
 
+/// Backup file name used when renaming a corrupt playlist file.
+pub const PLAYLISTS_CORRUPT_BACKUP_FILE: &str = "playlists.json.corrupt";
+
 /// On-disk schema version.
 pub const PLAYLISTS_SCHEMA_VERSION: u32 = 1;
 
@@ -41,13 +44,62 @@ impl DiskPlaylistStore {
         self.config_dir.join(PLAYLISTS_FILE)
     }
 
+    fn corrupt_backup_path(&self) -> PathBuf {
+        self.config_dir.join(PLAYLISTS_CORRUPT_BACKUP_FILE)
+    }
+
     /// Loads all playlists from disk. Returns an empty list if absent, unreadable, or corrupt.
     pub fn load_all(&self) -> Vec<LocalPlaylist> {
         let path = self.file_path();
-        let Ok(bytes) = read_file_bytes(&path) else {
-            return Vec::new();
+        let bytes = match read_file_optional(&path) {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => return Vec::new(),
+            Err(err) => {
+                log_read_error(&path, &err);
+                return Vec::new();
+            }
         };
         parse_playlist_bytes(&bytes, &path)
+    }
+
+    fn load_for_write(&self) -> anyhow::Result<Vec<LocalPlaylist>> {
+        let path = self.file_path();
+        let Some(bytes) = read_file_optional(&path)
+            .with_context(|| format!("failed to read playlist file at {}", path.display()))?
+        else {
+            return Ok(Vec::new());
+        };
+        self.parse_for_write(&bytes, &path)
+    }
+
+    fn parse_for_write(&self, bytes: &[u8], path: &Path) -> anyhow::Result<Vec<LocalPlaylist>> {
+        match parse_envelope(bytes) {
+            ParsedEnvelope::Valid(playlists) => Ok(playlists),
+            ParsedEnvelope::UnsupportedVersion(version) => {
+                anyhow::bail!(
+                    "unsupported playlist schema version {version} in {}",
+                    path.display()
+                );
+            }
+            ParsedEnvelope::Corrupt(err) => {
+                log_parse_error(path, &err);
+                self.backup_corrupt_file(path)?;
+                Ok(Vec::new())
+            }
+        }
+    }
+
+    fn backup_corrupt_file(&self, path: &Path) -> anyhow::Result<()> {
+        let backup_path = self.corrupt_backup_path();
+        std::fs::rename(path, &backup_path).with_context(|| {
+            format!(
+                "failed to rename corrupt playlist file from {} to {}",
+                path.display(),
+                backup_path.display()
+            )
+        })?;
+        log_corrupt_backup(path, &backup_path);
+        Ok(())
     }
 
     fn temp_file_path(&self) -> PathBuf {
@@ -95,36 +147,53 @@ fn log_version_error(path: &Path, version: u32) {
     tracing::warn!("unsupported playlist schema version {version} in {}", path.display());
 }
 
-fn read_file_bytes(path: &Path) -> Result<Vec<u8>, ()> {
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+fn log_corrupt_backup(path: &Path, backup_path: &Path) {
+    tracing::warn!(
+        "corrupt playlist file at {} backed up to {}",
+        path.display(),
+        backup_path.display()
+    );
+}
+
+enum ParsedEnvelope {
+    Valid(Vec<LocalPlaylist>),
+    Corrupt(serde_json::Error),
+    UnsupportedVersion(u32),
+}
+
+fn read_file_optional(path: &Path) -> std::io::Result<Option<Vec<u8>>> {
     match std::fs::read(path) {
-        Ok(bytes) => Ok(bytes),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(()),
-        Err(err) => {
-            log_read_error(path, &err);
-            Err(())
-        }
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(err) => Err(err),
     }
 }
 
-fn parse_envelope(bytes: &[u8], path: &Path) -> Result<PlaylistFile, ()> {
-    match serde_json::from_slice::<PlaylistFile>(bytes) {
-        Ok(envelope) => Ok(envelope),
-        Err(err) => {
-            log_parse_error(path, &err);
-            Err(())
-        }
+fn parse_envelope(bytes: &[u8]) -> ParsedEnvelope {
+    let envelope = match serde_json::from_slice::<PlaylistFile>(bytes) {
+        Ok(envelope) => envelope,
+        Err(err) => return ParsedEnvelope::Corrupt(err),
+    };
+    if envelope.version > PLAYLISTS_SCHEMA_VERSION {
+        return ParsedEnvelope::UnsupportedVersion(envelope.version);
     }
+    ParsedEnvelope::Valid(envelope.playlists)
 }
 
 fn parse_playlist_bytes(bytes: &[u8], path: &Path) -> Vec<LocalPlaylist> {
-    let Ok(envelope) = parse_envelope(bytes, path) else {
-        return Vec::new();
-    };
-    if envelope.version > PLAYLISTS_SCHEMA_VERSION {
-        log_version_error(path, envelope.version);
-        return Vec::new();
+    match parse_envelope(bytes) {
+        ParsedEnvelope::Valid(playlists) => playlists,
+        ParsedEnvelope::UnsupportedVersion(version) => {
+            log_version_error(path, version);
+            Vec::new()
+        }
+        ParsedEnvelope::Corrupt(err) => {
+            log_parse_error(path, &err);
+            Vec::new()
+        }
     }
-    envelope.playlists
 }
 
 fn upsert_playlist(playlists: &mut Vec<LocalPlaylist>, playlist: &LocalPlaylist) {
@@ -150,13 +219,13 @@ impl PlaylistStore for DiskPlaylistStore {
         if !is_local_playlist_id(&playlist.id) {
             anyhow::bail!("invalid local playlist id '{}'", playlist.id);
         }
-        let mut playlists = self.load_all();
+        let mut playlists = self.load_for_write()?;
         upsert_playlist(&mut playlists, playlist);
         self.persist_playlists(&playlists)
     }
 
     fn delete(&self, id: &str) -> anyhow::Result<()> {
-        let mut playlists = self.load_all();
+        let mut playlists = self.load_for_write()?;
         let initial_len = playlists.len();
         playlists.retain(|p| p.id != id);
         if playlists.len() == initial_len {
@@ -369,5 +438,136 @@ mod tests {
         let list = store.list();
         let ids: Vec<&str> = list.iter().map(|p| p.id.as_str()).collect();
         assert_eq!(ids, vec!["local:1", "local:2", "local:0", "local:3"]);
+    }
+
+    #[test]
+    fn test_corrupt_backup_file_constant_starts_with_playlists_file() {
+        assert!(PLAYLISTS_CORRUPT_BACKUP_FILE.starts_with(PLAYLISTS_FILE));
+        assert_eq!(PLAYLISTS_CORRUPT_BACKUP_FILE, "playlists.json.corrupt");
+    }
+
+    #[test]
+    fn test_disk_store_save_backs_up_corrupt_file_and_saves_new_playlist() {
+        let temp = TempDir::new("playlist-corrupt-save");
+        std::fs::create_dir_all(temp.path()).unwrap();
+        let store = DiskPlaylistStore::new(temp.path());
+
+        let corrupt_payload = "{not json";
+        std::fs::write(store.file_path(), corrupt_payload).unwrap();
+
+        let new_playlist = LocalPlaylist::new("local:new", "New Playlist");
+        store.save(&new_playlist).expect("save succeeds on corrupt file by backing it up");
+
+        let backup_path = temp.path().join(PLAYLISTS_CORRUPT_BACKUP_FILE);
+        assert!(backup_path.exists(), "corrupt backup file must exist");
+        let backup_content = std::fs::read_to_string(&backup_path).unwrap();
+        assert_eq!(backup_content, corrupt_payload);
+
+        let list = store.list();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].id, "local:new");
+        assert_eq!(list[0].title, "New Playlist");
+    }
+
+    #[test]
+    fn test_disk_store_save_fails_on_future_schema_version_and_preserves_file() {
+        let temp = TempDir::new("playlist-future-save");
+        std::fs::create_dir_all(temp.path()).unwrap();
+        let store = DiskPlaylistStore::new(temp.path());
+
+        let future_version = PLAYLISTS_SCHEMA_VERSION + 1;
+        let future_payload = format!(
+            r#"{{"version": {future_version}, "playlists": [{{"id": "local:existing", "title": "Existing", "tracks": []}}]}}"#
+        );
+        std::fs::write(store.file_path(), &future_payload).unwrap();
+        let bytes_before = std::fs::read(store.file_path()).unwrap();
+
+        let new_playlist = LocalPlaylist::new("local:new", "New Playlist");
+        let result = store.save(&new_playlist);
+        assert!(result.is_err(), "save must fail on future schema version");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("unsupported playlist schema version"),
+            "expected unsupported version error, got: {err_msg}"
+        );
+
+        let bytes_after = std::fs::read(store.file_path()).unwrap();
+        assert_eq!(bytes_before, bytes_after, "file bytes must be byte-identical to before");
+    }
+
+    #[test]
+    fn test_disk_store_delete_fails_on_future_schema_version_and_preserves_file() {
+        let temp = TempDir::new("playlist-future-delete");
+        std::fs::create_dir_all(temp.path()).unwrap();
+        let store = DiskPlaylistStore::new(temp.path());
+
+        let future_version = PLAYLISTS_SCHEMA_VERSION + 1;
+        let future_payload = format!(
+            r#"{{"version": {future_version}, "playlists": [{{"id": "local:x", "title": "X", "tracks": []}}]}}"#
+        );
+        std::fs::write(store.file_path(), &future_payload).unwrap();
+        let bytes_before = std::fs::read(store.file_path()).unwrap();
+
+        let result = store.delete("local:x");
+        assert!(result.is_err(), "delete must fail on future schema version");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("unsupported playlist schema version"),
+            "expected unsupported version error, got: {err_msg}"
+        );
+
+        let bytes_after = std::fs::read(store.file_path()).unwrap();
+        assert_eq!(bytes_before, bytes_after, "file bytes must be byte-identical to before");
+    }
+
+    #[test]
+    fn test_disk_store_save_replaces_existing_corrupt_backup_file() {
+        let temp = TempDir::new("playlist-corrupt-replace");
+        std::fs::create_dir_all(temp.path()).unwrap();
+        let store = DiskPlaylistStore::new(temp.path());
+
+        let backup_path = temp.path().join(PLAYLISTS_CORRUPT_BACKUP_FILE);
+        std::fs::write(&backup_path, "previous corrupt content").unwrap();
+
+        let corrupt_payload = "{latest corrupt payload";
+        std::fs::write(store.file_path(), corrupt_payload).unwrap();
+
+        let new_playlist = LocalPlaylist::new("local:new", "New Playlist");
+        store.save(&new_playlist).expect("save succeeds");
+
+        let backup_content = std::fs::read_to_string(&backup_path).unwrap();
+        assert_eq!(backup_content, corrupt_payload);
+    }
+
+    #[test]
+    fn test_disk_store_delete_backs_up_corrupt_file() {
+        let temp = TempDir::new("playlist-corrupt-delete");
+        std::fs::create_dir_all(temp.path()).unwrap();
+        let store = DiskPlaylistStore::new(temp.path());
+
+        let corrupt_payload = "{not json for delete";
+        std::fs::write(store.file_path(), corrupt_payload).unwrap();
+
+        store.delete("local:any").expect("delete handles corrupt file by backing it up");
+
+        let backup_path = temp.path().join(PLAYLISTS_CORRUPT_BACKUP_FILE);
+        assert!(backup_path.exists(), "corrupt backup file must exist after delete");
+        assert_eq!(std::fs::read_to_string(&backup_path).unwrap(), corrupt_payload);
+    }
+
+    #[test]
+    fn test_disk_store_save_fails_on_read_error_other_than_not_found() {
+        let temp = TempDir::new("playlist-read-err");
+        std::fs::create_dir_all(temp.path()).unwrap();
+        let store = DiskPlaylistStore::new(temp.path());
+
+        // A directory at playlists.json causes std::fs::read to fail with an I/O error (EISDIR).
+        std::fs::create_dir(store.file_path()).unwrap();
+
+        let new_playlist = LocalPlaylist::new("local:new", "New Playlist");
+        let result = store.save(&new_playlist);
+        assert!(result.is_err(), "save must fail if file cannot be read");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains(PLAYLISTS_FILE), "error should contain file path: {err_msg}");
     }
 }
