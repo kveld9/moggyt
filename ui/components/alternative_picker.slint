@@ -113,6 +113,16 @@ export component AlternativePicker inherits Rectangle {
                                     vertical-alignment: center;
                                 }
                             }
+
+                            Text {
+                                text: alt.detail;
+                                color: alt.index == root.selected
+                                    ? (alt-touch.has-hover ? Theme.text : Theme.window)
+                                    : Theme.secondary;
+                                font-size: 11px;
+                                horizontal-alignment: right;
+                                vertical-alignment: center;
+                            }
                         }
                     }
                 }

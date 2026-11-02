@@ -45,9 +45,19 @@ pub fn best_candidate<'a>(
         .max_by(|(s1, _), (s2, _)| s1.partial_cmp(s2).unwrap_or(std::cmp::Ordering::Equal))
 }
 
+/// Builds a [`LocalTrack`] candidate hit using YouTube Music metadata.
+///
+/// Uses candidate title and channel as track title and artist so the saved playlist
+/// stores the actual YouTube Music metadata. Preserves the Spotify source album
+/// and falls back to source duration when candidate duration is missing.
 fn build_local_track(source: &SpotifyTrack, hit: &CandidateHit, score: f32) -> LocalTrack {
     let confidence = MatchConfidence::from_score(score);
-    let mut local = LocalTrack::new(&hit.video_id, &source.title, &source.artist, confidence);
+    let mut local = LocalTrack::new(
+        &hit.video_id,
+        &hit.match_candidate.title,
+        &hit.match_candidate.channel,
+        confidence,
+    );
     local.album = source.album.clone();
     local.duration_secs = hit
         .match_candidate
@@ -59,7 +69,8 @@ fn build_local_track(source: &SpotifyTrack, hit: &CandidateHit, score: f32) -> L
 /// Returns up to [`MAX_ALTERNATIVES`] candidate matches sorted descending by score.
 ///
 /// Filters out candidates below [`MIN_ACCEPT_SCORE`], deduplicates by `video_id`
-/// retaining the highest-scoring occurrence, and converts each to a [`LocalTrack`].
+/// retaining the highest-scoring occurrence, and converts each to a [`LocalTrack`]
+/// carrying YouTube Music candidate title and channel metadata.
 pub fn ranked_alternatives(source: &SpotifyTrack, hits: &[CandidateHit]) -> Vec<LocalTrack> {
     let mut scored: Vec<(f32, &CandidateHit)> = hits
         .iter()
@@ -223,8 +234,45 @@ mod tests {
         assert_eq!(alts.len(), 2);
         assert_eq!(alts[0].title, "Heroes");
         assert_eq!(alts[0].artist, "David Bowie");
+        assert_eq!(alts[1].artist, "David Bowie - Topic");
         assert_eq!(alts[0].album.as_deref(), Some("Heroes Album"));
         assert_eq!(alts[0].duration_secs, Some(181));
         assert_eq!(alts[1].duration_secs, Some(180));
+    }
+
+    #[test]
+    fn test_ranked_alternatives_uses_candidate_metadata_not_source() {
+        let mut t = test_track("Heroes", "David Bowie");
+        t.album = Some("Heroes Album".into());
+        let pool = [test_hit(
+            "v1",
+            "Heroes (2017 Remaster)",
+            "David Bowie - Topic",
+            Some(181),
+            MusicVideoType::Atv,
+        )];
+        let alts = ranked_alternatives(&t, &pool);
+        assert_eq!(alts.len(), 1);
+        assert_eq!(alts[0].title, "Heroes (2017 Remaster)");
+        assert_eq!(alts[0].artist, "David Bowie - Topic");
+        assert_ne!(alts[0].title, t.title);
+        assert_ne!(alts[0].artist, t.artist);
+        assert_eq!(alts[0].album.as_deref(), Some("Heroes Album"));
+    }
+
+    #[test]
+    fn test_build_local_track_uses_candidate_title_and_channel() {
+        let mut t = test_track("Spotify Title", "Spotify Artist");
+        t.album = Some("Spotify Album".into());
+        t.duration_ms = 180_000;
+        let hit =
+            test_hit("yt123", "YouTube Title", "YouTube Channel", Some(182), MusicVideoType::Atv);
+        let track = build_local_track(&t, &hit, 0.95);
+        assert_eq!(track.video_id, "yt123");
+        assert_eq!(track.title, "YouTube Title");
+        assert_eq!(track.artist, "YouTube Channel");
+        assert_eq!(track.album.as_deref(), Some("Spotify Album"));
+        assert_eq!(track.duration_secs, Some(182));
+        assert_eq!(track.confidence, MatchConfidence::High);
     }
 }
