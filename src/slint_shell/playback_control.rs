@@ -9,7 +9,7 @@ use std::time::Instant;
 use slint::{ModelRc, VecModel};
 
 use crate::i18n::tr;
-use crate::infra::{AudioBackend, Catalog, Presence, should_scrobble};
+use crate::infra::{AudioBackend, AudioQuality, Catalog, Presence, should_scrobble};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::current_unix_secs;
 use crate::slint_shell::platform::rgba_to_image;
@@ -112,6 +112,16 @@ impl SlintAppState {
         }
         let mut settings = self.settings_store.load();
         settings.volume = volume;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Updates audio quality preference and persists preference to disk.
+    pub fn set_audio_quality(&mut self, quality: AudioQuality) {
+        if let Ok(mut a) = self.audio.lock() {
+            a.set_quality(quality);
+        }
+        let mut settings = self.settings_store.load();
+        settings.quality = quality;
         let _ = self.settings_store.save(&settings);
     }
 
@@ -466,5 +476,16 @@ mod tests {
         let next2 = state.cycle_playback_speed();
         assert_eq!(next2, 1.5);
         assert_eq!(state.audio.lock().unwrap().speed(), 1.5);
+    }
+
+    #[test]
+    fn test_set_audio_quality_in_state() {
+        let mut state = test_wired();
+        assert_eq!(state.audio.lock().unwrap().quality(), AudioQuality::Standard);
+        assert_eq!(state.settings_store.load().quality, AudioQuality::Standard);
+
+        state.set_audio_quality(AudioQuality::High);
+        assert_eq!(state.audio.lock().unwrap().quality(), AudioQuality::High);
+        assert_eq!(state.settings_store.load().quality, AudioQuality::High);
     }
 }

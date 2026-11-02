@@ -13,8 +13,8 @@ use crate::slint_shell::covers::resolve_row_cover_image;
 use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::explore::explore_card_shelves;
 use crate::slint_shell::format::{
-    format_playback_speed, format_queue_label, format_sleep_timer_status, format_update_status,
-    timer_preset_to_index,
+    audio_quality_to_index, format_playback_speed, format_queue_label, format_sleep_timer_status,
+    format_update_status, timer_preset_to_index,
 };
 use crate::slint_shell::labels::sync_static_labels;
 use crate::slint_shell::playback::{
@@ -39,6 +39,8 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_volume(volume as i32);
     let speed = state.audio.try_lock().map(|a| a.speed()).unwrap_or(1.0);
     window.set_playback_speed_text(format_playback_speed(speed).into());
+    let quality = state.audio.try_lock().map(|a| a.quality()).unwrap_or_default();
+    window.set_active_audio_quality_index(audio_quality_to_index(quality));
     window.set_signed_in(state.signed_in);
     window.set_app_version(GithubUpdater::current_version().into());
     sync_update_status(window, state);

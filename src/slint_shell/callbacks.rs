@@ -14,7 +14,10 @@ use crate::slint_shell::explore::{
     explore_columns_for_width, explore_item_at, load_explore_async,
     refresh_explore_covers_if_loaded,
 };
-use crate::slint_shell::format::{format_playback_speed, timer_preset_from_index};
+use crate::slint_shell::format::{
+    audio_quality_from_index, audio_quality_to_index, format_playback_speed,
+    timer_preset_from_index,
+};
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
     cycle_repeat_mode, format_position, progress_fraction, repeat_mode_to_int, should_seek,
@@ -475,6 +478,12 @@ fn wire_playback_callbacks(
     window.on_cycle_playback_speed(move || {
         with_window_state(&w, &s, handle_cycle_playback_speed);
     });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_audio_quality_selected(move |idx| {
+        with_window_state(&w, &s, |win, st| handle_audio_quality_selected(win, st, idx));
+    });
 }
 
 fn handle_prev_track(
@@ -533,6 +542,12 @@ fn handle_cycle_repeat(win: &MoggytWindow, st: &mut SlintAppState) {
 fn handle_cycle_playback_speed(win: &MoggytWindow, st: &mut SlintAppState) {
     let speed = st.cycle_playback_speed();
     win.set_playback_speed_text(format_playback_speed(speed).into());
+}
+
+fn handle_audio_quality_selected(win: &MoggytWindow, st: &mut SlintAppState, idx: i32) {
+    let quality = audio_quality_from_index(idx);
+    st.set_audio_quality(quality);
+    win.set_active_audio_quality_index(audio_quality_to_index(quality));
 }
 
 /// Wires settings, account authentication, player bar preferences, and resize callbacks.

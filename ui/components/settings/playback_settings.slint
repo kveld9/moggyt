@@ -6,9 +6,11 @@ export component PlaybackSettings inherits VerticalLayout {
     in property <string> playback-speed-text: "1.00x";
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
+    in property <int> active-audio-quality-index: 1;
 
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
+    callback audio-quality-selected(int);
 
     spacing: 10px;
 
@@ -55,6 +57,55 @@ export component PlaybackSettings inherits VerticalLayout {
                         font-weight: 700;
                         horizontal-alignment: center;
                         vertical-alignment: center;
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+
+            VerticalLayout {
+                spacing: 12px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: Labels.audio-quality-label;
+                        color: Theme.text;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: Labels.audio-quality-hint-label;
+                        color: Theme.secondary;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    SettingsModeButton {
+                        label: Labels.audio-quality-low-label;
+                        is-active: root.active-audio-quality-index == 0;
+                        clicked => { root.audio-quality-selected(0); }
+                    }
+
+                    SettingsModeButton {
+                        label: Labels.audio-quality-standard-label;
+                        is-active: root.active-audio-quality-index == 1;
+                        clicked => { root.audio-quality-selected(1); }
+                    }
+
+                    SettingsModeButton {
+                        label: Labels.audio-quality-high-label;
+                        is-active: root.active-audio-quality-index == 2;
+                        clicked => { root.audio-quality-selected(2); }
                     }
                 }
             }

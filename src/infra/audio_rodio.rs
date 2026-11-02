@@ -144,11 +144,6 @@ impl RodioBackend {
         self.paused_accum.saturating_add(active)
     }
 
-    /// Returns the currently configured audio quality preference.
-    pub fn quality(&self) -> AudioQuality {
-        self.resolver.quality()
-    }
-
     /// Returns whether skip-silence processing is enabled.
     pub fn skip_silence(&self) -> bool {
         self.skip_silence
@@ -228,6 +223,10 @@ impl AudioBackend for RodioBackend {
 
     fn set_quality(&mut self, quality: AudioQuality) {
         self.resolver.set_quality(quality);
+    }
+
+    fn quality(&self) -> AudioQuality {
+        self.resolver.quality()
     }
 
     fn set_skip_silence(&mut self, on: bool) {
@@ -341,6 +340,13 @@ impl AudioBackend for LiveAudio {
         match self {
             Self::Live(backend) => backend.set_quality(quality),
             Self::Muted(stub) => stub.set_quality(quality),
+        }
+    }
+
+    fn quality(&self) -> AudioQuality {
+        match self {
+            Self::Live(backend) => backend.quality(),
+            Self::Muted(stub) => stub.quality(),
         }
     }
 
@@ -494,8 +500,11 @@ mod tests {
         audio.set_speed(f32::NAN);
         assert_eq!(audio.speed(), 1.0);
 
+        assert_eq!(audio.quality(), AudioQuality::Standard);
         audio.set_quality(AudioQuality::High);
+        assert_eq!(audio.quality(), AudioQuality::High);
         audio.set_quality(AudioQuality::Compact);
+        assert_eq!(audio.quality(), AudioQuality::Compact);
         audio.set_skip_silence(true);
         audio.set_loudness_normalization(true);
     }

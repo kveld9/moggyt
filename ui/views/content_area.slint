@@ -46,6 +46,7 @@ export component ContentArea inherits Rectangle {
     in property <string> playback-speed-text: "1.00x";
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
+    in property <int> active-audio-quality-index: 1;
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Up to date";
@@ -80,6 +81,7 @@ export component ContentArea inherits Rectangle {
     callback theme-selected(int);
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
+    callback audio-quality-selected(int);
     callback back-pressed();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
@@ -238,6 +240,7 @@ export component ContentArea inherits Rectangle {
                 has-update: root.has-update;
                 sleep-timer-status-text: root.sleep-timer-status-text;
                 active-sleep-timer-index: root.active-sleep-timer-index;
+                active-audio-quality-index: root.active-audio-quality-index;
                 player-bar-mode: root.player-bar-mode;
                 player-bar-show-artwork: root.player-bar-show-artwork;
                 player-bar-show-like: root.player-bar-show-like;
@@ -249,6 +252,7 @@ export component ContentArea inherits Rectangle {
                 theme-selected(idx) => { root.theme-selected(idx); }
                 cycle-playback-speed => { root.cycle-playback-speed(); }
                 sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
+                audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
                 sign-in-submitted(t) => { root.sign-in-submitted(t); }
                 sign-out => { root.sign-out(); }
                 player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }

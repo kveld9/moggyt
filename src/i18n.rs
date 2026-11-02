@@ -102,8 +102,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
         "Sesión anónima: pegar cookies para desbloquear la biblioteca",
     ),
     ("App version", "Versión de la app"),
+    ("Applies from the next track", "Se aplica desde la siguiente canción"),
     ("Artist", "ARTISTA"),
     ("Artists", "Artistas"),
+    ("Audio quality", "Calidad de audio"),
     ("Black OLED", "Negro OLED"),
     ("CSV file path", "Ruta del archivo CSV"),
     ("Cancel", "Cancelar"),
@@ -125,6 +127,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Floating", "Flotante"),
     ("From file", "Desde archivo"),
     ("From link", "Desde enlace"),
+    ("High", "Alta"),
     ("High confidence", "Confianza alta"),
     ("Import", "Importar"),
     ("Import cancelled", "Importacion cancelada"),
@@ -135,6 +138,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Library", "Biblioteca"),
     ("Loading...", "Cargando..."),
     ("Loading explore...", "Cargando exploracion..."),
+    ("Low", "Baja"),
     ("Low confidence", "Confianza baja"),
     ("Lyrics unavailable", "Letras no disponibles"),
     ("Matched", "Coincidencias"),
@@ -193,6 +197,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Spanish", "Español"),
     ("Spotify playlist or album link", "Enlace de playlist o album de Spotify"),
     ("Start import", "Iniciar importacion"),
+    ("Standard", "Estándar"),
     ("Status: Anonymous", "Estado: Anónimo"),
     ("Status: Signed in", "Estado: Sesión iniciada"),
     ("Swap", "Cambiar"),
@@ -361,6 +366,17 @@ mod tests {
             "Timer: End of track",
             "Timer: {time}",
         ];
+        for key in keys {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_audio_quality_i18n_strings_exist_and_differ() {
+        let keys = ["Audio quality", "Applies from the next track", "Low", "Standard", "High"];
         for key in keys {
             let en = tr(Locale::English, key);
             let es = tr(Locale::Spanish, key);

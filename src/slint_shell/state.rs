@@ -451,6 +451,9 @@ impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
     fn set_quality(&mut self, q: crate::infra::AudioQuality) {
         (**self).set_quality(q);
     }
+    fn quality(&self) -> crate::infra::AudioQuality {
+        (**self).quality()
+    }
     fn set_skip_silence(&mut self, on: bool) {
         (**self).set_skip_silence(on);
     }

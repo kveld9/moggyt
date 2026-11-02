@@ -104,9 +104,12 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Volume (`volume`)**:
   - Integer audio level between `0` and `100` (default `100`). Clamped to `0..=100` on load.
 - **Audio Quality (`quality`)**:
-  - `"compact"`: Low-bandwidth audio stream using yt-dlp selector `"bestaudio[abr<=64]/bestaudio/best"`.
-  - `"standard"`: Balanced audio stream using yt-dlp selector `"bestaudio/best"` (default).
-  - `"high"`: High-fidelity audio stream using yt-dlp selector `"bestaudio[abr>=192]/bestaudio/best"`.
+  - Selectable in Settings > Playback and applies from the next track.
+  - `"compact"`: Low-bandwidth audio stream using yt-dlp selector
+    `"bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best"`.
+  - `"standard"`: Balanced audio stream using yt-dlp selector `"bestaudio[ext=m4a]/bestaudio/best"` (default).
+  - `"high"`: High-fidelity audio stream using yt-dlp selector
+    `"bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best"`.
 - **Keyboard Shortcuts (`keyboard_shortcuts`)**:
   - `true`: Global transport and playback shortcuts enabled (default).
   - `false`: Shortcuts disabled.
