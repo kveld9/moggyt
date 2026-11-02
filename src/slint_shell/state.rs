@@ -7,7 +7,6 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 use crate::domain::{
     Album, Detail, DetailKind, Palette, PlaybackQueue, PlayerBarMode, Playlist, RecentSearches,
@@ -25,6 +24,7 @@ use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::platform::rgba_to_image;
+use crate::slint_shell::playback_control::StartedPlay;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
 
@@ -68,7 +68,7 @@ pub struct SlintAppState {
     pub cover_key: Option<String>,
     pub current_cover_image: Option<slint::Image>,
     pub last_presence_key: Option<(String, String)>,
-    pub started_at: Option<(Instant, u64)>,
+    pub started_at: Option<StartedPlay>,
     pub last_skip_target: Option<(String, u32)>,
     pub cached_skip_ranges: Option<(String, Option<SkipRanges>)>,
     pub sleep_timer: SleepTimer,
