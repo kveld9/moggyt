@@ -42,6 +42,7 @@ pub struct ImportSession {
     pub review: Option<ImportReview>,
     pub status: String,
     pub picker_row: Option<usize>,
+    load_generation: u64,
     cancel: Arc<AtomicBool>,
     receiver: Option<mpsc::Receiver<ImportProgressEvent>>,
     played_events: usize,
@@ -63,6 +64,7 @@ impl ImportSession {
             review: None,
             status: String::new(),
             picker_row: None,
+            load_generation: 0,
             cancel: Arc::new(AtomicBool::new(false)),
             receiver: None,
             played_events: 0,
@@ -70,8 +72,9 @@ impl ImportSession {
         }
     }
 
-    /// Transitions to `LoadingSource` and clears any previous review or cancel flag.
-    pub fn start_loading(&mut self) {
+    /// Transitions to `LoadingSource`, increments generation, and clears any previous review or cancel flag.
+    pub fn start_loading(&mut self) -> u64 {
+        self.load_generation = self.load_generation.wrapping_add(1);
         self.stage = ImportStage::LoadingSource;
         self.source = None;
         self.review = None;
@@ -81,6 +84,28 @@ impl ImportSession {
         self.receiver = None;
         self.played_events = 0;
         self.resolutions.clear();
+        self.load_generation
+    }
+
+    /// Returns `true` if loading source or matching is actively running.
+    pub fn is_busy(&self) -> bool {
+        matches!(self.stage, ImportStage::LoadingSource | ImportStage::Matching)
+    }
+
+    /// Returns `true` only when stage is `LoadingSource` and generation matches.
+    pub fn accepts_load_result(&self, generation: u64) -> bool {
+        matches!(self.stage, ImportStage::LoadingSource) && self.load_generation == generation
+    }
+
+    /// Resets the session to `Idle`, requests cancellation, and invalidates in-flight loaders.
+    pub fn reset_to_idle(&mut self) {
+        self.request_cancel();
+        self.stage = ImportStage::Idle;
+        self.review = None;
+        self.picker_row = None;
+        self.receiver = None;
+        self.status.clear();
+        self.load_generation = self.load_generation.wrapping_add(1);
     }
 
     /// Sets the session to `Failed` stage with the given message.
@@ -322,10 +347,71 @@ mod tests {
         session.request_cancel();
         assert!(session.cancel_flag().load(Ordering::Relaxed));
 
-        session.start_loading();
+        let generation = session.start_loading();
+        assert_eq!(generation, 1);
         assert_eq!(session.stage, ImportStage::LoadingSource);
         assert!(session.status.is_empty());
         assert!(!session.cancel_flag().load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_start_loading_increments_generation() {
+        let mut session = ImportSession::new();
+        assert_eq!(session.start_loading(), 1);
+        assert_eq!(session.start_loading(), 2);
+    }
+
+    #[test]
+    fn test_accepts_load_result_generation_and_stage_checks() {
+        let mut session = ImportSession::new();
+        let gen1 = session.start_loading();
+        assert!(session.accepts_load_result(gen1));
+        assert!(!session.accepts_load_result(gen1 + 1));
+
+        let gen2 = session.start_loading();
+        assert!(!session.accepts_load_result(gen1));
+        assert!(session.accepts_load_result(gen2));
+
+        session.reset_to_idle();
+        assert!(!session.accepts_load_result(gen2));
+    }
+
+    #[test]
+    fn test_is_busy_per_stage() {
+        let mut session = ImportSession::new();
+        assert_eq!(session.stage, ImportStage::Idle);
+        assert!(!session.is_busy());
+
+        session.start_loading();
+        assert_eq!(session.stage, ImportStage::LoadingSource);
+        assert!(session.is_busy());
+
+        let (_tx, rx) = mpsc::channel();
+        session.begin_matching(sample_spotify_playlist(), rx);
+        assert_eq!(session.stage, ImportStage::Matching);
+        assert!(session.is_busy());
+
+        session.fail("prior error");
+        assert_eq!(session.stage, ImportStage::Failed);
+        assert!(!session.is_busy());
+
+        session.stage = ImportStage::Review;
+        assert!(!session.is_busy());
+    }
+
+    #[test]
+    fn test_reset_to_idle_sets_cancel_flag_and_clears_state() {
+        let mut session = ImportSession::new();
+        session.start_loading();
+        session.status = "in progress".into();
+        session.picker_row = Some(1);
+        assert!(!session.cancel_flag().load(Ordering::Relaxed));
+
+        session.reset_to_idle();
+        assert_eq!(session.stage, ImportStage::Idle);
+        assert!(session.status.is_empty());
+        assert_eq!(session.picker_row, None);
+        assert!(session.cancel_flag().load(Ordering::Relaxed));
     }
 
     #[test]

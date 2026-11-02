@@ -49,9 +49,10 @@ fn sync_import_progress(
     stage: ImportStage,
     status: &str,
     counts: &ImportCounts,
+    locale: Locale,
 ) {
     window.set_import_running(matches!(stage, ImportStage::Matching));
-    window.set_import_status_text(status.into());
+    window.set_import_status_text(tr(locale, status).into());
     window.set_import_total(counts.total as i32);
     window.set_import_high(counts.high as i32);
     window.set_import_review((counts.review + counts.low) as i32);
@@ -116,7 +117,9 @@ pub fn sync_import(window: &MoggytWindow) {
         with_session(|s| (s.stage, s.status.clone(), s.counts(), s.picker_row, s.review.clone()));
     let locale =
         crate::slint_shell::window::with_ui_state(|st| st.locale).unwrap_or(Locale::English);
-    sync_import_progress(window, stage, &status, &counts);
+    window.set_import_busy(matches!(stage, ImportStage::LoadingSource | ImportStage::Matching));
+    window.set_import_failed(matches!(stage, ImportStage::Failed));
+    sync_import_progress(window, stage, &status, &counts, locale);
     sync_import_modal_visibility(window, stage);
     sync_import_review(window, stage, review_opt.as_ref(), &counts, locale);
     sync_import_picker(window, picker_row, review_opt.as_ref(), locale);
@@ -160,6 +163,7 @@ fn spawn_source_loader(
     tab: i32,
     link_text: String,
     file_path: String,
+    generation: u64,
 ) {
     std::thread::Builder::new()
         .name("spotify-source-loader".into())
@@ -168,6 +172,9 @@ fn spawn_source_loader(
                 if tab == 0 { load_source_link(&link_text) } else { load_source_file(&file_path) };
             let _ = slint::invoke_from_event_loop(move || {
                 let Some(win) = weak.upgrade() else { return };
+                if !with_session(|s| s.accepts_load_result(generation)) {
+                    return;
+                }
                 match res {
                     Ok(source) => on_source_load_success(&win, source),
                     Err(err) => {
@@ -217,11 +224,13 @@ fn handle_save_requested(window: &MoggytWindow) {
         sync_import(window);
         return;
     };
+    let locale =
+        crate::slint_shell::window::with_ui_state(|st| st.locale).unwrap_or(Locale::English);
     match with_session(|s| s.save(store.as_ref())) {
         Ok(saved) => {
             with_session(|s| {
                 s.stage = ImportStage::Idle;
-                s.status = format!("Saved '{}'", saved.title);
+                s.status = format!("{}: {}", tr(locale, "Saved playlist"), saved.title);
                 s.review = None;
                 s.picker_row = None;
             });
@@ -230,19 +239,16 @@ fn handle_save_requested(window: &MoggytWindow) {
             sync_import(window);
         }
         Err(err) => {
-            with_session(|s| s.status = format!("Failed to save: {err}"));
+            with_session(|s| {
+                s.status = format!("{}: {err}", tr(locale, "Failed to save playlist"))
+            });
             sync_import(window);
         }
     }
 }
 
 fn reset_session_to_idle(window: &MoggytWindow) {
-    with_session(|s| {
-        s.stage = ImportStage::Idle;
-        s.review = None;
-        s.picker_row = None;
-        s.status.clear();
-    });
+    with_session(|s| s.reset_to_idle());
     window.set_show_import_modal(false);
     sync_import(window);
 }
@@ -261,12 +267,15 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
     let w = window.as_weak();
     window.on_import_start_requested(move || {
         let Some(win) = w.upgrade() else { return };
+        if with_session(|s| s.is_busy()) {
+            return;
+        }
         let tab = win.get_import_tab();
         let link_text = win.get_import_link_text().to_string();
         let file_path = win.get_import_file_path().to_string();
-        with_session(|s| s.start_loading());
+        let generation = with_session(|s| s.start_loading());
         sync_import(&win);
-        spawn_source_loader(win.as_weak(), tab, link_text, file_path);
+        spawn_source_loader(win.as_weak(), tab, link_text, file_path, generation);
     });
 
     let w = window.as_weak();
@@ -375,7 +384,7 @@ mod tests {
         let _serial = lock_session_tests();
         reset_session();
         with_session(|s| {
-            s.start_loading();
+            assert_eq!(s.start_loading(), 1);
             assert_eq!(s.stage, ImportStage::LoadingSource);
         });
     }
@@ -395,12 +404,7 @@ mod tests {
             s.status = "error".into();
             s.picker_row = Some(2);
         });
-        with_session(|s| {
-            s.stage = ImportStage::Idle;
-            s.review = None;
-            s.picker_row = None;
-            s.status.clear();
-        });
+        with_session(|s| s.reset_to_idle());
         with_session(|s| {
             assert_eq!(s.stage, ImportStage::Idle);
             assert!(s.status.is_empty());
