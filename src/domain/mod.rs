@@ -3,6 +3,7 @@
 //! Invariant: this module performs no I/O. Network, filesystem, clocks, and
 //! randomness stay behind ports in `crate::infra` or parameters.
 
+mod artist_match;
 mod library;
 mod local_playlist;
 mod matching;
@@ -13,6 +14,9 @@ mod segments;
 mod sleep_timer;
 mod theme;
 
+pub use artist_match::{
+    TOPIC_CHANNEL_SUFFIX, artist_score, split_source_artists, strip_topic_suffix,
+};
 pub use library::{Album, Artist, Detail, DetailKind, Playlist, SearchResult, Shelf};
 pub use local_playlist::{
     HIGH_CONFIDENCE_THRESHOLD, LOCAL_PLAYLIST_PREFIX, LocalPlaylist, LocalTrack,
@@ -24,7 +28,7 @@ pub use matching::{
     DURATION_TOLERANCE_SECS, DURATION_VIDEO_PENALTY, DURATION_WRONG_EDIT_PENALTY,
     DURATION_WRONG_EDIT_SECS, MatchCandidate, MatchScore, MusicVideoType, PRISM_ATV_BONUS,
     PRISM_KEYWORD_PENALTY, PRISM_OMV_PENALTY, PRISM_TOPIC_BONUS, PRISM_UGC_PENALTY,
-    WEIGHT_ARTIST_PRIMARY, WEIGHT_ARTIST_SECONDARY, WEIGHT_TITLE, artist_score, clean_track_title,
+    WEIGHT_ARTIST_PRIMARY, WEIGHT_ARTIST_SECONDARY, WEIGHT_TITLE, clean_track_title,
     confidence_for, duration_score, levenshtein, normalize_for_match, prism_video_penalty,
     score_candidate, similarity, split_featured, title_similarity, token_set,
 };

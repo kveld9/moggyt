@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::artist_match::{TOPIC_CHANNEL_SUFFIX, artist_score};
 use super::local_playlist::{MatchConfidence, SpotifyTrack};
 
 /// Maximum score contribution for the title similarity factor.
@@ -458,46 +459,8 @@ pub fn duration_score(candidate_secs: Option<u32>, source_secs: Option<u32>) -> 
     score_duration_delta(delta)
 }
 
-fn strip_topic_suffix(channel: &str) -> String {
-    let trimmed = channel.trim();
-    if let Some(stripped) = trimmed.strip_suffix("- Topic") {
-        stripped.trim().to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
-
-fn is_primary_artist_match(source_artist: &str, channel_tokens: &[String]) -> bool {
-    let source_tokens = token_set(source_artist);
-    !source_tokens.is_empty() && source_tokens.iter().all(|t| channel_tokens.contains(t))
-}
-
-fn is_featured_artist_match(featured: Option<&str>, channel_tokens: &[String]) -> bool {
-    let Some(feat) = featured else {
-        return false;
-    };
-    let feat_tokens = token_set(feat);
-    !feat_tokens.is_empty() && feat_tokens.iter().any(|t| channel_tokens.contains(t))
-}
-
-/// Scores candidate channel against source artist and optional featured artist.
-pub fn artist_score(source_artist: &str, candidate_channel: &str, featured: Option<&str>) -> f32 {
-    let channel_clean = strip_topic_suffix(candidate_channel);
-    let channel_tokens = token_set(&channel_clean);
-    if channel_tokens.is_empty() {
-        return 0.0;
-    }
-    if is_primary_artist_match(source_artist, &channel_tokens) {
-        return WEIGHT_ARTIST_PRIMARY;
-    }
-    if is_featured_artist_match(featured, &channel_tokens) {
-        return WEIGHT_ARTIST_SECONDARY;
-    }
-    0.0
-}
-
 fn topic_channel_bonus(channel: &str) -> f32 {
-    if channel.trim().ends_with("- Topic") { PRISM_TOPIC_BONUS } else { 0.0 }
+    if channel.trim().ends_with(TOPIC_CHANNEL_SUFFIX) { PRISM_TOPIC_BONUS } else { 0.0 }
 }
 
 fn video_type_adjustment(video_type: MusicVideoType) -> f32 {
@@ -669,15 +632,16 @@ mod tests {
     }
 
     #[test]
-    fn artist_score_variations() {
-        assert_eq!(artist_score("Queen", "Queen", None), WEIGHT_ARTIST_PRIMARY);
-        assert_eq!(artist_score("Queen", "Queen - Topic", None), WEIGHT_ARTIST_PRIMARY);
-        assert_eq!(
-            artist_score("Simon & Garfunkel", "Simon & Garfunkel", None),
-            WEIGHT_ARTIST_PRIMARY
-        );
-        assert_eq!(artist_score("Future", "Drake", Some("Drake")), WEIGHT_ARTIST_SECONDARY);
-        assert_eq!(artist_score("Queen", "The Beatles", None), 0.0);
+    fn score_candidate_multi_artist_high_confidence() {
+        let source = SpotifyTrack {
+            title: "Talk To You".to_string(),
+            artist: "ANOTR, 54 Ultra".to_string(),
+            album: None,
+            duration_ms: 191_076,
+            isrc: None,
+        };
+        let candidate = MatchCandidate::new("Talk To You", "ANOTR", Some(191), MusicVideoType::Atv);
+        assert_eq!(confidence_for(&source, &candidate), MatchConfidence::High);
     }
 
     #[test]

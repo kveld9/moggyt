@@ -3,7 +3,9 @@
 //! Maps InnerTube song search results to domain candidate hits, scores candidates
 //! using multi-factor heuristics, and ranks alternatives for track review.
 
-use crate::domain::{LocalTrack, MatchCandidate, MatchConfidence, SpotifyTrack, score_candidate};
+use crate::domain::{
+    LocalTrack, MatchCandidate, MatchConfidence, SpotifyTrack, score_candidate, strip_topic_suffix,
+};
 use crate::i18n::Locale;
 use crate::infra::{SearchFailure, SongCandidate, SpotifySongSearch};
 
@@ -47,17 +49,13 @@ pub fn best_candidate<'a>(
 
 /// Builds a [`LocalTrack`] candidate hit using YouTube Music metadata.
 ///
-/// Uses candidate title and channel as track title and artist so the saved playlist
-/// stores the actual YouTube Music metadata. Preserves the Spotify source album
-/// and falls back to source duration when candidate duration is missing.
+/// Uses candidate title and channel (with topic suffix stripped) as track title and
+/// artist so the saved playlist stores clean metadata. Preserves the Spotify source
+/// album and falls back to source duration when candidate duration is missing.
 fn build_local_track(source: &SpotifyTrack, hit: &CandidateHit, score: f32) -> LocalTrack {
     let confidence = MatchConfidence::from_score(score);
-    let mut local = LocalTrack::new(
-        &hit.video_id,
-        &hit.match_candidate.title,
-        &hit.match_candidate.channel,
-        confidence,
-    );
+    let artist = strip_topic_suffix(&hit.match_candidate.channel);
+    let mut local = LocalTrack::new(&hit.video_id, &hit.match_candidate.title, artist, confidence);
     local.album = source.album.clone();
     local.duration_secs = hit
         .match_candidate
@@ -234,7 +232,7 @@ mod tests {
         assert_eq!(alts.len(), 2);
         assert_eq!(alts[0].title, "Heroes");
         assert_eq!(alts[0].artist, "David Bowie");
-        assert_eq!(alts[1].artist, "David Bowie - Topic");
+        assert_eq!(alts[1].artist, "David Bowie");
         assert_eq!(alts[0].album.as_deref(), Some("Heroes Album"));
         assert_eq!(alts[0].duration_secs, Some(181));
         assert_eq!(alts[1].duration_secs, Some(180));
@@ -254,9 +252,8 @@ mod tests {
         let alts = ranked_alternatives(&t, &pool);
         assert_eq!(alts.len(), 1);
         assert_eq!(alts[0].title, "Heroes (2017 Remaster)");
-        assert_eq!(alts[0].artist, "David Bowie - Topic");
+        assert_eq!(alts[0].artist, "David Bowie");
         assert_ne!(alts[0].title, t.title);
-        assert_ne!(alts[0].artist, t.artist);
         assert_eq!(alts[0].album.as_deref(), Some("Heroes Album"));
     }
 
@@ -274,5 +271,10 @@ mod tests {
         assert_eq!(track.album.as_deref(), Some("Spotify Album"));
         assert_eq!(track.duration_secs, Some(182));
         assert_eq!(track.confidence, MatchConfidence::High);
+
+        let topic_hit =
+            test_hit("yt124", "YouTube Title", "Queen - Topic", Some(182), MusicVideoType::Atv);
+        let topic_track = build_local_track(&t, &topic_hit, 0.95);
+        assert_eq!(topic_track.artist, "Queen");
     }
 }
