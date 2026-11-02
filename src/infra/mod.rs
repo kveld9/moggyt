@@ -24,6 +24,7 @@ mod catalog_stub;
 mod cover;
 mod cover_art;
 mod cover_disk;
+mod file_picker;
 mod handoff;
 mod instance;
 mod lyric_overrides;
@@ -69,6 +70,9 @@ pub use catalog_stub::CatalogStub;
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use cover_art::{COVER_HIRES_MAX_PX, COVER_MAX_PX, decode_cover, fetch_artwork};
 pub use cover_disk::{DiskCoverCache, cache_file_name, fnv1a_hex};
+pub use file_picker::{
+    FilePicker, IMPORT_FILE_EXTENSIONS, RfdFilePicker, is_supported_import_file,
+};
 pub use handoff::{
     CHECKSUM_HEX_LEN, HANDOFF_PREFIX, MAX_HANDOFF_COOKIES, decode_handoff, encode_handoff,
 };
@@ -103,7 +107,8 @@ pub use settings::{
 };
 pub use skip_store::{DiskSkipStore, MemorySkipStore, SkipStore};
 pub use spotify_csv::{
-    REQUIRED_CSV_COLUMNS, parse_backup_json, parse_csv_records, parse_exportify_csv,
+    REQUIRED_CSV_COLUMNS, load_playlist_file, parse_backup_json, parse_csv_records,
+    parse_exportify_csv,
 };
 pub use spotify_embed::{
     EMBED_BASE_URL, EMBED_MAX_TRACKS, EMBED_TIMEOUT_SECS, SpotifyEmbedClient, embed_url,

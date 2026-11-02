@@ -5,6 +5,8 @@
 //! Provenance: Test fixture `exportify_playlist.csv` is a real Exportify
 //! 19-column export taken on 2026-10-31, trimmed to three tracks.
 
+use std::path::Path;
+
 use anyhow::Context;
 use serde_json::Value;
 
@@ -251,6 +253,42 @@ pub fn parse_backup_json(input: &str) -> anyhow::Result<SpotifyPlaylist> {
     Ok(SpotifyPlaylist { id, title: title.to_owned(), author, artwork, tracks })
 }
 
+fn playlist_from_csv(content: &str, stem: &str) -> anyhow::Result<SpotifyPlaylist> {
+    let tracks = parse_exportify_csv(content)?;
+    Ok(SpotifyPlaylist {
+        id: stem.to_owned(),
+        title: stem.to_owned(),
+        author: String::new(),
+        artwork: None,
+        tracks,
+    })
+}
+
+fn playlist_from_json(content: &str, stem: &str) -> anyhow::Result<SpotifyPlaylist> {
+    let mut playlist = parse_backup_json(content)?;
+    if playlist.id.is_empty() {
+        playlist.id = stem.to_owned();
+    }
+    Ok(playlist)
+}
+
+/// Loads a Spotify playlist from a file, supporting Exportify CSV and Spotify JSON backups.
+pub fn load_playlist_file(path: &Path) -> anyhow::Result<SpotifyPlaylist> {
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read playlist file at {}", path.display()))?;
+    let stem = path
+        .file_stem()
+        .and_then(std::ffi::OsStr::to_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("import");
+    let is_json = path
+        .extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("json"));
+    if is_json { playlist_from_json(&content, stem) } else { playlist_from_csv(&content, stem) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -392,5 +430,90 @@ mod tests {
             parse_csv_records("\"one,two\",three").unwrap(),
             vec![vec!["one,two".to_string(), "three".to_string()]]
         );
+    }
+
+    use std::path::PathBuf;
+
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "moggyt-{name}-{}-{}",
+                std::process::id(),
+                fastrand()
+            ));
+            let _ = std::fs::remove_dir_all(&path);
+            let _ = std::fs::create_dir_all(&path);
+            Self(path)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn fastrand() -> u64 {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(0)
+    }
+
+    #[test]
+    fn test_load_playlist_file_csv() {
+        let temp = TempDir::new("load-csv");
+        let csv_path = temp.path().join("my_summer_mix.csv");
+        let csv = concat!(
+            "Track URI,Track Name,Artist Name(s),Album Name,Track Duration (ms)\n",
+            "sp:1,Song One,Artist One,Album One,180000\n"
+        );
+        std::fs::write(&csv_path, csv).unwrap();
+
+        let playlist = load_playlist_file(&csv_path).expect("loads CSV playlist");
+        assert_eq!(playlist.id, "my_summer_mix");
+        assert_eq!(playlist.title, "my_summer_mix");
+        assert_eq!(playlist.tracks.len(), 1);
+        assert_eq!(playlist.tracks[0].title, "Song One");
+    }
+
+    #[test]
+    fn test_load_playlist_file_json_with_id() {
+        let temp = TempDir::new("load-json-id");
+        let json_path = temp.path().join("backup_file.json");
+        let json = r#"{"id":"sp_custom_id","name":"Workout Hits","tracks":[{"name":"Track 1"}]}"#;
+        std::fs::write(&json_path, json).unwrap();
+
+        let playlist = load_playlist_file(&json_path).expect("loads JSON playlist");
+        assert_eq!(playlist.id, "sp_custom_id");
+        assert_eq!(playlist.title, "Workout Hits");
+        assert_eq!(playlist.tracks.len(), 1);
+    }
+
+    #[test]
+    fn test_load_playlist_file_json_empty_id() {
+        let temp = TempDir::new("load-json-empty-id");
+        let json_path = temp.path().join("evening_chill.json");
+        let json = r#"{"name":"Evening Chill","tracks":[{"name":"Track 1"}]}"#;
+        std::fs::write(&json_path, json).unwrap();
+
+        let playlist = load_playlist_file(&json_path).expect("loads JSON playlist with empty id");
+        assert_eq!(playlist.id, "evening_chill");
+        assert_eq!(playlist.title, "Evening Chill");
+        assert_eq!(playlist.tracks.len(), 1);
+    }
+
+    #[test]
+    fn test_load_playlist_file_missing_fails() {
+        let temp = TempDir::new("load-missing");
+        let missing_path = temp.path().join("does_not_exist.csv");
+        let result = load_playlist_file(&missing_path);
+        assert!(result.is_err());
+        let err_msg = format!("{:#}", result.unwrap_err());
+        assert!(err_msg.contains("failed to read playlist file at"));
     }
 }

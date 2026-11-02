@@ -102,7 +102,8 @@ The modal provides two tabs for supplying playlist metadata:
   - Legacy user URLs: `https://open.spotify.com/user/<user>/playlist/<id>`
   - Desktop URIs: `spotify:playlist:<id>` and `spotify:album:<id>`
   Spotify identifiers must be valid 22-character alphanumeric IDs.
-- **From file (`From file`)**: Specify the path to an exported playlist file:
+- **From file (`From file`)**: Specify the path to an exported playlist file. Clicking the `...` browse button opens a
+  native file dialog filtered to `.csv` and `.json` files, or you can type the file path directly into the input field:
   - **Exportify CSV**: 19-column CSV file exported from Exportify containing `Track Name`, `Artist Name(s)`,
     `Album Name`, `Track Duration (ms)`, and `Track URI` columns (`ISRC` is optional and, when present, is used as the
     first search query).
