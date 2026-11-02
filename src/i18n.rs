@@ -167,6 +167,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Playback speed", "Velocidad de reproducción"),
     ("Playlist", "LISTA"),
     ("Playlists", "Listas de reproducción"),
+    ("Prefer songs over music videos", "Preferir canciones a videoclips"),
     ("Queue", "Cola"),
     ("Queue ({count})", "Cola ({count})"),
     ("Recent searches", "Búsquedas recientes"),
@@ -308,6 +309,10 @@ mod tests {
         assert_eq!(tr(Locale::Spanish, "Show skip 10s buttons"), "Mostrar botones +/-10s");
         assert_eq!(tr(Locale::Spanish, "Show queue button"), "Mostrar botón de cola");
         assert_eq!(tr(Locale::Spanish, "Show volume slider"), "Mostrar control de volumen");
+        assert_eq!(
+            tr(Locale::Spanish, "Prefer songs over music videos"),
+            "Preferir canciones a videoclips"
+        );
     }
 
     #[test]

@@ -41,6 +41,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_playback_speed_text(format_playback_speed(speed).into());
     let quality = state.audio.try_lock().map(|a| a.quality()).unwrap_or_default();
     window.set_active_audio_quality_index(audio_quality_to_index(quality));
+    window.set_songs_only(state.songs_only);
     window.set_signed_in(state.signed_in);
     window.set_app_version(GithubUpdater::current_version().into());
     sync_update_status(window, state);

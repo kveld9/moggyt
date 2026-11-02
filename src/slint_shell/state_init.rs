@@ -83,6 +83,7 @@ impl SlintAppState {
             sleep_fade_base_volume: None,
             autoplay: false,
             hi_res_covers: false,
+            songs_only: false,
             signed_in,
             theme: ThemeId::default(),
             locale: Locale::default(),

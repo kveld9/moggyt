@@ -263,11 +263,15 @@ pub fn execute_search<C: Catalog>(
     query: &str,
     catalog: &Arc<Mutex<C>>,
     locale: Locale,
+    songs_only: bool,
 ) -> (u64, String, Vec<Shelf>) {
     let Some(parsed) = SearchQuery::parse(query) else {
         return (generation, query.to_string(), Vec::new());
     };
-    let items = catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
+    let mut items = catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
+    if songs_only {
+        items = crate::domain::retain_song_results(items);
+    }
     let mut shelf = Shelf::new(tr(locale, "Search Results"));
     shelf.items = items;
     (generation, query.to_string(), vec![shelf])
@@ -348,8 +352,9 @@ mod tests {
         let catalog = Arc::new(Mutex::new(CatalogStub::new()));
         let cat_clone = Arc::clone(&catalog);
 
-        let handle =
-            std::thread::spawn(move || execute_search(42, "rock", &cat_clone, Locale::English));
+        let handle = std::thread::spawn(move || {
+            execute_search(42, "rock", &cat_clone, Locale::English, false)
+        });
 
         let (generation, query, shelves) = handle.join().expect("thread join succeeds");
         assert_eq!(generation, 42);
@@ -357,10 +362,59 @@ mod tests {
         assert_eq!(shelves.len(), 1);
         assert_eq!(shelves[0].title, "Search Results");
 
-        let handle_es =
-            std::thread::spawn(move || execute_search(43, "rock", &catalog, Locale::Spanish));
+        let handle_es = std::thread::spawn(move || {
+            execute_search(43, "rock", &catalog, Locale::Spanish, false)
+        });
         let (_, _, shelves_es) = handle_es.join().expect("thread join succeeds");
         assert_eq!(shelves_es[0].title, "Resultados de búsqueda");
+    }
+
+    #[derive(Debug, Default)]
+    struct VideoTrackSearchCatalog;
+
+    impl Catalog for VideoTrackSearchCatalog {
+        fn search(&self, _: &str) -> Vec<crate::domain::Track> {
+            Vec::new()
+        }
+        fn search_filtered(&self, _: &SearchQuery) -> Vec<crate::domain::SearchResult> {
+            vec![
+                crate::domain::SearchResult::Track(
+                    crate::domain::Track::new("t1", "Video", "Artist")
+                        .with_video_type(crate::domain::MusicVideoType::Omv),
+                ),
+                crate::domain::SearchResult::Track(
+                    crate::domain::Track::new("t2", "Song", "Artist")
+                        .with_video_type(crate::domain::MusicVideoType::Atv),
+                ),
+            ]
+        }
+        fn radio(&self, _: &str) -> Vec<crate::domain::Track> {
+            Vec::new()
+        }
+        fn home_shelves(&self) -> Vec<Shelf> {
+            Vec::new()
+        }
+        fn playlists(&self) -> Vec<crate::domain::Playlist> {
+            Vec::new()
+        }
+        fn saved_albums(&self) -> Vec<crate::domain::Album> {
+            Vec::new()
+        }
+        fn detail(&self, _: &str, _: DetailKind) -> Option<Detail> {
+            None
+        }
+    }
+
+    #[test]
+    fn test_execute_search_with_songs_only_drops_video() {
+        let catalog = Arc::new(Mutex::new(VideoTrackSearchCatalog));
+        let (_, _, shelves) = execute_search(1, "query", &catalog, Locale::English, true);
+        assert_eq!(shelves.len(), 1);
+        assert_eq!(shelves[0].items.len(), 1);
+        match &shelves[0].items[0] {
+            crate::domain::SearchResult::Track(t) => assert_eq!(t.id, "t2"),
+            _ => panic!("expected track result"),
+        }
     }
 
     #[test]

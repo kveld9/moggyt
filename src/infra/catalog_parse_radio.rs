@@ -2,7 +2,7 @@
 
 use super::catalog_model::RawTrack;
 use super::catalog_parse_common::{
-    best_thumbnail, panel_artist, parse_duration_secs, watch_video_id,
+    best_thumbnail, music_video_type, panel_artist, parse_duration_secs, watch_video_id,
 };
 use serde_json::Value;
 
@@ -36,7 +36,8 @@ fn parse_radio_item(item: &Value) -> Option<RawTrack> {
     let artist = panel_artist(renderer);
     let duration_secs = panel_duration(renderer);
     let thumb_url = best_thumbnail(renderer);
-    Some(RawTrack { video_id, title, artist, duration_secs, thumb_url })
+    let video_type = music_video_type(renderer);
+    Some(RawTrack { video_id, title, artist, duration_secs, thumb_url, video_type })
 }
 
 fn playlist_panel_contents(value: &Value) -> Option<&[Value]> {
@@ -90,6 +91,7 @@ mod tests {
                 artist: "Radio Artist 1".to_owned(),
                 duration_secs: Some(210),
                 thumb_url: Some("https://lh3.googleusercontent.com/radio-thumb-1".to_owned()),
+                video_type: None,
             }
         );
         assert_eq!(
@@ -100,7 +102,36 @@ mod tests {
                 artist: "Radio Artist 2".to_owned(),
                 duration_secs: None,
                 thumb_url: None,
+                video_type: None,
             }
         );
+    }
+
+    #[test]
+    fn parse_radio_all_inline_payload_extracts_omv_video_type() {
+        let payload = serde_json::json!({
+            "playlistPanelRenderer": {
+                "contents": [{
+                    "playlistPanelVideoRenderer": {
+                        "videoId": "omv-1",
+                        "title": { "runs": [{ "text": "Video Title" }] },
+                        "shortBylineText": { "runs": [{ "text": "Artist" }] },
+                        "navigationEndpoint": {
+                            "watchEndpoint": {
+                                "watchEndpointMusicSupportedConfigs": {
+                                    "watchEndpointMusicConfig": {
+                                        "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }]
+            }
+        });
+        let tracks = parse_radio_all(&payload);
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].video_id, "omv-1");
+        assert_eq!(tracks[0].video_type, Some(crate::domain::MusicVideoType::Omv));
     }
 }

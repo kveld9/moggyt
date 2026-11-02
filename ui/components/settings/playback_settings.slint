@@ -1,16 +1,18 @@
 import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
-import { SettingsModeButton } from "../settings_rows.slint";
+import { SettingsModeButton, SettingsToggleRow } from "../settings_rows.slint";
 
 export component PlaybackSettings inherits VerticalLayout {
     in property <string> playback-speed-text: "1.00x";
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
     in property <int> active-audio-quality-index: 1;
+    in property <bool> songs-only: false;
 
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
+    callback songs-only-toggled();
 
     spacing: 10px;
 
@@ -176,6 +178,17 @@ export component PlaybackSettings inherits VerticalLayout {
                         clicked => { root.sleep-timer-preset-selected(5); }
                     }
                 }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+
+            SettingsToggleRow {
+                label: Labels.songs-only-label;
+                checked: root.songs-only;
+                toggled => { root.songs-only-toggled(); }
             }
         }
     }

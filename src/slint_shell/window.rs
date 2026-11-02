@@ -161,9 +161,10 @@ pub(crate) fn submit_search_async(
     let weak = window.as_weak();
     let tx = worker_tx.clone();
     let loc = state.locale;
+    let songs_only = state.songs_only;
 
     std::thread::spawn(move || {
-        let (g, q_res, shelves) = execute_search(generation, &q, &cat, loc);
+        let (g, q_res, shelves) = execute_search(generation, &q, &cat, loc, songs_only);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {

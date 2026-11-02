@@ -36,7 +36,7 @@ pub use playlist_import::{SpotifyRef, extract_playlist_id, parse_spotify_ref};
 pub use queue::{PlaybackQueue, RepeatMode};
 pub use search::{
     LyricsSnippet, LyricsSnippetError, MAX_LYRICS_SNIPPET_LEN, RECENT_SEARCH_LIMIT, RecentSearches,
-    SearchFilter, SearchQuery, Track,
+    SearchFilter, SearchQuery, Track, retain_song_results, retain_songs,
 };
 pub use segments::{InvalidSegment, SkipRanges, SkipSegment};
 pub use sleep_timer::{SLEEP_FADE_WINDOW_SECS, SleepTimer, TimerPreset, faded_volume};
