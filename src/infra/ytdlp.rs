@@ -5,6 +5,8 @@
 //! from [`super::stream`].
 
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, PoisonError};
+use std::time::Instant;
 
 use anyhow::Context;
 
@@ -12,6 +14,9 @@ use super::stream::{AudioQuality, StreamResolver, audio_quality_format};
 
 /// Update interval for checking yt-dlp release freshness (3 days in seconds).
 pub const YTDLP_UPDATE_INTERVAL_SECS: u64 = 3 * 24 * 60 * 60;
+
+/// Cooldown period in seconds between forced refresh attempts on resolution failures (1 hour).
+pub const YTDLP_REFRESH_COOLDOWN_SECS: u64 = 60 * 60;
 
 /// Default format selector for audio streams (alias for standard quality preference).
 pub const YTDLP_AUDIO_FORMAT: &str = audio_quality_format(AudioQuality::Standard);
@@ -29,6 +34,13 @@ pub fn parse_version(output: &str) -> Option<String> {
 /// Evaluates whether the sidecar binary requires an update given its age in seconds.
 pub fn sidecar_needs_update(age_secs: u64) -> bool {
     age_secs >= YTDLP_UPDATE_INTERVAL_SECS
+}
+
+/// Evaluates whether a refresh is due given the elapsed duration in seconds since the last refresh.
+///
+/// An elapsed duration of `None` indicates unknown or never refreshed, which is considered due.
+pub fn is_refresh_due(elapsed_secs: Option<u64>) -> bool {
+    elapsed_secs.is_none_or(|s| s >= YTDLP_REFRESH_COOLDOWN_SECS)
 }
 
 /// Formats the CLI arguments passed to yt-dlp for extracting the audio URL using the default quality.
@@ -74,6 +86,11 @@ pub fn release_asset_name() -> &'static str {
 )))]
 pub fn release_asset_name() -> &'static str {
     "yt-dlp_linux"
+}
+
+/// Returns the public download URL for the latest yt-dlp release binary asset.
+pub fn release_download_url() -> String {
+    format!("https://github.com/yt-dlp/yt-dlp/releases/latest/download/{}", release_asset_name())
 }
 
 /// Target executable binary filename for the current operating system.
@@ -125,7 +142,20 @@ impl YtDlpResolver {
     /// Resolves `video_id` to a stream URL with explicit error details.
     pub fn fetch_audio_url(&self, video_id: &str) -> anyhow::Result<String> {
         let id = validate_video_id(video_id)?;
-        let output = spawn_ytdlp(&self.binary, id, self.quality)?;
+        match self.extract_url(id) {
+            Ok(url) => Ok(url),
+            Err(first_err) => {
+                if refresh_sidecar_if_due(&self.binary) {
+                    self.extract_url(id)
+                } else {
+                    Err(first_err)
+                }
+            }
+        }
+    }
+
+    fn extract_url(&self, video_id: &str) -> anyhow::Result<String> {
+        let output = spawn_ytdlp(&self.binary, video_id, self.quality)?;
         extract_stream_url(&output.stdout)
     }
 }
@@ -242,11 +272,66 @@ pub fn ensure_sidecar(data_dir: &Path) -> anyhow::Result<PathBuf> {
         return Ok(binary_path);
     }
 
-    let asset = release_asset_name();
-    let url = format!("https://github.com/yt-dlp/yt-dlp/releases/latest/download/{asset}");
+    let url = release_download_url();
     download_sidecar(&binary_path, &url)?;
 
     Ok(binary_path)
+}
+
+/// Global lock recording the timestamp of the last forced-refresh attempt.
+static REFRESH_STATE: Mutex<Option<Instant>> = Mutex::new(None);
+
+fn file_age_secs(path: &Path) -> Option<u64> {
+    let metadata = std::fs::metadata(path).ok()?;
+    let modified = metadata.modified().ok()?;
+    let elapsed = modified.elapsed().ok()?;
+    Some(elapsed.as_secs())
+}
+
+fn can_refresh(last_attempt: Option<Instant>, binary: &Path) -> bool {
+    let attempt_elapsed = last_attempt.map(|t| t.elapsed().as_secs());
+    is_refresh_due(attempt_elapsed) && is_refresh_due(file_age_secs(binary))
+}
+
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+fn execute_refresh(binary: &Path) -> bool {
+    let url = release_download_url();
+    match download_sidecar(binary, &url) {
+        Ok(()) => {
+            tracing::info!(binary = %binary.display(), "refreshed yt-dlp sidecar binary");
+            true
+        }
+        Err(err) => {
+            tracing::warn!(
+                binary = %binary.display(),
+                error = ?err,
+                "failed to refresh yt-dlp sidecar binary"
+            );
+            false
+        }
+    }
+}
+
+/// Attempts to force-refresh the sidecar binary from the latest GitHub release if due.
+///
+/// Refreshes only when the binary file exists on disk (a missing binary is a provisioning
+/// failure owned by [`ensure_sidecar`] at startup, not an extraction breakage).
+///
+/// Holding [`REFRESH_STATE`] during download ensures concurrent resolvers wait and skip
+/// redundant downloads.
+fn refresh_sidecar_if_due(binary: &Path) -> bool {
+    if !binary.is_file() {
+        return false;
+    }
+
+    let mut guard = REFRESH_STATE.lock().unwrap_or_else(PoisonError::into_inner);
+    if !can_refresh(*guard, binary) {
+        return false;
+    }
+
+    *guard = Some(Instant::now());
+    execute_refresh(binary)
 }
 
 #[cfg(test)]
@@ -343,6 +428,27 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[test]
+    fn is_refresh_due_edges() {
+        assert!(is_refresh_due(None));
+        assert!(!is_refresh_due(Some(0)));
+        assert!(!is_refresh_due(Some(YTDLP_REFRESH_COOLDOWN_SECS - 1)));
+        assert!(is_refresh_due(Some(YTDLP_REFRESH_COOLDOWN_SECS)));
+    }
+
+    #[test]
+    fn release_download_url_format() {
+        let url = release_download_url();
+        assert!(url.starts_with("https://github.com/yt-dlp/yt-dlp/releases/latest/download/"));
+        assert!(url.ends_with(release_asset_name()));
+    }
+
+    #[test]
+    fn refresh_sidecar_if_due_skips_when_binary_missing() {
+        let missing = Path::new("/definitely/missing/binary/yt-dlp");
+        assert!(!refresh_sidecar_if_due(missing));
     }
 
     #[test]

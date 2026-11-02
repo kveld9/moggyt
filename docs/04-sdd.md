@@ -199,7 +199,9 @@ hexagonal boundaries.
 
 Locked decision D-1 (streaming): v1 resolves audio through a bundled `yt-dlp` sidecar,
 downloaded on first launch into the app data directory and self-updated roughly every 3 days
-(same model as the native-backend reference). Rationale: YouTube breaks stream extraction several times a year;
+(same model as the native-backend reference). When a stream resolution fails, the sidecar is
+force-refreshed from the latest release and the resolution retried once, at most once per hour.
+Rationale: YouTube breaks stream extraction several times a year;
 the fix then arrives via `yt-dlp` without an emergency `moggyt` release. The `StreamResolver`
 port keeps a pure-Rust decipher implementation replaceable later without touching `domain`.
 
