@@ -147,7 +147,7 @@ mod tests {
         assert_eq!(palette.surface, [20, 20, 20]);
         assert_eq!(palette.text, [240, 240, 240]);
         assert_eq!(palette.secondary, [160, 160, 160]);
-        assert_eq!(palette.accent, [255, 60, 60]);
+        assert_eq!(palette.accent, [255, 255, 255]);
         assert_eq!(palette.border, [36, 36, 36]);
         assert_eq!(palette.hover, [28, 28, 28]);
         assert_eq!(palette.overlay, [24, 24, 24]);
@@ -202,7 +202,7 @@ mod tests {
         );
         assert_eq!(
             [oled_colors.accent.red(), oled_colors.accent.green(), oled_colors.accent.blue()],
-            [255, 60, 60]
+            [255, 255, 255]
         );
         assert!(oled_colors.dark);
     }

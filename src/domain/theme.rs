@@ -75,7 +75,7 @@ impl Palette {
             surface: [20, 20, 20],
             text: [240, 240, 240],
             secondary: [160, 160, 160],
-            accent: [255, 60, 60],
+            accent: [255, 255, 255],
             border: [36, 36, 36],
             hover: [28, 28, 28],
             overlay: [24, 24, 24],
@@ -156,6 +156,8 @@ mod tests {
         // 2. BlackOled window must be pure black [0, 0, 0]
         assert_eq!(black.window, [0, 0, 0]);
         assert!(black.dark);
+        // BlackOled accent is pure white (no hue on the OLED theme)
+        assert_eq!(black.accent, [255, 255, 255]);
 
         // 3. Mono has zero saturation (r == g == b on every color slot)
         let mono_colors = [
