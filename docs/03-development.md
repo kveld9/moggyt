@@ -18,6 +18,10 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 CI additionally runs markdown quality checks using `markdownlint-cli2`.
 
+Builds always go to the checkout's own `target/` directory: `.cargo/config.toml` overrides any user-level
+`target-dir`, so git worktrees never share build outputs or fingerprints and `cargo run` always runs the sources
+of the current checkout. Expect a full first build in each new worktree.
+
 ## Modularity limits
 
 Enforced automatically by `./scripts/check-repo.sh`:
