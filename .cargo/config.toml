@@ -1,0 +1,10 @@
+# Per-checkout build directory.
+#
+# Overrides any user-level `target-dir` (for example a shared directory in
+# ~/.cargo/config.toml). Relative config paths resolve against the directory
+# that contains `.cargo/`, so every checkout and git worktree builds into its
+# own `target/`. A shared target directory makes all checkouts of this crate
+# share one fingerprint, and `cargo run` can then execute a binary compiled
+# from another worktree's sources.
+[build]
+target-dir = "target"
