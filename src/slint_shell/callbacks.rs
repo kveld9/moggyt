@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::domain::{DetailKind, SearchFilter, SearchResult, TimerPreset};
+use crate::domain::{DetailKind, SearchFilter, SearchResult, ThemeId, TimerPreset};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::explore::{
@@ -31,7 +31,7 @@ use crate::slint_shell::sync::{
     persist_recent_searches, sync_explore_shelves, sync_recent_searches, sync_shelves_and_queue,
     sync_sleep_timer, sync_window,
 };
-use crate::slint_shell::theme::{apply_theme, theme_from_index};
+use crate::slint_shell::theme::{apply_palette, theme_from_index};
 use crate::slint_shell::window::{
     open_detail_async, refresh_library_async, submit_search_async, trigger_playback,
 };
@@ -598,7 +598,11 @@ fn wire_settings_callbacks(
         let mut st = s.borrow_mut();
         let theme = theme_from_index(idx);
         st.set_theme(theme);
-        apply_theme(&win, theme);
+        if theme == ThemeId::Custom {
+            st.reload_custom_theme();
+        }
+        apply_palette(&win, &st.active_palette());
+        win.set_custom_theme_status_text(st.custom_theme_status.clone().into());
         win.set_active_theme_index(idx);
     });
 

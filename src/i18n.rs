@@ -113,6 +113,9 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Classic", "Clásica"),
     ("Clear history", "Borrar todo el historial"),
     ("Close", "Cerrar"),
+    ("Custom", "Personalizado"),
+    ("Custom theme loaded from {path}", "Tema personalizado cargado desde {path}"),
+    ("Custom theme not loaded: {error}", "Tema personalizado no cargado: {error}"),
     ("Detail", "Detalle"),
     ("Discard", "Descartar"),
     (
@@ -282,6 +285,30 @@ mod tests {
         assert_eq!(
             tr(Locale::English, "Update available: {ver}").replace("{ver}", "v1.2.3"),
             "Update available: v1.2.3"
+        );
+
+        // Custom theme status & parameterized pattern
+        assert_eq!(tr(Locale::Spanish, "Custom"), "Personalizado");
+        assert_eq!(tr(Locale::English, "Custom"), "Custom");
+        assert_eq!(
+            tr(Locale::Spanish, "Custom theme loaded from {path}")
+                .replace("{path}", "/tmp/theme.json"),
+            "Tema personalizado cargado desde /tmp/theme.json"
+        );
+        assert_eq!(
+            tr(Locale::English, "Custom theme loaded from {path}")
+                .replace("{path}", "/tmp/theme.json"),
+            "Custom theme loaded from /tmp/theme.json"
+        );
+        assert_eq!(
+            tr(Locale::Spanish, "Custom theme not loaded: {error}")
+                .replace("{error}", "file not found"),
+            "Tema personalizado no cargado: file not found"
+        );
+        assert_eq!(
+            tr(Locale::English, "Custom theme not loaded: {error}")
+                .replace("{error}", "file not found"),
+            "Custom theme not loaded: file not found"
         );
 
         // Kind labels

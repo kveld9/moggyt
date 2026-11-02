@@ -44,6 +44,7 @@ export component MoggytWindow inherits Window {
     in-out property <string> header-title: "Search";
     in-out property <bool> show-settings: false;
     in-out property <int> active-theme-index: 0;
+    in-out property <string> custom-theme-status-text: "";
     in-out property <string> playback-speed-text: "1.00x";
     in-out property <string> sleep-timer-status-text: "Timer: Off";
     in-out property <int> active-sleep-timer-index: 0;
@@ -231,6 +232,7 @@ export component MoggytWindow inherits Window {
                     explore-loading: root.explore-loading;
                     has-update: root.has-update;
                     active-theme-index: root.active-theme-index;
+                    custom-theme-status-text: root.custom-theme-status-text;
                     playback-speed-text: root.playback-speed-text;
                     settings-cookie-text <=> root.settings-cookie-text;
                     app-version: root.app-version;

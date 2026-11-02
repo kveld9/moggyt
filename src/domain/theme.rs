@@ -30,6 +30,8 @@ pub enum ThemeId {
     BlackOled,
     /// High-contrast monochromatic theme with zero saturation.
     Mono,
+    /// User palette loaded from the custom theme file.
+    Custom,
 }
 
 /// Plain RGB color palette data with dark mode flag.
@@ -124,6 +126,96 @@ impl Palette {
             _ => None,
         }
     }
+
+    /// Constructs a [`Palette`] from custom key-value entries.
+    ///
+    /// Requires a `"mode"` key (`"dark"` or `"light"`). Unspecified slots inherit
+    /// from [`Palette::black_oled()`] for dark mode or [`Palette::white()`] for light mode.
+    pub fn from_custom_entries<'a>(
+        entries: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> Result<Palette, CustomPaletteError> {
+        let items: Vec<(&'a str, &'a str)> = entries.into_iter().collect();
+        let mode = items.iter().find(|(k, _)| *k == "mode").map(|(_, v)| *v);
+        let mut palette = resolve_mode(mode)?;
+
+        for &(slot, value) in &items {
+            if slot == "mode" {
+                continue;
+            }
+            apply_entry(&mut palette, slot, value)?;
+        }
+
+        Ok(palette)
+    }
+}
+
+/// Error conditions encountered when building a palette from user-defined custom theme entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CustomPaletteError {
+    /// Missing required "mode" field ("dark" or "light").
+    MissingMode,
+    /// Invalid mode value (expected "dark" or "light").
+    InvalidMode(String),
+    /// Unknown palette color slot name.
+    UnknownSlot(String),
+    /// Invalid RGB hex color format for a slot.
+    InvalidColor { slot: String, value: String },
+}
+
+impl std::fmt::Display for CustomPaletteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingMode => write!(f, "missing required 'mode' field"),
+            Self::InvalidMode(mode) => {
+                write!(f, "invalid mode '{mode}', expected 'dark' or 'light'")
+            }
+            Self::UnknownSlot(slot) => write!(f, "unknown color slot '{slot}'"),
+            Self::InvalidColor { slot, value } => {
+                write!(f, "invalid color value '{value}' for slot '{slot}'")
+            }
+        }
+    }
+}
+
+impl std::error::Error for CustomPaletteError {}
+
+/// Parses a hex color string in `#rrggbb` format into a plain `[u8; 3]` RGB array.
+///
+/// Accepts case-insensitive hex digits. Returns `None` if the input is not exactly
+/// a `#` followed by 6 hex characters.
+pub fn parse_hex_rgb(value: &str) -> Option<[u8; 3]> {
+    if value.len() != 7 || !value.starts_with('#') {
+        return None;
+    }
+    if !value[1..].chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let r = u8::from_str_radix(&value[1..3], 16).ok()?;
+    let g = u8::from_str_radix(&value[3..5], 16).ok()?;
+    let b = u8::from_str_radix(&value[5..7], 16).ok()?;
+    Some([r, g, b])
+}
+
+fn resolve_mode(mode: Option<&str>) -> Result<Palette, CustomPaletteError> {
+    match mode {
+        Some("dark") => Ok(Palette::black_oled()),
+        Some("light") => Ok(Palette::white()),
+        Some(other) => Err(CustomPaletteError::InvalidMode(other.to_string())),
+        None => Err(CustomPaletteError::MissingMode),
+    }
+}
+
+fn apply_entry(palette: &mut Palette, slot: &str, value: &str) -> Result<(), CustomPaletteError> {
+    let Some(rgb) = parse_hex_rgb(value) else {
+        return Err(CustomPaletteError::InvalidColor {
+            slot: slot.to_string(),
+            value: value.to_string(),
+        });
+    };
+    if !palette.set(slot, rgb) {
+        return Err(CustomPaletteError::UnknownSlot(slot.to_string()));
+    }
+    Ok(())
 }
 
 impl ThemeId {
@@ -133,6 +225,8 @@ impl ThemeId {
             Self::White => Palette::white(),
             Self::BlackOled => Palette::black_oled(),
             Self::Mono => Palette::mono(),
+            // Fallback until a custom file is loaded.
+            Self::Custom => Palette::black_oled(),
         }
     }
 }
@@ -238,5 +332,109 @@ mod tests {
         assert_eq!(floating_json, "\"floating\"");
         let floating_deser: PlayerBarMode = serde_json::from_str("\"floating\"").unwrap();
         assert_eq!(floating_deser, PlayerBarMode::Floating);
+    }
+
+    #[test]
+    fn test_parse_hex_rgb_valid_and_invalid_formats() {
+        assert_eq!(parse_hex_rgb("#121318"), Some([0x12, 0x13, 0x18]));
+        assert_eq!(parse_hex_rgb("#AABBCC"), Some([0xaa, 0xbb, 0xcc]));
+        assert_eq!(parse_hex_rgb("#ffffff"), Some([255, 255, 255]));
+        assert_eq!(parse_hex_rgb("#000000"), Some([0, 0, 0]));
+
+        // Invalid: missing '#'
+        assert_eq!(parse_hex_rgb("123456"), None);
+        // Invalid: 5 digits
+        assert_eq!(parse_hex_rgb("#12345"), None);
+        // Invalid: non-hex characters
+        assert_eq!(parse_hex_rgb("#12345g"), None);
+        assert_eq!(parse_hex_rgb("#+12345"), None);
+        assert_eq!(parse_hex_rgb("# 12345"), None);
+        // Invalid: 7 digits
+        assert_eq!(parse_hex_rgb("#1234567"), None);
+        // Invalid: empty
+        assert_eq!(parse_hex_rgb(""), None);
+    }
+
+    #[test]
+    fn test_from_custom_entries_full_dark_palette() {
+        let entries = [
+            ("mode", "dark"),
+            ("window", "#121318"),
+            ("panel", "#1e1f25"),
+            ("surface", "#282a2f"),
+            ("text", "#e2e2e9"),
+            ("secondary", "#c5c6d0"),
+            ("accent", "#b1c5ff"),
+            ("border", "#44464f"),
+            ("hover", "#33343a"),
+            ("overlay", "#38393f"),
+        ];
+
+        let palette = Palette::from_custom_entries(entries).expect("parse valid entries");
+        assert!(palette.dark);
+        assert_eq!(palette.window, [0x12, 0x13, 0x18]);
+        assert_eq!(palette.panel, [0x1e, 0x1f, 0x25]);
+        assert_eq!(palette.surface, [0x28, 0x2a, 0x2f]);
+        assert_eq!(palette.text, [0xe2, 0xe2, 0xe9]);
+        assert_eq!(palette.secondary, [0xc5, 0xc6, 0xd0]);
+        assert_eq!(palette.accent, [0xb1, 0xc5, 0xff]);
+        assert_eq!(palette.border, [0x44, 0x46, 0x4f]);
+        assert_eq!(palette.hover, [0x33, 0x34, 0x3a]);
+        assert_eq!(palette.overlay, [0x38, 0x39, 0x3f]);
+    }
+
+    #[test]
+    fn test_from_custom_entries_partial_light_inherits_white_base() {
+        let entries = [("mode", "light"), ("accent", "#001122")];
+
+        let palette = Palette::from_custom_entries(entries).expect("parse partial light entries");
+        assert!(!palette.dark);
+        assert_eq!(palette.accent, [0x00, 0x11, 0x22]);
+        // Unspecified slots match Palette::white()
+        let default_white = Palette::white();
+        assert_eq!(palette.window, default_white.window);
+        assert_eq!(palette.panel, default_white.panel);
+        assert_eq!(palette.surface, default_white.surface);
+        assert_eq!(palette.text, default_white.text);
+        assert_eq!(palette.secondary, default_white.secondary);
+        assert_eq!(palette.border, default_white.border);
+        assert_eq!(palette.hover, default_white.hover);
+        assert_eq!(palette.overlay, default_white.overlay);
+    }
+
+    #[test]
+    fn test_from_custom_entries_error_conditions() {
+        // Missing mode
+        let err = Palette::from_custom_entries([("window", "#112233")]).unwrap_err();
+        assert_eq!(err, CustomPaletteError::MissingMode);
+
+        // Invalid mode
+        let err = Palette::from_custom_entries([("mode", "sepia")]).unwrap_err();
+        assert_eq!(err, CustomPaletteError::InvalidMode("sepia".to_string()));
+
+        // Unknown slot
+        let err =
+            Palette::from_custom_entries([("mode", "dark"), ("sidebar", "#112233")]).unwrap_err();
+        assert_eq!(err, CustomPaletteError::UnknownSlot("sidebar".to_string()));
+
+        // Invalid color
+        let err = Palette::from_custom_entries([("mode", "dark"), ("accent", "red")]).unwrap_err();
+        assert_eq!(
+            err,
+            CustomPaletteError::InvalidColor {
+                slot: "accent".to_string(),
+                value: "red".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_theme_id_custom_serde_and_fallback_palette() {
+        assert_eq!(ThemeId::Custom.palette(), Palette::black_oled());
+
+        let json = serde_json::to_string(&ThemeId::Custom).expect("serialize custom");
+        assert_eq!(json, "\"custom\"");
+        let deserialized: ThemeId = serde_json::from_str("\"custom\"").expect("deserialize custom");
+        assert_eq!(deserialized, ThemeId::Custom);
     }
 }

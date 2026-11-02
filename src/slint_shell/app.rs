@@ -8,9 +8,10 @@ use std::sync::{Arc, Mutex};
 
 use slint::ComponentHandle;
 
+use crate::domain::ThemeId;
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, LyricOverrideDir, LyricsSource, QueueStore, Scrobbler,
-    SessionStore, Settings, SettingsStore, SingleInstanceGuard, SkipStore, TrayHandle,
+    AudioBackend, Catalog, CoverCache, CustomThemeFile, LyricOverrideDir, LyricsSource, QueueStore,
+    Scrobbler, SessionStore, Settings, SettingsStore, SingleInstanceGuard, SkipStore, TrayHandle,
 };
 
 pub use crate::slint_shell::covers::{
@@ -51,6 +52,8 @@ pub struct AppDependencies<C, A, S, L, K> {
     pub secondary_scrobbler: Option<Box<dyn Scrobbler>>,
     pub lyric_overrides: Option<LyricOverrideDir>,
     pub tray: Option<TrayHandle>,
+    /// Loaded custom theme file watcher for runtime reloading.
+    pub custom_theme: CustomThemeFile,
 }
 
 /// Composition function launching the Slint desktop UI wired to injected platform adapters.
@@ -84,9 +87,11 @@ pub fn run(
         secondary_scrobbler,
         lyric_overrides,
         tray,
+        custom_theme,
     } = deps;
 
     let mut state = SlintAppState::new(catalog, audio, session, lyrics, covers);
+    state.custom_theme = Some(custom_theme);
     state.lyric_overrides = lyric_overrides;
     state.tray = tray;
 
@@ -102,6 +107,9 @@ pub fn run(
     state.keyboard_shortcuts = settings.keyboard_shortcuts;
     state.theme = settings.theme;
     state.locale = settings.locale;
+    if state.theme == ThemeId::Custom {
+        state.reload_custom_theme();
+    }
     state.player_bar = PlayerBarPrefs::from_settings(&settings);
     state.recent_searches = settings.recent_searches;
     if let Ok(mut c) = state.catalog.lock() {

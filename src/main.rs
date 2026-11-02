@@ -6,9 +6,9 @@
 //! in [`moggyt::infra`].
 
 use moggyt::infra::{
-    CachedLyrics, DiskQueueStore, DiskSettingsStore, DiskSkipStore, KeyringSessionStore,
-    LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir, Scrobbler, SettingsStore,
-    SingleInstanceGuard, TrayHandle, default_config_dir,
+    CachedLyrics, CustomThemeFile, DiskQueueStore, DiskSettingsStore, DiskSkipStore,
+    KeyringSessionStore, LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir, Scrobbler,
+    SettingsStore, SingleInstanceGuard, TrayHandle, default_config_dir,
 };
 use moggyt::slint_shell::app::AppDependencies;
 use moggyt::slint_shell::init::{
@@ -63,6 +63,7 @@ fn main() -> anyhow::Result<()> {
     let lyric_overrides = Some(LyricOverrideDir::new(config_dir.join("lyrics")));
     let tray = init_tray();
 
+    let custom_theme = CustomThemeFile::new(&config_dir);
     let queue_store = DiskQueueStore::new(config_dir.clone());
     let skip_store = DiskSkipStore::new(config_dir);
 
@@ -88,5 +89,6 @@ fn main() -> anyhow::Result<()> {
         secondary_scrobbler: secondary_scrobbler.map(|c| Box::new(c) as Box<dyn Scrobbler>),
         lyric_overrides,
         tray,
+        custom_theme,
     })
 }

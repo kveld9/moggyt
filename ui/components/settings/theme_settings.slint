@@ -4,6 +4,7 @@ import { SettingsModeButton } from "../settings_rows.slint";
 
 export component ThemeSettings inherits VerticalLayout {
     in property <int> active-theme-index: 0;
+    in property <string> custom-theme-status-text: "";
 
     callback theme-selected(int);
 
@@ -36,5 +37,18 @@ export component ThemeSettings inherits VerticalLayout {
             is-active: root.active-theme-index == 2;
             clicked => { root.theme-selected(2); }
         }
+
+        SettingsModeButton {
+            label: Labels.theme-custom-label;
+            is-active: root.active-theme-index == 3;
+            clicked => { root.theme-selected(3); }
+        }
+    }
+
+    if root.active-theme-index == 3: Text {
+        text: root.custom-theme-status-text;
+        color: Theme.secondary;
+        font-size: 12px;
+        wrap: word-wrap;
     }
 }

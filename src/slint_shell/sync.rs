@@ -23,13 +23,14 @@ use crate::slint_shell::playback::{
 use crate::slint_shell::player_bar::mode_to_index;
 use crate::slint_shell::search::{SearchRow, format_duration};
 use crate::slint_shell::state::SlintAppState;
-use crate::slint_shell::theme::{apply_theme, theme_to_index};
+use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::{LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData};
 
 /// Synchronizes state with Slint window properties without performing blocking I/O.
 pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
-    apply_theme(window, state.theme);
+    apply_palette(window, &state.active_palette());
     window.set_active_theme_index(theme_to_index(state.theme));
+    window.set_custom_theme_status_text(state.custom_theme_status.clone().into());
     window.set_active_page(state.page.to_index());
     window.set_header_title(tr(state.locale, state.page.title()).into());
     window.set_queue_panel_open(state.queue_panel_open);

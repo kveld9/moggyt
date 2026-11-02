@@ -37,6 +37,7 @@ src/
     ├── audio.rs       # AudioBackend trait definition
     ├── audio_rodio.rs # rodio playback adapter with LiveAudio fallback
     ├── cover*.rs      # CoverCache port and memory/disk caching adapters
+    ├── custom_theme.rs # Custom theme JSON loader with file modification monitoring
     ├── catalog_client.rs # Catalog API search request builder and parser
     ├── instance.rs    # SingleInstanceGuard lock
     ├── lyrics*.rs     # LyricsSource port and LRCLIB synced lyrics client
