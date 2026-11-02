@@ -140,6 +140,19 @@ fn run_cli_import(cli: &ImportCli) -> i32 {
     }
 }
 
+/// Runs before any GUI/audio/tray initialization; returns the process exit code when an import was
+/// requested.
+pub fn run_import_cli_if_requested(args: &[String]) -> Option<i32> {
+    match parse_import_args(args) {
+        Ok(Some(cli)) => Some(run_cli_import(&cli)),
+        Err(err) => {
+            eprintln!("{err:#}");
+            Some(2)
+        }
+        Ok(None) => None,
+    }
+}
+
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
 fn handle_legacy_cli_args(state: &mut SlintAppState, raw_args: &[String]) {
@@ -159,21 +172,8 @@ fn handle_legacy_cli_args(state: &mut SlintAppState, raw_args: &[String]) {
 }
 
 /// Parses CLI arguments and executes single-instance URL/handoff import commands.
-// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
-#[allow(clippy::cognitive_complexity)]
 pub(crate) fn handle_cli_args(state: &mut SlintAppState) {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    match parse_import_args(&raw_args) {
-        Ok(Some(cli)) => {
-            let code = run_cli_import(&cli);
-            std::process::exit(code);
-        }
-        Err(err) => {
-            eprintln!("{err:#}");
-            std::process::exit(2);
-        }
-        Ok(None) => {}
-    }
     handle_legacy_cli_args(state, &raw_args);
 }
 
@@ -283,5 +283,27 @@ mod tests {
 
         handle_legacy_cli_args(&mut state, &["--unknown-flag".to_string()]);
         assert!(state.queue.is_empty());
+    }
+
+    #[test]
+    fn test_run_import_cli_if_requested_none_for_empty_or_non_import_args() {
+        assert_eq!(run_import_cli_if_requested(&[]), None);
+
+        let unrelated = vec!["--unknown-flag".to_string(), "arg".to_string()];
+        assert_eq!(run_import_cli_if_requested(&unrelated), None);
+    }
+
+    #[test]
+    fn test_run_import_cli_if_requested_error_returns_exit_code_two() {
+        let json_alone = vec!["--json".to_string()];
+        assert_eq!(run_import_cli_if_requested(&json_alone), Some(2));
+
+        let conflicting = vec![
+            "--import-spotify".to_string(),
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M".to_string(),
+            "--import-csv".to_string(),
+            "tracks.csv".to_string(),
+        ];
+        assert_eq!(run_import_cli_if_requested(&conflicting), Some(2));
     }
 }

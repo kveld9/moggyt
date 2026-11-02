@@ -13,7 +13,7 @@ use moggyt::infra::{
 use moggyt::slint_shell::app::AppDependencies;
 use moggyt::slint_shell::init::{
     app_data_dir, init_cover_cache, init_lastfm_scrobbler, init_live_audio,
-    init_secondary_lastfm_scrobbler, tracing_subscriber_setup,
+    init_secondary_lastfm_scrobbler, run_import_cli_if_requested, tracing_subscriber_setup,
 };
 
 fn acquire_single_instance() -> Option<SingleInstanceGuard> {
@@ -37,6 +37,11 @@ fn init_tray() -> Option<TrayHandle> {
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
 fn main() -> anyhow::Result<()> {
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(code) = run_import_cli_if_requested(&raw_args) {
+        std::process::exit(code);
+    }
+
     let Some(instance) = acquire_single_instance() else {
         return Ok(());
     };
