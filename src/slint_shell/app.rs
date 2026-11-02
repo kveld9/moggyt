@@ -99,6 +99,7 @@ pub fn run(
     }
     state.hi_res_covers = settings.hi_res_covers;
     state.songs_only = settings.songs_only;
+    state.keyboard_shortcuts = settings.keyboard_shortcuts;
     state.theme = settings.theme;
     state.locale = settings.locale;
     state.player_bar = PlayerBarPrefs::from_settings(&settings);

@@ -79,6 +79,7 @@ pub struct SlintAppState {
     pub autoplay: bool,
     pub hi_res_covers: bool,
     pub songs_only: bool,
+    pub keyboard_shortcuts: bool,
     pub signed_in: bool,
     pub theme: ThemeId,
     pub locale: Locale,

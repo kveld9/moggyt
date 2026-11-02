@@ -134,6 +134,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Import from Spotify", "Importar desde Spotify"),
     ("Import progress", "Progreso de importacion"),
     ("Importing matches...", "Importando coincidencias..."),
+    ("Keyboard shortcuts", "Atajos de teclado"),
     ("Language", "Idioma"),
     ("Library", "Biblioteca"),
     ("Loading...", "Cargando..."),
@@ -313,6 +314,7 @@ mod tests {
             tr(Locale::Spanish, "Prefer songs over music videos"),
             "Preferir canciones a videoclips"
         );
+        assert_eq!(tr(Locale::Spanish, "Keyboard shortcuts"), "Atajos de teclado");
     }
 
     #[test]

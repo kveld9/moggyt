@@ -8,11 +8,13 @@ export component PlaybackSettings inherits VerticalLayout {
     in property <int> active-sleep-timer-index: 0;
     in property <int> active-audio-quality-index: 1;
     in property <bool> songs-only: false;
+    in property <bool> keyboard-shortcuts: true;
 
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
     callback songs-only-toggled();
+    callback keyboard-shortcuts-toggled();
 
     spacing: 10px;
 
@@ -189,6 +191,17 @@ export component PlaybackSettings inherits VerticalLayout {
                 label: Labels.songs-only-label;
                 checked: root.songs-only;
                 toggled => { root.songs-only-toggled(); }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+
+            SettingsToggleRow {
+                label: Labels.keyboard-shortcuts-label;
+                checked: root.keyboard-shortcuts;
+                toggled => { root.keyboard-shortcuts-toggled(); }
             }
         }
     }

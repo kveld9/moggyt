@@ -54,6 +54,7 @@ pub mod playback_control;
 pub mod playback_worker;
 pub mod player_bar;
 pub mod search;
+pub mod shortcuts;
 pub mod state;
 pub mod state_init;
 pub mod sync;

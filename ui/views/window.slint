@@ -12,6 +12,7 @@ import { Sidebar } from "../components/sidebar.slint";
 import { PlayerBar } from "../components/player_bar.slint";
 import { QueuePanel } from "../components/queue_panel.slint";
 import { AlternativePicker } from "../components/alternative_picker.slint";
+import { ShortcutScope } from "../components/shortcut_scope.slint";
 import { ContentArea } from "./content_area.slint";
 import { ImportModal } from "./import_modal.slint";
 import { ImportProgress } from "./import_progress.slint";
@@ -25,6 +26,7 @@ export component MoggytWindow inherits Window {
     preferred-height: 640px;
     background: Theme.window;
     default-font-family: "Inter";
+    forward-focus: shortcuts;
 
     in-out property <color> theme-window <=> Theme.window;
     in-out property <color> theme-panel <=> Theme.panel;
@@ -47,6 +49,7 @@ export component MoggytWindow inherits Window {
     in-out property <int> active-sleep-timer-index: 0;
     in-out property <int> active-audio-quality-index: 1;
     in-out property <bool> songs-only: false;
+    in-out property <bool> keyboard-shortcuts: true;
     in-out property <string> settings-cookie-text: "";
     in-out property <string> app-version: "0.1.0";
     in-out property <string> update-status-text: "Up to date";
@@ -129,6 +132,8 @@ export component MoggytWindow inherits Window {
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
     callback songs-only-toggled();
+    callback keyboard-shortcuts-toggled();
+    callback shortcut-pressed(string, bool) -> bool;
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
@@ -173,159 +178,168 @@ export component MoggytWindow inherits Window {
 
     changed width => { root.width-changed(self.width / 1px); }
 
-    VerticalLayout {
-        padding: 0;
-        spacing: 0;
+    shortcuts := ShortcutScope {
+        shortcuts-enabled: root.keyboard-shortcuts;
+        shortcut-pressed(text, modified) => { return root.shortcut-pressed(text, modified); }
 
-        HorizontalLayout {
-            vertical-stretch: 1;
+        VerticalLayout {
+            width: parent.width;
+            height: parent.height;
             padding: 0;
             spacing: 0;
 
-            Sidebar {
-                width: 200px;
-                active-page: root.active-page;
-                page-selected(idx) => { root.page-selected(idx); }
-            }
+            HorizontalLayout {
+                vertical-stretch: 1;
+                padding: 0;
+                spacing: 0;
 
-            ContentArea {
-                horizontal-stretch: 1;
-                active-page: root.active-page;
-                header-title: root.header-title;
-                query <=> root.query;
-                shelves: root.shelves;
-                search-filter: root.search-filter;
-                cookie-text <=> root.cookie-text;
-                signed-in: root.signed-in;
-                active-track-title: root.active-track-title;
-                active-track-artist: root.active-track-artist;
-                position-text: root.position-text;
-                duration-text: root.duration-text;
-                playback-progress: root.playback-progress;
-                cover-image: root.cover-image;
-                has-cover: root.has-cover;
-                lyrics-lines: root.lyrics-lines;
-                active-lyric-index: root.active-lyric-index;
-                library-playlists: root.library-playlists;
-                library-albums: root.library-albums;
-                detail-has-detail: root.detail-has-detail;
-                detail-has-artwork: root.detail-has-artwork;
-                detail-title: root.detail-title;
-                detail-subtitle: root.detail-subtitle;
-                detail-description: root.detail-description;
-                detail-kind-label: root.detail-kind-label;
-                detail-cover: root.detail-cover;
-                detail-tracks: root.detail-tracks;
-                explore-shelves: root.explore-shelves;
-                explore-loading: root.explore-loading;
-                has-update: root.has-update;
-                active-theme-index: root.active-theme-index;
-                playback-speed-text: root.playback-speed-text;
-                settings-cookie-text <=> root.settings-cookie-text;
-                app-version: root.app-version;
-                update-status-text: root.update-status-text;
-                recent-searches: root.recent-searches;
-                search-active: root.search-active;
-                sleep-timer-status-text: root.sleep-timer-status-text;
-                active-sleep-timer-index: root.active-sleep-timer-index;
-                active-audio-quality-index: root.active-audio-quality-index;
-                songs-only: root.songs-only;
-                player-bar-mode: root.player-bar-mode;
-                player-bar-show-artwork: root.player-bar-show-artwork;
-                player-bar-show-like: root.player-bar-show-like;
-                player-bar-show-shuffle: root.player-bar-show-shuffle;
-                player-bar-show-repeat: root.player-bar-show-repeat;
-                player-bar-show-skip-seconds: root.player-bar-show-skip-seconds;
-                player-bar-show-queue: root.player-bar-show-queue;
-                player-bar-show-volume: root.player-bar-show-volume;
-                open-settings => { root.page-selected(4); }
-                query-submitted(q) => { root.query-submitted(q); }
-                track-selected(idx) => { root.track-selected(idx); }
-                filter-selected(idx) => { root.filter-selected(idx); }
-                recent-search-selected(q) => { root.recent-search-selected(q); }
-                recent-search-removed(q) => { root.recent-search-removed(q); }
-                recent-searches-cleared => { root.recent-searches-cleared(); }
-                explore-track-selected(idx) => { root.explore-track-selected(idx); }
-                playlist-selected(idx) => { root.playlist-selected(idx); }
-                album-selected(idx) => { root.album-selected(idx); }
-                detail-track-selected(idx) => { root.detail-track-selected(idx); }
-                detail-play => { root.detail-play(); }
-                detail-shuffle => { root.detail-shuffle(); }
-                sign-in-submitted(t) => { root.sign-in-submitted(t); }
-                sign-out() => { root.sign-out(); }
-                theme-selected(idx) => { root.theme-selected(idx); }
-                cycle-playback-speed => { root.cycle-playback-speed(); }
-                sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
-                audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
-                songs-only-toggled => { root.songs-only-toggled(); }
-                back-pressed => { root.back-pressed(); }
-                player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
-                player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
+                Sidebar {
+                    width: 200px;
+                    active-page: root.active-page;
+                    page-selected(idx) => { root.page-selected(idx); }
+                }
+
+                ContentArea {
+                    horizontal-stretch: 1;
+                    active-page: root.active-page;
+                    header-title: root.header-title;
+                    query <=> root.query;
+                    shelves: root.shelves;
+                    search-filter: root.search-filter;
+                    cookie-text <=> root.cookie-text;
+                    signed-in: root.signed-in;
+                    active-track-title: root.active-track-title;
+                    active-track-artist: root.active-track-artist;
+                    position-text: root.position-text;
+                    duration-text: root.duration-text;
+                    playback-progress: root.playback-progress;
+                    cover-image: root.cover-image;
+                    has-cover: root.has-cover;
+                    lyrics-lines: root.lyrics-lines;
+                    active-lyric-index: root.active-lyric-index;
+                    library-playlists: root.library-playlists;
+                    library-albums: root.library-albums;
+                    detail-has-detail: root.detail-has-detail;
+                    detail-has-artwork: root.detail-has-artwork;
+                    detail-title: root.detail-title;
+                    detail-subtitle: root.detail-subtitle;
+                    detail-description: root.detail-description;
+                    detail-kind-label: root.detail-kind-label;
+                    detail-cover: root.detail-cover;
+                    detail-tracks: root.detail-tracks;
+                    explore-shelves: root.explore-shelves;
+                    explore-loading: root.explore-loading;
+                    has-update: root.has-update;
+                    active-theme-index: root.active-theme-index;
+                    playback-speed-text: root.playback-speed-text;
+                    settings-cookie-text <=> root.settings-cookie-text;
+                    app-version: root.app-version;
+                    update-status-text: root.update-status-text;
+                    recent-searches: root.recent-searches;
+                    search-active: root.search-active;
+                    sleep-timer-status-text: root.sleep-timer-status-text;
+                    active-sleep-timer-index: root.active-sleep-timer-index;
+                    active-audio-quality-index: root.active-audio-quality-index;
+                    songs-only: root.songs-only;
+                    keyboard-shortcuts: root.keyboard-shortcuts;
+                    player-bar-mode: root.player-bar-mode;
+                    player-bar-show-artwork: root.player-bar-show-artwork;
+                    player-bar-show-like: root.player-bar-show-like;
+                    player-bar-show-shuffle: root.player-bar-show-shuffle;
+                    player-bar-show-repeat: root.player-bar-show-repeat;
+                    player-bar-show-skip-seconds: root.player-bar-show-skip-seconds;
+                    player-bar-show-queue: root.player-bar-show-queue;
+                    player-bar-show-volume: root.player-bar-show-volume;
+                    open-settings => { root.page-selected(4); }
+                    query-submitted(q) => { root.query-submitted(q); }
+                    track-selected(idx) => { root.track-selected(idx); }
+                    filter-selected(idx) => { root.filter-selected(idx); }
+                    recent-search-selected(q) => { root.recent-search-selected(q); }
+                    recent-search-removed(q) => { root.recent-search-removed(q); }
+                    recent-searches-cleared => { root.recent-searches-cleared(); }
+                    explore-track-selected(idx) => { root.explore-track-selected(idx); }
+                    playlist-selected(idx) => { root.playlist-selected(idx); }
+                    album-selected(idx) => { root.album-selected(idx); }
+                    detail-track-selected(idx) => { root.detail-track-selected(idx); }
+                    detail-play => { root.detail-play(); }
+                    detail-shuffle => { root.detail-shuffle(); }
+                    sign-in-submitted(t) => { root.sign-in-submitted(t); }
+                    sign-out() => { root.sign-out(); }
+                    theme-selected(idx) => { root.theme-selected(idx); }
+                    cycle-playback-speed => { root.cycle-playback-speed(); }
+                    sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
+                    audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
+                    songs-only-toggled => { root.songs-only-toggled(); }
+                    keyboard-shortcuts-toggled => { root.keyboard-shortcuts-toggled(); }
+                    back-pressed => { root.back-pressed(); }
+                    player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
+                    player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
+                }
+
+                Rectangle {
+                    width: root.queue-panel-open ? 340px : 0px;
+                    clip: true;
+                    animate width { duration: 180ms; easing: ease-in-out; }
+
+                    QueuePanel {
+                        width: 340px;
+                        height: parent.height;
+                        tracks: root.queue-tracks;
+                        selected-index: root.queue-selected-index;
+                        track-selected(idx) => { root.queue-track-selected(idx); }
+                        close-panel => { root.close-queue-panel(); }
+                    }
+                }
             }
 
             Rectangle {
-                width: root.queue-panel-open ? 340px : 0px;
-                clip: true;
-                animate width { duration: 180ms; easing: ease-in-out; }
+                vertical-stretch: 0;
+                background: transparent;
+                height: root.player-bar-mode == 1 ? 92px : 72px;
 
-                QueuePanel {
-                    width: 340px;
-                    height: parent.height;
-                    tracks: root.queue-tracks;
-                    selected-index: root.queue-selected-index;
-                    track-selected(idx) => { root.queue-track-selected(idx); }
-                    close-panel => { root.close-queue-panel(); }
+                PlayerBar {
+                    mode: root.player-bar-mode;
+                    show-artwork: root.player-bar-show-artwork;
+                    show-like: root.player-bar-show-like;
+                    show-shuffle: root.player-bar-show-shuffle;
+                    show-repeat: root.player-bar-show-repeat;
+                    show-skip-seconds: root.player-bar-show-skip-seconds;
+                    show-queue: root.player-bar-show-queue;
+                    show-volume: root.player-bar-show-volume;
+
+                    width: root.player-bar-mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
+                    height: 72px;
+                    x: (parent.width - self.width) / 2;
+                    y: root.player-bar-mode == 1 ? 8px : 0px;
+
+                    active-track-title: root.active-track-title;
+                    active-track-artist: root.active-track-artist;
+                    is-playing: root.is-playing;
+                    volume: root.volume;
+                    position-text: root.position-text;
+                    duration-text: root.duration-text;
+                    cover: root.now-playing-cover;
+                    is-liked: root.is-liked;
+                    is-shuffle: root.is-shuffle;
+                    repeat-mode: root.repeat-mode;
+                    progress: root.playback-progress;
+                    position-secs: root.position-secs;
+                    duration-secs: root.duration-secs;
+                    queue-count: root.queue-count;
+                    queue-button-text: root.queue-button-text;
+
+                    toggle-play => { root.toggle-play(); }
+                    prev-track => { root.prev-track(); }
+                    next-track => { root.next-track(); }
+                    seek-by(delta) => { root.seek-by(delta); }
+                    seek-to(secs) => { root.seek-to(secs); }
+                    set-volume(vol) => { root.set-volume(vol); }
+                    toggle-like => { root.toggle-like(); }
+                    toggle-shuffle => { root.toggle-shuffle(); }
+                    cycle-repeat => { root.cycle-repeat(); }
+                    is-queue-open: root.queue-panel-open;
+                    toggle-queue-panel => { root.toggle-queue-panel(); }
                 }
-            }
-        }
-
-        Rectangle {
-            vertical-stretch: 0;
-            background: transparent;
-            height: root.player-bar-mode == 1 ? 92px : 72px;
-
-            PlayerBar {
-                mode: root.player-bar-mode;
-                show-artwork: root.player-bar-show-artwork;
-                show-like: root.player-bar-show-like;
-                show-shuffle: root.player-bar-show-shuffle;
-                show-repeat: root.player-bar-show-repeat;
-                show-skip-seconds: root.player-bar-show-skip-seconds;
-                show-queue: root.player-bar-show-queue;
-                show-volume: root.player-bar-show-volume;
-
-                width: root.player-bar-mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
-                height: 72px;
-                x: (parent.width - self.width) / 2;
-                y: root.player-bar-mode == 1 ? 8px : 0px;
-
-                active-track-title: root.active-track-title;
-                active-track-artist: root.active-track-artist;
-                is-playing: root.is-playing;
-                volume: root.volume;
-                position-text: root.position-text;
-                duration-text: root.duration-text;
-                cover: root.now-playing-cover;
-                is-liked: root.is-liked;
-                is-shuffle: root.is-shuffle;
-                repeat-mode: root.repeat-mode;
-                progress: root.playback-progress;
-                position-secs: root.position-secs;
-                duration-secs: root.duration-secs;
-                queue-count: root.queue-count;
-                queue-button-text: root.queue-button-text;
-
-                toggle-play => { root.toggle-play(); }
-                prev-track => { root.prev-track(); }
-                next-track => { root.next-track(); }
-                seek-by(delta) => { root.seek-by(delta); }
-                seek-to(secs) => { root.seek-to(secs); }
-                set-volume(vol) => { root.set-volume(vol); }
-                toggle-like => { root.toggle-like(); }
-                toggle-shuffle => { root.toggle-shuffle(); }
-                cycle-repeat => { root.cycle-repeat(); }
-                is-queue-open: root.queue-panel-open;
-                toggle-queue-panel => { root.toggle-queue-panel(); }
             }
         }
     }

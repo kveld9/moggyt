@@ -132,3 +132,8 @@ guessing; every rule here was verified against a build or the official documenta
   Empty states that do not scroll should be rendered outside `Flickable` in a dedicated layout with `vertical-stretch: 1`
   so they cannot collapse when the list is empty.
   Source: <https://docs.slint.dev/latest/docs/slint/src/language/builtins/elements#flickable>.
+- Global shortcuts belong in a bubbling `key-pressed` handler on a `FocusScope` that wraps the main layout
+  (focused text inputs consume their keys first, unhandled keys bubble up), the scope is made the initial focus via
+  the Window's `forward-focus`, and a layout inside a non-layout parent needs explicit
+  `width: parent.width; height: parent.height`.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/keyboard-input/focusscope/>.

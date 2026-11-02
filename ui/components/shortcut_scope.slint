@@ -1,0 +1,21 @@
+export component ShortcutScope inherits FocusScope {
+    in property <bool> shortcuts-enabled: true;
+
+    callback shortcut-pressed(string, bool) -> bool;
+
+    key-pressed(event) => {
+        if (event.text == Key.Escape) {
+            self.focus();
+            return accept;
+        }
+        if (!root.shortcuts-enabled) {
+            return reject;
+        }
+        if (root.shortcut-pressed(event.text, event.modifiers.control || event.modifiers.alt || event.modifiers.meta)) {
+            return accept;
+        }
+        return reject;
+    }
+
+    @children
+}

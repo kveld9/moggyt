@@ -16,6 +16,7 @@ export component SettingsView inherits VerticalLayout {
     in property <int> active-sleep-timer-index: 0;
     in property <int> active-audio-quality-index: 1;
     in property <bool> songs-only: false;
+    in property <bool> keyboard-shortcuts: true;
     in property <int> player-bar-mode: 0;
     in property <bool> player-bar-show-artwork: true;
     in property <bool> player-bar-show-like: true;
@@ -30,6 +31,7 @@ export component SettingsView inherits VerticalLayout {
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
     callback songs-only-toggled();
+    callback keyboard-shortcuts-toggled();
     callback sign-in-submitted(string);
     callback sign-out();
     callback player-bar-mode-selected(int);
@@ -49,10 +51,12 @@ export component SettingsView inherits VerticalLayout {
         active-sleep-timer-index: root.active-sleep-timer-index;
         active-audio-quality-index: root.active-audio-quality-index;
         songs-only: root.songs-only;
+        keyboard-shortcuts: root.keyboard-shortcuts;
         cycle-playback-speed => { root.cycle-playback-speed(); }
         sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
         audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
         songs-only-toggled => { root.songs-only-toggled(); }
+        keyboard-shortcuts-toggled => { root.keyboard-shortcuts-toggled(); }
     }
 
     session-panel := SessionSettings {
