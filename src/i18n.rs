@@ -169,6 +169,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Search Results", "Resultados de búsqueda"),
     ("Search songs...", "Buscar canciones..."),
     ("Searching...", "Buscando..."),
+    ("Select a playlist file", "Selecciona un archivo de playlist"),
     ("Session", "Sesión"),
     ("Settings", "Ajustes"),
     ("Show artwork", "Mostrar portada"),
@@ -395,6 +396,7 @@ mod tests {
             ("No match", "Sin coincidencia"),
             ("Review matches", "Revisar coincidencias"),
             ("Save playlist", "Guardar playlist"),
+            ("Select a playlist file", "Selecciona un archivo de playlist"),
             ("Source", "Origen"),
             ("Swap", "Cambiar"),
         ];

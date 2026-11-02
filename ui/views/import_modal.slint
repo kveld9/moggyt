@@ -8,14 +8,9 @@ export component ImportModal inherits Rectangle {
     in-out property <string> file-path: "";
 
     callback tab-selected(int);
-    callback link-edited(string);
-    callback file-path-edited(string);
     callback browse-requested();
     callback start-requested();
     callback close-requested();
-
-    changed link-text => { root.link-edited(root.link-text); }
-    changed file-path => { root.file-path-edited(root.file-path); }
 
     background: Theme.overlay;
 

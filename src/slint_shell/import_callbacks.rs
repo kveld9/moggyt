@@ -10,8 +10,10 @@ use anyhow::Context;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::domain::{SpotifyPlaylist, parse_spotify_ref};
-use crate::i18n::Locale;
-use crate::infra::{PlaylistStore, SpotifyEmbedClient, parse_exportify_csv};
+use crate::i18n::{Locale, tr};
+use crate::infra::{
+    FilePicker, PlaylistStore, RfdFilePicker, SpotifyEmbedClient, load_playlist_file,
+};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
 use crate::slint_shell::import_session::{ImportSession, ImportStage};
@@ -134,18 +136,7 @@ fn load_source_link(link_text: &str) -> anyhow::Result<SpotifyPlaylist> {
 }
 
 fn load_source_file(file_path: &str) -> anyhow::Result<SpotifyPlaylist> {
-    let content = std::fs::read_to_string(file_path)
-        .with_context(|| format!("failed to read file '{file_path}'"))?;
-    let tracks = parse_exportify_csv(&content)?;
-    let stem =
-        std::path::Path::new(file_path).file_stem().and_then(|s| s.to_str()).unwrap_or("import");
-    Ok(SpotifyPlaylist {
-        id: stem.to_string(),
-        title: stem.to_string(),
-        author: "Imported".to_string(),
-        artwork: None,
-        tracks,
-    })
+    load_playlist_file(std::path::Path::new(file_path))
 }
 
 fn on_source_load_success(win: &MoggytWindow, source: SpotifyPlaylist) {
@@ -187,6 +178,22 @@ fn spawn_source_loader(
             });
         })
         .expect("spawn spotify source loader thread");
+}
+
+fn run_import_file_picker(weak: slint::Weak<MoggytWindow>, title: &str) {
+    let Some(path) = RfdFilePicker.pick_import_file(title) else { return };
+    let _ = slint::invoke_from_event_loop(move || {
+        let Some(win) = weak.upgrade() else { return };
+        win.set_import_file_path(path.display().to_string().into());
+        win.set_import_tab(1);
+    });
+}
+
+fn spawn_import_file_picker(weak: slint::Weak<MoggytWindow>, title: String) {
+    std::thread::Builder::new()
+        .name("import-file-picker".into())
+        .spawn(move || run_import_file_picker(weak, &title))
+        .expect("spawn import file picker thread");
 }
 
 fn reload_local_library(window: &MoggytWindow, store: &dyn PlaylistStore) {
@@ -242,6 +249,15 @@ fn reset_session_to_idle(window: &MoggytWindow) {
 
 /// Wires import interaction callbacks between MoggytWindow and the import session.
 pub fn install_import_callbacks(window: &MoggytWindow) {
+    let w = window.as_weak();
+    window.on_import_browse_requested(move || {
+        let Some(win) = w.upgrade() else { return };
+        let locale =
+            crate::slint_shell::window::with_ui_state(|st| st.locale).unwrap_or(Locale::English);
+        let title = tr(locale, "Select a playlist file");
+        spawn_import_file_picker(win.as_weak(), title.to_string());
+    });
+
     let w = window.as_weak();
     window.on_import_start_requested(move || {
         let Some(win) = w.upgrade() else { return };

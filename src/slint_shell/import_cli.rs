@@ -13,7 +13,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{MatchConfidence, SpotifyPlaylist, SpotifyTrack, parse_spotify_ref};
-use crate::infra::{PlaylistStore, SpotifyEmbedClient, parse_exportify_csv};
+use crate::infra::{PlaylistStore, SpotifyEmbedClient, load_playlist_file};
 use crate::slint_shell::import_worker::{
     ImportProgressEvent, TrackResolution, TrackSearcher, WorkerConfig, assemble_playlist,
     resolve_tracks,
@@ -248,23 +248,8 @@ fn load_link_source(url: &str) -> anyhow::Result<SpotifyPlaylist> {
 }
 
 fn load_csv_source(path: &Path) -> anyhow::Result<SpotifyPlaylist> {
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read CSV file at '{}'", path.display()))?;
-    let tracks = parse_exportify_csv(&content)
-        .with_context(|| format!("failed to parse CSV file at '{}'", path.display()))?;
-    let stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .filter(|s| !s.is_empty())
-        .unwrap_or("import")
-        .to_string();
-    Ok(SpotifyPlaylist {
-        id: stem.clone(),
-        title: stem,
-        author: String::new(),
-        artwork: None,
-        tracks,
-    })
+    load_playlist_file(path)
+        .with_context(|| format!("failed to load playlist file at '{}'", path.display()))
 }
 
 fn load_source(source_arg: &ImportSourceArg) -> anyhow::Result<SpotifyPlaylist> {

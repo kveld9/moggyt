@@ -152,6 +152,7 @@ export component MoggytWindow inherits Window {
     callback close-queue-panel();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
+    callback import-browse-requested();
     callback import-start-requested();
     callback import-cancel-requested();
     callback import-close-requested();
@@ -324,6 +325,7 @@ export component MoggytWindow inherits Window {
         active-tab <=> root.import-tab;
         link-text <=> root.import-link-text;
         file-path <=> root.import-file-path;
+        browse-requested => { root.import-browse-requested(); }
         start-requested => { root.import-start-requested(); }
         close-requested => {
             root.show-import-modal = false;
