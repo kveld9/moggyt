@@ -10,14 +10,14 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::domain::{
-    Album, Detail, DetailKind, PlaybackQueue, PlayerBarMode, Playlist, RecentSearches,
+    Album, Detail, DetailKind, Palette, PlaybackQueue, PlayerBarMode, Playlist, RecentSearches,
     SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer, ThemeId, Track,
     extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, LyricLine,
-    LyricOverrideDir, LyricsSource, MediaKeyAction, QueueStore, ReleaseInfo, Scrobbler,
+    AudioBackend, Catalog, CoverCache, CustomThemeFile, DesktopPresence, DiscordPresence,
+    LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, QueueStore, ReleaseInfo, Scrobbler,
     SessionStore, SettingsStore, SkipStore, TrayAction, TrayHandle, decode_cover, decode_handoff,
     fetch_artwork, sanitize_cookie_input,
 };
@@ -82,6 +82,9 @@ pub struct SlintAppState {
     pub keyboard_shortcuts: bool,
     pub signed_in: bool,
     pub theme: ThemeId,
+    pub custom_theme: Option<CustomThemeFile>,
+    pub custom_palette: Option<Palette>,
+    pub custom_theme_status: String,
     pub locale: Locale,
     pub player_bar: PlayerBarPrefs,
     pub search_filter: SearchFilter,

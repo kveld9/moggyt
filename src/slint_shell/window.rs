@@ -40,6 +40,7 @@ use crate::slint_shell::sync::{
     persist_recent_searches, sync_library_and_detail, sync_playback_tick, sync_recent_searches,
     sync_shelves_and_queue, sync_update_status, sync_window,
 };
+use crate::slint_shell::theme::apply_custom_theme_if_changed;
 
 thread_local! {
     static ACTIVE_STATE: RefCell<Option<SharedState>> = const { RefCell::new(None) };
@@ -382,6 +383,7 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
         state.check_auto_skip();
         state.continue_autoplay_if_ended();
         state.poll_sleep_timer();
+        apply_custom_theme_if_changed(&win, &mut state);
         drain_updater_check(&win, &mut state);
         sync_playback_tick(&win, &mut state);
     });

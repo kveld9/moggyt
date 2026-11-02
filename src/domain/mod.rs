@@ -40,4 +40,4 @@ pub use search::{
 };
 pub use segments::{InvalidSegment, SkipRanges, SkipSegment};
 pub use sleep_timer::{SLEEP_FADE_WINDOW_SECS, SleepTimer, TimerPreset, faded_volume};
-pub use theme::{Palette, PlayerBarMode, ThemeId};
+pub use theme::{CustomPaletteError, Palette, PlayerBarMode, ThemeId, parse_hex_rgb};

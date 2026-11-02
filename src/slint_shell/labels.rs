@@ -47,6 +47,7 @@ pub struct StaticLabels {
     pub theme_white: &'static str,
     pub theme_black_oled: &'static str,
     pub theme_mono: &'static str,
+    pub theme_custom: &'static str,
     pub section_playback: &'static str,
     pub playback_speed: &'static str,
     pub sleep_timer_label: &'static str,
@@ -153,6 +154,7 @@ impl StaticLabels {
             theme_white: tr(locale, "White"),
             theme_black_oled: tr(locale, "Black OLED"),
             theme_mono: tr(locale, "Mono"),
+            theme_custom: tr(locale, "Custom"),
             section_playback: tr(locale, "Playback"),
             playback_speed: tr(locale, "Playback speed"),
             sleep_timer_label: tr(locale, "Sleep timer"),
@@ -265,6 +267,7 @@ impl StaticLabels {
         labels.set_theme_white_label(self.theme_white.into());
         labels.set_theme_black_oled_label(self.theme_black_oled.into());
         labels.set_theme_mono_label(self.theme_mono.into());
+        labels.set_theme_custom_label(self.theme_custom.into());
         labels.set_section_playback_label(self.section_playback.into());
         labels.set_playback_speed_label(self.playback_speed.into());
         labels.set_sleep_timer_label(self.sleep_timer_label.into());
@@ -393,6 +396,7 @@ mod tests {
         assert_eq!(es.theme_white, "Blanco");
         assert_eq!(es.theme_black_oled, "Negro OLED");
         assert_eq!(es.theme_mono, "Monocromo");
+        assert_eq!(es.theme_custom, "Personalizado");
         assert_eq!(es.section_playback, "Reproducción");
         assert_eq!(es.playback_speed, "Velocidad de reproducción");
         assert_eq!(es.sleep_timer_label, "Temporizador de apagado");
@@ -495,6 +499,7 @@ mod tests {
         assert_eq!(en.theme_white, "White");
         assert_eq!(en.theme_black_oled, "Black OLED");
         assert_eq!(en.theme_mono, "Mono");
+        assert_eq!(en.theme_custom, "Custom");
         assert_eq!(en.section_playback, "Playback");
         assert_eq!(en.playback_speed, "Playback speed");
         assert_eq!(en.sleep_timer_label, "Sleep timer");

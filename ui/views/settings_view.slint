@@ -6,6 +6,7 @@ import { AboutSettings } from "../components/settings/about_settings.slint";
 
 export component SettingsView inherits VerticalLayout {
     in property <int> active-theme-index: 0;
+    in property <string> custom-theme-status-text: "";
     in property <string> playback-speed-text: "1.00x";
     in property <bool> signed-in: false;
     in-out property <string> cookie-text: "";
@@ -42,6 +43,7 @@ export component SettingsView inherits VerticalLayout {
 
     theme-panel := ThemeSettings {
         active-theme-index: root.active-theme-index;
+        custom-theme-status-text: root.custom-theme-status-text;
         theme-selected(idx) => { root.theme-selected(idx); }
     }
 

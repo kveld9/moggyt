@@ -5,7 +5,9 @@
 //! color primitives.
 
 use crate::domain::{Palette, ThemeId};
+use crate::i18n::tr;
 use crate::slint_shell::MoggytWindow;
+use crate::slint_shell::state::SlintAppState;
 
 /// Converts a domain [u8; 3] sRGB array into a Slint [`slint::Color`].
 pub fn rgb_to_slint(c: [u8; 3]) -> slint::Color {
@@ -18,21 +20,27 @@ pub fn palette_for(id: ThemeId) -> Palette {
         ThemeId::White => Palette::white(),
         ThemeId::BlackOled => Palette::black_oled(),
         ThemeId::Mono => Palette::mono(),
+        ThemeId::Custom => Palette::black_oled(),
     }
 }
 
 /// Available themes with their domain identifier and human-readable display name.
-pub const ALL_THEMES: [(ThemeId, &str); 3] =
-    [(ThemeId::White, "White"), (ThemeId::BlackOled, "Black OLED"), (ThemeId::Mono, "Monochrome")];
+pub const ALL_THEMES: [(ThemeId, &str); 4] = [
+    (ThemeId::White, "White"),
+    (ThemeId::BlackOled, "Black OLED"),
+    (ThemeId::Mono, "Monochrome"),
+    (ThemeId::Custom, "Custom"),
+];
 
 /// Maps a 0-based integer index to its corresponding [`ThemeId`].
 ///
 /// Returns [`ThemeId::White`] for 0 or unknown values,
-/// [`ThemeId::BlackOled`] for 1, and [`ThemeId::Mono`] for 2.
+/// [`ThemeId::BlackOled`] for 1, [`ThemeId::Mono`] for 2, and [`ThemeId::Custom`] for 3.
 pub fn theme_from_index(index: i32) -> ThemeId {
     match index {
         1 => ThemeId::BlackOled,
         2 => ThemeId::Mono,
+        3 => ThemeId::Custom,
         _ => ThemeId::White,
     }
 }
@@ -43,6 +51,7 @@ pub fn theme_to_index(id: ThemeId) -> i32 {
         ThemeId::White => 0,
         ThemeId::BlackOled => 1,
         ThemeId::Mono => 2,
+        ThemeId::Custom => 3,
     }
 }
 
@@ -52,6 +61,7 @@ pub fn theme_display_name(id: ThemeId) -> &'static str {
         ThemeId::White => "White",
         ThemeId::BlackOled => "Black OLED",
         ThemeId::Mono => "Monochrome",
+        ThemeId::Custom => "Custom",
     }
 }
 
@@ -113,6 +123,66 @@ impl ThemeColors {
 pub fn apply_theme(window: &MoggytWindow, theme_id: ThemeId) {
     let colors = ThemeColors::for_theme(theme_id);
     colors.apply_to_window(window);
+}
+
+/// Convenience helper to push an arbitrary palette's color slots to window.
+pub fn apply_palette(window: &MoggytWindow, palette: &Palette) {
+    let colors = ThemeColors::from(palette);
+    colors.apply_to_window(window);
+}
+
+impl SlintAppState {
+    /// Returns the active color palette, resolving custom overrides if Custom theme is selected.
+    pub fn active_palette(&self) -> Palette {
+        if self.theme == ThemeId::Custom {
+            self.custom_palette.clone().unwrap_or_else(|| palette_for(ThemeId::Custom))
+        } else {
+            palette_for(self.theme)
+        }
+    }
+
+    /// Reloads custom theme from disk if configured, updating state status message.
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
+    pub fn reload_custom_theme(&mut self) {
+        let Some(ref mut custom) = self.custom_theme else {
+            return;
+        };
+        let path_display = custom.path().display().to_string();
+        match custom.load() {
+            Ok(palette) => {
+                self.custom_palette = Some(palette);
+                self.custom_theme_status = tr(self.locale, "Custom theme loaded from {path}")
+                    .replace("{path}", &path_display);
+            }
+            Err(err) => {
+                tracing::warn!("failed to load custom theme: {err:#}");
+                self.custom_theme_status = tr(self.locale, "Custom theme not loaded: {error}")
+                    .replace("{error}", &format!("{err:#}"));
+            }
+        }
+    }
+
+    /// Polls custom theme file on disk and reloads palette if modified and Custom theme is active.
+    pub fn poll_custom_theme(&mut self) -> bool {
+        if self.theme != ThemeId::Custom {
+            return false;
+        }
+        let has_changed = self.custom_theme.as_ref().is_some_and(|c| c.has_changed());
+        if !has_changed {
+            return false;
+        }
+        self.reload_custom_theme();
+        true
+    }
+}
+
+/// Checks for custom theme file modifications and applies colors to window if updated.
+pub(crate) fn apply_custom_theme_if_changed(window: &MoggytWindow, state: &mut SlintAppState) {
+    if state.poll_custom_theme() {
+        apply_palette(window, &state.active_palette());
+        window.set_custom_theme_status_text(state.custom_theme_status.clone().into());
+    }
 }
 
 #[cfg(test)]
@@ -212,6 +282,7 @@ mod tests {
         assert_eq!(theme_from_index(0), ThemeId::White);
         assert_eq!(theme_from_index(1), ThemeId::BlackOled);
         assert_eq!(theme_from_index(2), ThemeId::Mono);
+        assert_eq!(theme_from_index(3), ThemeId::Custom);
         assert_eq!(theme_from_index(-1), ThemeId::White);
         assert_eq!(theme_from_index(99), ThemeId::White);
     }
@@ -221,6 +292,7 @@ mod tests {
         assert_eq!(theme_to_index(ThemeId::White), 0);
         assert_eq!(theme_to_index(ThemeId::BlackOled), 1);
         assert_eq!(theme_to_index(ThemeId::Mono), 2);
+        assert_eq!(theme_to_index(ThemeId::Custom), 3);
     }
 
     #[test]
@@ -228,6 +300,7 @@ mod tests {
         assert_eq!(theme_display_name(ThemeId::White), "White");
         assert_eq!(theme_display_name(ThemeId::BlackOled), "Black OLED");
         assert_eq!(theme_display_name(ThemeId::Mono), "Monochrome");
+        assert_eq!(theme_display_name(ThemeId::Custom), "Custom");
     }
 
     #[test]
@@ -237,5 +310,68 @@ mod tests {
             assert_eq!(theme_from_index(idx), theme);
             assert_eq!(theme_display_name(theme), name);
         }
+    }
+
+    #[test]
+    fn test_custom_theme_palette_for_returns_black_oled() {
+        assert_eq!(palette_for(ThemeId::Custom), Palette::black_oled());
+    }
+
+    #[test]
+    fn test_active_palette_resolves_builtin_and_custom() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        state.theme = ThemeId::White;
+        assert_eq!(state.active_palette(), Palette::white());
+
+        state.theme = ThemeId::Custom;
+        state.custom_palette = None;
+        assert_eq!(state.active_palette(), Palette::black_oled());
+
+        let custom_pal = Palette::mono();
+        state.custom_palette = Some(custom_pal.clone());
+        assert_eq!(state.active_palette(), custom_pal);
+    }
+
+    #[test]
+    fn test_poll_custom_theme_false_when_not_custom() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        state.theme = ThemeId::White;
+        assert!(!state.poll_custom_theme());
+    }
+
+    #[test]
+    fn test_reload_custom_theme_keeps_previous_palette_on_error() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-test-shell-theme-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let custom = crate::infra::CustomThemeFile::new(&temp_dir);
+        let path = custom.path().to_path_buf();
+        std::fs::write(&path, r##"{"mode": "light", "window": "#112233"}"##).unwrap();
+
+        state.custom_theme = Some(custom);
+        state.theme = ThemeId::Custom;
+        state.reload_custom_theme();
+
+        assert!(state.custom_palette.is_some());
+        let previous = state.custom_palette.clone().unwrap();
+        assert_eq!(previous.window, [0x11, 0x22, 0x33]);
+        assert!(state.custom_theme_status.contains("Custom theme loaded from"));
+
+        // Now break the file by writing invalid JSON
+        std::fs::write(&path, "invalid json").unwrap();
+        let file = std::fs::File::options().write(true).open(&path).unwrap();
+        let future_time = std::time::SystemTime::now() + std::time::Duration::from_secs(3600);
+        file.set_modified(future_time).unwrap();
+        drop(file);
+
+        assert!(state.poll_custom_theme());
+        // Custom palette should be KEPT (not wiped out)
+        assert_eq!(state.custom_palette, Some(previous));
+        assert!(state.custom_theme_status.contains("Custom theme not loaded:"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

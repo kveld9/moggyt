@@ -43,6 +43,7 @@ export component ContentArea inherits Rectangle {
     in property <[TrackRowData]> detail-tracks: [];
     in property <image> detail-cover;
     in property <int> active-theme-index: 0;
+    in property <string> custom-theme-status-text: "";
     in property <string> playback-speed-text: "1.00x";
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
@@ -236,6 +237,7 @@ export component ContentArea inherits Rectangle {
 
             if root.active-page == 4 : SettingsView {
                 active-theme-index: root.active-theme-index;
+                custom-theme-status-text: root.custom-theme-status-text;
                 playback-speed-text: root.playback-speed-text;
                 signed-in: root.signed-in;
                 cookie-text <=> root.settings-cookie-text;
