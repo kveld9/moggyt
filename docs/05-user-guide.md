@@ -160,25 +160,33 @@ If a matched track is incorrect or a better alternative exists:
 
 #### Headless CLI Usage
 
-You can also import playlists headlessly from the terminal without opening the graphical interface:
+You can also import playlists headlessly from the terminal without opening the graphical interface. The CLI
+runs before and without taking the single-instance lock or initializing audio/tray devices, so imports work even
+while the GUI is actively running:
 
 ```bash
-# Import from a Spotify link
-moggyt --import-spotify <URL> --headless
+# Import from a Spotify link (--headless is optional and implied)
+moggyt --import-spotify <URL>
 
-# Import from an Exportify CSV or JSON file
-moggyt --import-csv <PATH> --headless
+# Import from an Exportify CSV or Spotify JSON backup file
+moggyt --import-csv <PATH>
 
-# Emit machine-readable JSON output to stdout
+# Emit machine-readable JSON output to stdout (--json requires --headless)
 moggyt --import-spotify <URL> --headless --json
 moggyt --import-csv <PATH> --headless --json
 ```
 
 In headless mode:
 
+- The `--headless` flag is optional and implied by `--import-spotify` and `--import-csv`.
+- Note the parser rule: `--json` still requires `--headless` (`--json requires --headless`), so keep `--headless`
+  in every `--json` invocation.
+- Operates before single-instance lock acquisition, allowing CLI imports while the GUI is running (a running GUI
+  does not refresh its library live; saved playlists become available on restart).
+- `--import-csv` accepts both Exportify CSV files and Spotify JSON backup files.
 - Matching progress is streamed to `stderr`.
-- A summary report is printed to `stdout` upon completion (JSON format when `--json` is passed, plain text otherwise).
-- Successfully imported playlists are saved directly to `playlists.json` and become available in the library.
+- A summary report is printed to `stdout` upon completion (JSON format with `--json`, plain text otherwise).
+- Successfully imported playlists are saved directly to `playlists.json` in the configuration directory.
 
 ## Persistent Player Bar
 
