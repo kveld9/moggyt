@@ -74,6 +74,8 @@ pub struct SlintAppState {
     pub sleep_timer: SleepTimer,
     pub sleep_timer_accumulated: u64,
     pub sleep_timer_base_offset: u64,
+    /// User volume captured when progressive sleep timer fade started; None when no fade is active.
+    pub sleep_fade_base_volume: Option<u8>,
     pub autoplay: bool,
     pub hi_res_covers: bool,
     pub signed_in: bool,
