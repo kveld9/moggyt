@@ -11,6 +11,7 @@ use crate::domain::{
 };
 use crate::i18n::{Locale, tr};
 use crate::slint_shell::import_worker::TrackResolution;
+use crate::slint_shell::search::format_duration;
 use crate::slint_shell::{ImportAlternativeData, ImportRowData};
 
 /// One review row: the Spotify source track and the chosen local match.
@@ -248,8 +249,14 @@ pub fn rows_to_slint(review: &ImportReview, locale: Locale) -> Vec<ImportRowData
     review.rows.iter().map(|r| row_to_slint_data(r, locale)).collect()
 }
 
+fn alternative_detail(alt: &LocalTrack, locale: Locale) -> String {
+    let duration = format_duration(alt.duration_secs);
+    let label = tr(locale, confidence_label_key(alt.confidence));
+    if duration.is_empty() { label.to_string() } else { format!("{duration} - {label}") }
+}
+
 /// Converts an [`ImportRow`]'s alternatives into Slint alternative models.
-pub fn alternatives_to_slint(row: &ImportRow) -> Vec<ImportAlternativeData> {
+pub fn alternatives_to_slint(row: &ImportRow, locale: Locale) -> Vec<ImportAlternativeData> {
     row.alternatives
         .iter()
         .enumerate()
@@ -257,6 +264,7 @@ pub fn alternatives_to_slint(row: &ImportRow) -> Vec<ImportAlternativeData> {
             index: i as i32,
             title: alt.title.as_str().into(),
             artist: alt.artist.as_str().into(),
+            detail: alternative_detail(alt, locale).into(),
         })
         .collect()
 }
@@ -576,7 +584,8 @@ mod tests {
 
     #[test]
     fn test_alternatives_to_slint_mapping() {
-        let alt1 = LocalTrack::new("v1", "Alt 1", "Artist 1", MatchConfidence::High);
+        let mut alt1 = LocalTrack::new("v1", "Alt 1", "Artist 1", MatchConfidence::High);
+        alt1.duration_secs = Some(185);
         let alt2 = LocalTrack::new("v2", "Alt 2", "Artist 2", MatchConfidence::Medium);
         let row = ImportRow {
             index: 0,
@@ -584,18 +593,38 @@ mod tests {
             source_artist: "Artist".to_string(),
             chosen: Some(alt1.clone()),
             confidence: Some(MatchConfidence::High),
-            alternatives: vec![alt1, alt2],
+            alternatives: vec![alt1.clone(), alt2.clone()],
             chosen_alternative: 0,
             reason: None,
         };
-        let slint_alts = alternatives_to_slint(&row);
-        assert_eq!(slint_alts.len(), 2);
-        assert_eq!(slint_alts[0].index, 0);
-        assert_eq!(slint_alts[0].title, "Alt 1");
-        assert_eq!(slint_alts[0].artist, "Artist 1");
-        assert_eq!(slint_alts[1].index, 1);
-        assert_eq!(slint_alts[1].title, "Alt 2");
-        assert_eq!(slint_alts[1].artist, "Artist 2");
+
+        let slint_alts_en = alternatives_to_slint(&row, Locale::English);
+        assert_eq!(slint_alts_en.len(), 2);
+        assert_eq!(slint_alts_en[0].index, 0);
+        assert_eq!(slint_alts_en[0].title, "Alt 1");
+        assert_eq!(slint_alts_en[0].artist, "Artist 1");
+        assert_eq!(
+            slint_alts_en[0].detail,
+            format!("3:05 - {}", tr(Locale::English, confidence_label_key(alt1.confidence)))
+        );
+        assert_eq!(slint_alts_en[1].index, 1);
+        assert_eq!(slint_alts_en[1].title, "Alt 2");
+        assert_eq!(slint_alts_en[1].artist, "Artist 2");
+        assert_eq!(
+            slint_alts_en[1].detail,
+            tr(Locale::English, confidence_label_key(alt2.confidence))
+        );
+
+        let slint_alts_es = alternatives_to_slint(&row, Locale::Spanish);
+        assert_eq!(slint_alts_es.len(), 2);
+        assert_eq!(
+            slint_alts_es[0].detail,
+            format!("3:05 - {}", tr(Locale::Spanish, confidence_label_key(alt1.confidence)))
+        );
+        assert_eq!(
+            slint_alts_es[1].detail,
+            tr(Locale::Spanish, confidence_label_key(alt2.confidence))
+        );
     }
 
     #[test]

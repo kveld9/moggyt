@@ -92,12 +92,14 @@ fn sync_import_picker(
     window: &MoggytWindow,
     picker_row: Option<usize>,
     review_opt: Option<&ImportReview>,
+    locale: Locale,
 ) {
     window.set_import_picker_open(picker_row.is_some());
     if let Some(row_idx) = picker_row {
         if let Some(row) = review_opt.and_then(|r| r.rows.get(row_idx)) {
-            window
-                .set_import_alternatives(ModelRc::new(VecModel::from(alternatives_to_slint(row))));
+            window.set_import_alternatives(ModelRc::new(VecModel::from(alternatives_to_slint(
+                row, locale,
+            ))));
             window.set_import_alternative_selected(row.chosen_alternative as i32);
             return;
         }
@@ -115,7 +117,7 @@ pub fn sync_import(window: &MoggytWindow) {
     sync_import_progress(window, stage, &status, &counts);
     sync_import_modal_visibility(window, stage);
     sync_import_review(window, stage, review_opt.as_ref(), &counts, locale);
-    sync_import_picker(window, picker_row, review_opt.as_ref());
+    sync_import_picker(window, picker_row, review_opt.as_ref(), locale);
 }
 
 /// Drains pending background events and synchronizes the window.
