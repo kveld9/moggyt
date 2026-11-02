@@ -638,6 +638,7 @@ fn wire_settings_callbacks(
 
 /// Handles sleep timer preset selection, arming or canceling the timer.
 pub(crate) fn handle_sleep_timer_selection(state: &mut SlintAppState, idx: i32) {
+    state.restore_sleep_fade_volume();
     let preset = timer_preset_from_index(idx);
     let track_id = state.queue.current().map(|t| t.id.clone());
     if preset == TimerPreset::Off {

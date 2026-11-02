@@ -39,5 +39,5 @@ pub use search::{
     SearchFilter, SearchQuery, Track,
 };
 pub use segments::{InvalidSegment, SkipRanges, SkipSegment};
-pub use sleep_timer::{SleepTimer, TimerPreset};
+pub use sleep_timer::{SLEEP_FADE_WINDOW_SECS, SleepTimer, TimerPreset, faded_volume};
 pub use theme::{Palette, PlayerBarMode, ThemeId};

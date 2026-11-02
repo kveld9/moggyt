@@ -80,6 +80,7 @@ impl SlintAppState {
             sleep_timer: SleepTimer::new(),
             sleep_timer_accumulated: 0,
             sleep_timer_base_offset: 0,
+            sleep_fade_base_volume: None,
             autoplay: false,
             hi_res_covers: false,
             signed_in,

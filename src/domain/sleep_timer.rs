@@ -3,6 +3,9 @@
 //! Invariant: this module performs no I/O and reads no clocks. All elapsed durations
 //! and track identifiers enter as injected parameters.
 
+/// Fixed duration in seconds for the volume fade-out window before sleep timer expiry.
+pub const SLEEP_FADE_WINDOW_SECS: u64 = 30;
+
 /// Standard sleep timer presets including interval countdowns and stop-after-track.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TimerPreset {
@@ -155,6 +158,19 @@ impl SleepTimer {
     }
 }
 
+/// Computes the attenuated volume level during the progressive sleep fade window.
+///
+/// Outside the fade window (when `remaining_secs >= SLEEP_FADE_WINDOW_SECS`), returns `base`.
+/// Inside the window, scales down linearly toward 0 using integer arithmetic:
+/// `base * remaining_secs / SLEEP_FADE_WINDOW_SECS`.
+pub fn faded_volume(base: u8, remaining_secs: u64) -> u8 {
+    if remaining_secs >= SLEEP_FADE_WINDOW_SECS {
+        return base;
+    }
+    let scaled = (base as u64).saturating_mul(remaining_secs) / SLEEP_FADE_WINDOW_SECS;
+    scaled as u8
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +286,27 @@ mod tests {
         assert!(!timer.is_armed());
         assert_eq!(timer.preset(), TimerPreset::Off);
         assert!(!timer.notify_track_changed("t2"));
+    }
+
+    #[test]
+    fn faded_volume_scale_and_boundaries() {
+        assert_eq!(faded_volume(100, SLEEP_FADE_WINDOW_SECS), 100);
+        assert_eq!(faded_volume(100, SLEEP_FADE_WINDOW_SECS + 10), 100);
+        assert_eq!(faded_volume(75, 45), 75);
+        assert_eq!(faded_volume(100, 15), 50);
+        assert_eq!(faded_volume(100, 0), 0);
+        assert_eq!(faded_volume(0, 15), 0);
+        assert_eq!(faded_volume(0, 30), 0);
+    }
+
+    #[test]
+    fn faded_volume_monotonic_non_increasing_as_remaining_decreases() {
+        let base = 100;
+        let mut prev = faded_volume(base, SLEEP_FADE_WINDOW_SECS);
+        for r in (0..SLEEP_FADE_WINDOW_SECS).rev() {
+            let curr = faded_volume(base, r);
+            assert!(curr <= prev, "expected curr {curr} <= prev {prev} at remaining {r}");
+            prev = curr;
+        }
     }
 }
