@@ -48,6 +48,7 @@ export component ContentArea inherits Rectangle {
     in property <int> active-sleep-timer-index: 0;
     in property <int> active-audio-quality-index: 1;
     in property <bool> songs-only: false;
+    in property <bool> keyboard-shortcuts: true;
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Up to date";
@@ -84,6 +85,7 @@ export component ContentArea inherits Rectangle {
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
     callback songs-only-toggled();
+    callback keyboard-shortcuts-toggled();
     callback back-pressed();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
@@ -244,6 +246,7 @@ export component ContentArea inherits Rectangle {
                 active-sleep-timer-index: root.active-sleep-timer-index;
                 active-audio-quality-index: root.active-audio-quality-index;
                 songs-only: root.songs-only;
+                keyboard-shortcuts: root.keyboard-shortcuts;
                 player-bar-mode: root.player-bar-mode;
                 player-bar-show-artwork: root.player-bar-show-artwork;
                 player-bar-show-like: root.player-bar-show-like;
@@ -257,6 +260,7 @@ export component ContentArea inherits Rectangle {
                 sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
                 audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
                 songs-only-toggled => { root.songs-only-toggled(); }
+                keyboard-shortcuts-toggled => { root.keyboard-shortcuts-toggled(); }
                 sign-in-submitted(t) => { root.sign-in-submitted(t); }
                 sign-out => { root.sign-out(); }
                 player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }

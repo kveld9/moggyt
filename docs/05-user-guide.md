@@ -239,8 +239,9 @@ Global keyboard shortcuts provide transport and playback control when single-lin
 | `N` | Next track | Skips to next track in queue (requires queued tracks). |
 | `P` | Previous track | Skips to previous track in queue (requires queued tracks). |
 | `L` | Toggle like | Adds or removes current track from liked songs. |
+| `Esc` | Leave text field | Returns focus from the search field so shortcuts apply again. |
 
-Keyboard shortcuts can be toggled in the `Library` preferences section and are enabled by default.
+Keyboard shortcuts can be toggled in the `Playback` settings section and are enabled by default.
 
 ## Desktop Integration
 
