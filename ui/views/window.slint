@@ -101,6 +101,8 @@ export component MoggytWindow inherits Window {
     in-out property <int> import-tab: 0;
     in-out property <string> import-link-text: "";
     in-out property <string> import-file-path: "";
+    in-out property <bool> import-busy: false;
+    in-out property <bool> import-failed: false;
     in-out property <bool> import-running: false;
     in-out property <string> import-status-text: "";
     in-out property <int> import-done: 0;
@@ -325,6 +327,9 @@ export component MoggytWindow inherits Window {
         active-tab <=> root.import-tab;
         link-text <=> root.import-link-text;
         file-path <=> root.import-file-path;
+        busy: root.import-busy;
+        failed: root.import-failed;
+        status-text: root.import-status-text;
         browse-requested => { root.import-browse-requested(); }
         start-requested => { root.import-start-requested(); }
         close-requested => {

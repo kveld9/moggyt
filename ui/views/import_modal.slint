@@ -6,6 +6,9 @@ export component ImportModal inherits Rectangle {
     in-out property <int> active-tab: 0;
     in-out property <string> link-text: "";
     in-out property <string> file-path: "";
+    in property <bool> busy: false;
+    in property <bool> failed: false;
+    in property <string> status-text: "";
 
     callback tab-selected(int);
     callback browse-requested();
@@ -163,6 +166,13 @@ export component ImportModal inherits Rectangle {
                 }
             }
 
+            if root.status-text != "" : Text {
+                text: root.status-text;
+                color: root.failed ? Theme.accent : Theme.secondary;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
             HorizontalLayout {
                 alignment: end;
                 spacing: 12px;
@@ -189,9 +199,11 @@ export component ImportModal inherits Rectangle {
                 Rectangle {
                     width: 130px;
                     border-radius: 8px;
+                    opacity: root.busy ? 0.5 : 1.0;
                     background: start-btn.pressed ? Theme.overlay : (start-btn.has-hover ? Theme.hover : Theme.accent);
                     animate background { duration: 150ms; easing: ease-in-out; }
                     start-btn := TouchArea {
+                        enabled: !root.busy;
                         clicked => { root.start-requested(); }
                     }
                     Text {
