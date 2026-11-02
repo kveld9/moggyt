@@ -104,7 +104,8 @@ The modal provides two tabs for supplying playlist metadata:
   Spotify identifiers must be valid 22-character alphanumeric IDs.
 - **From file (`From file`)**: Specify the path to an exported playlist file:
   - **Exportify CSV**: 19-column CSV file exported from Exportify containing `Track Name`, `Artist Name(s)`,
-    `Album Name`, `Track Duration (ms)`, `ISRC`, and `Track URI` columns.
+    `Album Name`, `Track Duration (ms)`, and `Track URI` columns (`ISRC` is optional and, when present, is used as the
+    first search query).
   - **Spotify JSON Backup**: Standard JSON playlist backup file containing track and artist metadata.
 
 #### Embed 100-Track Limit & CSV Alternative
