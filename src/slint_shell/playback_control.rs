@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use slint::{ModelRc, VecModel};
 
-use crate::domain::{SLEEP_FADE_WINDOW_SECS, faded_volume};
+use crate::domain::{SLEEP_FADE_WINDOW_SECS, Track, faded_volume};
 use crate::i18n::tr;
 use crate::infra::{AudioBackend, AudioQuality, Catalog, Presence, should_scrobble};
 use crate::slint_shell::covers::request_queue_track_cover;
@@ -17,6 +17,21 @@ use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_worker::PlayTrackResult;
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::{LyricLineData, MoggytWindow};
+
+/// Playback start record: when the track started and which track it was.
+#[derive(Debug, Clone)]
+pub struct StartedPlay {
+    pub instant: Instant,
+    pub unix_secs: u64,
+    pub track: Track,
+}
+
+impl StartedPlay {
+    /// Captures the start instant and unix epoch timestamp for the given track.
+    pub fn now(track: Track) -> Self {
+        Self { instant: Instant::now(), unix_secs: current_unix_secs(), track }
+    }
+}
 
 impl SlintAppState {
     /// Advances or retreats queue cursor in-memory to target index without triggering playback.
@@ -43,13 +58,14 @@ impl SlintAppState {
         let Some(track) = self.queue.current() else {
             return;
         };
+        let track = track.clone();
         let id = track.id.clone();
         let artist = track.artist.clone();
         let title = track.title.clone();
         if let Ok(mut a) = self.audio.lock() {
             a.play(&id);
         }
-        self.started_at = Some((Instant::now(), current_unix_secs()));
+        self.started_at = Some(StartedPlay::now(track));
         if let Ok(mut s) = self.scrobbler.lock() {
             s.now_playing(&artist, &title);
         }
@@ -243,25 +259,25 @@ impl SlintAppState {
 
     /// Submits scrobble record to active scrobbler if playback elapsed threshold was met.
     pub fn maybe_scrobble_current(&mut self) {
-        let Some((started_instant, started_unix)) = self.started_at else {
+        let Some(started) = self.started_at.take() else {
             return;
         };
-        let elapsed = started_instant.elapsed().as_secs();
-        let Some(current) = self.queue.current() else {
-            return;
-        };
-        let duration = current.duration_secs.map(u64::from);
+        let elapsed = started.instant.elapsed().as_secs();
+        let duration = started.track.duration_secs.map(u64::from);
         if should_scrobble(elapsed, duration) {
-            if let Ok(mut s) = self.scrobbler.lock() {
-                s.scrobble(&current.artist, &current.title, started_unix);
-            }
-            if let Some(sec) = &self.secondary_scrobbler {
-                if let Ok(mut s) = sec.lock() {
-                    s.scrobble(&current.artist, &current.title, started_unix);
-                }
+            self.submit_scrobble(&started.track.artist, &started.track.title, started.unix_secs);
+        }
+    }
+
+    fn submit_scrobble(&self, artist: &str, title: &str, unix_secs: u64) {
+        if let Ok(mut s) = self.scrobbler.lock() {
+            s.scrobble(artist, title, unix_secs);
+        }
+        if let Some(sec) = &self.secondary_scrobbler {
+            if let Ok(mut s) = sec.lock() {
+                s.scrobble(artist, title, unix_secs);
             }
         }
-        self.started_at = None;
     }
 
     /// Synchronizes active track metadata with desktop presence and Discord presence.
@@ -375,7 +391,8 @@ pub fn apply_play_track_completion(
     }
 
     state.sync_presence_track(&res.artist, &res.title, true);
-    state.started_at = Some((Instant::now(), current_unix_secs()));
+    state.started_at =
+        state.queue.tracks().iter().find(|t| t.id == res.track_id).cloned().map(StartedPlay::now);
     state.last_skip_target = None;
     state.cached_skip_ranges = None;
 }
@@ -385,11 +402,12 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
+    use std::time::Duration;
 
     use super::*;
 
     use crate::domain::{SkipRanges, SkipSegment, Track};
-    use crate::infra::SkipStore;
+    use crate::infra::{Scrobbler, SkipStore};
     use crate::slint_shell::test_support::test_wired;
 
     #[derive(Debug)]
@@ -698,5 +716,75 @@ mod tests {
 
         assert_eq!(state.queue.len(), 2);
         assert_eq!(state.queue.tracks()[1].id, "song-atv");
+    }
+
+    #[derive(Debug)]
+    struct RecordingScrobbler {
+        scrobbles: Arc<Mutex<Vec<(String, String, u64)>>>,
+    }
+
+    impl Scrobbler for RecordingScrobbler {
+        fn now_playing(&mut self, _artist: &str, _title: &str) {}
+
+        fn scrobble(&mut self, artist: &str, title: &str, timestamp_secs: u64) {
+            self.scrobbles.lock().unwrap().push((
+                artist.to_string(),
+                title.to_string(),
+                timestamp_secs,
+            ));
+        }
+    }
+
+    #[test]
+    fn test_maybe_scrobble_current_credits_started_track_after_queue_advance() {
+        let mut state = test_wired();
+        let track_a = Track::new("a", "A title", "A artist").with_duration(200);
+        let track_b = Track::new("b", "B title", "B artist").with_duration(200);
+        state.queue.push(track_a.clone());
+        state.queue.push(track_b);
+
+        let scrobbles = Arc::new(Mutex::new(Vec::new()));
+        let rec = RecordingScrobbler { scrobbles: Arc::clone(&scrobbles) };
+        state.scrobbler = Arc::new(Mutex::new(Box::new(rec)));
+        state.started_at = Some(StartedPlay {
+            instant: Instant::now().checked_sub(Duration::from_secs(150)).unwrap(),
+            unix_secs: 1_000,
+            track: track_a,
+        });
+
+        state.queue.advance();
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("b"));
+
+        state.maybe_scrobble_current();
+
+        assert_eq!(
+            *scrobbles.lock().unwrap(),
+            vec![("A artist".to_string(), "A title".to_string(), 1_000)]
+        );
+        assert!(state.started_at.is_none());
+    }
+
+    #[test]
+    fn test_maybe_scrobble_current_below_threshold_does_not_scrobble_and_resets() {
+        let mut state = test_wired();
+        let track_a = Track::new("a", "A title", "A artist").with_duration(200);
+        let track_b = Track::new("b", "B title", "B artist").with_duration(200);
+        state.queue.push(track_a.clone());
+        state.queue.push(track_b);
+
+        let scrobbles = Arc::new(Mutex::new(Vec::new()));
+        let rec = RecordingScrobbler { scrobbles: Arc::clone(&scrobbles) };
+        state.scrobbler = Arc::new(Mutex::new(Box::new(rec)));
+        state.started_at = Some(StartedPlay {
+            instant: Instant::now().checked_sub(Duration::from_secs(10)).unwrap(),
+            unix_secs: 1_000,
+            track: track_a,
+        });
+
+        state.queue.advance();
+        state.maybe_scrobble_current();
+
+        assert!(scrobbles.lock().unwrap().is_empty());
+        assert!(state.started_at.is_none());
     }
 }
