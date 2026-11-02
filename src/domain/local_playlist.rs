@@ -100,6 +100,7 @@ impl LocalTrack {
             album: self.album.clone(),
             duration_secs: self.duration_secs,
             artwork,
+            video_type: None,
         }
     }
 }

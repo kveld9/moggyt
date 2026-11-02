@@ -78,6 +78,7 @@ pub struct SlintAppState {
     pub sleep_fade_base_volume: Option<u8>,
     pub autoplay: bool,
     pub hi_res_covers: bool,
+    pub songs_only: bool,
     pub signed_in: bool,
     pub theme: ThemeId,
     pub locale: Locale,
@@ -190,7 +191,10 @@ impl SlintAppState {
         };
         self.search_active = true;
         self.recent_searches.record(parsed.text());
-        let items = self.catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
+        let mut items = self.catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
+        if self.songs_only {
+            items = crate::domain::retain_song_results(items);
+        }
         self.search_results = items
             .iter()
             .filter_map(|it| match it {

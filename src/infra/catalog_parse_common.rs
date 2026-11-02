@@ -1,7 +1,18 @@
 //! Shared parsing primitives and renderer extractors for catalog payloads.
 
-use crate::domain::{Album, Artist, Playlist, SearchResult};
+use crate::domain::{Album, Artist, MusicVideoType, Playlist, SearchResult};
+use crate::infra::spotify_search::video_type_from;
 use serde_json::Value;
+
+/// Extracts the music video classification from renderer endpoints if present.
+pub fn music_video_type(renderer: &Value) -> Option<MusicVideoType> {
+    const PATHS: &[&str] = &[
+        "/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/watchEndpointMusicSupportedConfigs/watchEndpointMusicConfig/musicVideoType",
+        "/navigationEndpoint/watchEndpoint/watchEndpointMusicSupportedConfigs/watchEndpointMusicConfig/musicVideoType",
+    ];
+    let raw = PATHS.iter().find_map(|p| renderer.pointer(p).and_then(Value::as_str))?;
+    Some(video_type_from(Some(raw)))
+}
 
 /// Extracts a playable YouTube video identifier from renderer endpoints.
 pub fn watch_video_id(item: &Value) -> Option<String> {
@@ -352,5 +363,45 @@ mod tests {
         assert_eq!(parse_track_count("1 track"), 1);
         assert_eq!(parse_track_count("no tracks"), 0);
         assert_eq!(parse_track_count(""), 0);
+    }
+
+    #[test]
+    fn music_video_type_extraction() {
+        let atv_flex = serde_json::json!({
+            "flexColumns": [{
+                "musicResponsiveListItemFlexColumnRenderer": {
+                    "text": {
+                        "runs": [{
+                            "text": "Song",
+                            "navigationEndpoint": {
+                                "watchEndpoint": {
+                                    "watchEndpointMusicSupportedConfigs": {
+                                        "watchEndpointMusicConfig": {
+                                            "musicVideoType": "MUSIC_VIDEO_TYPE_ATV"
+                                        }
+                                    }
+                                }
+                            }
+                        }]
+                    }
+                }
+            }]
+        });
+        assert_eq!(music_video_type(&atv_flex), Some(MusicVideoType::Atv));
+
+        let omv_endpoint = serde_json::json!({
+            "navigationEndpoint": {
+                "watchEndpoint": {
+                    "watchEndpointMusicSupportedConfigs": {
+                        "watchEndpointMusicConfig": {
+                            "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                        }
+                    }
+                }
+            }
+        });
+        assert_eq!(music_video_type(&omv_endpoint), Some(MusicVideoType::Omv));
+
+        assert_eq!(music_video_type(&serde_json::json!({})), None);
     }
 }

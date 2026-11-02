@@ -79,6 +79,9 @@ fn raw_to_track(raw: RawTrack) -> Track {
     if let Some(dur) = raw.duration_secs {
         track = track.with_duration(dur);
     }
+    if let Some(video_type) = raw.video_type {
+        track = track.with_video_type(video_type);
+    }
     match raw.thumb_url {
         Some(url) => track.with_artwork(url),
         None => track,
@@ -184,6 +187,7 @@ mod tests {
                     artist: "A1".into(),
                     duration_secs: None,
                     thumb_url: Some("https://artwork.test/v1".into()),
+                    video_type: None,
                 },
                 RawTrack {
                     video_id: "v2".into(),
@@ -191,6 +195,7 @@ mod tests {
                     artist: "A2".into(),
                     duration_secs: None,
                     thumb_url: None,
+                    video_type: None,
                 },
             ],
             albums: vec![RawAlbum {
@@ -283,6 +288,7 @@ mod tests {
             artist: "Radio Artist".into(),
             duration_secs: Some(225),
             thumb_url: Some("https://img.local/radio.jpg".into()),
+            video_type: Some(crate::domain::MusicVideoType::Atv),
         };
         let track = raw_to_track(raw);
         assert_eq!(track.id, "radio-vid-1");
@@ -290,6 +296,7 @@ mod tests {
         assert_eq!(track.artist, "Radio Artist");
         assert_eq!(track.duration_secs, Some(225));
         assert_eq!(track.artwork.as_deref(), Some("https://img.local/radio.jpg"));
+        assert_eq!(track.video_type, Some(crate::domain::MusicVideoType::Atv));
 
         let catalog = LiveCatalog::new();
         assert!(catalog.radio("").is_empty());

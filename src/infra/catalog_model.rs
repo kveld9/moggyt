@@ -1,5 +1,7 @@
 //! Raw model definitions for catalog API search hits and entity containers.
 
+use crate::domain::MusicVideoType;
+
 /// Parsed track hit from catalog API search.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawTrack {
@@ -13,6 +15,8 @@ pub struct RawTrack {
     pub duration_secs: Option<u32>,
     /// Highest-resolution thumbnail URL when known.
     pub thumb_url: Option<String>,
+    /// Optional InnerTube music video classification.
+    pub video_type: Option<MusicVideoType>,
 }
 
 /// Parsed album hit from catalog API search.
@@ -78,6 +82,7 @@ mod tests {
             artist: "A1".into(),
             duration_secs: Some(180),
             thumb_url: None,
+            video_type: None,
         });
         assert!(!with_track.is_empty());
 

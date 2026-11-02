@@ -152,6 +152,14 @@ impl SlintAppState {
         let _ = self.settings_store.save(&settings);
     }
 
+    /// Toggles the songs-only preference and persists preference to disk.
+    pub fn toggle_songs_only(&mut self) {
+        self.songs_only = !self.songs_only;
+        let mut settings = self.settings_store.load();
+        settings.songs_only = self.songs_only;
+        let _ = self.settings_store.save(&settings);
+    }
+
     /// Evaluates auto-skip intervals for active track, seeking past matched range.
     pub fn check_auto_skip(&mut self) {
         let Some(track) = self.queue.current() else {
@@ -210,7 +218,10 @@ impl SlintAppState {
         }
         let current_id = current.id.clone();
         drop(audio);
-        let recs = self.catalog.lock().map(|c| c.radio(&current_id)).unwrap_or_default();
+        let mut recs = self.catalog.lock().map(|c| c.radio(&current_id)).unwrap_or_default();
+        if self.songs_only {
+            recs = crate::domain::retain_songs(recs);
+        }
         let worker_tx = self.worker_tx.clone();
         let generation = self.play_generation;
         for track in recs {
@@ -373,6 +384,7 @@ pub fn apply_play_track_completion(
 mod tests {
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
 
     use super::*;
 
@@ -612,5 +624,79 @@ mod tests {
         state.set_audio_quality(AudioQuality::High);
         assert_eq!(state.audio.lock().unwrap().quality(), AudioQuality::High);
         assert_eq!(state.settings_store.load().quality, AudioQuality::High);
+    }
+
+    #[test]
+    fn test_toggle_songs_only_flips_and_persists() {
+        let mut state = test_wired();
+        assert!(!state.songs_only);
+        assert!(!state.settings_store.load().songs_only);
+
+        state.toggle_songs_only();
+        assert!(state.songs_only);
+        assert!(state.settings_store.load().songs_only);
+
+        state.toggle_songs_only();
+        assert!(!state.songs_only);
+        assert!(!state.settings_store.load().songs_only);
+    }
+
+    #[derive(Debug, Default)]
+    struct RadioVideoCatalog;
+
+    impl Catalog for RadioVideoCatalog {
+        fn search(&self, _query: &str) -> Vec<Track> {
+            Vec::new()
+        }
+        fn search_filtered(
+            &self,
+            _query: &crate::domain::SearchQuery,
+        ) -> Vec<crate::domain::SearchResult> {
+            Vec::new()
+        }
+        fn radio(&self, _seed_track_id: &str) -> Vec<Track> {
+            vec![
+                Track::new("vid-omv", "OMV Track", "Artist")
+                    .with_duration(180)
+                    .with_video_type(crate::domain::MusicVideoType::Omv),
+                Track::new("song-atv", "ATV Track", "Artist")
+                    .with_duration(200)
+                    .with_video_type(crate::domain::MusicVideoType::Atv),
+            ]
+        }
+        fn home_shelves(&self) -> Vec<crate::domain::Shelf> {
+            Vec::new()
+        }
+        fn playlists(&self) -> Vec<crate::domain::Playlist> {
+            Vec::new()
+        }
+        fn saved_albums(&self) -> Vec<crate::domain::Album> {
+            Vec::new()
+        }
+        fn detail(
+            &self,
+            _browse_id: &str,
+            _kind: crate::domain::DetailKind,
+        ) -> Option<crate::domain::Detail> {
+            None
+        }
+    }
+
+    #[test]
+    fn test_continue_autoplay_if_ended_filters_video_recommendations_when_songs_only() {
+        let mut state = test_wired();
+        state.catalog = Arc::new(Mutex::new(Box::new(RadioVideoCatalog)));
+        state.autoplay = true;
+        state.songs_only = true;
+
+        let seed = Track::new("seed", "Seed", "Artist").with_duration(100);
+        state.queue.push(seed);
+        state.play_track_at_index_in_memory(0);
+        state.audio.lock().unwrap().seek(100);
+
+        state.continue_autoplay_if_ended();
+
+        assert_eq!(state.queue.len(), 2);
+        assert_eq!(state.queue.tracks()[1].id, "song-atv");
     }
 }

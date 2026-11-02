@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::{MusicVideoType, SearchResult};
+
 /// Category filter for catalog search queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SearchFilter {
@@ -146,6 +148,9 @@ pub struct Track {
     pub duration_secs: Option<u32>,
     /// Highest-resolution catalog thumbnail URL when known.
     pub artwork: Option<String>,
+    /// Optional InnerTube music video classification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub video_type: Option<MusicVideoType>,
 }
 
 impl Track {
@@ -158,6 +163,7 @@ impl Track {
             album: None,
             duration_secs: None,
             artwork: None,
+            video_type: None,
         }
     }
 
@@ -176,6 +182,7 @@ impl Track {
             album,
             duration_secs,
             artwork: None,
+            video_type: None,
         }
     }
 
@@ -197,10 +204,55 @@ impl Track {
         self
     }
 
+    /// Sets the optional music video classification, consuming self.
+    pub fn with_video_type(mut self, video_type: MusicVideoType) -> Self {
+        self.video_type = Some(video_type);
+        self
+    }
+
+    /// Whether this track represents an official music video or user-uploaded video.
+    pub fn is_music_video(&self) -> bool {
+        matches!(self.video_type, Some(MusicVideoType::Omv | MusicVideoType::Ugc))
+    }
+
     /// Human-facing one-line rendering (`title - artist`).
     pub fn display(&self) -> String {
         format!("{} - {}", self.title, self.artist)
     }
+}
+
+/// Drops music videos (OMV and UGC) from `tracks`, preserving songs and unknown types.
+///
+/// Invariant: if dropping music videos would remove every track from a non-empty
+/// list, the input list is returned unchanged so playback is never stalled.
+pub fn retain_songs(tracks: Vec<Track>) -> Vec<Track> {
+    if tracks.iter().all(|t| t.is_music_video()) {
+        tracks
+    } else {
+        tracks.into_iter().filter(|t| !t.is_music_video()).collect()
+    }
+}
+
+/// Drops music video track results from `items`, keeping non-track results in order.
+///
+/// Invariant: if the input contained at least one track and dropping videos would
+/// leave zero tracks, the input list is returned unchanged.
+pub fn retain_song_results(items: Vec<SearchResult>) -> Vec<SearchResult> {
+    let had_tracks = items.iter().any(|item| matches!(item, SearchResult::Track(_)));
+    let songs_survive = items.iter().any(|item| match item {
+        SearchResult::Track(track) => !track.is_music_video(),
+        _ => false,
+    });
+    if had_tracks && !songs_survive {
+        return items;
+    }
+    items
+        .into_iter()
+        .filter(|item| match item {
+            SearchResult::Track(track) => !track.is_music_video(),
+            _ => true,
+        })
+        .collect()
 }
 
 /// Maximum number of recent search queries retained in history.
@@ -333,15 +385,21 @@ mod tests {
         assert_eq!(base.album, None);
         assert_eq!(base.duration_secs, None);
         assert_eq!(base.artwork, None);
+        assert_eq!(base.video_type, None);
 
-        let built =
-            base.with_album("Album").with_duration(210).with_artwork("https://artwork.local/art");
+        let built = base
+            .with_album("Album")
+            .with_duration(210)
+            .with_artwork("https://artwork.local/art")
+            .with_video_type(MusicVideoType::Atv);
         let full = Track::new_full("id", "Title", "Artist", Some("Album".to_owned()), Some(210))
-            .with_artwork("https://artwork.local/art");
+            .with_artwork("https://artwork.local/art")
+            .with_video_type(MusicVideoType::Atv);
         assert_eq!(built, full);
         assert_eq!(built.album.as_deref(), Some("Album"));
         assert_eq!(built.duration_secs, Some(210));
         assert_eq!(built.artwork.as_deref(), Some("https://artwork.local/art"));
+        assert_eq!(built.video_type, Some(MusicVideoType::Atv));
         assert_eq!(built.display(), "Title - Artist");
     }
 
@@ -352,6 +410,88 @@ mod tests {
         let json = serde_json::to_string(&track).expect("serialize track");
         let deserialized: Track = serde_json::from_str(&json).expect("deserialize track");
         assert_eq!(track, deserialized);
+    }
+
+    #[test]
+    fn track_is_music_video_classification() {
+        let base = Track::new("id", "Title", "Artist");
+        assert!(!base.is_music_video());
+        assert!(!base.clone().with_video_type(MusicVideoType::Atv).is_music_video());
+        assert!(!base.clone().with_video_type(MusicVideoType::Other).is_music_video());
+        assert!(base.clone().with_video_type(MusicVideoType::Omv).is_music_video());
+        assert!(base.with_video_type(MusicVideoType::Ugc).is_music_video());
+    }
+
+    #[test]
+    fn retain_songs_filters_videos_and_keeps_songs_and_none() {
+        let atv = Track::new("t1", "ATV", "Artist").with_video_type(MusicVideoType::Atv);
+        let omv = Track::new("t2", "OMV", "Artist").with_video_type(MusicVideoType::Omv);
+        let ugc = Track::new("t3", "UGC", "Artist").with_video_type(MusicVideoType::Ugc);
+        let none = Track::new("t4", "None", "Artist");
+        let other = Track::new("t5", "Other", "Artist").with_video_type(MusicVideoType::Other);
+
+        let input = vec![atv.clone(), omv, ugc, none.clone(), other.clone()];
+        let retained = retain_songs(input);
+        assert_eq!(retained, vec![atv, none, other]);
+    }
+
+    #[test]
+    fn retain_songs_fallback_when_all_are_videos() {
+        let omv = Track::new("t1", "OMV", "Artist").with_video_type(MusicVideoType::Omv);
+        let ugc = Track::new("t2", "UGC", "Artist").with_video_type(MusicVideoType::Ugc);
+        let input = vec![omv.clone(), ugc.clone()];
+        assert_eq!(retain_songs(input), vec![omv, ugc]);
+    }
+
+    #[test]
+    fn retain_songs_empty_returns_empty() {
+        let empty: Vec<Track> = Vec::new();
+        assert_eq!(retain_songs(empty), Vec::<Track>::new());
+    }
+
+    #[test]
+    fn retain_song_results_drops_video_tracks_and_preserves_non_tracks() {
+        let album = SearchResult::Album(crate::domain::Album::new("a1", "Alb", "Art", None));
+        let atv = SearchResult::Track(
+            Track::new("t1", "ATV", "Art").with_video_type(MusicVideoType::Atv),
+        );
+        let omv = SearchResult::Track(
+            Track::new("t2", "OMV", "Art").with_video_type(MusicVideoType::Omv),
+        );
+        let artist = SearchResult::Artist(crate::domain::Artist::new("ar1", "Art", None));
+
+        let input = vec![album.clone(), atv.clone(), omv, artist.clone()];
+        assert_eq!(retain_song_results(input), vec![album, atv, artist]);
+    }
+
+    #[test]
+    fn retain_song_results_fallback_when_no_tracks_survive() {
+        let album = SearchResult::Album(crate::domain::Album::new("a1", "Alb", "Art", None));
+        let omv = SearchResult::Track(
+            Track::new("t1", "OMV", "Art").with_video_type(MusicVideoType::Omv),
+        );
+        let ugc = SearchResult::Track(
+            Track::new("t2", "UGC", "Art").with_video_type(MusicVideoType::Ugc),
+        );
+        let input = vec![album.clone(), omv.clone(), ugc.clone()];
+        assert_eq!(retain_song_results(input), vec![album, omv, ugc]);
+    }
+
+    #[test]
+    fn track_serde_missing_video_type_deserializes_to_none_and_none_skips_key() {
+        let json_without = r#"{"id":"t1","title":"Song","artist":"Art","album":null,"duration_secs":null,"artwork":null}"#;
+        let track: Track = serde_json::from_str(json_without).expect("deserialization succeeds");
+        assert_eq!(track.video_type, None);
+
+        let serialized = serde_json::to_string(&track).expect("serialization succeeds");
+        assert!(!serialized.contains("video_type"));
+
+        let with_video = track.with_video_type(MusicVideoType::Atv);
+        let serialized_video = serde_json::to_string(&with_video).expect("serialize with video");
+        assert!(serialized_video.contains(r#""video_type":"ATV""#));
+        let deserialized: Track =
+            serde_json::from_str(&serialized_video).expect("deserialize with video");
+        assert_eq!(deserialized.video_type, Some(MusicVideoType::Atv));
     }
 
     #[test]

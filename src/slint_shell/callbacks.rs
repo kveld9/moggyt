@@ -484,6 +484,15 @@ fn wire_playback_callbacks(
     window.on_audio_quality_selected(move |idx| {
         with_window_state(&w, &s, |win, st| handle_audio_quality_selected(win, st, idx));
     });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_songs_only_toggled(move || {
+        with_window_state(&w, &s, |win, st| {
+            st.toggle_songs_only();
+            sync_window(win, st);
+        });
+    });
 }
 
 fn handle_prev_track(

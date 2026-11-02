@@ -78,6 +78,7 @@ The configuration file uses JSON serialization with atomic replacement:
   "locale": "en",
   "volume": 100,
   "quality": "standard",
+  "songs_only": false,
   "keyboard_shortcuts": true,
   "player_bar_mode": "classic",
   "player_bar_show_artwork": true,
@@ -110,6 +111,11 @@ The configuration file uses JSON serialization with atomic replacement:
   - `"standard"`: Balanced audio stream using yt-dlp selector `"bestaudio[ext=m4a]/bestaudio/best"` (default).
   - `"high"`: High-fidelity audio stream using yt-dlp selector
     `"bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best"`.
+- **Prefer Songs Over Videos (`songs_only`)**:
+  - `false`: Search results and autoplay radio retain both official tracks and music videos (default).
+  - `true`: Search results and autoplay radio drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks
+    (`ATV`) and unknown types. If dropping music videos would remove every track from a result list, the fallback
+    preserves the original list unfiltered so playback and autoplay do not stall.
 - **Keyboard Shortcuts (`keyboard_shortcuts`)**:
   - `true`: Global transport and playback shortcuts enabled (default).
   - `false`: Shortcuts disabled.

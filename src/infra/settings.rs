@@ -58,6 +58,9 @@ pub struct Settings {
     /// Whether high-resolution cover artwork decoding is enabled.
     #[serde(default = "default_false")]
     pub hi_res_covers: bool,
+    /// Whether only songs (dropping music videos) are preferred.
+    #[serde(default = "default_false")]
+    pub songs_only: bool,
     /// Whether leading/trailing silence should be skipped during playback.
     #[serde(default = "default_false")]
     pub skip_silence: bool,
@@ -106,6 +109,7 @@ impl Default for Settings {
             lastfm_enabled: false,
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
+            songs_only: false,
             skip_silence: false,
             loudness_normalization: false,
             player_bar_mode: PlayerBarMode::Classic,
@@ -134,6 +138,7 @@ impl Settings {
             lastfm_enabled: false,
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
+            songs_only: false,
             skip_silence: false,
             loudness_normalization: false,
             player_bar_mode: PlayerBarMode::Classic,
@@ -326,6 +331,7 @@ mod tests {
             lastfm_enabled: true,
             secondary_lastfm_enabled: true,
             hi_res_covers: true,
+            songs_only: true,
             skip_silence: true,
             loudness_normalization: true,
             player_bar_mode: PlayerBarMode::Floating,
@@ -362,6 +368,7 @@ mod tests {
         assert!(!fallback.lastfm_enabled);
         assert!(!fallback.secondary_lastfm_enabled);
         assert!(!fallback.hi_res_covers);
+        assert!(!fallback.songs_only);
         assert!(!fallback.skip_silence);
         assert!(!fallback.loudness_normalization);
         assert_eq!(fallback.player_bar_mode, PlayerBarMode::Classic);
@@ -387,6 +394,7 @@ mod tests {
         assert!(!loaded.lastfm_enabled);
         assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
+        assert!(!loaded.songs_only);
         assert!(!loaded.skip_silence);
         assert!(!loaded.loudness_normalization);
         assert_eq!(loaded.player_bar_mode, PlayerBarMode::Classic);
@@ -398,6 +406,23 @@ mod tests {
         assert!(loaded.player_bar_show_queue);
         assert!(loaded.player_bar_show_volume);
         assert_eq!(loaded, Settings::default());
+    }
+
+    #[test]
+    fn test_songs_only_setting_defaults_false_and_roundtrips() {
+        let default_settings = Settings::default();
+        assert!(!default_settings.songs_only);
+
+        let missing_key: Settings = serde_json::from_str("{}").expect("deserialize empty json");
+        assert!(!missing_key.songs_only);
+
+        let json_true = r#"{"songs_only": true}"#;
+        let loaded: Settings = serde_json::from_str(json_true).expect("deserialize true");
+        assert!(loaded.songs_only);
+
+        let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
+        let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
+        assert!(decoded.songs_only);
     }
 
     #[test]

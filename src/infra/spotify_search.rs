@@ -140,12 +140,7 @@ pub fn video_type_from(raw: Option<&str>) -> MusicVideoType {
 }
 
 fn extract_video_type(renderer: &Value) -> MusicVideoType {
-    const PATHS: &[&str] = &[
-        "/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/watchEndpoint/watchEndpointMusicSupportedConfigs/watchEndpointMusicConfig/musicVideoType",
-        "/navigationEndpoint/watchEndpoint/watchEndpointMusicSupportedConfigs/watchEndpointMusicConfig/musicVideoType",
-    ];
-    let raw = PATHS.iter().find_map(|p| renderer.pointer(p).and_then(Value::as_str));
-    video_type_from(raw)
+    super::catalog_parse_common::music_video_type(renderer).unwrap_or(MusicVideoType::Other)
 }
 
 fn extract_artist(runs: &[Value]) -> String {

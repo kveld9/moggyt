@@ -46,6 +46,7 @@ export component MoggytWindow inherits Window {
     in-out property <string> sleep-timer-status-text: "Timer: Off";
     in-out property <int> active-sleep-timer-index: 0;
     in-out property <int> active-audio-quality-index: 1;
+    in-out property <bool> songs-only: false;
     in-out property <string> settings-cookie-text: "";
     in-out property <string> app-version: "0.1.0";
     in-out property <string> update-status-text: "Up to date";
@@ -127,6 +128,7 @@ export component MoggytWindow inherits Window {
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
+    callback songs-only-toggled();
     callback query-submitted(string);
     callback track-selected(int);
     callback filter-selected(int);
@@ -227,6 +229,7 @@ export component MoggytWindow inherits Window {
                 sleep-timer-status-text: root.sleep-timer-status-text;
                 active-sleep-timer-index: root.active-sleep-timer-index;
                 active-audio-quality-index: root.active-audio-quality-index;
+                songs-only: root.songs-only;
                 player-bar-mode: root.player-bar-mode;
                 player-bar-show-artwork: root.player-bar-show-artwork;
                 player-bar-show-like: root.player-bar-show-like;
@@ -254,6 +257,7 @@ export component MoggytWindow inherits Window {
                 cycle-playback-speed => { root.cycle-playback-speed(); }
                 sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
                 audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
+                songs-only-toggled => { root.songs-only-toggled(); }
                 back-pressed => { root.back-pressed(); }
                 player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
                 player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }

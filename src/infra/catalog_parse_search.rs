@@ -2,7 +2,7 @@
 
 use super::catalog_model::{RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits};
 use super::catalog_parse_common::{
-    best_thumbnail, browse_of, flex_text, parse_two_row, watch_video_id,
+    best_thumbnail, browse_of, flex_text, music_video_type, parse_two_row, watch_video_id,
 };
 use crate::domain::SearchFilter;
 use serde_json::Value;
@@ -12,7 +12,8 @@ fn parse_item(renderer: &Value) -> Option<RawTrack> {
     let title = flex_text(renderer, 0)?;
     let artist = flex_text(renderer, 1).unwrap_or_default();
     let thumb_url = best_thumbnail(renderer);
-    Some(RawTrack { video_id, title, artist, duration_secs: None, thumb_url })
+    let video_type = music_video_type(renderer);
+    Some(RawTrack { video_id, title, artist, duration_secs: None, thumb_url, video_type })
 }
 
 fn collect_shelf_items(shelf: &Value, out: &mut Vec<RawTrack>) {
@@ -188,7 +189,15 @@ fn is_browse_badge(badge: &str) -> bool {
 fn dispatch_bare_track(renderer: &Value, title: String, artist: String, hits: &mut SearchHits) {
     let Some(video_id) = video_id_of(renderer) else { return };
     let thumb_url = best_thumbnail(renderer);
-    hits.tracks.push(RawTrack { video_id, title, artist, duration_secs: None, thumb_url });
+    let video_type = music_video_type(renderer);
+    hits.tracks.push(RawTrack {
+        video_id,
+        title,
+        artist,
+        duration_secs: None,
+        thumb_url,
+        video_type,
+    });
 }
 
 fn dispatch_bare_browse(
@@ -322,6 +331,7 @@ mod tests {
                 artist: "M83".to_owned(),
                 duration_secs: None,
                 thumb_url: Some("https://lh3.googleusercontent.com/test-thumb-large".to_owned()),
+                video_type: None,
             }
         );
         assert_eq!(
@@ -332,8 +342,24 @@ mod tests {
                 artist: "The Weeknd".to_owned(),
                 duration_secs: None,
                 thumb_url: None,
+                video_type: None,
             }
         );
+    }
+
+    #[test]
+    fn parse_search_tracks_songs_fixture_extracts_video_type() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let fixture_path = std::path::Path::new(manifest_dir)
+            .join("tests")
+            .join("fixtures")
+            .join("catalog_search_songs.json");
+        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
+        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
+
+        let tracks = parse_search_tracks(&payload);
+        assert!(!tracks.is_empty());
+        assert!(tracks.iter().all(|t| t.video_type == Some(crate::domain::MusicVideoType::Atv)));
     }
 
     #[test]
