@@ -40,6 +40,7 @@ src/
     ├── catalog_client.rs # Catalog API search request builder and parser
     ├── instance.rs    # SingleInstanceGuard lock
     ├── lyrics*.rs     # LyricsSource port and LRCLIB synced lyrics client
+    ├── lyrics_cache.rs # LyricsSource decorator with bounded FIFO cache
     ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence
     ├── scrobble.rs    # Scrobbler port and Last.fm client adapter
     ├── session*.rs    # SessionStore port and Keyring cookie persistence

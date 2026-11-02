@@ -6,9 +6,9 @@
 //! in [`moggyt::infra`].
 
 use moggyt::infra::{
-    DiskQueueStore, DiskSettingsStore, DiskSkipStore, KeyringSessionStore, LastFmClient,
-    LiveCatalog, LrclibClient, LyricOverrideDir, Scrobbler, SettingsStore, SingleInstanceGuard,
-    TrayHandle, default_config_dir,
+    CachedLyrics, DiskQueueStore, DiskSettingsStore, DiskSkipStore, KeyringSessionStore,
+    LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir, Scrobbler, SettingsStore,
+    SingleInstanceGuard, TrayHandle, default_config_dir,
 };
 use moggyt::slint_shell::app::AppDependencies;
 use moggyt::slint_shell::init::{
@@ -57,7 +57,7 @@ fn main() -> anyhow::Result<()> {
     let audio = init_live_audio(&data_dir);
     let catalog = LiveCatalog::new();
     let session = KeyringSessionStore::moggyt();
-    let lyrics = LrclibClient::new();
+    let lyrics = CachedLyrics::new(LrclibClient::new());
     let covers = init_cover_cache(&data_dir);
 
     let lyric_overrides = Some(LyricOverrideDir::new(config_dir.join("lyrics")));
