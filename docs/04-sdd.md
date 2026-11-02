@@ -233,7 +233,8 @@ developer API credentials or user accounts.
   payload, parsing track title, artist (subtitle), duration, and metadata without requiring Spotify Web API keys.
 - **File Ingestion (`parse_exportify_csv`, `parse_spotify_backup_json`)**: Pure, allocation-light parsers. The CSV
   adapter parses RFC 4180 files exported by Exportify, requiring `Track Name`, `Artist Name(s)`, `Album Name`,
-  `Track Duration (ms)`, `ISRC`, and `Track URI` columns. The JSON adapter processes standard Spotify JSON backup dumps.
+  `Track Duration (ms)`, and `Track URI` columns; `ISRC` is optional and, when present, is used as the first search
+  query. The JSON adapter processes standard Spotify JSON backup dumps.
 
 #### 6.1.2 Link and identifier parsing
 

@@ -9,13 +9,12 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
-use crate::domain::{
-    LocalPlaylist, LocalTrack, MatchConfidence, SpotifyPlaylist, SpotifyTrack, clean_track_title,
-    local_playlist_id,
-};
+use crate::domain::{LocalPlaylist, LocalTrack, MatchConfidence, SpotifyPlaylist, SpotifyTrack};
 pub use crate::infra::SearchFailure;
 
-use super::import_searcher::{CandidateHit, ranked_alternatives};
+use super::import_searcher::{
+    CandidateHit, compute_backoff, failure_to_resolution, hits_to_resolution, search_queries,
+};
 
 /// Port for candidate search used by the import worker.
 pub trait TrackSearcher: Send + Sync {
@@ -72,33 +71,7 @@ pub struct ImportStats {
     pub with_alternatives: usize,
 }
 
-/// Pure query built for one Spotify track.
-pub fn search_query(track: &SpotifyTrack) -> String {
-    format!("{} {}", clean_track_title(&track.title), track.artist)
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// Builds the local playlist from an ordered resolution list.
-pub fn assemble_playlist(
-    source: &SpotifyPlaylist,
-    resolutions: &[TrackResolution],
-) -> LocalPlaylist {
-    let mut p = LocalPlaylist::new(&local_playlist_id(&source.id), &source.title)
-        .with_author(&source.author);
-    if let Some(ref art) = source.artwork {
-        p = p.with_artwork(art);
-    }
-    p.tracks = resolutions
-        .iter()
-        .filter_map(|r| match r {
-            TrackResolution::Matched { track, .. } => Some(track.clone()),
-            TrackResolution::Unresolved { .. } => None,
-        })
-        .collect();
-    p
-}
+pub use super::import_searcher::assemble_playlist;
 
 struct WorkerEnv<'a> {
     searcher: &'a dyn TrackSearcher,
@@ -106,20 +79,6 @@ struct WorkerEnv<'a> {
     config: &'a WorkerConfig,
     sleeper: &'a (dyn Fn(Duration) + Sync),
     cache: &'a Mutex<HashMap<String, Vec<CandidateHit>>>,
-}
-
-fn compute_backoff(base: Duration, attempt: u32, query: &str, interval: Duration) -> Duration {
-    let mult = 1u32.checked_shl(attempt).unwrap_or(u32::MAX);
-    let half_nanos = (base / 2).as_nanos();
-    let jitter = if half_nanos > 0 {
-        let seed = (query.len() as u128)
-            .wrapping_mul(2654435761)
-            .wrapping_add((attempt as u128).wrapping_mul(2246822519));
-        Duration::from_nanos((seed % (half_nanos + 1)) as u64)
-    } else {
-        Duration::ZERO
-    };
-    base.saturating_mul(mult).saturating_add(jitter).max(interval)
 }
 
 fn execute_search_attempt(
@@ -155,46 +114,65 @@ fn search_with_retries(
     Err(SearchFailure::RateLimited)
 }
 
-fn hits_to_resolution(track: &SpotifyTrack, hits: &[CandidateHit]) -> TrackResolution {
-    let alternatives = ranked_alternatives(track, hits);
-    if let Some(first) = alternatives.first().cloned() {
-        TrackResolution::Matched { track: first, alternatives }
-    } else {
-        TrackResolution::Unresolved {
-            title: track.title.clone(),
-            artist: track.artist.clone(),
-            reason: "no suitable match found".into(),
-        }
+fn cache_hits(env: &WorkerEnv<'_>, query: &str, hits: &[CandidateHit]) {
+    if let Ok(mut cache) = env.cache.lock() {
+        cache.insert(query.to_owned(), hits.to_vec());
     }
 }
 
-fn failure_to_resolution(track: &SpotifyTrack, failure: SearchFailure) -> TrackResolution {
-    TrackResolution::Unresolved {
-        title: track.title.clone(),
-        artist: track.artist.clone(),
-        reason: failure.to_string(),
+fn cached_resolution(
+    env: &WorkerEnv<'_>,
+    track: &SpotifyTrack,
+    query: &str,
+) -> Option<TrackResolution> {
+    let cache = env.cache.lock().ok()?;
+    let hits = cache.get(query)?;
+    Some(hits_to_resolution(track, hits))
+}
+
+fn resolve_with_query(
+    env: &WorkerEnv<'_>,
+    track: &SpotifyTrack,
+    query: &str,
+) -> Option<Result<TrackResolution, SearchFailure>> {
+    if env.cancel.load(Ordering::Relaxed) {
+        return None;
+    }
+    if let Some(res) = cached_resolution(env, track, query) {
+        return Some(Ok(res));
+    }
+    let res = search_with_retries(env, query);
+    if let Ok(ref hits) = res {
+        cache_hits(env, query, hits);
+    }
+    Some(res.map(|hits| hits_to_resolution(track, &hits)))
+}
+
+fn handle_query_result(
+    env: &WorkerEnv<'_>,
+    track: &SpotifyTrack,
+    outcome: Result<TrackResolution, SearchFailure>,
+    is_last: bool,
+) -> Option<Option<TrackResolution>> {
+    match outcome {
+        Ok(res @ TrackResolution::Matched { .. }) => Some(Some(res)),
+        Ok(res) => is_last.then_some(Some(res)),
+        Err(err) => is_last.then(|| {
+            (!env.cancel.load(Ordering::Relaxed)).then(|| failure_to_resolution(track, err))
+        }),
     }
 }
 
 fn resolve_one_track(env: &WorkerEnv<'_>, track: &SpotifyTrack) -> Option<TrackResolution> {
-    if env.cancel.load(Ordering::Relaxed) {
-        return None;
-    }
-    let query = search_query(track);
-    if let Some(hits) = env.cache.lock().ok()?.get(&query).cloned() {
-        return Some(hits_to_resolution(track, &hits));
-    }
-    match search_with_retries(env, &query) {
-        Ok(hits) => {
-            if let Ok(mut g) = env.cache.lock() {
-                g.insert(query, hits.clone());
-            }
-            Some(hits_to_resolution(track, &hits))
-        }
-        Err(failure) => {
-            (!env.cancel.load(Ordering::Relaxed)).then(|| failure_to_resolution(track, failure))
+    let queries = search_queries(track);
+    for (i, query) in queries.iter().enumerate() {
+        let is_last = i + 1 == queries.len();
+        let outcome = resolve_with_query(env, track, query)?;
+        if let Some(terminal) = handle_query_result(env, track, outcome, is_last) {
+            return terminal;
         }
     }
+    None
 }
 
 fn apply_resolution(
@@ -509,12 +487,6 @@ mod tests {
     }
 
     #[test]
-    fn test_search_query_normalizes_and_collapses_whitespace() {
-        let t = track("Song (2011 Remaster) [Deluxe]", "The  Artist");
-        assert_eq!(search_query(&t), "Song The Artist");
-    }
-
-    #[test]
     fn test_happy_path_resolves_all_with_confidence_buckets() {
         let p = playlist(
             "sp_h",
@@ -658,38 +630,6 @@ mod tests {
     }
 
     #[test]
-    fn test_assemble_playlist_order_author_artwork_prefix() {
-        let (ta, tb) = (
-            LocalTrack::new("vid_a", "Song A", "Artist A", MatchConfidence::High),
-            LocalTrack::new("vid_b", "Song B", "Artist B", MatchConfidence::Medium),
-        );
-        let source = SpotifyPlaylist {
-            id: "37i9dQZF1DXcBWIGoYBM5M".into(),
-            title: "My Playlist".into(),
-            author: "Spotify Curator".into(),
-            artwork: Some("https://example.com/art.jpg".into()),
-            tracks: Vec::new(),
-        };
-        let res = assemble_playlist(
-            &source,
-            &[
-                TrackResolution::Matched { track: ta.clone(), alternatives: vec![ta.clone()] },
-                TrackResolution::Unresolved {
-                    title: "X".into(),
-                    artist: "X".into(),
-                    reason: "no match".into(),
-                },
-                TrackResolution::Matched { track: tb.clone(), alternatives: vec![tb.clone()] },
-            ],
-        );
-        assert_eq!(res.id, "local:37i9dQZF1DXcBWIGoYBM5M");
-        assert_eq!(res.title, "My Playlist");
-        assert_eq!(res.author, "Spotify Curator");
-        assert_eq!(res.artwork.as_deref(), Some("https://example.com/art.jpg"));
-        assert_eq!(res.tracks, vec![ta, tb]);
-    }
-
-    #[test]
     fn test_with_alternatives_counter() {
         let p = playlist(
             "sp_alts",
@@ -789,5 +729,37 @@ mod tests {
             ImportProgressEvent::Cancelled { playlist } if playlist.track_count() == 0
         ));
         assert_eq!(searcher.calls(), 0);
+    }
+
+    #[test]
+    fn test_isrc_query_success_skips_text_query() {
+        let mut t = track("Song Title", "Artist");
+        t.isrc = Some("USUM71703861".into());
+        let p = playlist("sp_isrc", vec![t]);
+        let fake = FakeSearcher::default()
+            .with_hit("USUM71703861", hit("v1", "Song Title", "Topic", MusicVideoType::Atv));
+        let (res, stats, _) =
+            run_worker(&fake, &p, &WorkerConfig::default(), &FakeSleeper::default(), &mut |_| {});
+        assert_eq!((fake.calls(), stats.matched), (1, 1));
+        assert!(matches!(
+            &res[0],
+            TrackResolution::Matched { track, .. } if track.video_id == "v1"
+        ));
+    }
+
+    #[test]
+    fn test_isrc_query_miss_falls_through_to_text_query() {
+        let mut t = track("Song Title", "Artist");
+        t.isrc = Some("USUM71703861".into());
+        let p = playlist("sp_fall", vec![t]);
+        let fake = FakeSearcher::default()
+            .with_hit("Song Title Artist", hit("v2", "Song Title", "Topic", MusicVideoType::Atv));
+        let (res, stats, _) =
+            run_worker(&fake, &p, &WorkerConfig::default(), &FakeSleeper::default(), &mut |_| {});
+        assert_eq!((fake.calls(), stats.matched), (2, 1));
+        assert!(matches!(
+            &res[0],
+            TrackResolution::Matched { track, .. } if track.video_id == "v2"
+        ));
     }
 }

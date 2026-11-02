@@ -75,7 +75,7 @@ pub use import_cli::{
 };
 pub use import_searcher::{
     CandidateHit, LiveTrackSearcher, MAX_ALTERNATIVES, MIN_ACCEPT_SCORE, best_candidate,
-    ranked_alternatives,
+    ranked_alternatives, search_query,
 };
 pub use import_session::{DrainOutcome, ImportSession, ImportStage, progress_status};
 pub use import_state::{
@@ -84,7 +84,7 @@ pub use import_state::{
 };
 pub use import_worker::{
     ImportProgressEvent, ImportStats, TrackResolution, TrackSearcher, WorkerConfig,
-    assemble_playlist, resolve_tracks, search_query, spawn_import,
+    assemble_playlist, resolve_tracks, spawn_import,
 };
 pub use page::SlintPage;
 pub use platform::{CoverArtData, PresenceSnapshot, dispatch_to_ui, rgba_to_image};

@@ -10,9 +10,10 @@ use serde_json::Value;
 
 use crate::domain::{SpotifyPlaylist, SpotifyTrack};
 
-pub const REQUIRED_CSV_COLUMNS: [&str; 5] =
-    ["Track Name", "Artist Name(s)", "Album Name", "Track Duration (ms)", "ISRC"];
+pub const REQUIRED_CSV_COLUMNS: [&str; 4] =
+    ["Track Name", "Artist Name(s)", "Album Name", "Track Duration (ms)"];
 
+const ISRC_COLUMN: &str = "ISRC";
 const TRACK_URI_COLUMN: &str = "Track URI";
 
 fn consume_newline(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) {
@@ -95,6 +96,7 @@ fn parse_record(
 
 /// Parses an RFC 4180 CSV document into records and fields.
 pub fn parse_csv_records(input: &str) -> anyhow::Result<Vec<Vec<String>>> {
+    let input = input.strip_prefix('\u{FEFF}').unwrap_or(input);
     let mut chars = input.chars().peekable();
     let mut records = Vec::new();
     while chars.peek().is_some() {
@@ -109,7 +111,7 @@ struct CsvColIndices {
     artist_name: usize,
     album_name: usize,
     duration_ms: usize,
-    isrc: usize,
+    isrc: Option<usize>,
 }
 
 fn find_column_index(headers: &[String], target: &str) -> Option<usize> {
@@ -131,12 +133,13 @@ fn validate_and_map_headers(headers: &[String]) -> anyhow::Result<CsvColIndices>
     if !missing.is_empty() {
         anyhow::bail!("CSV header missing required column(s): {}", missing.join(", "));
     }
+    let isrc = find_column_index(headers, ISRC_COLUMN);
     Ok(CsvColIndices {
         track_name: indices[0],
         artist_name: indices[1],
         album_name: indices[2],
         duration_ms: indices[3],
-        isrc: indices[4],
+        isrc,
     })
 }
 
@@ -162,7 +165,7 @@ fn parse_exportify_row(row: &[String], cols: &CsvColIndices) -> Option<SpotifyTr
     let artist = row.get(cols.artist_name).map(|s| s.trim()).unwrap_or("");
     let album = parse_optional_cell(row.get(cols.album_name));
     let duration_ms = parse_duration_cell(row.get(cols.duration_ms));
-    let isrc = parse_optional_cell(row.get(cols.isrc));
+    let isrc = cols.isrc.and_then(|idx| parse_optional_cell(row.get(idx)));
 
     Some(SpotifyTrack {
         title: title.to_owned(),
@@ -280,14 +283,39 @@ mod tests {
 
     #[test]
     fn header_validation_names_missing_columns() {
-        let missing_isrc =
-            "Track URI,Track Name,Artist Name(s),Album Name,Track Duration (ms)\nuri,T,A,Alb,100";
-        let err = parse_exportify_csv(missing_isrc).expect_err("missing ISRC must error");
+        let missing_title =
+            "Track URI,Artist Name(s),Album Name,Track Duration (ms)\nuri,A,Alb,100";
+        let err = parse_exportify_csv(missing_title).expect_err("missing Track Name must error");
         let msg = format!("{err:#}");
-        assert!(msg.contains("ISRC"), "error should name missing column: {msg}");
+        assert!(msg.contains("Track Name"), "error should name missing column: {msg}");
 
         let empty = "";
         assert!(parse_exportify_csv(empty).is_err());
+    }
+
+    #[test]
+    fn csv_without_isrc_column_parses_with_none() {
+        let missing_isrc =
+            "Track URI,Track Name,Artist Name(s),Album Name,Track Duration (ms)\nuri,T,A,Alb,100";
+        let tracks = parse_exportify_csv(missing_isrc).expect("missing ISRC column must succeed");
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].title, "T");
+        assert_eq!(tracks[0].artist, "A");
+        assert_eq!(tracks[0].album.as_deref(), Some("Alb"));
+        assert_eq!(tracks[0].duration_ms, 100);
+        assert_eq!(tracks[0].isrc, None);
+    }
+
+    #[test]
+    fn bom_prefixed_csv_parses() {
+        let bom_csv = concat!(
+            "\u{FEFF}Track URI,Track Name,Artist Name(s),Album Name,Track Duration (ms),ISRC\n",
+            "uri,T,A,Alb,100,US1234567890"
+        );
+        let tracks = parse_exportify_csv(bom_csv).expect("BOM-prefixed CSV parses");
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].title, "T");
+        assert_eq!(tracks[0].isrc.as_deref(), Some("US1234567890"));
     }
 
     #[test]
