@@ -43,6 +43,14 @@ use crate::infra::{
 };
 use crate::slint_shell::platform::{CoverArtData, PresenceSnapshot};
 
+/// Target track metadata for background lyrics prefetching.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LyricsPrefetch {
+    pub artist: String,
+    pub title: String,
+    pub duration_secs: Option<u32>,
+}
+
 /// Request payload dispatched to the playback worker thread.
 #[derive(Debug, Clone)]
 pub struct PlayTrackRequest {
@@ -54,6 +62,7 @@ pub struct PlayTrackRequest {
     pub duration_secs: Option<u32>,
     pub hi_res_covers: bool,
     pub lyric_overrides: Option<LyricOverrideDir>,
+    pub prefetch_lyrics: Option<LyricsPrefetch>,
 }
 
 /// Result payload returned from the playback worker thread to the UI thread.
@@ -90,6 +99,37 @@ pub fn resolve_lyrics<L: LyricsSource>(req: &PlayTrackRequest, lyrics: &Arc<L>) 
     }
     let duration = req.duration_secs.map(u64::from);
     lyrics.lookup(&req.artist, &req.title, duration).map(|s| s.lines).unwrap_or_default()
+}
+
+/// Spawns a background thread to prefetch lyrics for the next track into cache.
+///
+/// Returns `None` without spawning if `prefetch` is `None` or if either artist or title
+/// is blank whitespace. The spawned thread runs as `"moggyt-lyrics-prefetch"`.
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+pub fn spawn_lyrics_prefetch<L: LyricsSource + Send + Sync + ?Sized + 'static>(
+    prefetch: Option<LyricsPrefetch>,
+    lyrics: Arc<L>,
+) -> Option<std::thread::JoinHandle<()>> {
+    let prefetch = prefetch?;
+    let trimmed_artist = prefetch.artist.trim();
+    let trimmed_title = prefetch.title.trim();
+    if trimmed_artist.is_empty() || trimmed_title.is_empty() {
+        return None;
+    }
+    let artist = trimmed_artist.to_string();
+    let title = trimmed_title.to_string();
+    let duration = prefetch.duration_secs.map(u64::from);
+
+    match std::thread::Builder::new().name("moggyt-lyrics-prefetch".into()).spawn(move || {
+        let _ = lyrics.lookup(&artist, &title, duration);
+    }) {
+        Ok(handle) => Some(handle),
+        Err(err) => {
+            warn!(error = %err, "failed to spawn lyrics prefetch thread");
+            None
+        }
+    }
 }
 
 /// Fetches or retrieves cached artwork bytes for a given URL off the UI thread.
@@ -325,6 +365,7 @@ mod tests {
             duration_secs: Some(180),
             hi_res_covers: false,
             lyric_overrides: None,
+            prefetch_lyrics: None,
         };
 
         let adapters = PlaybackWorkerAdapters::new(
@@ -475,6 +516,7 @@ mod tests {
             duration_secs: None,
             hi_res_covers: false,
             lyric_overrides: None,
+            prefetch_lyrics: None,
         }))
         .unwrap();
 
@@ -627,5 +669,67 @@ mod tests {
             thumbnail_variant_for_row(playlist_art),
             "https://lh3.googleusercontent.com/playlist-thumb"
         );
+    }
+
+    #[test]
+    fn test_spawn_lyrics_prefetch_blank_or_none_returns_none() {
+        let lyrics = Arc::new(LrclibStub::new());
+        assert!(spawn_lyrics_prefetch(None, Arc::clone(&lyrics)).is_none());
+
+        for (artist, title) in [
+            ("", "Title"),
+            ("   ", "Title"),
+            ("Artist", ""),
+            ("Artist", "   "),
+            ("", ""),
+            ("  ", "  "),
+        ] {
+            let prefetch = LyricsPrefetch {
+                artist: artist.into(),
+                title: title.into(),
+                duration_secs: Some(120),
+            };
+            assert!(spawn_lyrics_prefetch(Some(prefetch), Arc::clone(&lyrics)).is_none());
+        }
+    }
+
+    struct CountingPrefetchLyrics {
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl LyricsSource for CountingPrefetchLyrics {
+        fn lookup(
+            &self,
+            artist: &str,
+            title: &str,
+            _duration_secs: Option<u64>,
+        ) -> Option<crate::infra::SyncedLyrics> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Some(crate::infra::SyncedLyrics {
+                lines: vec![LyricLine { start_ms: 0, text: format!("{title} by {artist}") }],
+            })
+        }
+    }
+
+    #[test]
+    fn test_spawn_lyrics_prefetch_warms_cache() {
+        let fake = CountingPrefetchLyrics { calls: std::sync::atomic::AtomicUsize::new(0) };
+        let cached = Arc::new(crate::infra::CachedLyrics::new(fake));
+
+        let prefetch = LyricsPrefetch {
+            artist: "Radiohead".into(),
+            title: "Creep".into(),
+            duration_secs: Some(236),
+        };
+
+        let handle = spawn_lyrics_prefetch(Some(prefetch), Arc::clone(&cached));
+        let handle = handle.expect("prefetch thread spawned");
+        handle.join().expect("prefetch thread join succeeds");
+
+        assert_eq!(cached.inner().calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        let hit = cached.lookup("Radiohead", "Creep", Some(236));
+        assert!(hit.is_some());
+        assert_eq!(cached.inner().calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }

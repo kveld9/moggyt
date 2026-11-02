@@ -29,6 +29,7 @@ mod handoff;
 mod instance;
 mod lyric_overrides;
 mod lyrics;
+mod lyrics_cache;
 mod lyrics_lrclib;
 mod playlist_store;
 mod playlist_store_disk;
@@ -81,6 +82,7 @@ pub use lyric_overrides::{
     LyricOverrideDir, MAX_OVERRIDE_BYTES, default_lyrics_dir, sanitize_id, sanitize_video_id,
 };
 pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
+pub use lyrics_cache::{CachedLyrics, LYRICS_CACHE_CAPACITY};
 pub use lyrics_lrclib::{
     CONFIDENCE_THRESHOLD, DURATION_NEUTRAL_SCORE, DURATION_TOLERANCE_SECS, LrclibClient,
     LyricsCandidate, PARTIAL_MATCH_SCORE, WEIGHT_ARTIST, WEIGHT_DURATION, WEIGHT_TITLE,

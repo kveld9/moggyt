@@ -82,21 +82,31 @@ impl PlaybackQueue {
         }
     }
 
-    /// Advances the cursor according to the active repeat policy.
-    pub fn advance(&mut self) {
-        if self.tracks.is_empty() {
-            return;
+    fn next_cursor(&self) -> Option<usize> {
+        let len = self.tracks.len();
+        if len == 0 || self.repeat == RepeatMode::One {
+            return None;
         }
         match self.repeat {
-            RepeatMode::One => {}
-            RepeatMode::All => {
-                self.cursor = (self.cursor + 1) % self.tracks.len();
-            }
-            RepeatMode::Off => {
-                if self.cursor + 1 < self.tracks.len() {
-                    self.cursor += 1;
-                }
-            }
+            RepeatMode::All if len > 1 => Some((self.cursor + 1) % len),
+            RepeatMode::Off if self.cursor + 1 < len => Some(self.cursor + 1),
+            _ => None,
+        }
+    }
+
+    /// Returns the track that [`advance`](Self::advance) would move to without mutating the queue.
+    ///
+    /// Returns `None` when the queue is empty or when advancing would keep the same cursor
+    /// (`RepeatMode::One`, `RepeatMode::Off` at the tail, or single-track `RepeatMode::All`).
+    pub fn peek_next(&self) -> Option<&Track> {
+        let idx = self.next_cursor()?;
+        self.tracks.get(idx)
+    }
+
+    /// Advances the cursor according to the active repeat policy.
+    pub fn advance(&mut self) {
+        if let Some(next) = self.next_cursor() {
+            self.cursor = next;
         }
     }
 
@@ -289,5 +299,31 @@ mod tests {
         assert_eq!(loaded.cursor(), 99);
         loaded.clamp_cursor();
         assert_eq!(loaded.cursor(), 0);
+    }
+
+    #[test]
+    fn peek_next_policies_and_non_mutating() {
+        let empty = PlaybackQueue::new();
+        assert_eq!(empty.peek_next(), None);
+
+        let q_off_middle = queue_from(&["a", "b", "c"], 0, RepeatMode::Off);
+        assert_eq!(q_off_middle.peek_next().map(|t| t.id.as_str()), Some("b"));
+        assert_eq!(q_off_middle.cursor(), 0);
+
+        let q_off_last = queue_from(&["a", "b", "c"], 2, RepeatMode::Off);
+        assert_eq!(q_off_last.peek_next(), None);
+        assert_eq!(q_off_last.cursor(), 2);
+
+        let q_all_wrap = queue_from(&["a", "b", "c"], 2, RepeatMode::All);
+        assert_eq!(q_all_wrap.peek_next().map(|t| t.id.as_str()), Some("a"));
+        assert_eq!(q_all_wrap.cursor(), 2);
+
+        let q_all_single = queue_from(&["a"], 0, RepeatMode::All);
+        assert_eq!(q_all_single.peek_next(), None);
+        assert_eq!(q_all_single.cursor(), 0);
+
+        let q_one = queue_from(&["a", "b", "c"], 1, RepeatMode::One);
+        assert_eq!(q_one.peek_next(), None);
+        assert_eq!(q_one.cursor(), 1);
     }
 }

@@ -31,9 +31,9 @@ use crate::slint_shell::platform::dispatch_to_ui;
 use crate::slint_shell::playback::{format_track_duration, is_track_liked};
 use crate::slint_shell::playback_control::apply_play_track_completion;
 use crate::slint_shell::playback_worker::{
-    PlayTrackRequest, PlaybackWorkerAdapters, PlaybackWorkerCommand, execute_detail,
-    execute_play_track, execute_refresh_library, execute_scrobble, execute_search, execute_seek,
-    thumbnail_variant_for_row,
+    LyricsPrefetch, PlayTrackRequest, PlaybackWorkerAdapters, PlaybackWorkerCommand,
+    execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
+    execute_seek, spawn_lyrics_prefetch, thumbnail_variant_for_row,
 };
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{
@@ -116,6 +116,13 @@ pub(crate) fn trigger_playback(
     window.set_lyrics_lines(ModelRc::new(VecModel::default()));
     window.set_active_lyric_index(-1);
 
+    let prefetch_lyrics =
+        state.queue.peek_next().filter(|next| next.id != track.id).map(|next| LyricsPrefetch {
+            artist: next.artist.clone(),
+            title: next.title.clone(),
+            duration_secs: next.duration_secs,
+        });
+
     let req = PlayTrackRequest {
         generation,
         track_id: track.id.clone(),
@@ -125,6 +132,7 @@ pub(crate) fn trigger_playback(
         duration_secs: track.duration_secs,
         hi_res_covers: state.hi_res_covers,
         lyric_overrides: state.lyric_overrides.clone(),
+        prefetch_lyrics,
     };
     let _ = worker_tx.send(PlaybackWorkerCommand::Play(req));
 }
@@ -292,6 +300,7 @@ pub(crate) fn spawn_playback_worker(
             while let Ok(cmd) = rx.recv() {
                 match cmd {
                     PlaybackWorkerCommand::Play(req) => {
+                        let prefetch = req.prefetch_lyrics.clone();
                         let res = execute_play_track(req, &adapters);
                         let w = weak.clone();
                         let _ = dispatch_to_ui(move || {
@@ -302,6 +311,7 @@ pub(crate) fn spawn_playback_worker(
                                 }
                             });
                         });
+                        spawn_lyrics_prefetch(prefetch, Arc::clone(&adapters.lyrics));
                     }
                     PlaybackWorkerCommand::Scrobble { artist, title, started_unix } => {
                         execute_scrobble(
