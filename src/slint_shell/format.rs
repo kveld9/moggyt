@@ -4,6 +4,7 @@
 
 use crate::domain::TimerPreset;
 use crate::i18n::{Locale, tr};
+use crate::infra::AudioQuality;
 
 /// Returns current UTC timestamp in seconds since UNIX epoch, or 0 on clock failure.
 pub fn current_unix_secs() -> u64 {
@@ -78,6 +79,24 @@ pub fn timer_preset_to_index(preset: TimerPreset) -> i32 {
         TimerPreset::Minutes45 => 3,
         TimerPreset::Minutes60 => 4,
         TimerPreset::StopAfterTrack => 5,
+    }
+}
+
+/// Maps an [`AudioQuality`] preference to its corresponding Slint UI integer index (0..=2).
+pub fn audio_quality_to_index(q: AudioQuality) -> i32 {
+    match q {
+        AudioQuality::Compact => 0,
+        AudioQuality::Standard => 1,
+        AudioQuality::High => 2,
+    }
+}
+
+/// Maps an integer index (0..=2) from Slint UI selection to [`AudioQuality`].
+pub fn audio_quality_from_index(i: i32) -> AudioQuality {
+    match i {
+        0 => AudioQuality::Compact,
+        2 => AudioQuality::High,
+        _ => AudioQuality::Standard,
     }
 }
 
@@ -205,5 +224,18 @@ mod tests {
             format_sleep_timer_status(Locale::Spanish, TimerPreset::StopAfterTrack, None),
             "Temporizador: Fin de la canción"
         );
+    }
+
+    #[test]
+    fn test_audio_quality_index_mapping_roundtrip_and_fallback() {
+        let cases =
+            [(0, AudioQuality::Compact), (1, AudioQuality::Standard), (2, AudioQuality::High)];
+        for (idx, quality) in cases {
+            assert_eq!(audio_quality_from_index(idx), quality);
+            assert_eq!(audio_quality_to_index(quality), idx);
+        }
+        assert_eq!(audio_quality_from_index(-1), AudioQuality::Standard);
+        assert_eq!(audio_quality_from_index(3), AudioQuality::Standard);
+        assert_eq!(audio_quality_from_index(99), AudioQuality::Standard);
     }
 }

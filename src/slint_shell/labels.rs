@@ -56,6 +56,11 @@ pub struct StaticLabels {
     pub sleep_timer_45m_label: &'static str,
     pub sleep_timer_60m_label: &'static str,
     pub sleep_timer_end_of_track_label: &'static str,
+    pub audio_quality_label: &'static str,
+    pub audio_quality_hint_label: &'static str,
+    pub audio_quality_low_label: &'static str,
+    pub audio_quality_standard_label: &'static str,
+    pub audio_quality_high_label: &'static str,
     pub section_session: &'static str,
     pub status_signed_in: &'static str,
     pub status_anonymous: &'static str,
@@ -155,6 +160,11 @@ impl StaticLabels {
             sleep_timer_45m_label: tr(locale, "45m"),
             sleep_timer_60m_label: tr(locale, "60m"),
             sleep_timer_end_of_track_label: tr(locale, "End of track"),
+            audio_quality_label: tr(locale, "Audio quality"),
+            audio_quality_hint_label: tr(locale, "Applies from the next track"),
+            audio_quality_low_label: tr(locale, "Low"),
+            audio_quality_standard_label: tr(locale, "Standard"),
+            audio_quality_high_label: tr(locale, "High"),
             section_session: tr(locale, "Session"),
             status_signed_in: tr(locale, "Status: Signed in"),
             status_anonymous: tr(locale, "Status: Anonymous"),
@@ -260,6 +270,11 @@ impl StaticLabels {
         labels.set_sleep_timer_45m_label(self.sleep_timer_45m_label.into());
         labels.set_sleep_timer_60m_label(self.sleep_timer_60m_label.into());
         labels.set_sleep_timer_end_of_track_label(self.sleep_timer_end_of_track_label.into());
+        labels.set_audio_quality_label(self.audio_quality_label.into());
+        labels.set_audio_quality_hint_label(self.audio_quality_hint_label.into());
+        labels.set_audio_quality_low_label(self.audio_quality_low_label.into());
+        labels.set_audio_quality_standard_label(self.audio_quality_standard_label.into());
+        labels.set_audio_quality_high_label(self.audio_quality_high_label.into());
         labels.set_section_session_label(self.section_session.into());
         labels.set_status_signed_in_label(self.status_signed_in.into());
         labels.set_status_anonymous_label(self.status_anonymous.into());
@@ -381,6 +396,11 @@ mod tests {
         assert_eq!(es.sleep_timer_45m_label, "45 min");
         assert_eq!(es.sleep_timer_60m_label, "60 min");
         assert_eq!(es.sleep_timer_end_of_track_label, "Fin de la canción");
+        assert_eq!(es.audio_quality_label, "Calidad de audio");
+        assert_eq!(es.audio_quality_hint_label, "Se aplica desde la siguiente canción");
+        assert_eq!(es.audio_quality_low_label, "Baja");
+        assert_eq!(es.audio_quality_standard_label, "Estándar");
+        assert_eq!(es.audio_quality_high_label, "Alta");
         assert_eq!(es.section_session, "Sesión");
         assert_eq!(es.status_signed_in, "Estado: Sesión iniciada");
         assert_eq!(es.status_anonymous, "Estado: Anónimo");
@@ -476,6 +496,11 @@ mod tests {
         assert_eq!(en.sleep_timer_45m_label, "45m");
         assert_eq!(en.sleep_timer_60m_label, "60m");
         assert_eq!(en.sleep_timer_end_of_track_label, "End of track");
+        assert_eq!(en.audio_quality_label, "Audio quality");
+        assert_eq!(en.audio_quality_hint_label, "Applies from the next track");
+        assert_eq!(en.audio_quality_low_label, "Low");
+        assert_eq!(en.audio_quality_standard_label, "Standard");
+        assert_eq!(en.audio_quality_high_label, "High");
         assert_eq!(en.section_session, "Session");
         assert_eq!(en.status_signed_in, "Status: Signed in");
         assert_eq!(en.status_anonymous, "Status: Anonymous");

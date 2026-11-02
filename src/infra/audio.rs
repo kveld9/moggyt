@@ -25,6 +25,10 @@ pub trait AudioBackend {
     fn is_playing(&self) -> bool;
     fn last_requested(&self) -> Option<&str>;
     fn set_quality(&mut self, _q: AudioQuality) {}
+    /// Returns current audio streaming quality preference (defaults to [`AudioQuality::Standard`]).
+    fn quality(&self) -> AudioQuality {
+        AudioQuality::default()
+    }
     fn set_skip_silence(&mut self, _on: bool) {}
     fn set_loudness_normalization(&mut self, _on: bool) {}
     /// Sets playback speed (valid range: 0.5..=2.0).
@@ -46,6 +50,7 @@ pub struct AudioStub {
     volume: u8,
     speed: f32,
     position_secs: u64,
+    quality: AudioQuality,
     skip_silence: bool,
     loudness_normalization: bool,
 }
@@ -58,6 +63,7 @@ impl Default for AudioStub {
             volume: 100,
             speed: 1.0,
             position_secs: 0,
+            quality: AudioQuality::default(),
             skip_silence: false,
             loudness_normalization: false,
         }
@@ -117,6 +123,14 @@ impl AudioBackend for AudioStub {
 
     fn last_requested(&self) -> Option<&str> {
         self.last_requested.as_deref()
+    }
+
+    fn set_quality(&mut self, quality: AudioQuality) {
+        self.quality = quality;
+    }
+
+    fn quality(&self) -> AudioQuality {
+        self.quality
     }
 
     fn set_skip_silence(&mut self, on: bool) {
@@ -214,5 +228,13 @@ mod tests {
         assert!(audio.skip_silence());
         audio.set_loudness_normalization(true);
         assert!(audio.loudness_normalization());
+    }
+
+    #[test]
+    fn audio_stub_quality_recording() {
+        let mut audio = AudioStub::new();
+        assert_eq!(audio.quality(), AudioQuality::Standard);
+        audio.set_quality(AudioQuality::High);
+        assert_eq!(audio.quality(), AudioQuality::High);
     }
 }
