@@ -1,6 +1,7 @@
 //! Audio port and no-op stub (no sound yet).
 
 use super::stream::AudioQuality;
+use super::ytdlp::YtDlpResolver;
 
 /// Clamps a playback speed factor to the valid `0.5..=2.0` range.
 ///
@@ -39,6 +40,10 @@ pub trait AudioBackend {
     /// Returns current playback speed factor (defaults to 1.0).
     fn speed(&self) -> f32 {
         1.0
+    }
+    /// Returns a resolver handle sharing this backend's stream URL cache, for off-lock prefetching.
+    fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
+        None
     }
 }
 
@@ -236,5 +241,11 @@ mod tests {
         assert_eq!(audio.quality(), AudioQuality::Standard);
         audio.set_quality(AudioQuality::High);
         assert_eq!(audio.quality(), AudioQuality::High);
+    }
+
+    #[test]
+    fn audio_stub_stream_prefetcher_default_is_none() {
+        let audio = AudioStub::new();
+        assert!(audio.stream_prefetcher().is_none());
     }
 }

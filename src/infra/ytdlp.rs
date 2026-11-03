@@ -11,6 +11,7 @@ use std::time::Instant;
 use anyhow::Context;
 
 use super::stream::{AudioQuality, StreamResolver, audio_quality_format};
+use super::stream_url_cache::StreamUrlCache;
 
 /// Update interval for checking yt-dlp release freshness (3 days in seconds).
 pub const YTDLP_UPDATE_INTERVAL_SECS: u64 = 3 * 24 * 60 * 60;
@@ -104,12 +105,42 @@ pub struct YtDlpResolver {
     binary: PathBuf,
     timeout_secs: u64,
     quality: AudioQuality,
+    cache: StreamUrlCache,
 }
 
 impl YtDlpResolver {
     /// Creates a resolver with default timeout (30 seconds) and standard quality.
     pub fn new(binary: impl Into<PathBuf>) -> Self {
-        Self { binary: binary.into(), timeout_secs: 30, quality: AudioQuality::default() }
+        Self {
+            binary: binary.into(),
+            timeout_secs: 30,
+            quality: AudioQuality::default(),
+            cache: StreamUrlCache::default(),
+        }
+    }
+
+    /// Borrows the internal stream URL cache.
+    pub fn cache(&self) -> &StreamUrlCache {
+        &self.cache
+    }
+
+    /// Prefetches and caches the stream URL for `video_id`.
+    ///
+    /// Returns `true` if resolution succeeds or if the URL is already cached.
+    /// Returns `false` on blank video IDs or resolution failures.
+    pub fn prefetch(&self, video_id: &str) -> bool {
+        let Ok(id) = validate_video_id(video_id) else {
+            return false;
+        };
+        if self.cache.get(id, self.quality, Instant::now()).is_some() {
+            return true;
+        }
+        self.fetch_audio_url(id).is_ok()
+    }
+
+    /// Invalidates cached stream URLs for `video_id`.
+    pub fn invalidate(&self, video_id: &str) {
+        self.cache.invalidate(video_id);
     }
 
     /// Mutates the preferred audio quality in place.
@@ -142,6 +173,15 @@ impl YtDlpResolver {
     /// Resolves `video_id` to a stream URL with explicit error details.
     pub fn fetch_audio_url(&self, video_id: &str) -> anyhow::Result<String> {
         let id = validate_video_id(video_id)?;
+        if let Some(url) = self.cache.get(id, self.quality, Instant::now()) {
+            return Ok(url);
+        }
+        let url = self.resolve_uncached(id)?;
+        self.cache.insert(id, self.quality, url.clone(), Instant::now());
+        Ok(url)
+    }
+
+    fn resolve_uncached(&self, id: &str) -> anyhow::Result<String> {
         match self.extract_url(id) {
             Ok(url) => Ok(url),
             Err(first_err) => {
@@ -461,5 +501,47 @@ mod tests {
 
         resolver.set_quality(AudioQuality::Compact);
         assert_eq!(resolver.quality(), AudioQuality::Compact);
+    }
+
+    #[test]
+    fn resolver_cache_hit_avoids_spawning_and_different_quality_misses() {
+        let resolver = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let video_id = "dQw4w9WgXcQ";
+        let cached_url = "https://googlevideo.example.com/audio-stream";
+        resolver.cache().insert(
+            video_id,
+            AudioQuality::Standard,
+            cached_url.to_string(),
+            Instant::now(),
+        );
+
+        // Hit returns cached URL without spawning missing binary
+        assert_eq!(resolver.resolve(video_id), Some(cached_url.to_string()));
+
+        // Different quality misses cache and fails on missing binary
+        let mut high_resolver = resolver.clone();
+        high_resolver.set_quality(AudioQuality::High);
+        assert_eq!(high_resolver.resolve(video_id), None);
+
+        // Invalidation removes cached URL
+        resolver.invalidate(video_id);
+        assert_eq!(resolver.resolve(video_id), None);
+    }
+
+    #[test]
+    fn resolver_prefetch_returns_true_when_cached_and_false_on_missing_binary() {
+        let resolver = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let video_id = "dQw4w9WgXcQ";
+        assert!(!resolver.prefetch(video_id));
+        assert!(!resolver.prefetch(""));
+        assert!(!resolver.prefetch("   "));
+
+        resolver.cache().insert(
+            video_id,
+            AudioQuality::Standard,
+            "https://cached.test/stream".into(),
+            Instant::now(),
+        );
+        assert!(resolver.prefetch(video_id));
     }
 }

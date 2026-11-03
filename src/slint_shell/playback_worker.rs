@@ -63,6 +63,8 @@ pub struct PlayTrackRequest {
     pub hi_res_covers: bool,
     pub lyric_overrides: Option<LyricOverrideDir>,
     pub prefetch_lyrics: Option<LyricsPrefetch>,
+    /// Target video ID of the upcoming track for background stream URL prefetching.
+    pub prefetch_stream_id: Option<String>,
 }
 
 /// Result payload returned from the playback worker thread to the UI thread.
@@ -366,6 +368,7 @@ mod tests {
             hi_res_covers: false,
             lyric_overrides: None,
             prefetch_lyrics: None,
+            prefetch_stream_id: None,
         };
 
         let adapters = PlaybackWorkerAdapters::new(
@@ -517,6 +520,7 @@ mod tests {
             hi_res_covers: false,
             lyric_overrides: None,
             prefetch_lyrics: None,
+            prefetch_stream_id: None,
         }))
         .unwrap();
 
