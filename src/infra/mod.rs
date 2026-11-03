@@ -56,6 +56,7 @@ mod stream;
 mod stream_reader;
 mod stream_reqwest;
 mod stream_stub;
+mod stream_url_cache;
 mod tray;
 mod updater;
 mod updater_github;
@@ -138,6 +139,7 @@ pub use spotify_search::{
     video_type_from,
 };
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
+pub use stream_url_cache::{STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
 pub use updater_github::{

@@ -28,6 +28,7 @@ src/
 │   ├── history.rs     # Account history playlist entry projection, detail labeling, and subtitles
 │   ├── lastfm_connect.rs # Last.fm desktop authentication and connect flow
 │   ├── stats.rs       # Wrapped-style listening statistics UI view model and refresh wiring
+│   ├── stream_prefetch.rs # Next-track stream URL prefetching thread spawner
 │   └── bridges/       # Platform and domain integration bridges
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
@@ -55,6 +56,7 @@ src/
     ├── session*.rs    # SessionStore port and Keyring cookie persistence
     ├── settings.rs    # SettingsStore port and atomic JSON persistence
     ├── stream.rs      # StreamResolver trait definition
+    ├── stream_url_cache.rs # Stream URL cache with TTL and capacity eviction
     ├── tray.rs        # System tray handle and action event loop
     ├── updater*.rs    # Updater port and GitHub Releases release checker
     ├── ytdlp.rs       # yt-dlp sidecar download and stream resolution adapter

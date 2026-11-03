@@ -37,6 +37,7 @@ use crate::slint_shell::playback_worker::{
     execute_seek, spawn_lyrics_prefetch, thumbnail_variant_for_row,
 };
 use crate::slint_shell::state::{SharedState, SlintAppState};
+use crate::slint_shell::stream_prefetch::spawn_stream_prefetch;
 use crate::slint_shell::sync::{
     persist_recent_searches, sync_library_and_detail, sync_playback_tick, sync_recent_searches,
     sync_shelves_and_queue, sync_update_status, sync_window,
@@ -118,12 +119,13 @@ pub(crate) fn trigger_playback(
     window.set_lyrics_lines(ModelRc::new(VecModel::default()));
     window.set_active_lyric_index(-1);
 
-    let prefetch_lyrics =
-        state.queue.peek_next().filter(|next| next.id != track.id).map(|next| LyricsPrefetch {
-            artist: next.artist.clone(),
-            title: next.title.clone(),
-            duration_secs: next.duration_secs,
-        });
+    let next_track = state.queue.peek_next().filter(|next| next.id != track.id);
+    let prefetch_lyrics = next_track.as_ref().map(|next| LyricsPrefetch {
+        artist: next.artist.clone(),
+        title: next.title.clone(),
+        duration_secs: next.duration_secs,
+    });
+    let prefetch_stream_id = next_track.map(|next| next.id.clone());
 
     let req = PlayTrackRequest {
         generation,
@@ -135,6 +137,7 @@ pub(crate) fn trigger_playback(
         hi_res_covers: state.hi_res_covers,
         lyric_overrides: state.lyric_overrides.clone(),
         prefetch_lyrics,
+        prefetch_stream_id,
     };
     let _ = worker_tx.send(PlaybackWorkerCommand::Play(req));
 }
@@ -315,6 +318,7 @@ pub(crate) fn spawn_playback_worker(
                 match cmd {
                     PlaybackWorkerCommand::Play(req) => {
                         let prefetch = req.prefetch_lyrics.clone();
+                        let stream_id = req.prefetch_stream_id.clone();
                         let res = execute_play_track(req, &adapters);
                         let w = weak.clone();
                         let _ = dispatch_to_ui(move || {
@@ -326,6 +330,7 @@ pub(crate) fn spawn_playback_worker(
                             });
                         });
                         spawn_lyrics_prefetch(prefetch, Arc::clone(&adapters.lyrics));
+                        spawn_stream_prefetch(stream_id, &adapters.audio);
                     }
                     PlaybackWorkerCommand::Scrobble { artist, title, started_unix } => {
                         execute_scrobble(

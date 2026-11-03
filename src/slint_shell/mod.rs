@@ -64,6 +64,7 @@ pub mod shortcuts;
 pub mod state;
 pub mod state_init;
 pub mod stats;
+pub mod stream_prefetch;
 pub mod sync;
 #[cfg(test)]
 pub mod test_support;
@@ -103,6 +104,7 @@ pub use playback_worker::{
 };
 pub use player_bar::{PLAYER_BAR_OPTION_COUNT, PlayerBarPrefs, mode_from_index, mode_to_index};
 pub use search::format_duration;
+pub use stream_prefetch::spawn_stream_prefetch;
 pub use theme::{ThemeColors, apply_theme, palette_for, rgb_to_slint};
 
 #[cfg(test)]

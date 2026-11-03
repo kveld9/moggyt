@@ -153,6 +153,19 @@ impl RodioBackend {
     pub fn loudness_normalization(&self) -> bool {
         self.loudness_normalization
     }
+
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
+    fn retry_play_with_fresh_url(&mut self, track_id: &str) {
+        self.resolver.invalidate(track_id);
+        let Some(url) = self.resolver.resolve(track_id) else {
+            tracing::warn!(track_id = %track_id, "failed to re-resolve audio stream URL on retry");
+            return;
+        };
+        if let Err(err) = self.play_url(track_id, &url) {
+            tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream on retry");
+        }
+    }
 }
 
 impl AudioBackend for RodioBackend {
@@ -169,7 +182,12 @@ impl AudioBackend for RodioBackend {
         };
         if let Err(err) = self.play_url(track_id, &url) {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream");
+            self.retry_play_with_fresh_url(track_id);
         }
+    }
+
+    fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
+        Some(self.resolver.clone())
     }
 
     fn pause(&mut self) {
@@ -363,6 +381,13 @@ impl AudioBackend for LiveAudio {
             Self::Muted(stub) => stub.set_loudness_normalization(on),
         }
     }
+
+    fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
+        match self {
+            Self::Live(backend) => backend.stream_prefetcher(),
+            Self::Muted(stub) => stub.stream_prefetcher(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -507,5 +532,39 @@ mod tests {
         assert_eq!(audio.quality(), AudioQuality::Compact);
         audio.set_skip_silence(true);
         audio.set_loudness_normalization(true);
+        assert!(audio.stream_prefetcher().is_none());
+    }
+
+    #[test]
+    fn play_invalidates_cache_and_retries_on_stream_failure() {
+        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
+            Ok(backend) => backend,
+            Err(err) => {
+                eprintln!("Skipping audio hardware assertions in headless environment: {err:#}");
+                return;
+            }
+        };
+
+        let track_id = "test-fail-retry";
+        backend.resolver.cache().insert(
+            track_id,
+            AudioQuality::Standard,
+            "not-a-valid-url".to_string(),
+            Instant::now(),
+        );
+        assert!(
+            backend
+                .resolver
+                .cache()
+                .get(track_id, AudioQuality::Standard, Instant::now())
+                .is_some()
+        );
+
+        // play should fail on "not-a-valid-url", invalidate the cache entry, and fail second resolve
+        backend.play(track_id);
+        assert_eq!(
+            backend.resolver.cache().get(track_id, AudioQuality::Standard, Instant::now()),
+            None
+        );
     }
 }
