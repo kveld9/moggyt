@@ -5,6 +5,7 @@
 
 mod artist_match;
 mod library;
+mod listening_stats;
 mod local_playlist;
 mod matching;
 mod play_log;
@@ -19,6 +20,10 @@ pub use artist_match::{
     TOPIC_CHANNEL_SUFFIX, artist_score, split_source_artists, strip_topic_suffix,
 };
 pub use library::{Album, Artist, Detail, DetailKind, Playlist, SearchResult, Shelf};
+pub use listening_stats::{
+    ListeningStats, RankedEntry, SECS_PER_DAY, STATS_TOP_LIMIT, StatsPeriod,
+    compute_listening_stats,
+};
 pub use local_playlist::{
     HIGH_CONFIDENCE_THRESHOLD, LOCAL_PLAYLIST_PREFIX, LocalPlaylist, LocalTrack,
     MEDIUM_CONFIDENCE_THRESHOLD, MatchConfidence, SpotifyPlaylist, SpotifyTrack,

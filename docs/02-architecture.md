@@ -29,6 +29,7 @@ src/
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
 │   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)
+│   ├── listening_stats.rs # Wrapped-style listening statistics from play records
 │   ├── play_log.rs    # Listening history models and duration clamping
 │   ├── queue.rs       # Pure playback queue (add, next, previous, shuffle, repeat)
 │   ├── search.rs      # Search models (immutable query, track model)
