@@ -39,6 +39,14 @@ fn init_tray() -> Option<TrayHandle> {
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
 fn main() -> anyhow::Result<()> {
+    if std::env::var_os("SLINT_BACKEND").is_none() {
+        // Default to winit backend to avoid Qt Wayland text-input v3 surface invalidation bug.
+        // Safety: main is single-threaded at startup before any background threads or runtimes are spawned.
+        unsafe {
+            std::env::set_var("SLINT_BACKEND", "winit");
+        }
+    }
+
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     if let Some(code) = run_import_cli_if_requested(&raw_args) {
         std::process::exit(code);
