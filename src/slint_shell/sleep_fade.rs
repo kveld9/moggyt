@@ -132,7 +132,7 @@ mod tests {
         state.poll_sleep_timer();
         assert_eq!(state.audio.lock().unwrap().volume(), 50);
 
-        crate::slint_shell::callbacks::handle_sleep_timer_selection(&mut state, 0);
+        crate::slint_shell::settings_callbacks::handle_sleep_timer_selection(&mut state, 0);
         assert_eq!(state.audio.lock().unwrap().volume(), 100);
         assert_eq!(state.sleep_fade_base_volume, None);
     }
