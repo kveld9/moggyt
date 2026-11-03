@@ -64,6 +64,10 @@ pub struct StaticLabels {
     pub audio_quality_high_label: &'static str,
     pub songs_only_label: &'static str,
     pub keyboard_shortcuts_label: &'static str,
+    pub crossfade: &'static str,
+    pub crossfade_hint: &'static str,
+    pub stream_cache: &'static str,
+    pub stream_cache_hint: &'static str,
     pub section_integrations: &'static str,
     pub discord_presence_label: &'static str,
     pub discord_presence_hint_label: &'static str,
@@ -188,6 +192,10 @@ impl StaticLabels {
             audio_quality_high_label: tr(locale, "High"),
             songs_only_label: tr(locale, "Prefer songs over music videos"),
             keyboard_shortcuts_label: tr(locale, "Keyboard shortcuts"),
+            crossfade: tr(locale, "Crossfade"),
+            crossfade_hint: tr(locale, "Smooth transition between tracks"),
+            stream_cache: tr(locale, "Stream Cache Limit"),
+            stream_cache_hint: tr(locale, "Disk space quota for offline stream cache"),
             section_integrations: tr(locale, "Integrations"),
             discord_presence_label: tr(locale, "Discord Rich Presence"),
             discord_presence_hint_label: tr(
@@ -324,6 +332,10 @@ impl StaticLabels {
         labels.set_audio_quality_high_label(self.audio_quality_high_label.into());
         labels.set_songs_only_label(self.songs_only_label.into());
         labels.set_keyboard_shortcuts_label(self.keyboard_shortcuts_label.into());
+        labels.set_crossfade_label(self.crossfade.into());
+        labels.set_crossfade_hint_label(self.crossfade_hint.into());
+        labels.set_stream_cache_label(self.stream_cache.into());
+        labels.set_stream_cache_hint_label(self.stream_cache_hint.into());
         labels.set_section_integrations_label(self.section_integrations.into());
         labels.set_discord_presence_label(self.discord_presence_label.into());
         labels.set_discord_presence_hint_label(self.discord_presence_hint_label.into());
@@ -488,6 +500,10 @@ mod tests {
         assert_eq!(es.audio_quality_high_label, "Alta");
         assert_eq!(es.songs_only_label, "Preferir canciones a videoclips");
         assert_eq!(es.keyboard_shortcuts_label, "Atajos de teclado");
+        assert_eq!(es.crossfade, "Fundido cruzado");
+        assert_eq!(es.crossfade_hint, "Transición suave entre temas");
+        assert_eq!(es.stream_cache, "Límite de caché de streams");
+        assert_eq!(es.stream_cache_hint, "Espacio en disco para la caché de audio");
         assert_eq!(es.section_integrations, "Integraciones");
         assert_eq!(es.discord_presence_label, "Discord Rich Presence");
         assert_eq!(
@@ -611,6 +627,10 @@ mod tests {
         assert_eq!(en.audio_quality_high_label, "High");
         assert_eq!(en.songs_only_label, "Prefer songs over music videos");
         assert_eq!(en.keyboard_shortcuts_label, "Keyboard shortcuts");
+        assert_eq!(en.crossfade, "Crossfade");
+        assert_eq!(en.crossfade_hint, "Smooth transition between tracks");
+        assert_eq!(en.stream_cache, "Stream Cache Limit");
+        assert_eq!(en.stream_cache_hint, "Disk space quota for offline stream cache");
         assert_eq!(en.section_integrations, "Integrations");
         assert_eq!(en.discord_presence_label, "Discord Rich Presence");
         assert_eq!(

@@ -116,12 +116,14 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Close", "Cerrar"),
     ("Connect with Last.fm", "Conectar con Last.fm"),
     ("Connected as", "Conectado como"),
+    ("Crossfade", "Fundido cruzado"),
     ("Custom", "Personalizado"),
     ("Custom theme loaded from {path}", "Tema personalizado cargado desde {path}"),
     ("Custom theme not loaded: {error}", "Tema personalizado no cargado: {error}"),
     ("Detail", "Detalle"),
     ("Discard", "Descartar"),
     ("Disconnect", "Desconectar"),
+    ("Disk space quota for offline stream cache", "Espacio en disco para la caché de audio"),
     ("Discord Rich Presence", "Discord Rich Presence"),
     (
         "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
@@ -219,6 +221,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Sign out", "Cerrar sesión"),
     ("Signed in: library unlocked", "Sesión iniciada: biblioteca desbloqueada"),
     ("Sleep timer", "Temporizador de apagado"),
+    ("Smooth transition between tracks", "Transición suave entre temas"),
     ("Songs", "Canciones"),
     ("Source", "Origen"),
     ("Spanish", "Español"),
@@ -228,6 +231,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Stats", "Estadísticas"),
     ("Status: Anonymous", "Estado: Anónimo"),
     ("Status: Signed in", "Estado: Sesión iniciada"),
+    ("Stream Cache Limit", "Límite de caché de streams"),
     ("Swap", "Cambiar"),
     (
         "Synchronized lyrics will appear during playback",
@@ -532,6 +536,27 @@ mod tests {
             (
                 "Waiting for authorization in your browser",
                 "Esperando la autorización en tu navegador",
+            ),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_crossfade_and_stream_cache_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Crossfade", "Fundido cruzado"),
+            ("Smooth transition between tracks", "Transición suave entre temas"),
+            ("Stream Cache Limit", "Límite de caché de streams"),
+            (
+                "Disk space quota for offline stream cache",
+                "Espacio en disco para la caché de audio",
             ),
         ];
 
