@@ -118,6 +118,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Custom theme not loaded: {error}", "Tema personalizado no cargado: {error}"),
     ("Detail", "Detalle"),
     ("Discard", "Descartar"),
+    ("Discord Rich Presence", "Discord Rich Presence"),
     (
         "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
         "Las importaciones por enlace se limitan a 100 canciones. Exporta un CSV para playlists mas largas.",
@@ -137,6 +138,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Import from Spotify", "Importar desde Spotify"),
     ("Import progress", "Progreso de importacion"),
     ("Importing matches...", "Importando coincidencias..."),
+    ("Integrations", "Integraciones"),
     ("Keyboard shortcuts", "Atajos de teclado"),
     ("Language", "Idioma"),
     ("Library", "Biblioteca"),
@@ -192,6 +194,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Show shuffle button", "Mostrar botón Aleatorio"),
     ("Show skip 10s buttons", "Mostrar botones +/-10s"),
     ("Show volume slider", "Mostrar control de volumen"),
+    (
+        "Shows the current track in your Discord status while Discord is running.",
+        "Muestra el tema actual en tu estado de Discord mientras Discord está abierto.",
+    ),
     ("Shuffle", "Aleatorio"),
     ("Sign in", "Iniciar sesión"),
     ("Sign out", "Cerrar sesión"),

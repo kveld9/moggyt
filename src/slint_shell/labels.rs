@@ -64,6 +64,9 @@ pub struct StaticLabels {
     pub audio_quality_high_label: &'static str,
     pub songs_only_label: &'static str,
     pub keyboard_shortcuts_label: &'static str,
+    pub section_integrations: &'static str,
+    pub discord_presence_label: &'static str,
+    pub discord_presence_hint_label: &'static str,
     pub section_session: &'static str,
     pub status_signed_in: &'static str,
     pub status_anonymous: &'static str,
@@ -171,6 +174,12 @@ impl StaticLabels {
             audio_quality_high_label: tr(locale, "High"),
             songs_only_label: tr(locale, "Prefer songs over music videos"),
             keyboard_shortcuts_label: tr(locale, "Keyboard shortcuts"),
+            section_integrations: tr(locale, "Integrations"),
+            discord_presence_label: tr(locale, "Discord Rich Presence"),
+            discord_presence_hint_label: tr(
+                locale,
+                "Shows the current track in your Discord status while Discord is running.",
+            ),
             section_session: tr(locale, "Session"),
             status_signed_in: tr(locale, "Status: Signed in"),
             status_anonymous: tr(locale, "Status: Anonymous"),
@@ -284,6 +293,9 @@ impl StaticLabels {
         labels.set_audio_quality_high_label(self.audio_quality_high_label.into());
         labels.set_songs_only_label(self.songs_only_label.into());
         labels.set_keyboard_shortcuts_label(self.keyboard_shortcuts_label.into());
+        labels.set_section_integrations_label(self.section_integrations.into());
+        labels.set_discord_presence_label(self.discord_presence_label.into());
+        labels.set_discord_presence_hint_label(self.discord_presence_hint_label.into());
         labels.set_section_session_label(self.section_session.into());
         labels.set_status_signed_in_label(self.status_signed_in.into());
         labels.set_status_anonymous_label(self.status_anonymous.into());
@@ -346,11 +358,23 @@ mod tests {
         assert_eq!(en_labels.nav_explore, "Explore");
         assert_eq!(en_labels.explore_loading, "Loading explore...");
         assert_eq!(en_labels.explore_empty, "No sections found in Explore.");
+        assert_eq!(en_labels.section_integrations, "Integrations");
+        assert_eq!(en_labels.discord_presence_label, "Discord Rich Presence");
+        assert_eq!(
+            en_labels.discord_presence_hint_label,
+            "Shows the current track in your Discord status while Discord is running."
+        );
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
         assert_eq!(es_labels.nav_explore, "Explorar");
         assert_eq!(es_labels.explore_loading, "Cargando exploracion...");
         assert_eq!(es_labels.explore_empty, "No se encontraron secciones en Explorar.");
+        assert_eq!(es_labels.section_integrations, "Integraciones");
+        assert_eq!(es_labels.discord_presence_label, "Discord Rich Presence");
+        assert_eq!(
+            es_labels.discord_presence_hint_label,
+            "Muestra el tema actual en tu estado de Discord mientras Discord está abierto."
+        );
     }
 
     #[test]
@@ -413,6 +437,12 @@ mod tests {
         assert_eq!(es.audio_quality_high_label, "Alta");
         assert_eq!(es.songs_only_label, "Preferir canciones a videoclips");
         assert_eq!(es.keyboard_shortcuts_label, "Atajos de teclado");
+        assert_eq!(es.section_integrations, "Integraciones");
+        assert_eq!(es.discord_presence_label, "Discord Rich Presence");
+        assert_eq!(
+            es.discord_presence_hint_label,
+            "Muestra el tema actual en tu estado de Discord mientras Discord está abierto."
+        );
         assert_eq!(es.section_session, "Sesión");
         assert_eq!(es.status_signed_in, "Estado: Sesión iniciada");
         assert_eq!(es.status_anonymous, "Estado: Anónimo");
@@ -516,6 +546,12 @@ mod tests {
         assert_eq!(en.audio_quality_high_label, "High");
         assert_eq!(en.songs_only_label, "Prefer songs over music videos");
         assert_eq!(en.keyboard_shortcuts_label, "Keyboard shortcuts");
+        assert_eq!(en.section_integrations, "Integrations");
+        assert_eq!(en.discord_presence_label, "Discord Rich Presence");
+        assert_eq!(
+            en.discord_presence_hint_label,
+            "Shows the current track in your Discord status while Discord is running."
+        );
         assert_eq!(en.section_session, "Session");
         assert_eq!(en.status_signed_in, "Status: Signed in");
         assert_eq!(en.status_anonymous, "Status: Anonymous");

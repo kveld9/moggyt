@@ -1,0 +1,38 @@
+import { Labels } from "../../labels.slint";
+import { Theme } from "../../theme.slint";
+import { Integrations } from "../../integrations.slint";
+import { SettingsToggleRow } from "../settings_rows.slint";
+
+export component IntegrationSettings inherits VerticalLayout {
+    spacing: 10px;
+
+    Text {
+        text: Labels.section-integrations-label;
+        color: Theme.text;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    Rectangle {
+        border-radius: 8px;
+        background: Theme.panel;
+
+        VerticalLayout {
+            padding: 16px;
+            spacing: 8px;
+
+            SettingsToggleRow {
+                label: Labels.discord-presence-label;
+                checked: Integrations.discord-presence-enabled;
+                toggled => { Integrations.discord-presence-toggled(); }
+            }
+
+            Text {
+                text: Labels.discord-presence-hint-label;
+                color: Theme.secondary;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

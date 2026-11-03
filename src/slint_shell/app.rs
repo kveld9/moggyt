@@ -10,8 +10,8 @@ use slint::ComponentHandle;
 
 use crate::domain::ThemeId;
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, CustomThemeFile, LyricOverrideDir, LyricsSource,
-    PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings, SettingsStore,
+    AudioBackend, Catalog, CoverCache, CustomThemeFile, DiscordPresence, LyricOverrideDir,
+    LyricsSource, PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings, SettingsStore,
     SingleInstanceGuard, SkipStore, TrayHandle,
 };
 
@@ -108,6 +108,9 @@ pub fn run(
     state.hi_res_covers = settings.hi_res_covers;
     state.songs_only = settings.songs_only;
     state.keyboard_shortcuts = settings.keyboard_shortcuts;
+    if settings.discord_presence_enabled {
+        state.discord = DiscordPresence::new();
+    }
     state.theme = settings.theme;
     state.locale = settings.locale;
     if state.theme == ThemeId::Custom {

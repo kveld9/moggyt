@@ -37,6 +37,7 @@ pub mod callbacks;
 pub mod cover_pool;
 pub mod covers;
 pub mod detail;
+pub mod discord;
 pub mod explore;
 pub mod format;
 pub mod import_callbacks;

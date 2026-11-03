@@ -264,6 +264,7 @@ When supported by the desktop environment, `moggyt` creates a system tray icon:
 
 ### Discord Presence & Last.fm Scrobbling
 
-- **Discord Rich Presence**: dormant in this build (`DISCORD_APP_ID` is 0, no IPC attempted); it will publish track
-  title and artist only once a valid application ID is configured.
+- **Discord Rich Presence**: opt-in toggle in Settings > Integrations. Broadcasts a "Listening to moggyt" activity with
+  title and artist; connects lazily when Discord is running (also if Discord starts later, on the next track change).
+  Disabling clears the status.
 - **Last.fm Scrobbler**: initialized in a dormant state by default until credentials and registration are configured.
