@@ -13,6 +13,7 @@ import { NowPlayingView } from "./now_playing_view.slint";
 import { LibraryView } from "./library_view.slint";
 import { DetailView } from "./detail_view.slint";
 import { SettingsView } from "./settings_view.slint";
+import { StatsView } from "./stats_view.slint";
 
 export component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
@@ -274,6 +275,8 @@ export component ContentArea inherits Rectangle {
                 is-loading: root.explore-loading;
                 track-selected(idx) => { root.explore-track-selected(idx); }
             }
+
+            if root.active-page == 6 : StatsView {}
         }
     }
 }

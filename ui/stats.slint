@@ -1,0 +1,20 @@
+// Stats global and model definitions for wrapped-style listening statistics.
+
+export struct StatsEntryData {
+    rank: string,
+    name: string,
+    detail: string,
+    plays: string,
+}
+
+export global StatsData {
+    in-out property <int> period-index: 2;
+    in-out property <bool> is-empty: true;
+    in-out property <string> total-plays: "";
+    in-out property <string> total-time: "";
+    in-out property <string> unique-tracks: "";
+    in-out property <string> unique-artists: "";
+    in-out property <[StatsEntryData]> top-artists: [];
+    in-out property <[StatsEntryData]> top-tracks: [];
+    callback period-selected(int);
+}

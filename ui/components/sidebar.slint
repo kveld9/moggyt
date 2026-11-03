@@ -7,6 +7,7 @@ import {
     IconSearch,
     IconSettings,
 } from "../icons.slint";
+import { IconStats } from "../icons/navigation_icons.slint";
 
 export component NavItem inherits Rectangle {
     in property <string> text;
@@ -40,6 +41,10 @@ export component NavItem inherits Rectangle {
                 tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
             }
             if root.icon-name == "library" : IconLibrary {
+                size: 18px;
+                tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
+            }
+            if root.icon-name == "stats" : IconStats {
                 size: 18px;
                 tint: root.is-active ? Theme.accent : (touch.has-hover ? Theme.text : Theme.secondary);
             }
@@ -103,6 +108,13 @@ export component Sidebar inherits Rectangle {
             icon-name: "library";
             is-active: root.active-page == 2;
             clicked => { root.page-selected(2); }
+        }
+
+        NavItem {
+            text: Labels.nav-stats-label;
+            icon-name: "stats";
+            is-active: root.active-page == 6;
+            clicked => { root.page-selected(6); }
         }
 
         NavItem {

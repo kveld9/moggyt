@@ -135,3 +135,20 @@ export component IconMusic inherits Rectangle {
         commands: "M 9 17 A 3 2.5 0 1 1 6 14.5 A 3 2.5 0 0 1 9 17 Z M 9 17 L 9 5.5 L 20 3 L 20 14 M 20 14 A 3 2.5 0 1 1 17 11.5 A 3 2.5 0 0 1 20 14 Z";
     }
 }
+
+export component IconStats inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 5 19 C 5 19.6 5.4 20 6 20 C 6.6 20 7 19.6 7 19 L 7 14 C 7 13.4 6.6 13 6 13 C 5.4 13 5 13.4 5 14 Z M 11 19 C 11 19.6 11.4 20 12 20 C 12.6 20 13 19.6 13 19 L 13 9 C 13 8.4 12.6 8 12 8 C 11.4 8 11 8.4 11 9 Z M 17 19 C 17 19.6 17.4 20 18 20 C 18.6 20 19 19.6 19 19 L 19 4 C 19 3.4 18.6 3 18 3 C 17.4 3 17 3.4 17 4 Z";
+    }
+}

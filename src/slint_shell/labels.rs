@@ -114,6 +114,17 @@ pub struct StaticLabels {
     pub import_save_label: &'static str,
     pub import_discard_label: &'static str,
     pub import_all_matched_label: &'static str,
+    pub nav_stats: &'static str,
+    pub stats_last_4_weeks: &'static str,
+    pub stats_last_6_months: &'static str,
+    pub stats_all_time: &'static str,
+    pub stats_plays: &'static str,
+    pub stats_listening_time: &'static str,
+    pub stats_tracks: &'static str,
+    pub stats_artists: &'static str,
+    pub stats_top_artists: &'static str,
+    pub stats_top_tracks: &'static str,
+    pub stats_empty: &'static str,
 }
 
 impl StaticLabels {
@@ -233,6 +244,20 @@ impl StaticLabels {
             import_save_label: tr(locale, "Save playlist"),
             import_discard_label: tr(locale, "Discard"),
             import_all_matched_label: tr(locale, "All matched"),
+            nav_stats: tr(locale, "Stats"),
+            stats_last_4_weeks: tr(locale, "Last 4 weeks"),
+            stats_last_6_months: tr(locale, "Last 6 months"),
+            stats_all_time: tr(locale, "All time"),
+            stats_plays: tr(locale, "Plays"),
+            stats_listening_time: tr(locale, "Listening time"),
+            stats_tracks: tr(locale, "Tracks"),
+            stats_artists: tr(locale, "Artists"),
+            stats_top_artists: tr(locale, "Top artists"),
+            stats_top_tracks: tr(locale, "Top tracks"),
+            stats_empty: tr(
+                locale,
+                "No plays recorded yet. Songs you listen to for at least 30 seconds show up here.",
+            ),
         }
     }
 
@@ -349,6 +374,17 @@ impl StaticLabels {
         labels.set_import_save_label(self.import_save_label.into());
         labels.set_import_discard_label(self.import_discard_label.into());
         labels.set_import_all_matched_label(self.import_all_matched_label.into());
+        labels.set_nav_stats_label(self.nav_stats.into());
+        labels.set_stats_last_4_weeks_label(self.stats_last_4_weeks.into());
+        labels.set_stats_last_6_months_label(self.stats_last_6_months.into());
+        labels.set_stats_all_time_label(self.stats_all_time.into());
+        labels.set_stats_plays_caption(self.stats_plays.into());
+        labels.set_stats_listening_time_caption(self.stats_listening_time.into());
+        labels.set_stats_tracks_caption(self.stats_tracks.into());
+        labels.set_stats_artists_caption(self.stats_artists.into());
+        labels.set_stats_top_artists_header(self.stats_top_artists.into());
+        labels.set_stats_top_tracks_header(self.stats_top_tracks.into());
+        labels.set_stats_empty_label(self.stats_empty.into());
     }
 }
 
@@ -505,6 +541,20 @@ mod tests {
         assert_eq!(es.import_save_label, "Guardar playlist");
         assert_eq!(es.import_discard_label, "Descartar");
         assert_eq!(es.import_all_matched_label, "Todo coincidio");
+        assert_eq!(es.nav_stats, "Estadísticas");
+        assert_eq!(es.stats_last_4_weeks, "Últimas 4 semanas");
+        assert_eq!(es.stats_last_6_months, "Últimos 6 meses");
+        assert_eq!(es.stats_all_time, "Todo el tiempo");
+        assert_eq!(es.stats_plays, "Reproducciones");
+        assert_eq!(es.stats_listening_time, "Tiempo escuchado");
+        assert_eq!(es.stats_tracks, "Temas");
+        assert_eq!(es.stats_artists, "Artistas");
+        assert_eq!(es.stats_top_artists, "Artistas más escuchados");
+        assert_eq!(es.stats_top_tracks, "Temas más escuchados");
+        assert_eq!(
+            es.stats_empty,
+            "Todavía no hay reproducciones. Los temas que escuches al menos 30 segundos aparecen acá."
+        );
 
         let en = StaticLabels::resolve(Locale::English);
         assert_eq!(en.nav_search, "Search");
@@ -614,5 +664,19 @@ mod tests {
         assert_eq!(en.import_save_label, "Save playlist");
         assert_eq!(en.import_discard_label, "Discard");
         assert_eq!(en.import_all_matched_label, "All matched");
+        assert_eq!(en.nav_stats, "Stats");
+        assert_eq!(en.stats_last_4_weeks, "Last 4 weeks");
+        assert_eq!(en.stats_last_6_months, "Last 6 months");
+        assert_eq!(en.stats_all_time, "All time");
+        assert_eq!(en.stats_plays, "Plays");
+        assert_eq!(en.stats_listening_time, "Listening time");
+        assert_eq!(en.stats_tracks, "Tracks");
+        assert_eq!(en.stats_artists, "Artists");
+        assert_eq!(en.stats_top_artists, "Top artists");
+        assert_eq!(en.stats_top_tracks, "Top tracks");
+        assert_eq!(
+            en.stats_empty,
+            "No plays recorded yet. Songs you listen to for at least 30 seconds show up here."
+        );
     }
 }

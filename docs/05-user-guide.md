@@ -82,6 +82,17 @@ The library view manages account authentication, release update actions, and sav
 - **Liked Songs**: lists liked tracks. Each row provides track details and an `Unlike` button.
 - **Saved Albums**: lists saved albums by title and artist. Shows `No saved albums` when empty.
 
+### Stats Page
+
+The stats page presents Wrapped-style listening statistics computed from your local listening history:
+
+- **Navigation**: accessible directly from the sidebar by selecting the `Stats` item.
+- **Selectable Periods**: choose between `Last 4 weeks`, `Last 6 months`, and `All time` using the top filter chips.
+- **Qualification Criteria**: tracks you listen to for at least 30 seconds are counted as valid plays.
+- **Summary Metrics**: view total plays, cumulative listening time, unique track count, and unique artist count.
+- **Top Rankings**: inspect top 5 artists and top 5 tracks ranked by play count and listening duration.
+- **Local Data Privacy**: all metrics are computed locally from `play-log.jsonl` without contacting external servers.
+
 ### Spotify Import
 
 `moggyt` allows importing playlists and albums from Spotify directly into your local library, resolving tracks against
