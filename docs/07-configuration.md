@@ -104,6 +104,8 @@ The configuration file uses JSON serialization with atomic replacement:
   "songs_only": false,
   "keyboard_shortcuts": true,
   "discord_presence_enabled": false,
+  "lastfm_enabled": false,
+  "lastfm_username": "",
   "player_bar_mode": "classic",
   "player_bar_show_artwork": true,
   "player_bar_show_like": true,
@@ -148,6 +150,9 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Discord Rich Presence (`discord_presence_enabled`)**:
   - `false`: Discord Rich Presence disabled; no IPC connection is attempted (default).
   - `true`: Outbound Rich Presence enabled; broadcasts a "Listening to moggyt" activity with track title and artist.
+- **Last.fm Integration (`lastfm_enabled`, `lastfm_username`)**:
+  - `lastfm_enabled` (boolean, default `false`): Whether live scrobbling to Last.fm is enabled.
+  - `lastfm_username` (string, default `""`): Display name of the connected Last.fm account.
 - **Player Bar Mode (`player_bar_mode`)**:
   - `"classic"`: Docked full-width bar flush with window bottom edge (default).
   - `"floating"`: Rounded, centered card floating above the bottom edge capped at 960px.
@@ -237,4 +242,5 @@ empty, or corrupted, `moggyt` automatically falls back to default settings witho
   `MOGGYT_LASTFM_SECRET` (release builds get them from repository secrets; local builds without them keep
   Last.fm dormant; for local development export them before `cargo build`, e.g.
   `set -a; . ~/.config/moggyt/lastfm-dev.env; set +a`); the per-user session key lives in the OS keyring; requests
-  are sent off the UI thread with a 10 s timeout; account connection UI is not available yet.
+  are sent off the UI thread with a 10 s timeout; connect via Settings > Integrations > Connect with Last.fm, which
+  opens the browser authorization flow; authorize within 3 minutes; Disconnect removes the session from the keyring.

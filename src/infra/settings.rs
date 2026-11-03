@@ -55,6 +55,9 @@ pub struct Settings {
     /// Whether Last.fm live scrobbling is enabled.
     #[serde(default = "default_false")]
     pub lastfm_enabled: bool,
+    /// Display name of the connected Last.fm account.
+    #[serde(default)]
+    pub lastfm_username: String,
     /// Whether secondary Last.fm live scrobbling is enabled.
     #[serde(default = "default_false")]
     pub secondary_lastfm_enabled: bool,
@@ -111,6 +114,7 @@ impl Default for Settings {
             keyboard_shortcuts: true,
             discord_presence_enabled: false,
             lastfm_enabled: false,
+            lastfm_username: String::new(),
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
             songs_only: false,
@@ -141,6 +145,7 @@ impl Settings {
             keyboard_shortcuts: true,
             discord_presence_enabled: false,
             lastfm_enabled: false,
+            lastfm_username: String::new(),
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
             songs_only: false,
@@ -282,6 +287,7 @@ mod tests {
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.discord_presence_enabled);
         assert!(!loaded.lastfm_enabled);
+        assert!(loaded.lastfm_username.is_empty());
         assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
@@ -336,6 +342,7 @@ mod tests {
             keyboard_shortcuts: false,
             discord_presence_enabled: true,
             lastfm_enabled: true,
+            lastfm_username: "testuser".to_string(),
             secondary_lastfm_enabled: true,
             hi_res_covers: true,
             songs_only: true,
@@ -401,6 +408,7 @@ mod tests {
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.discord_presence_enabled);
         assert!(!loaded.lastfm_enabled);
+        assert!(loaded.lastfm_username.is_empty());
         assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.songs_only);
@@ -487,6 +495,7 @@ mod tests {
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.discord_presence_enabled);
         assert!(!loaded.lastfm_enabled);
+        assert!(loaded.lastfm_username.is_empty());
         assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
         assert!(!loaded.skip_silence);
@@ -540,16 +549,20 @@ mod tests {
             serde_json::from_str(r#"{"lastfm_enabled": false, "hi_res_covers": false}"#)
                 .expect("deserialize false");
         assert!(!with_both_false.lastfm_enabled);
+        assert!(with_both_false.lastfm_username.is_empty());
         assert!(!with_both_false.hi_res_covers);
 
-        let with_both_true: Settings =
-            serde_json::from_str(r#"{"lastfm_enabled": true, "hi_res_covers": true}"#)
-                .expect("deserialize true");
+        let with_both_true: Settings = serde_json::from_str(
+            r#"{"lastfm_enabled": true, "lastfm_username": "moggy", "hi_res_covers": true}"#,
+        )
+        .expect("deserialize true");
         assert!(with_both_true.lastfm_enabled);
+        assert_eq!(with_both_true.lastfm_username, "moggy");
         assert!(with_both_true.hi_res_covers);
 
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(!omitted.lastfm_enabled);
+        assert!(omitted.lastfm_username.is_empty());
         assert!(!omitted.hi_res_covers);
     }
 

@@ -168,8 +168,12 @@ pub fn request_token(keys: &LastFmAppKeys) -> anyhow::Result<String> {
         .get(LASTFM_API_URL)
         .query(&params)
         .send()
+        .map_err(reqwest::Error::without_url)
         .context("Last.fm token request transport error")?;
-    let body = resp.text().context("failed to read Last.fm token response body")?;
+    let body = resp
+        .text()
+        .map_err(reqwest::Error::without_url)
+        .context("failed to read Last.fm token response body")?;
     parse_token_response(&body)
 }
 
@@ -182,11 +186,15 @@ pub fn request_session(keys: &LastFmAppKeys, token: &str) -> SessionPoll {
     let params = session_request_params(keys, token);
     let resp = match client.get(LASTFM_API_URL).query(&params).send() {
         Ok(r) => r,
-        Err(err) => return SessionPoll::Failed(format!("Last.fm session transport error: {err}")),
+        Err(err) => {
+            let err = err.without_url();
+            return SessionPoll::Failed(format!("Last.fm session transport error: {err}"));
+        }
     };
     let body = match resp.text() {
         Ok(b) => b,
         Err(err) => {
+            let err = err.without_url();
             return SessionPoll::Failed(format!("failed to read Last.fm session response: {err}"));
         }
     };

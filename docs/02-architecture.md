@@ -25,6 +25,7 @@ src/
 ├── i18n.rs            # Interface localization skeleton and translation lookup
 ├── slint_shell/       # Slint UI shell: window controller, bridges, and app runner
 │   ├── app.rs         # Shell composition root: SlintAppState, event handlers, and window wiring
+│   ├── lastfm_connect.rs # Last.fm desktop authentication and connect flow
 │   └── bridges/       # Platform and domain integration bridges
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
@@ -38,6 +39,7 @@ src/
     ├── mod.rs         # Re-exports adapters and port traits
     ├── audio.rs       # AudioBackend trait definition
     ├── audio_rodio.rs # rodio playback adapter with LiveAudio fallback
+    ├── browser.rs     # Platform browser opener adapter
     ├── cover*.rs      # CoverCache port and memory/disk caching adapters
     ├── custom_theme.rs # Custom theme JSON loader with file modification monitoring
     ├── catalog_client.rs # Catalog API search request builder and parser

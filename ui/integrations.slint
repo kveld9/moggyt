@@ -2,4 +2,11 @@
 export global Integrations {
     in-out property <bool> discord-presence-enabled: false;
     callback discord-presence-toggled();
+
+    in-out property <bool> lastfm-available: false;
+    in-out property <bool> lastfm-connected: false;
+    in-out property <bool> lastfm-busy: false;
+    in-out property <string> lastfm-status: "";
+    callback lastfm-connect();
+    callback lastfm-disconnect();
 }

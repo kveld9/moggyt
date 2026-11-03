@@ -26,7 +26,7 @@ session storage are functional.
   cover art rendering with memory LRU and disk caching.
 - **Desktop Integration**: system tray icon with playback controls and show/quit actions; outbound desktop media
   presence via MPRIS (Linux) and SMTC (Windows); opt-in Discord Rich Presence ("Listening to moggyt" activity with
-  title and artist, lazy reconnection); dormant Last.fm scrobbler port.
+  title and artist, lazy reconnection); opt-in Last.fm scrobbler with browser authorization and keyring storage.
 - **Update Checks**: manual release checking against GitHub Releases with direct download links.
 - **Planned Features**: hi-res cover upgrades and compact floating player (v1.1); equalizer, crossfade, and quality
   selector (v2).
