@@ -53,6 +53,7 @@ mod spotify_csv;
 mod spotify_embed;
 mod spotify_search;
 mod stream;
+pub mod stream_disk_cache;
 mod stream_reader;
 mod stream_reqwest;
 mod stream_stub;
@@ -140,6 +141,7 @@ pub use spotify_search::{
     video_type_from,
 };
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
+pub use stream_disk_cache::StreamDiskCache;
 pub use stream_url_cache::{STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
