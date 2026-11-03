@@ -103,6 +103,7 @@ The configuration file uses JSON serialization with atomic replacement:
   "quality": "standard",
   "songs_only": false,
   "keyboard_shortcuts": true,
+  "discord_presence_enabled": false,
   "player_bar_mode": "classic",
   "player_bar_show_artwork": true,
   "player_bar_show_like": true,
@@ -144,6 +145,9 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Keyboard Shortcuts (`keyboard_shortcuts`)**:
   - `true`: Global transport and playback shortcuts enabled (default).
   - `false`: Shortcuts disabled.
+- **Discord Rich Presence (`discord_presence_enabled`)**:
+  - `false`: Discord Rich Presence disabled; no IPC connection is attempted (default).
+  - `true`: Outbound Rich Presence enabled; broadcasts a "Listening to moggyt" activity with track title and artist.
 - **Player Bar Mode (`player_bar_mode`)**:
   - `"classic"`: Docked full-width bar flush with window bottom edge (default).
   - `"floating"`: Rounded, centered card floating above the bottom edge capped at 960px.
@@ -226,8 +230,8 @@ empty, or corrupted, `moggyt` automatically falls back to default settings witho
 
 ## External Integrations
 
-- **Discord Rich Presence**: stays dormant in this build because `DISCORD_APP_ID` is 0 (unregistered); no IPC
-  connection is attempted and playback is unaffected. Setting a valid Discord application client ID is required to
-  activate it.
+- **Discord Rich Presence**: opt-in toggle in Settings > Integrations. Broadcasts a "Listening to moggyt" activity with
+  title and artist; connects lazily when Discord is running (also if Discord starts later, on the next track change).
+  Disabling clears the status.
 - **Last.fm Scrobbler**: initialized with dormant stub credentials by default. Scrobbles are submitted only after
   credentials and API keys are registered.
