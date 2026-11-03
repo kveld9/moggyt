@@ -73,20 +73,26 @@ export component PlayerBar inherits Rectangle {
             width: root.mode == 1 ? 220px : 260px;
             horizontal-stretch: 0;
             spacing: 12px;
-            alignment: start;
 
-            if root.show-artwork : Rectangle {
-                width: 40px;
-                height: 40px;
-                border-radius: 8px;
-                background: Theme.surface;
-                clip: true;
+            // Slint layout rule: a layout's `alignment` also places fixed-size children on
+            // the cross axis, so a 40px thumbnail inside a 72px bar is centered by its own
+            // wrapper instead of being pinned to the top edge by `alignment: start`.
+            if root.show-artwork : VerticalLayout {
+                alignment: center;
 
-                Image {
-                    width: parent.width;
-                    height: parent.height;
-                    source: root.cover;
-                    image-fit: ImageFit.cover;
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 8px;
+                    background: Theme.surface;
+                    clip: true;
+
+                    Image {
+                        width: parent.width;
+                        height: parent.height;
+                        source: root.cover;
+                        image-fit: ImageFit.cover;
+                    }
                 }
             }
 

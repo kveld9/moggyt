@@ -119,6 +119,10 @@ guessing; every rule here was verified against a build or the official documenta
   `space-between` or `center`) sizes children only to their preferred/minimum size and places extra space into gaps,
   preventing children with `horizontal-stretch: 1` from expanding. To let a center child stretch between fixed-width
   edge elements, omit `alignment` on the container layout.
+- `alignment` on a `HorizontalLayout` also places fixed-height children on the cross axis, so
+  `alignment: start` pins a fixed-size child (for example the 40px artwork thumbnail of the
+  player bar) to the top edge instead of centering it. Center fixed-size children with a
+  wrapping `VerticalLayout { alignment: center; ... }` and leave the zone at default stretch.
   Source: <https://docs.slint.dev/latest/docs/slint/src/language/builtins/layouts>.
 - `Flickable` viewport content-sizing and layout interaction: a `Flickable` does not provide an intrinsic
   content height to enclosing layouts or intermediate containers; its `viewport-height` is computed from its
