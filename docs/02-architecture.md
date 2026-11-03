@@ -42,6 +42,7 @@ src/
     ├── custom_theme.rs # Custom theme JSON loader with file modification monitoring
     ├── catalog_client.rs # Catalog API search request builder and parser
     ├── instance.rs    # SingleInstanceGuard lock
+    ├── lastfm_auth.rs # Last.fm desktop authentication (token, authorize URL, session)
     ├── lyrics*.rs     # LyricsSource port and LRCLIB synced lyrics client
     ├── lyrics_cache.rs # LyricsSource decorator with bounded FIFO cache
     ├── play_log_store.rs # PlayLogStore port and JSON Lines file persistence

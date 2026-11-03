@@ -9,8 +9,8 @@ use anyhow::Context;
 
 use crate::infra::{
     CredentialStore, DiskCoverCache, DiskPlaylistStore, GithubUpdater, KeyringCredentialStore,
-    LastFmClient, LiveAudio, ReleaseInfo, RodioBackend, Updater, client_from_credentials,
-    default_config_dir, ensure_sidecar, is_newer,
+    LastFmAppKeys, LastFmClient, LastFmCredentials, LiveAudio, ReleaseInfo, RodioBackend, Updater,
+    client_from_credentials, default_config_dir, ensure_sidecar, is_newer,
 };
 use crate::slint_shell::import_cli::{ImportCli, parse_import_args, report_to_json, run_headless};
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
@@ -82,19 +82,36 @@ pub fn init_cover_cache(data_dir: &Path) -> DiskCoverCache {
     })
 }
 
+fn client_from_stored(stored: Option<LastFmCredentials>) -> LastFmClient {
+    match stored {
+        Some(creds) if creds.is_complete() => client_from_credentials(&creds),
+        _ => LastFmClient::new("", ""),
+    }
+}
+
+pub(crate) fn select_lastfm_client(
+    app: Option<LastFmAppKeys>,
+    stored: Option<LastFmCredentials>,
+) -> LastFmClient {
+    if let Some(keys) = app {
+        let sk = stored.as_ref().map(|c| c.session_key.trim()).unwrap_or("");
+        return match sk.is_empty() {
+            false => LastFmClient::from_app_keys(&keys, sk),
+            true => LastFmClient::new("", ""),
+        };
+    }
+    client_from_stored(stored)
+}
+
 /// Initializes the primary Last.fm client from settings and stored keyring credentials.
 pub fn init_lastfm_scrobbler(enabled: bool) -> LastFmClient {
     if !enabled {
         return LastFmClient::new("", "");
     }
     let store = KeyringCredentialStore::moggyt();
-    let Some(creds) = store.load_lastfm() else {
-        return LastFmClient::new("", "");
-    };
-    if !creds.is_complete() {
-        return LastFmClient::new("", "");
-    }
-    client_from_credentials(&creds)
+    let stored = store.load_lastfm();
+    let app = LastFmAppKeys::from_build_env();
+    select_lastfm_client(app, stored)
 }
 
 /// Initializes the secondary Last.fm client from settings and stored keyring credentials.
@@ -305,5 +322,24 @@ mod tests {
             "tracks.csv".to_string(),
         ];
         assert_eq!(run_import_cli_if_requested(&conflicting), Some(2));
+    }
+
+    #[test]
+    fn test_select_lastfm_client_outcomes() {
+        let app = LastFmAppKeys { api_key: "app_key".to_string(), secret: "app_sec".to_string() };
+        let complete = LastFmCredentials::new("stored_k", "stored_s", "stored_sk");
+        let incomplete = LastFmCredentials::new("stored_k", "", "stored_sk");
+        let empty_sk = LastFmCredentials::new("stored_k", "stored_s", "   ");
+
+        // With build-time app keys:
+        assert!(select_lastfm_client(Some(app.clone()), Some(complete.clone())).is_live());
+        assert!(select_lastfm_client(Some(app.clone()), Some(incomplete.clone())).is_live());
+        assert!(!select_lastfm_client(Some(app.clone()), Some(empty_sk)).is_live());
+        assert!(!select_lastfm_client(Some(app), None).is_live());
+
+        // Without build-time app keys:
+        assert!(select_lastfm_client(None, Some(complete)).is_live());
+        assert!(!select_lastfm_client(None, Some(incomplete)).is_live());
+        assert!(!select_lastfm_client(None, None).is_live());
     }
 }

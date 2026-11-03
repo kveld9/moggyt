@@ -233,5 +233,8 @@ empty, or corrupted, `moggyt` automatically falls back to default settings witho
 - **Discord Rich Presence**: opt-in toggle in Settings > Integrations. Broadcasts a "Listening to moggyt" activity with
   title and artist; connects lazily when Discord is running (also if Discord starts later, on the next track change).
   Disabling clears the status.
-- **Last.fm Scrobbler**: initialized with dormant stub credentials by default. Scrobbles are submitted only after
-  credentials and API keys are registered.
+- **Last.fm Scrobbler**: application keys are injected at compile time from `MOGGYT_LASTFM_API_KEY` and
+  `MOGGYT_LASTFM_SECRET` (release builds get them from repository secrets; local builds without them keep
+  Last.fm dormant; for local development export them before `cargo build`, e.g.
+  `set -a; . ~/.config/moggyt/lastfm-dev.env; set +a`); the per-user session key lives in the OS keyring; requests
+  are sent off the UI thread with a 10 s timeout; account connection UI is not available yet.
