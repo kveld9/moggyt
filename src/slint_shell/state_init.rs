@@ -83,6 +83,8 @@ impl SlintAppState {
             sleep_timer_base_offset: 0,
             sleep_fade_base_volume: None,
             autoplay: false,
+            crossfade_seconds: 0,
+            last_crossfaded_track: None,
             hi_res_covers: false,
             songs_only: false,
             keyboard_shortcuts: true,

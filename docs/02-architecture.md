@@ -44,8 +44,8 @@ src/
 │   └── theme.rs       # Color palette data and ThemeId domain models
 └── infra/
     ├── mod.rs         # Re-exports adapters and port traits
-    ├── audio.rs       # AudioBackend trait definition
-    ├── audio_rodio.rs # rodio playback adapter with LiveAudio fallback
+    ├── audio.rs       # AudioBackend trait definition (playback, crossfade, seeking, volume)
+    ├── audio_rodio.rs # rodio playback adapter with dual-sink crossfade and LiveAudio fallback
     ├── browser.rs     # Platform browser opener adapter
     ├── cover*.rs      # CoverCache port and memory/disk caching adapters
     ├── custom_theme.rs # Custom theme JSON loader with file modification monitoring

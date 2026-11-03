@@ -122,7 +122,8 @@ pub use scrobble::{
 pub use session::{MemorySessionStore, SessionStore};
 pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
 pub use settings::{
-    DiskSettingsStore, MemorySettingsStore, Settings, SettingsStore, default_config_dir,
+    DiskSettingsStore, MAX_CROSSFADE_SECONDS, MemorySettingsStore, Settings, SettingsStore,
+    clamp_crossfade_seconds, default_config_dir,
 };
 pub use skip_store::{DiskSkipStore, MemorySkipStore, SkipStore};
 pub use spotify_csv::{
