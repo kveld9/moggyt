@@ -41,6 +41,10 @@ const fn default_crossfade_seconds() -> u32 {
     0
 }
 
+const fn default_stream_cache_limit_mb() -> u32 {
+    512
+}
+
 /// Persistent user settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -58,6 +62,9 @@ pub struct Settings {
     /// Duration of crossfade transition between tracks in seconds (0..=15, 0 = disabled).
     #[serde(default = "default_crossfade_seconds")]
     pub crossfade_seconds: u32,
+    /// Disk cache size limit for audio streams in megabytes (0..=10240, 0 = disabled).
+    #[serde(default = "default_stream_cache_limit_mb")]
+    pub stream_cache_limit_mb: u32,
     /// Preferred audio streaming quality.
     #[serde(default)]
     pub quality: AudioQuality,
@@ -126,6 +133,7 @@ impl Default for Settings {
             volume: 100,
             playback_speed: 1.0,
             crossfade_seconds: 0,
+            stream_cache_limit_mb: 512,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             discord_presence_enabled: false,
@@ -158,6 +166,7 @@ impl Settings {
             volume: 100,
             playback_speed: 1.0,
             crossfade_seconds: 0,
+            stream_cache_limit_mb: 512,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             discord_presence_enabled: false,
@@ -178,6 +187,14 @@ impl Settings {
             player_bar_show_volume: true,
             recent_searches: RecentSearches::default(),
         }
+    }
+
+    /// Sanitizes and clamps setting values to their valid operational bounds.
+    pub fn sanitize(&mut self) {
+        self.volume = self.volume.min(100);
+        self.playback_speed = clamp_speed(self.playback_speed);
+        self.crossfade_seconds = clamp_crossfade_seconds(self.crossfade_seconds);
+        self.stream_cache_limit_mb = self.stream_cache_limit_mb.min(10240);
     }
 }
 
@@ -204,9 +221,7 @@ impl Default for MemorySettingsStore {
 impl SettingsStore for MemorySettingsStore {
     fn load(&self) -> Settings {
         let mut settings = self.inner.lock().map(|g| g.clone()).unwrap_or_default();
-        settings.volume = settings.volume.min(100);
-        settings.playback_speed = clamp_speed(settings.playback_speed);
-        settings.crossfade_seconds = clamp_crossfade_seconds(settings.crossfade_seconds);
+        settings.sanitize();
         settings
     }
 
@@ -254,9 +269,7 @@ impl SettingsStore for DiskSettingsStore {
         };
         let mut settings: Settings =
             serde_json::from_slice(&bytes).unwrap_or_else(|_| Settings::fallback());
-        settings.volume = settings.volume.min(100);
-        settings.playback_speed = clamp_speed(settings.playback_speed);
-        settings.crossfade_seconds = clamp_crossfade_seconds(settings.crossfade_seconds);
+        settings.sanitize();
         settings
     }
 
@@ -302,6 +315,7 @@ mod tests {
         assert_eq!(loaded.locale, Locale::English);
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.playback_speed, 1.0);
+        assert_eq!(loaded.stream_cache_limit_mb, 512);
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.discord_presence_enabled);
@@ -358,6 +372,7 @@ mod tests {
             volume: 75,
             playback_speed: 1.25,
             crossfade_seconds: 5,
+            stream_cache_limit_mb: 1024,
             quality: AudioQuality::High,
             keyboard_shortcuts: false,
             discord_presence_enabled: true,
@@ -424,6 +439,7 @@ mod tests {
         assert_eq!(loaded.locale, Locale::English);
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.playback_speed, 1.0);
+        assert_eq!(loaded.stream_cache_limit_mb, 512);
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.discord_presence_enabled);
@@ -721,5 +737,37 @@ mod tests {
         assert_eq!(clamp_crossfade_seconds(15), 15);
         assert_eq!(clamp_crossfade_seconds(16), 15);
         assert_eq!(clamp_crossfade_seconds(100), 15);
+    }
+
+    #[test]
+    fn test_stream_cache_limit_mb_serde_defaults_and_explicit_deserialization() {
+        let explicit: Settings = serde_json::from_str(r#"{"stream_cache_limit_mb": 1024}"#)
+            .expect("deserialize explicit");
+        assert_eq!(explicit.stream_cache_limit_mb, 1024);
+
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(omitted.stream_cache_limit_mb, 512);
+
+        let roundtrip = serde_json::to_string(&explicit).expect("serialize settings");
+        let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
+        assert_eq!(decoded.stream_cache_limit_mb, 1024);
+    }
+
+    #[test]
+    fn test_stream_cache_limit_mb_clamped_on_sanitize_and_load() {
+        let mut settings = Settings { stream_cache_limit_mb: 20000, ..Settings::default() };
+        settings.sanitize();
+        assert_eq!(settings.stream_cache_limit_mb, 10240);
+
+        let temp_dir = std::env::temp_dir()
+            .join(format!("moggyt-test-stream-cache-clamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let store = DiskSettingsStore::new(temp_dir.clone());
+
+        std::fs::write(store.file_path(), r#"{"stream_cache_limit_mb": 50000}"#).unwrap();
+        assert_eq!(store.load().stream_cache_limit_mb, 10240);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
