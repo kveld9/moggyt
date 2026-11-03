@@ -80,6 +80,7 @@ pub struct SlintAppState {
     pub autoplay: bool,
     pub crossfade_seconds: u32,
     pub last_crossfaded_track: Option<String>,
+    pub stream_cache_limit_mb: u32,
     pub hi_res_covers: bool,
     pub songs_only: bool,
     pub keyboard_shortcuts: bool,
@@ -130,6 +131,15 @@ impl SlintAppState {
         self.crossfade_seconds = clamped;
         let mut settings = self.settings_store.load();
         settings.crossfade_seconds = clamped;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Updates the stream cache size limit and persists preference to disk settings store.
+    pub fn set_stream_cache_limit_mb(&mut self, limit_mb: u32) {
+        let clamped = limit_mb.min(10240);
+        self.stream_cache_limit_mb = clamped;
+        let mut settings = self.settings_store.load();
+        settings.stream_cache_limit_mb = clamped;
         let _ = self.settings_store.save(&settings);
     }
 
@@ -733,6 +743,30 @@ mod tests {
         assert_eq!(state.cover_max_px(), 512);
         state.hi_res_covers = true;
         assert_eq!(state.cover_max_px(), 1024);
+    }
+
+    #[test]
+    fn test_set_crossfade_seconds_persists_to_settings_store() {
+        let mut state = test_wired();
+        assert_eq!(state.crossfade_seconds, 0);
+        state.set_crossfade_seconds(5);
+        assert_eq!(state.crossfade_seconds, 5);
+        assert_eq!(state.settings_store.load().crossfade_seconds, 5);
+        state.set_crossfade_seconds(20);
+        assert_eq!(state.crossfade_seconds, 15);
+        assert_eq!(state.settings_store.load().crossfade_seconds, 15);
+    }
+
+    #[test]
+    fn test_set_stream_cache_limit_mb_persists_to_settings_store() {
+        let mut state = test_wired();
+        assert_eq!(state.stream_cache_limit_mb, 512);
+        state.set_stream_cache_limit_mb(1024);
+        assert_eq!(state.stream_cache_limit_mb, 1024);
+        assert_eq!(state.settings_store.load().stream_cache_limit_mb, 1024);
+        state.set_stream_cache_limit_mb(20000);
+        assert_eq!(state.stream_cache_limit_mb, 10240);
+        assert_eq!(state.settings_store.load().stream_cache_limit_mb, 10240);
     }
 
     #[test]

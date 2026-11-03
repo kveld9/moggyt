@@ -7,12 +7,16 @@ export component PlaybackSettings inherits VerticalLayout {
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
     in property <int> active-audio-quality-index: 1;
+    in property <int> crossfade-seconds: 0;
+    in property <int> stream-cache-limit-mb: 512;
     in property <bool> songs-only: false;
     in property <bool> keyboard-shortcuts: true;
 
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
+    callback crossfade-changed(int);
+    callback stream-cache-limit-selected(int);
     callback songs-only-toggled();
     callback keyboard-shortcuts-toggled();
 
@@ -178,6 +182,148 @@ export component PlaybackSettings inherits VerticalLayout {
                         label: Labels.sleep-timer-end-of-track-label;
                         is-active: root.active-sleep-timer-index == 5;
                         clicked => { root.sleep-timer-preset-selected(5); }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+
+            VerticalLayout {
+                spacing: 12px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: Labels.crossfade-label;
+                        color: Theme.text;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: root.crossfade-seconds == 0 ? "Off" : (root.crossfade-seconds + "s");
+                        color: root.crossfade-seconds != 0 ? Theme.accent : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: Labels.crossfade-hint-label;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    SettingsModeButton {
+                        label: "Off";
+                        is-active: root.crossfade-seconds == 0;
+                        clicked => { root.crossfade-changed(0); }
+                    }
+
+                    SettingsModeButton {
+                        label: "2s";
+                        is-active: root.crossfade-seconds == 2;
+                        clicked => { root.crossfade-changed(2); }
+                    }
+
+                    SettingsModeButton {
+                        label: "5s";
+                        is-active: root.crossfade-seconds == 5;
+                        clicked => { root.crossfade-changed(5); }
+                    }
+
+                    SettingsModeButton {
+                        label: "8s";
+                        is-active: root.crossfade-seconds == 8;
+                        clicked => { root.crossfade-changed(8); }
+                    }
+
+                    SettingsModeButton {
+                        label: "12s";
+                        is-active: root.crossfade-seconds == 12;
+                        clicked => { root.crossfade-changed(12); }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+
+            VerticalLayout {
+                spacing: 12px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: Labels.stream-cache-label;
+                        color: Theme.text;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: root.stream-cache-limit-mb == 0 ? "Off" : (root.stream-cache-limit-mb >= 1024 ? ((root.stream-cache-limit-mb / 1024) + " GB") : (root.stream-cache-limit-mb + " MB"));
+                        color: root.stream-cache-limit-mb != 0 ? Theme.accent : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: Labels.stream-cache-hint-label;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    SettingsModeButton {
+                        label: "Off";
+                        is-active: root.stream-cache-limit-mb == 0;
+                        clicked => { root.stream-cache-limit-selected(0); }
+                    }
+
+                    SettingsModeButton {
+                        label: "256 MB";
+                        is-active: root.stream-cache-limit-mb == 256;
+                        clicked => { root.stream-cache-limit-selected(256); }
+                    }
+
+                    SettingsModeButton {
+                        label: "512 MB";
+                        is-active: root.stream-cache-limit-mb == 512;
+                        clicked => { root.stream-cache-limit-selected(512); }
+                    }
+
+                    SettingsModeButton {
+                        label: "1 GB";
+                        is-active: root.stream-cache-limit-mb == 1024;
+                        clicked => { root.stream-cache-limit-selected(1024); }
+                    }
+
+                    SettingsModeButton {
+                        label: "2 GB";
+                        is-active: root.stream-cache-limit-mb == 2048;
+                        clicked => { root.stream-cache-limit-selected(2048); }
+                    }
+
+                    SettingsModeButton {
+                        label: "5 GB";
+                        is-active: root.stream-cache-limit-mb == 5120;
+                        clicked => { root.stream-cache-limit-selected(5120); }
                     }
                 }
             }
