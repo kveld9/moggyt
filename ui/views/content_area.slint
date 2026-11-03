@@ -49,6 +49,8 @@ export component ContentArea inherits Rectangle {
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
     in property <int> active-audio-quality-index: 1;
+    in property <int> crossfade-seconds: 0;
+    in property <int> stream-cache-limit-mb: 512;
     in property <bool> songs-only: false;
     in property <bool> keyboard-shortcuts: true;
     in-out property <string> settings-cookie-text: "";
@@ -86,6 +88,8 @@ export component ContentArea inherits Rectangle {
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
+    callback crossfade-changed(int);
+    callback stream-cache-limit-selected(int);
     callback songs-only-toggled();
     callback keyboard-shortcuts-toggled();
     callback back-pressed();
@@ -248,6 +252,8 @@ export component ContentArea inherits Rectangle {
                 sleep-timer-status-text: root.sleep-timer-status-text;
                 active-sleep-timer-index: root.active-sleep-timer-index;
                 active-audio-quality-index: root.active-audio-quality-index;
+                crossfade-seconds: root.crossfade-seconds;
+                stream-cache-limit-mb: root.stream-cache-limit-mb;
                 songs-only: root.songs-only;
                 keyboard-shortcuts: root.keyboard-shortcuts;
                 player-bar-mode: root.player-bar-mode;
@@ -262,6 +268,8 @@ export component ContentArea inherits Rectangle {
                 cycle-playback-speed => { root.cycle-playback-speed(); }
                 sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
                 audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
+                crossfade-changed(secs) => { root.crossfade-changed(secs); }
+                stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
                 songs-only-toggled => { root.songs-only-toggled(); }
                 keyboard-shortcuts-toggled => { root.keyboard-shortcuts-toggled(); }
                 sign-in-submitted(t) => { root.sign-in-submitted(t); }

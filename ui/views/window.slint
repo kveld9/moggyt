@@ -1,12 +1,6 @@
 import {
-    Theme,
-    TrackRowData,
-    ShelfData,
-    ExploreShelfData,
-    LibraryItemData,
-    LyricLineData,
-    ImportRowData,
-    ImportAlternativeData,
+    Theme, TrackRowData, ShelfData, ExploreShelfData, LibraryItemData,
+    LyricLineData, ImportRowData, ImportAlternativeData,
 } from "../theme.slint";
 import { Sidebar } from "../components/sidebar.slint";
 import { PlayerBar } from "../components/player_bar.slint";
@@ -49,6 +43,8 @@ export component MoggytWindow inherits Window {
     in-out property <string> sleep-timer-status-text: "Timer: Off";
     in-out property <int> active-sleep-timer-index: 0;
     in-out property <int> active-audio-quality-index: 1;
+    in-out property <int> crossfade-seconds: 0;
+    in-out property <int> stream-cache-limit-mb: 512;
     in-out property <bool> songs-only: false;
     in-out property <bool> keyboard-shortcuts: true;
     in-out property <string> settings-cookie-text: "";
@@ -132,6 +128,8 @@ export component MoggytWindow inherits Window {
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
+    callback crossfade-changed(int);
+    callback stream-cache-limit-selected(int);
     callback songs-only-toggled();
     callback keyboard-shortcuts-toggled();
     callback shortcut-pressed(string, bool) -> bool;
@@ -182,7 +180,6 @@ export component MoggytWindow inherits Window {
     shortcuts := ShortcutScope {
         shortcuts-enabled: root.keyboard-shortcuts;
         shortcut-pressed(text, modified) => { return root.shortcut-pressed(text, modified); }
-
         VerticalLayout {
             width: parent.width;
             height: parent.height;
@@ -242,6 +239,8 @@ export component MoggytWindow inherits Window {
                     sleep-timer-status-text: root.sleep-timer-status-text;
                     active-sleep-timer-index: root.active-sleep-timer-index;
                     active-audio-quality-index: root.active-audio-quality-index;
+                    crossfade-seconds: root.crossfade-seconds;
+                    stream-cache-limit-mb: root.stream-cache-limit-mb;
                     songs-only: root.songs-only;
                     keyboard-shortcuts: root.keyboard-shortcuts;
                     player-bar-mode: root.player-bar-mode;
@@ -271,18 +270,18 @@ export component MoggytWindow inherits Window {
                     cycle-playback-speed => { root.cycle-playback-speed(); }
                     sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
                     audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
+                    crossfade-changed(secs) => { root.crossfade-changed(secs); }
+                    stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
                     songs-only-toggled => { root.songs-only-toggled(); }
                     keyboard-shortcuts-toggled => { root.keyboard-shortcuts-toggled(); }
                     back-pressed => { root.back-pressed(); }
                     player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
                     player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
                 }
-
                 Rectangle {
                     width: root.queue-panel-open ? 340px : 0px;
                     clip: true;
                     animate width { duration: 180ms; easing: ease-in-out; }
-
                     QueuePanel {
                         width: 340px;
                         height: parent.height;
@@ -293,12 +292,10 @@ export component MoggytWindow inherits Window {
                     }
                 }
             }
-
             Rectangle {
                 vertical-stretch: 0;
                 background: transparent;
                 height: root.player-bar-mode == 1 ? 92px : 72px;
-
                 PlayerBar {
                     mode: root.player-bar-mode;
                     show-artwork: root.player-bar-show-artwork;
@@ -308,12 +305,10 @@ export component MoggytWindow inherits Window {
                     show-skip-seconds: root.player-bar-show-skip-seconds;
                     show-queue: root.player-bar-show-queue;
                     show-volume: root.player-bar-show-volume;
-
                     width: root.player-bar-mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
                     height: 72px;
                     x: (parent.width - self.width) / 2;
                     y: root.player-bar-mode == 1 ? 8px : 0px;
-
                     active-track-title: root.active-track-title;
                     active-track-artist: root.active-track-artist;
                     is-playing: root.is-playing;
