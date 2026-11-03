@@ -91,6 +91,24 @@ pub(crate) fn wire_settings_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    window.on_crossfade_changed(move |secs| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        handle_crossfade_change(&mut st, secs);
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_stream_cache_limit_selected(move |mb| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        handle_stream_cache_limit_selection(&mut st, mb);
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
     window.on_width_changed(move |width| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
@@ -122,11 +140,63 @@ pub(crate) fn handle_sleep_timer_selection(state: &mut SlintAppState, idx: i32) 
     }
 }
 
+/// Handles crossfade duration change, clamping to [0, 15] seconds and syncing state.
+pub(crate) fn handle_crossfade_change(state: &mut SlintAppState, secs: i32) {
+    state.set_crossfade_seconds(secs.clamp(0, 15) as u32);
+}
+
+/// Handles stream cache limit selection, clamping to [0, 10240] MB and syncing state.
+pub(crate) fn handle_stream_cache_limit_selection(state: &mut SlintAppState, mb: i32) {
+    state.set_stream_cache_limit_mb(mb.clamp(0, 10240) as u32);
+}
+
 #[cfg(test)]
 mod tests {
-    use super::handle_sleep_timer_selection;
+    use super::{
+        handle_crossfade_change, handle_sleep_timer_selection, handle_stream_cache_limit_selection,
+    };
     use crate::domain::{TimerPreset, Track};
     use crate::slint_shell::test_support::test_wired;
+
+    #[test]
+    fn test_crossfade_change_callback_path() {
+        let mut state = test_wired();
+        assert_eq!(state.crossfade_seconds, 0);
+
+        handle_crossfade_change(&mut state, 5);
+        assert_eq!(state.crossfade_seconds, 5);
+        assert_eq!(state.settings_store.load().crossfade_seconds, 5);
+
+        // Clamping negative to 0
+        handle_crossfade_change(&mut state, -3);
+        assert_eq!(state.crossfade_seconds, 0);
+        assert_eq!(state.settings_store.load().crossfade_seconds, 0);
+
+        // Clamping above 15 to 15
+        handle_crossfade_change(&mut state, 20);
+        assert_eq!(state.crossfade_seconds, 15);
+        assert_eq!(state.settings_store.load().crossfade_seconds, 15);
+    }
+
+    #[test]
+    fn test_stream_cache_limit_selection_callback_path() {
+        let mut state = test_wired();
+        assert_eq!(state.stream_cache_limit_mb, 512);
+
+        handle_stream_cache_limit_selection(&mut state, 1024);
+        assert_eq!(state.stream_cache_limit_mb, 1024);
+        assert_eq!(state.settings_store.load().stream_cache_limit_mb, 1024);
+
+        // Clamping negative to 0
+        handle_stream_cache_limit_selection(&mut state, -100);
+        assert_eq!(state.stream_cache_limit_mb, 0);
+        assert_eq!(state.settings_store.load().stream_cache_limit_mb, 0);
+
+        // Clamping above 10240 to 10240
+        handle_stream_cache_limit_selection(&mut state, 20000);
+        assert_eq!(state.stream_cache_limit_mb, 10240);
+        assert_eq!(state.settings_store.load().stream_cache_limit_mb, 10240);
+    }
 
     #[test]
     fn test_sleep_timer_selection_callback_path() {
