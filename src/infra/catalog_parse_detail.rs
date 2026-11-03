@@ -452,4 +452,127 @@ mod tests {
         assert_eq!(enriched.description.as_deref(), Some("Desc"));
         assert_eq!(enriched.artwork.as_deref(), Some("https://img.local/art.jpg"));
     }
+
+    #[test]
+    fn parse_detail_all_history_shape_flattens_sections_and_preserves_order() {
+        let payload = serde_json::json!({
+            "contents": {
+                "singleColumnBrowseResultsRenderer": {
+                    "tabs": [{
+                        "tabRenderer": {
+                            "content": {
+                                "sectionListRenderer": {
+                                    "contents": [
+                                        {
+                                            "musicShelfRenderer": {
+                                                "title": { "runs": [{ "text": "Today" }] },
+                                                "contents": [
+                                                    {
+                                                        "musicResponsiveListItemRenderer": {
+                                                            "videoId": "hist-track-1",
+                                                            "flexColumns": [
+                                                                {
+                                                                    "musicResponsiveListItemFlexColumnRenderer": {
+                                                                        "text": { "runs": [{ "text": "Track 1" }] }
+                                                                    }
+                                                                },
+                                                                {
+                                                                    "musicResponsiveListItemFlexColumnRenderer": {
+                                                                        "text": { "runs": [{ "text": "Artist 1" }] }
+                                                                    }
+                                                                }
+                                                            ],
+                                                            "fixedColumns": [
+                                                                {
+                                                                    "musicResponsiveListItemFixedColumnRenderer": {
+                                                                        "text": { "runs": [{ "text": "3:15" }] }
+                                                                    }
+                                                                }
+                                                            ],
+                                                            "thumbnail": {
+                                                                "musicThumbnailRenderer": {
+                                                                    "thumbnail": {
+                                                                        "thumbnails": [{ "url": "https://img.local/t1.jpg", "width": 300, "height": 300 }]
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    },
+                                                    {
+                                                        "musicResponsiveListItemRenderer": {
+                                                            "videoId": "hist-track-2",
+                                                            "flexColumns": [
+                                                                {
+                                                                    "musicResponsiveListItemFlexColumnRenderer": {
+                                                                        "text": { "runs": [{ "text": "Track 2" }] }
+                                                                    }
+                                                                },
+                                                                {
+                                                                    "musicResponsiveListItemFlexColumnRenderer": {
+                                                                        "text": { "runs": [{ "text": "Artist 2" }] }
+                                                                    }
+                                                                }
+                                                            ]
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "musicShelfRenderer": {
+                                                "title": { "runs": [{ "text": "Yesterday" }] },
+                                                "contents": [
+                                                    {
+                                                        "musicResponsiveListItemRenderer": {
+                                                            "videoId": "hist-track-3",
+                                                            "flexColumns": [
+                                                                {
+                                                                    "musicResponsiveListItemFlexColumnRenderer": {
+                                                                        "text": { "runs": [{ "text": "Track 3" }] }
+                                                                    }
+                                                                },
+                                                                {
+                                                                    "musicResponsiveListItemFlexColumnRenderer": {
+                                                                        "text": { "runs": [{ "text": "Artist 3" }] }
+                                                                    }
+                                                                }
+                                                            ],
+                                                            "fixedColumns": [
+                                                                {
+                                                                    "musicResponsiveListItemFixedColumnRenderer": {
+                                                                        "text": { "runs": [{ "text": "2:45" }] }
+                                                                    }
+                                                                }
+                                                            ]
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }]
+                }
+            }
+        });
+
+        let detail = parse_detail_all(&payload, DetailKind::Playlist)
+            .expect("must parse history detail with tracks");
+        assert_eq!(detail.kind, DetailKind::Playlist);
+        assert_eq!(detail.title, "");
+        assert_eq!(detail.tracks.len(), 3);
+        assert_eq!(
+            detail.tracks[0],
+            Track::new("hist-track-1", "Track 1", "Artist 1")
+                .with_duration(195)
+                .with_artwork("https://img.local/t1.jpg")
+        );
+        assert_eq!(detail.tracks[1], Track::new("hist-track-2", "Track 2", "Artist 2"));
+        assert_eq!(
+            detail.tracks[2],
+            Track::new("hist-track-3", "Track 3", "Artist 3").with_duration(165)
+        );
+    }
 }

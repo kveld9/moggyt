@@ -42,6 +42,7 @@ pub mod detail;
 pub mod discord;
 pub mod explore;
 pub mod format;
+mod history;
 pub mod import_callbacks;
 mod import_cli;
 pub mod import_searcher;

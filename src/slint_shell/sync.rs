@@ -16,6 +16,7 @@ use crate::slint_shell::format::{
     audio_quality_to_index, format_playback_speed, format_queue_label, format_sleep_timer_status,
     format_update_status, timer_preset_to_index,
 };
+use crate::slint_shell::history::library_item_subtitle;
 use crate::slint_shell::labels::sync_static_labels;
 use crate::slint_shell::playback::{
     format_position, format_track_duration, is_track_liked, progress_fraction, repeat_mode_to_int,
@@ -204,7 +205,7 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
         .map(|(i, p)| LibraryItemData {
             index: i as i32,
             title: p.title.clone().into(),
-            subtitle: format!("{} tracks", p.track_count).into(),
+            subtitle: library_item_subtitle(p, state.locale).into(),
             cover: resolve_row_cover_image(p.artwork.as_deref(), &state.search_covers),
         })
         .collect();

@@ -72,6 +72,10 @@ pub use browser::{open_url, opener_command};
 pub use catalog::Catalog;
 pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
 pub use catalog_live::LiveCatalog;
+pub use catalog_requests::{
+    EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID,
+    LIBRARY_PLAYLISTS_BROWSE_ID,
+};
 pub use catalog_stub::CatalogStub;
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use cover_art::{COVER_HIRES_MAX_PX, COVER_MAX_PX, decode_cover, fetch_artwork};

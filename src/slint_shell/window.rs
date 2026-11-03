@@ -22,6 +22,7 @@ use crate::slint_shell::covers::{
     spawn_cover_fetch_pool,
 };
 use crate::slint_shell::format::format_queue_label;
+use crate::slint_shell::history::{is_history_id, label_history_detail, with_history_entry};
 use crate::slint_shell::import_callbacks::{
     current_store, install_import_callbacks, install_playlist_store, poll_import,
 };
@@ -207,6 +208,14 @@ pub fn resolve_local_detail(browse_id: &str, store: &dyn PlaylistStore) -> Optio
     store.get(trimmed).map(|p| local_detail(&p))
 }
 
+fn apply_detail_result(
+    detail: Option<Detail>,
+    id: &str,
+    locale: crate::i18n::Locale,
+) -> Option<Detail> {
+    if is_history_id(id) { detail.map(|d| label_history_detail(d, locale)) } else { detail }
+}
+
 /// Dispatches asynchronous container detail lookup off the UI thread.
 pub(crate) fn open_detail_async(
     window: &MoggytWindow,
@@ -244,7 +253,7 @@ pub(crate) fn open_detail_async(
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
                 if st.detail_generation == g {
-                    st.detail = detail;
+                    st.detail = apply_detail_result(detail, &id, st.locale);
                     request_detail_covers(st, &tx);
                     sync_library_and_detail(&win, st);
                 }
@@ -272,7 +281,11 @@ pub(crate) fn refresh_library_async(
             with_ui_state(|st| {
                 if st.library_generation == g {
                     let local = current_store().map(|s| s.list()).unwrap_or_default();
-                    st.library_playlists = merge_local_library(&playlists, &local);
+                    st.library_playlists = with_history_entry(
+                        merge_local_library(&playlists, &local),
+                        st.signed_in,
+                        st.locale,
+                    );
                     st.library_albums = albums;
                     request_library_covers(st, &tx);
                     sync_library_and_detail(&win, st);
