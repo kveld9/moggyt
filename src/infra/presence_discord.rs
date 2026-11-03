@@ -1,15 +1,15 @@
 //! Discord Rich Presence integration port implementation.
 
-use discord_rich_presence::activity::Activity;
+use discord_rich_presence::activity::{Activity, ActivityType};
 use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
 
 use super::presence::Presence;
 
-/// Application ID registered with the Discord Developer Portal.
+/// Application ID registered for "moggyt" with the Discord Developer Portal.
 ///
 /// An ID of zero denotes an unregistered dormant state: no socket connection or IPC
 /// activity will be attempted. Set to a valid Discord application client ID to activate.
-pub const DISCORD_APP_ID: u64 = 0;
+pub const DISCORD_APP_ID: u64 = 1566973935109541999;
 
 fn clean_text<'a>(value: &'a str, fallback: &'static str) -> &'a str {
     let trimmed = value.trim();
@@ -31,6 +31,7 @@ pub fn activity_parts(artist: &str, title: &str) -> (String, String) {
 ///
 /// Remains zero-cost and dormant when initialized with an unregistered application ID (0).
 pub struct DiscordPresence {
+    app_id: u64,
     client: Option<DiscordIpcClient>,
     last_published: Option<(String, String)>,
 }
@@ -43,12 +44,17 @@ impl DiscordPresence {
         Self::with_app_id(DISCORD_APP_ID)
     }
 
+    /// Initializes Discord Rich Presence in a dormant state (app ID 0) that never touches IPC.
+    pub fn dormant() -> Self {
+        Self::with_app_id(0)
+    }
+
     /// Initializes Discord Rich Presence for a specific application ID.
     ///
     /// Passing 0 remains dormant without touching IPC. Non-zero IDs attempt connection
     /// guarded by panic catch, falling back to dormant on any failure.
     pub fn with_app_id(app_id: u64) -> Self {
-        Self { client: try_connect(app_id), last_published: None }
+        Self { app_id, client: try_connect(app_id), last_published: None }
     }
 
     /// Returns true if connected to the Discord IPC socket.
@@ -59,6 +65,21 @@ impl DiscordPresence {
     /// Test seam accessor for the last published activity parts (details, state).
     pub fn last_published(&self) -> Option<(String, String)> {
         self.last_published.clone()
+    }
+
+    /// Clears active status, closes any active IPC connection, and resets presence state.
+    // NOTE(clippy): tracing macro expansion inflates cognitive complexity (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
+    pub fn shutdown(&mut self) {
+        if let Some(mut client) = self.client.take() {
+            if let Err(err) = client.clear_activity() {
+                tracing::debug!("failed to clear discord activity on shutdown: {err:#}");
+            }
+            if let Err(err) = client.close() {
+                tracing::debug!("failed to close discord ipc client: {err:#}");
+            }
+        }
+        self.last_published = None;
     }
 }
 
@@ -71,18 +92,23 @@ impl Default for DiscordPresence {
 impl Presence for DiscordPresence {
     /// Publishes track metadata to Discord Rich Presence when live; always records the test seam.
     ///
-    /// On IPC error, logs a warning and retains the client for future track retries.
+    /// On IPC error, logs a warning and drops the client so subsequent tracks attempt reconnect.
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
     fn set_track(&mut self, artist: &str, title: &str) {
         let (details, state) = activity_parts(artist, title);
         self.last_published = Some((details.clone(), state.clone()));
+        if self.client.is_none() && self.app_id != 0 {
+            self.client = try_connect(self.app_id);
+        }
         let Some(client) = &mut self.client else {
             return;
         };
-        let activity = Activity::new().details(&details).state(&state);
+        let activity =
+            Activity::new().activity_type(ActivityType::Listening).details(&details).state(&state);
         if let Err(err) = client.set_activity(activity) {
             tracing::warn!("failed to set discord activity: {err:#}");
+            self.client = None;
         }
     }
 
@@ -139,7 +165,7 @@ mod tests {
 
     #[test]
     fn discord_presence_lifecycle_and_test_seams() {
-        let mut presence = DiscordPresence::new();
+        let mut presence = DiscordPresence::dormant();
         assert!(!presence.is_live());
         assert_eq!(presence.last_published(), None);
 
@@ -154,11 +180,28 @@ mod tests {
     }
 
     #[test]
-    fn discord_presence_with_app_id_zero_and_non_zero_fails_gracefully() {
+    fn discord_presence_with_app_id_zero_is_dormant() {
         let p0 = DiscordPresence::with_app_id(0);
         assert!(!p0.is_live());
 
-        let p_non_zero = DiscordPresence::with_app_id(999_999_999);
-        assert!(!p_non_zero.is_live());
+        let p_dormant = DiscordPresence::dormant();
+        assert!(!p_dormant.is_live());
+    }
+
+    #[test]
+    fn discord_presence_shutdown_clears_last_published() {
+        let mut presence = DiscordPresence::dormant();
+        presence.set_track("Daft Punk", "Get Lucky");
+        assert!(presence.last_published().is_some());
+
+        presence.shutdown();
+        assert_eq!(presence.last_published(), None);
+        assert!(!presence.is_live());
+    }
+
+    #[test]
+    fn discord_app_id_is_configured() {
+        assert_ne!(DISCORD_APP_ID, 0);
+        assert_eq!(DISCORD_APP_ID, 1566973935109541999);
     }
 }

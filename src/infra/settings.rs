@@ -49,6 +49,9 @@ pub struct Settings {
     /// Whether global keyboard shortcuts are enabled.
     #[serde(default = "default_true")]
     pub keyboard_shortcuts: bool,
+    /// Whether Discord Rich Presence is enabled.
+    #[serde(default = "default_false")]
+    pub discord_presence_enabled: bool,
     /// Whether Last.fm live scrobbling is enabled.
     #[serde(default = "default_false")]
     pub lastfm_enabled: bool,
@@ -106,6 +109,7 @@ impl Default for Settings {
             playback_speed: 1.0,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
+            discord_presence_enabled: false,
             lastfm_enabled: false,
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
@@ -135,6 +139,7 @@ impl Settings {
             playback_speed: 1.0,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
+            discord_presence_enabled: false,
             lastfm_enabled: false,
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
@@ -275,6 +280,7 @@ mod tests {
         assert_eq!(loaded.playback_speed, 1.0);
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
+        assert!(!loaded.discord_presence_enabled);
         assert!(!loaded.lastfm_enabled);
         assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
@@ -328,6 +334,7 @@ mod tests {
             playback_speed: 1.25,
             quality: AudioQuality::High,
             keyboard_shortcuts: false,
+            discord_presence_enabled: true,
             lastfm_enabled: true,
             secondary_lastfm_enabled: true,
             hi_res_covers: true,
@@ -365,6 +372,7 @@ mod tests {
         assert_eq!(fallback.playback_speed, 1.0);
         assert_eq!(fallback.quality, AudioQuality::Standard);
         assert!(fallback.keyboard_shortcuts);
+        assert!(!fallback.discord_presence_enabled);
         assert!(!fallback.lastfm_enabled);
         assert!(!fallback.secondary_lastfm_enabled);
         assert!(!fallback.hi_res_covers);
@@ -391,6 +399,7 @@ mod tests {
         assert_eq!(loaded.playback_speed, 1.0);
         assert_eq!(loaded.quality, AudioQuality::Standard);
         assert!(loaded.keyboard_shortcuts);
+        assert!(!loaded.discord_presence_enabled);
         assert!(!loaded.lastfm_enabled);
         assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
@@ -476,6 +485,7 @@ mod tests {
         assert_eq!(loaded.playback_speed, 1.0);
         assert_eq!(loaded.quality, AudioQuality::Compact);
         assert!(loaded.keyboard_shortcuts);
+        assert!(!loaded.discord_presence_enabled);
         assert!(!loaded.lastfm_enabled);
         assert!(!loaded.secondary_lastfm_enabled);
         assert!(!loaded.hi_res_covers);
@@ -505,6 +515,23 @@ mod tests {
 
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(omitted.keyboard_shortcuts);
+    }
+
+    #[test]
+    fn test_discord_presence_setting_defaults_false_and_roundtrips() {
+        let default_settings = Settings::default();
+        assert!(!default_settings.discord_presence_enabled);
+
+        let missing_key: Settings = serde_json::from_str("{}").expect("deserialize empty json");
+        assert!(!missing_key.discord_presence_enabled);
+
+        let json_true = r#"{"discord_presence_enabled": true}"#;
+        let loaded: Settings = serde_json::from_str(json_true).expect("deserialize true");
+        assert!(loaded.discord_presence_enabled);
+
+        let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
+        let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
+        assert!(decoded.discord_presence_enabled);
     }
 
     #[test]
