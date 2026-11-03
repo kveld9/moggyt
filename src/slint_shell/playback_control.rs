@@ -32,7 +32,26 @@ impl StartedPlay {
     }
 }
 
+fn dispatch_audio_play(audio: &mut dyn AudioBackend, id: &str, crossfade_seconds: u32) {
+    if audio.is_playing() && crossfade_seconds > 0 {
+        audio.play_crossfade(id, std::time::Duration::from_secs(crossfade_seconds as u64));
+    } else {
+        audio.play(id);
+    }
+}
+
 impl SlintAppState {
+    fn notify_now_playing(&self, artist: &str, title: &str) {
+        if let Ok(mut s) = self.scrobbler.lock() {
+            s.now_playing(artist, title);
+        }
+        if let Some(sec) = &self.secondary_scrobbler {
+            if let Ok(mut s) = sec.lock() {
+                s.now_playing(artist, title);
+            }
+        }
+    }
+
     /// Advances or retreats queue cursor in-memory to target index without triggering playback.
     pub fn play_track_at_index_in_memory(&mut self, index: usize) {
         if index >= self.queue.len() {
@@ -54,32 +73,15 @@ impl SlintAppState {
 
     /// Plays the track currently under the cursor without changing navigation page.
     pub fn play_current_quiet(&mut self) {
-        let Some(track) = self.queue.current() else {
+        let Some(track) = self.queue.current().cloned() else {
             return;
         };
-        let track = track.clone();
-        let id = track.id.clone();
-        let artist = track.artist.clone();
-        let title = track.title.clone();
+        let (id, artist, title) = (track.id.clone(), track.artist.clone(), track.title.clone());
         if let Ok(mut a) = self.audio.lock() {
-            if a.is_playing() && self.crossfade_seconds > 0 {
-                a.play_crossfade(
-                    &id,
-                    std::time::Duration::from_secs(self.crossfade_seconds as u64),
-                );
-            } else {
-                a.play(&id);
-            }
+            dispatch_audio_play(&mut **a, &id, self.crossfade_seconds);
         }
         self.started_at = Some(StartedPlay::now(track));
-        if let Ok(mut s) = self.scrobbler.lock() {
-            s.now_playing(&artist, &title);
-        }
-        if let Some(sec) = &self.secondary_scrobbler {
-            if let Ok(mut s) = sec.lock() {
-                s.now_playing(&artist, &title);
-            }
-        }
+        self.notify_now_playing(&artist, &title);
         self.last_skip_target = None;
         self.cached_skip_ranges = None;
         self.sync_presence_track(&artist, &title, true);

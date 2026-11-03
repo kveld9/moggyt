@@ -18,6 +18,25 @@ pub fn volume_to_amplitude(volume: u8) -> f32 {
     volume.min(100) as f32 / 100.0
 }
 
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+fn log_open_stream_error(track_id: &str, err: anyhow::Error) -> anyhow::Error {
+    tracing::warn!(track_id = %track_id, error = ?err, "failed to open audio stream");
+    err
+}
+
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+fn log_decode_stream_error(
+    track_id: &str,
+    err: impl std::error::Error + Send + Sync + 'static,
+) -> anyhow::Error {
+    let anyhow_err = anyhow::Error::new(err)
+        .context(format!("failed to decode audio stream for track '{track_id}'"));
+    tracing::warn!(track_id = %track_id, error = ?anyhow_err, "failed to decode audio stream");
+    anyhow_err
+}
+
 /// Real rodio playback backend maintaining an active sink and position tracking.
 pub struct RodioBackend {
     _stream: OutputStream,
@@ -112,19 +131,8 @@ impl RodioBackend {
     ) -> anyhow::Result<
         Decoder<super::stream_reader::RangeReader<super::stream_reqwest::ReqwestRangeTransport>>,
     > {
-        let stream = match open_audio_stream(url) {
-            Ok(stream) => stream,
-            Err(err) => {
-                tracing::warn!(track_id = %track_id, error = ?err, "failed to open audio stream");
-                return Err(err);
-            }
-        };
-        Decoder::new(stream).map_err(|err| {
-            let anyhow_err = anyhow::Error::new(err)
-                .context(format!("failed to decode audio stream for track '{track_id}'"));
-            tracing::warn!(track_id = %track_id, error = ?anyhow_err, "failed to decode audio stream");
-            anyhow_err
-        })
+        let stream = open_audio_stream(url).map_err(|err| log_open_stream_error(track_id, err))?;
+        Decoder::new(stream).map_err(|err| log_decode_stream_error(track_id, err))
     }
 
     /// Downloads and decodes audio from `url`, immediately starting playback.
