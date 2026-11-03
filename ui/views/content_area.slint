@@ -99,20 +99,11 @@ export component ContentArea inherits Rectangle {
     background: Theme.window;
     clip: true;
 
+    changed active-page => {
+        flick.viewport-y = 0px;
+    }
+
     flick := Flickable {
-        TouchArea {
-            x: 0;
-            y: -flick.viewport-y;
-            width: flick.width;
-            height: flick.height;
-
-            scroll-event(event) => {
-                let min-y = min(0px, flick.height - flick.viewport-height);
-                flick.viewport-y = min(0px, max(min-y, flick.viewport-y + event.delta-y * 3.5));
-                return EventResult.accept;
-            }
-        }
-
         VerticalLayout {
             padding: 24px;
             spacing: 16px;

@@ -71,19 +71,6 @@ export component QueuePanel inherits Rectangle {
         if root.tracks.length > 0 : flick := Flickable {
             vertical-stretch: 1;
 
-            TouchArea {
-                x: 0;
-                y: -flick.viewport-y;
-                width: flick.width;
-                height: flick.height;
-
-                scroll-event(event) => {
-                    let min-y = min(0px, flick.height - flick.viewport-height);
-                    flick.viewport-y = min(0px, max(min-y, flick.viewport-y + event.delta-y * 3.5));
-                    return EventResult.accept;
-                }
-            }
-
             VerticalLayout {
                 spacing: 8px;
                 alignment: start;
