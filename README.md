@@ -22,6 +22,7 @@ session storage are functional.
 - **Library & Authentication**: anonymous browsing by default; optional session cookie import into the OS credential
   store (Secret Service on Linux, Credential Manager on Windows) for library collections. Authenticated library
   endpoints are interim anonymous empty readers.
+- **Account History**: read-only YouTube Music listening history entry in the Library view when signed in.
 - **Synced Lyrics & Artwork**: synchronized timestamped lyrics from LRCLIB with dynamic user timing offset controls;
   cover art rendering with memory LRU and disk caching.
 - **Desktop Integration**: system tray icon with playback controls and show/quit actions; outbound desktop media

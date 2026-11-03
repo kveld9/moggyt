@@ -8,8 +8,9 @@ use super::catalog_parse_library::{parse_library_albums, parse_library_playlists
 use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::{parse_search_all, parse_search_tracks};
 use super::catalog_requests::{
-    CATALOG_API_KEY, EXPLORE_BROWSE_ID, HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID,
-    LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_url, next_body, next_url, search_body,
+    CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
+    LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_url, next_body,
+    next_url, search_body,
 };
 use crate::domain::{Album, Detail, DetailKind, Playlist, Shelf};
 use crate::i18n::Locale;
@@ -154,6 +155,14 @@ impl CatalogClient {
             .map_or_else(|_| Vec::new(), |p| parse_explore_all(&p))
     }
 
+    fn detail_payload(&self, id: &str) -> anyhow::Result<Value> {
+        if id == HISTORY_BROWSE_ID {
+            self.library_browse_payload(id)
+        } else {
+            self.browse_payload(id)
+        }
+    }
+
     /// Queries the browse endpoint for `browse_id` and returns parsed detail view of `kind`.
     /// Returns `None` on blank id, network error, or parse failure.
     pub fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
@@ -161,7 +170,7 @@ impl CatalogClient {
         if trimmed.is_empty() {
             return None;
         }
-        let payload = self.browse_payload(trimmed).ok()?;
+        let payload = self.detail_payload(trimmed).ok()?;
         parse_detail_all(&payload, kind)
     }
 
@@ -250,5 +259,11 @@ mod tests {
         let anon = CatalogClient::new();
         assert!(anon.library_playlists().is_empty());
         assert!(anon.library_saved_albums().is_empty());
+    }
+
+    #[test]
+    fn catalog_client_history_detail_unauthenticated_returns_none() {
+        let client = CatalogClient::new();
+        assert_eq!(client.detail(HISTORY_BROWSE_ID, DetailKind::Playlist), None);
     }
 }

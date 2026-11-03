@@ -78,7 +78,9 @@ The library view manages account authentication, release update actions, and sav
   - `Check for updates`: triggers an asynchronous query to GitHub Releases.
   - When an update is available, displays a direct link to the GitHub download page and a `Dismiss` button to clear the
     notice for the session.
-- **Playlists**: lists saved playlists with title and track counts. Shows `No playlists` when empty.
+- **Playlists**: lists saved playlists with title and track counts. Shows `No playlists` when empty. When signed in,
+  a read-only "History" entry appears first in the list, loading the account's recent plays as recorded by YouTube
+  Music into the detail view with grouped day sections flattened in order.
 - **Liked Songs**: lists liked tracks. Each row provides track details and an `Unlike` button.
 - **Saved Albums**: lists saved albums by title and artist. Shows `No saved albums` when empty.
 

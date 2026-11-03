@@ -15,6 +15,9 @@ pub const LIBRARY_PLAYLISTS_BROWSE_ID: &str = "FEmusic_liked_playlists";
 /// Library saved albums browse identifier for YouTube Music.
 pub const LIBRARY_ALBUMS_BROWSE_ID: &str = "FEmusic_liked_albums";
 
+/// Browse id of the signed-in account's listening history.
+pub const HISTORY_BROWSE_ID: &str = "FEmusic_history";
+
 /// Public catalog API web key for the WEB_REMIX client context.
 ///
 /// Embedded by every unofficial client; grants no private-data or billable-resource
@@ -162,5 +165,10 @@ mod tests {
     #[test]
     fn explore_browse_id_constant() {
         assert_eq!(EXPLORE_BROWSE_ID, "FEmusic_explore");
+    }
+
+    #[test]
+    fn history_browse_id_constant() {
+        assert_eq!(HISTORY_BROWSE_ID, "FEmusic_history");
     }
 }
