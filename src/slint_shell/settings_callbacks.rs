@@ -28,7 +28,6 @@ pub(crate) fn wire_settings_callbacks(
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         if st.sign_in_from_input(cookies.as_str()) {
-            win.set_cookie_text("".into());
             win.set_settings_cookie_text("".into());
             refresh_library_async(&win, &mut st, &tx);
         }

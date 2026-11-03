@@ -1,141 +1,101 @@
 import { Labels } from "../labels.slint";
 import { Theme, LibraryItemData } from "../theme.slint";
-import { StyledInputField } from "../components/controls.slint";
 import { LibraryItemCard } from "../components/rows.slint";
+import { IconLibrary } from "../icons.slint";
 
 export component LibraryView inherits VerticalLayout {
-    in-out property <string> cookie-text: "";
     in property <bool> signed-in: false;
     in property <[LibraryItemData]> playlists: [];
     in property <[LibraryItemData]> albums: [];
     callback playlist-selected(int);
     callback album-selected(int);
-    callback sign-in-submitted(string);
-    callback sign-out();
     callback import-requested();
+    callback open-settings();
     spacing: 16px;
     alignment: start;
 
-    HorizontalLayout {
-        spacing: 12px;
-
-        Rectangle {
-            horizontal-stretch: 1;
-            border-radius: 8px;
-            background: Theme.panel;
+    if !root.signed-in : VerticalLayout {
+        alignment: center;
+        padding-top: 80px;
+        padding-bottom: 80px;
+        spacing: 16px;
 
         VerticalLayout {
-            padding: 12px;
-            spacing: 8px;
+            alignment: center;
+            spacing: 12px;
 
-            if !root.signed-in : VerticalLayout {
-                spacing: 8px;
-
-                Text {
-                    text: Labels.session-anonymous-hint;
-                    color: Theme.secondary;
-                    font-size: 13px;
-                }
-
-                HorizontalLayout {
-                    spacing: 8px;
-                    height: 32px;
-
-                    StyledInputField {
-                        text <=> root.cookie-text;
-                        placeholder-text: Labels.session-cookie-placeholder;
-                        input-type: InputType.password;
-                        accepted(t) => { root.sign-in-submitted(t); }
-                    }
-
-                    Rectangle {
-                        width: 90px;
-                        border-radius: 8px;
-                        background: sign-in-btn.pressed ? Theme.overlay : (sign-in-btn.has-hover ? Theme.hover : Theme.accent);
-                        animate background { duration: 150ms; easing: ease-in-out; }
-
-                        sign-in-btn := TouchArea {
-                            clicked => { root.sign-in-submitted(root.cookie-text); }
-                        }
-
-                        Text {
-                            text: Labels.sign-in-label;
-                            color: sign-in-btn.has-hover ? Theme.text : Theme.window;
-                            font-size: 12px;
-                            font-weight: 700;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
+            IconLibrary {
+                size: 48px;
+                tint: Theme.secondary;
             }
 
-            if root.signed-in : HorizontalLayout {
-                spacing: 12px;
-                alignment: space-between;
+            Text {
+                text: Labels.library-signed-out-hint;
+                color: Theme.secondary;
+                font-size: 14px;
+                horizontal-alignment: center;
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 140px;
+                height: 36px;
+                border-radius: 8px;
+                background: settings-btn.pressed ? Theme.overlay : (settings-btn.has-hover ? Theme.hover : Theme.accent);
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                settings-btn := TouchArea {
+                    clicked => { root.open-settings(); }
+                }
 
                 Text {
-                    text: Labels.session-signed-in-hint;
-                    color: Theme.accent;
+                    text: Labels.open-settings-label;
+                    color: settings-btn.has-hover ? Theme.text : Theme.window;
                     font-size: 13px;
                     font-weight: 700;
+                    horizontal-alignment: center;
                     vertical-alignment: center;
-                }
-
-                Rectangle {
-                    width: 90px;
-                    height: 32px;
-                    border-radius: 8px;
-                    background: sign-out-btn.pressed ? Theme.overlay : (sign-out-btn.has-hover ? Theme.hover : Theme.surface);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    sign-out-btn := TouchArea {
-                        clicked => { root.sign-out(); }
-                    }
-
-                    Text {
-                        text: Labels.sign-out-label;
-                        color: Theme.text;
-                        font-size: 12px;
-                        font-weight: 700;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
                 }
             }
         }
     }
 
-    Rectangle {
-        width: 90px;
-        height: 32px;
-        border-radius: 8px;
-        background: import-btn.pressed ? Theme.overlay : (import-btn.has-hover ? Theme.hover : Theme.accent);
-        animate background { duration: 150ms; easing: ease-in-out; }
+    if root.signed-in : HorizontalLayout {
+        alignment: end;
 
-        import-btn := TouchArea {
-            clicked => { root.import-requested(); }
-        }
+        Rectangle {
+            width: 90px;
+            height: 32px;
+            border-radius: 8px;
+            background: import-btn.pressed ? Theme.overlay : (import-btn.has-hover ? Theme.hover : Theme.accent);
+            animate background { duration: 150ms; easing: ease-in-out; }
 
-        Text {
-            text: Labels.import-button-label;
-            color: import-btn.has-hover ? Theme.text : Theme.window;
-            font-size: 12px;
-            font-weight: 700;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+            import-btn := TouchArea {
+                clicked => { root.import-requested(); }
+            }
+
+            Text {
+                text: Labels.import-button-label;
+                color: import-btn.has-hover ? Theme.text : Theme.window;
+                font-size: 12px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
     }
-}
 
-    VerticalLayout {
+    if root.signed-in : VerticalLayout {
         spacing: 6px;
         Text { text: Labels.section-playlists-label; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.playlists.length == 0 : Text { text: Labels.empty-playlists-text; color: Theme.secondary; font-size: 13px; }
         for item in root.playlists : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.playlist-selected(item.index); } }
     }
 
-    VerticalLayout {
+    if root.signed-in : VerticalLayout {
         spacing: 6px;
         Text { text: Labels.section-albums-label; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.albums.length == 0 : Text { text: Labels.empty-albums-text; color: Theme.secondary; font-size: 13px; }

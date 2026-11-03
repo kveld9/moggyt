@@ -33,6 +33,10 @@ export component IconSpeakerMuted inherits Rectangle {
     width: root.size;
     height: root.size;
 
+    // The muted glyph is redrawn narrower than IconSpeaker instead of being narrowed by
+    // scaling it down: at 16px the full-width body leaves too few pixels for the mute
+    // marker, where a thin slash or a cramped X turns into a stray pixel. A shorter cone
+    // plus a separate 2.2-unit X keeps both silhouettes readable at the player bar size.
     Path {
         width: root.size;
         height: root.size;
@@ -40,7 +44,7 @@ export component IconSpeakerMuted inherits Rectangle {
         stroke: root.tint;
         stroke-width: 1.8px;
         fill: root.tint;
-        commands: "M 4 9.5 L 8 9.5 L 13 5.5 L 13 18.5 L 8 14.5 L 4 14.5 Z";
+        commands: "M 3 9.5 L 6.5 9.5 L 11 6 L 11 18 L 6.5 14.5 L 3 14.5 Z";
     }
 
     Path {
@@ -48,8 +52,8 @@ export component IconSpeakerMuted inherits Rectangle {
         height: root.size;
         viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
         stroke: root.tint;
-        stroke-width: 1.8px;
+        stroke-width: 2.2px;
         fill: transparent;
-        commands: "M 16 17 L 21 7";
+        commands: "M 14 8 L 21 16 M 21 8 L 14 16";
     }
 }

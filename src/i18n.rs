@@ -183,6 +183,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Not connected", "No conectado"),
     ("Now Playing", "Sonando"),
     ("Off", "Desactivado"),
+    ("Open settings", "Abrir ajustes"),
     ("Paste session cookies...", "Pegar cookies de sesión..."),
     ("Player bar", "Barra de reproducción"),
     ("Play", "Reproducir"),
@@ -218,6 +219,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ),
     ("Shuffle", "Aleatorio"),
     ("Sign in", "Iniciar sesión"),
+    (
+        "Sign in from Settings to load your library.",
+        "Inicia sesión desde Ajustes para cargar tu biblioteca.",
+    ),
     ("Sign out", "Cerrar sesión"),
     ("Signed in: library unlocked", "Sesión iniciada: biblioteca desbloqueada"),
     ("Sleep timer", "Temporizador de apagado"),
@@ -557,6 +562,25 @@ mod tests {
             (
                 "Disk space quota for offline stream cache",
                 "Espacio en disco para la caché de audio",
+            ),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_library_view_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Open settings", "Abrir ajustes"),
+            (
+                "Sign in from Settings to load your library.",
+                "Inicia sesión desde Ajustes para cargar tu biblioteca.",
             ),
         ];
 

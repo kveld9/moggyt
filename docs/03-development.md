@@ -119,7 +119,24 @@ guessing; every rule here was verified against a build or the official documenta
   `space-between` or `center`) sizes children only to their preferred/minimum size and places extra space into gaps,
   preventing children with `horizontal-stretch: 1` from expanding. To let a center child stretch between fixed-width
   edge elements, omit `alignment` on the container layout.
+- `alignment` on a `HorizontalLayout` also places fixed-height children on the cross axis, so
+  `alignment: start` pins a fixed-size child (for example the 40px artwork thumbnail of the
+  player bar) to the top edge instead of centering it. Center fixed-size children with a
+  wrapping `VerticalLayout { alignment: center; ... }` and leave the zone at default stretch.
+  Likewise, in a `HorizontalLayout` holding buttons of mixed heights (such as 26px skip buttons,
+  32px secondary transport buttons, and a 40px primary play/pause button), `HorizontalLayout` aligns
+  fixed-height children to the top (`y: 0`); wrapping each button in `VerticalLayout { alignment: center; ... }`
+  ensures all buttons share the same vertical centerline rather than aligning flush to the top.
   Source: <https://docs.slint.dev/latest/docs/slint/src/language/builtins/layouts>.
+- Symmetric flanking zones for horizontal centering:
+  To center a stretching middle zone dead-middle in a three-zone bar (left / center / right), both
+  flanking edge zones must have identical symmetric widths (e.g. `root.mode == 1 ? 220px : 260px`).
+  Any width discrepancy between left and right zones shifts the stretching center zone off-center
+  by half of the difference.
+- Container vertical padding for centered control blocks:
+  In a fixed-height container (such as a 72px bar holding a 56px controls block), specifying explicit
+  symmetric vertical padding (`padding-top: root.mode == 1 ? 6px : 8px; padding-bottom: root.mode == 1 ? 6px : 8px;`)
+  ensures the inner controls block is vertically centered instead of flush against the top border.
 - `Flickable` viewport content-sizing and layout interaction: a `Flickable` does not provide an intrinsic
   content height to enclosing layouts or intermediate containers; its `viewport-height` is computed from its
   children, while its own outer `height` defaults to 100% of the parent element or must be allocated by layout stretch.

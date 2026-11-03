@@ -20,7 +20,6 @@ export component ContentArea inherits Rectangle {
     in property <string> header-title: "Search";
     in property <bool> has-update: false;
     in-out property <string> query: "";
-    in-out property <string> cookie-text: "";
     in property <bool> signed-in: false;
     in property <[ShelfData]> shelves: [];
     in property <int> search-filter: 0;
@@ -95,24 +94,16 @@ export component ContentArea inherits Rectangle {
     callback back-pressed();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
+    callback library-import-requested();
 
     background: Theme.window;
     clip: true;
 
+    changed active-page => {
+        flick.viewport-y = 0px;
+    }
+
     flick := Flickable {
-        TouchArea {
-            x: 0;
-            y: -flick.viewport-y;
-            width: flick.width;
-            height: flick.height;
-
-            scroll-event(event) => {
-                let min-y = min(0px, flick.height - flick.viewport-height);
-                flick.viewport-y = min(0px, max(min-y, flick.viewport-y + event.delta-y * 3.5));
-                return EventResult.accept;
-            }
-        }
-
         VerticalLayout {
             padding: 24px;
             spacing: 16px;
@@ -216,14 +207,13 @@ export component ContentArea inherits Rectangle {
             }
 
             if root.active-page == 2 : LibraryView {
-                cookie-text <=> root.cookie-text;
                 signed-in: root.signed-in;
                 playlists: root.library-playlists;
                 albums: root.library-albums;
                 playlist-selected(idx) => { root.playlist-selected(idx); }
                 album-selected(idx) => { root.album-selected(idx); }
-                sign-in-submitted(t) => { root.sign-in-submitted(t); }
-                sign-out() => { root.sign-out(); }
+                import-requested() => { root.library-import-requested(); }
+                open-settings() => { root.open-settings(); }
             }
 
             if root.active-page == 3 : DetailView {

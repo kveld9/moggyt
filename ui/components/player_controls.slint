@@ -34,150 +34,178 @@ export component PlayerCenterControls inherits VerticalLayout {
         spacing: 6px;
         alignment: center;
 
-        if root.show-shuffle : Rectangle {
-            width: 32px;
-            height: 32px;
-            border-radius: 16px;
-            background: shuf-touch.pressed ? Theme.overlay : (root.is-shuffle ? Theme.surface : (shuf-touch.has-hover ? Theme.hover : transparent));
-            animate background { duration: 150ms; easing: ease-in-out; }
+        if root.show-shuffle : VerticalLayout {
+            alignment: center;
 
-            shuf-touch := TouchArea {
-                clicked => { root.toggle-shuffle(); }
-            }
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: shuf-touch.pressed ? Theme.overlay : (root.is-shuffle ? Theme.surface : (shuf-touch.has-hover ? Theme.hover : transparent));
+                animate background { duration: 150ms; easing: ease-in-out; }
 
-            IconShuffle {
-                tint: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
-                size: 16px;
-            }
-        }
+                shuf-touch := TouchArea {
+                    clicked => { root.toggle-shuffle(); }
+                }
 
-        Rectangle {
-            width: 32px;
-            height: 32px;
-            border-radius: 16px;
-            background: pt.pressed ? Theme.overlay : (pt.has-hover ? Theme.hover : transparent);
-            animate background { duration: 150ms; easing: ease-in-out; }
-
-            pt := TouchArea {
-                clicked => { root.prev-track(); }
-            }
-
-            IconPrev {
-                tint: pt.has-hover ? Theme.text : Theme.secondary;
-                size: 16px;
-            }
-        }
-
-        if root.show-skip-seconds : Rectangle {
-            min-width: 32px;
-            height: 26px;
-            border-radius: 13px;
-            background: s10m-touch.pressed ? Theme.overlay : (s10m-touch.has-hover ? Theme.hover : transparent);
-            animate background { duration: 150ms; easing: ease-in-out; }
-
-            s10m-touch := TouchArea {
-                clicked => { root.seek-by(-10); }
-            }
-
-            HorizontalLayout {
-                padding-left: 6px;
-                padding-right: 6px;
-                alignment: center;
-
-                Text {
-                    text: "-10s";
-                    color: s10m-touch.has-hover ? Theme.text : Theme.secondary;
-                    font-size: 11px;
-                    font-weight: 600;
-                    vertical-alignment: center;
-                    horizontal-alignment: center;
+                IconShuffle {
+                    tint: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
+                    size: 16px;
                 }
             }
         }
 
-        Rectangle {
-            width: 40px;
-            height: 40px;
-            border-radius: 20px;
-            background: pp.pressed ? Theme.overlay : (pp.has-hover ? Theme.hover : Theme.accent);
-            animate background { duration: 150ms; easing: ease-in-out; }
+        VerticalLayout {
+            alignment: center;
 
-            pp := TouchArea {
-                clicked => { root.toggle-play(); }
-            }
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: pt.pressed ? Theme.overlay : (pt.has-hover ? Theme.hover : transparent);
+                animate background { duration: 150ms; easing: ease-in-out; }
 
-            if root.is-playing : IconPause {
-                tint: pp.has-hover ? Theme.text : Theme.window;
-                size: 20px;
-            }
-            if !root.is-playing : IconPlay {
-                tint: pp.has-hover ? Theme.text : Theme.window;
-                size: 20px;
-            }
-        }
+                pt := TouchArea {
+                    clicked => { root.prev-track(); }
+                }
 
-        if root.show-skip-seconds : Rectangle {
-            min-width: 32px;
-            height: 26px;
-            border-radius: 13px;
-            background: s10p-touch.pressed ? Theme.overlay : (s10p-touch.has-hover ? Theme.hover : transparent);
-            animate background { duration: 150ms; easing: ease-in-out; }
-
-            s10p-touch := TouchArea {
-                clicked => { root.seek-by(10); }
-            }
-
-            HorizontalLayout {
-                padding-left: 6px;
-                padding-right: 6px;
-                alignment: center;
-
-                Text {
-                    text: "+10s";
-                    color: s10p-touch.has-hover ? Theme.text : Theme.secondary;
-                    font-size: 11px;
-                    font-weight: 600;
-                    vertical-alignment: center;
-                    horizontal-alignment: center;
+                IconPrev {
+                    tint: pt.has-hover ? Theme.text : Theme.secondary;
+                    size: 16px;
                 }
             }
         }
 
-        Rectangle {
-            width: 32px;
-            height: 32px;
-            border-radius: 16px;
-            background: nt.pressed ? Theme.overlay : (nt.has-hover ? Theme.hover : transparent);
-            animate background { duration: 150ms; easing: ease-in-out; }
+        if root.show-skip-seconds : VerticalLayout {
+            alignment: center;
 
-            nt := TouchArea {
-                clicked => { root.next-track(); }
-            }
+            Rectangle {
+                min-width: 32px;
+                height: 26px;
+                border-radius: 13px;
+                background: s10m-touch.pressed ? Theme.overlay : (s10m-touch.has-hover ? Theme.hover : transparent);
+                animate background { duration: 150ms; easing: ease-in-out; }
 
-            IconNext {
-                tint: nt.has-hover ? Theme.text : Theme.secondary;
-                size: 16px;
+                s10m-touch := TouchArea {
+                    clicked => { root.seek-by(-10); }
+                }
+
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    alignment: center;
+
+                    Text {
+                        text: "-10s";
+                        color: s10m-touch.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 11px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
             }
         }
 
-        if root.show-repeat : Rectangle {
-            width: 32px;
-            height: 32px;
-            border-radius: 16px;
-            background: rep-touch.pressed ? Theme.overlay : (root.repeat-mode != 0 ? Theme.surface : (rep-touch.has-hover ? Theme.hover : transparent));
-            animate background { duration: 150ms; easing: ease-in-out; }
+        VerticalLayout {
+            alignment: center;
 
-            rep-touch := TouchArea {
-                clicked => { root.cycle-repeat(); }
-            }
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 20px;
+                background: pp.pressed ? Theme.overlay : (pp.has-hover ? Theme.hover : Theme.accent);
+                animate background { duration: 150ms; easing: ease-in-out; }
 
-            if root.repeat-mode == 2 : IconRepeatOne {
-                tint: Theme.accent;
-                size: 16px;
+                pp := TouchArea {
+                    clicked => { root.toggle-play(); }
+                }
+
+                if root.is-playing : IconPause {
+                    tint: pp.has-hover ? Theme.text : Theme.window;
+                    size: 20px;
+                }
+                if !root.is-playing : IconPlay {
+                    tint: pp.has-hover ? Theme.text : Theme.window;
+                    size: 20px;
+                }
             }
-            if root.repeat-mode != 2 : IconRepeat {
-                tint: root.repeat-mode != 0 ? Theme.accent : (rep-touch.has-hover ? Theme.text : Theme.secondary);
-                size: 16px;
+        }
+
+        if root.show-skip-seconds : VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                min-width: 32px;
+                height: 26px;
+                border-radius: 13px;
+                background: s10p-touch.pressed ? Theme.overlay : (s10p-touch.has-hover ? Theme.hover : transparent);
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                s10p-touch := TouchArea {
+                    clicked => { root.seek-by(10); }
+                }
+
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    alignment: center;
+
+                    Text {
+                        text: "+10s";
+                        color: s10p-touch.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 11px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: nt.pressed ? Theme.overlay : (nt.has-hover ? Theme.hover : transparent);
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                nt := TouchArea {
+                    clicked => { root.next-track(); }
+                }
+
+                IconNext {
+                    tint: nt.has-hover ? Theme.text : Theme.secondary;
+                    size: 16px;
+                }
+            }
+        }
+
+        if root.show-repeat : VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: rep-touch.pressed ? Theme.overlay : (root.repeat-mode != 0 ? Theme.surface : (rep-touch.has-hover ? Theme.hover : transparent));
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                rep-touch := TouchArea {
+                    clicked => { root.cycle-repeat(); }
+                }
+
+                if root.repeat-mode == 2 : IconRepeatOne {
+                    tint: Theme.accent;
+                    size: 16px;
+                }
+                if root.repeat-mode != 2 : IconRepeat {
+                    tint: root.repeat-mode != 0 ? Theme.accent : (rep-touch.has-hover ? Theme.text : Theme.secondary);
+                    size: 16px;
+                }
             }
         }
     }

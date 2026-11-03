@@ -52,7 +52,6 @@ export component MoggytWindow inherits Window {
     in-out property <string> update-status-text: "Up to date";
     in-out property <bool> has-update: false;
     in-out property <string> query: "";
-    in-out property <string> cookie-text: "";
     in-out property <bool> signed-in: false;
     in-out property <[ShelfData]> shelves: [];
     in-out property <int> search-filter: 0;
@@ -204,7 +203,6 @@ export component MoggytWindow inherits Window {
                     query <=> root.query;
                     shelves: root.shelves;
                     search-filter: root.search-filter;
-                    cookie-text <=> root.cookie-text;
                     signed-in: root.signed-in;
                     active-track-title: root.active-track-title;
                     active-track-artist: root.active-track-artist;
@@ -252,6 +250,7 @@ export component MoggytWindow inherits Window {
                     player-bar-show-queue: root.player-bar-show-queue;
                     player-bar-show-volume: root.player-bar-show-volume;
                     open-settings => { root.page-selected(4); }
+                    library-import-requested => { root.library-import-requested(); }
                     query-submitted(q) => { root.query-submitted(q); }
                     track-selected(idx) => { root.track-selected(idx); }
                     filter-selected(idx) => { root.filter-selected(idx); }
