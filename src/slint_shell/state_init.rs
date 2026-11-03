@@ -10,8 +10,8 @@ use crate::domain::{PlaybackQueue, SearchFilter, SleepTimer, ThemeId};
 use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, LyricsSource,
-    MemoryQueueStore, MemorySettingsStore, MemorySkipStore, SessionStore, SettingsStore,
-    StubScrobbler,
+    MemoryPlayLogStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore, SessionStore,
+    SettingsStore, StubScrobbler,
 };
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
@@ -56,6 +56,7 @@ impl SlintAppState {
             settings_store,
             queue_store: Box::new(MemoryQueueStore::default()),
             skip_store: Box::new(MemorySkipStore::new()),
+            play_log_store: Box::new(MemoryPlayLogStore::new()),
             updater_rx: None,
             page: SlintPage::Search,
             queue_panel_open: false,

@@ -263,6 +263,7 @@ impl SlintAppState {
             return;
         };
         let elapsed = started.instant.elapsed().as_secs();
+        self.record_play(&started, elapsed);
         let duration = started.track.duration_secs.map(u64::from);
         if should_scrobble(elapsed, duration) {
             self.submit_scrobble(&started.track.artist, &started.track.title, started.unix_secs);

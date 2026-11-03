@@ -49,6 +49,7 @@ pub mod init;
 pub mod labels;
 pub mod page;
 pub mod platform;
+pub mod play_log;
 pub mod playback;
 pub mod playback_control;
 pub mod playback_worker;

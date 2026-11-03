@@ -27,6 +27,29 @@ Artwork thumbnails displayed in the `Now Playing` page are cached on local stora
 - **Memory LRU**: an in-memory cache layer retains recent textures to prevent redundant disk reads and UI thread
   stalls.
 
+## Play Log
+
+Local listening history is recorded to an append-only JSON Lines file in the application data directory:
+
+- **Path**: `<data_dir>/play-log.jsonl`
+- **Format**: JSON Lines (`.jsonl`), where each completed playback entry is written as a single line containing one
+  JSON object.
+- **Fields**:
+  - `video_id` (string): Stable catalog identifier or video id.
+  - `title` (string): Track title.
+  - `artist` (string): Artist display name.
+  - `album` (optional string): Album name when known; omitted when absent.
+  - `started_at_unix` (integer): Unix epoch timestamp in seconds when playback started.
+  - `listened_secs` (integer): Wall-clock time in seconds spent listening, clamped to track duration when known.
+  - `duration_secs` (optional integer): Track duration in seconds when known; omitted when absent.
+- **Recording Threshold**: a play is recorded when playback ends (via next track, previous track, queue/autoplay
+  advance, or starting another track) and elapsed listening time is at least 30 seconds (`MIN_RECORDED_PLAY_SECS`).
+- **Timing & Clamping**: listened time is measured from the moment the track starts and is clamped to the track's
+  catalog duration when known (pauses currently count toward elapsed wall-clock time).
+- **Exit Behavior**: any play in progress when the application exits is not recorded.
+- **Fault Tolerance**: when loading playback records, malformed or truncated lines (such as from a crash or power cut)
+  are skipped with a warning log without failing the remaining history load.
+
 ## Authentication and Credential Storage
 
 User authentication for library access (playlists, liked tracks, saved albums) relies on importing session cookies from

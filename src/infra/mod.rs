@@ -32,6 +32,7 @@ mod lyric_overrides;
 mod lyrics;
 mod lyrics_cache;
 mod lyrics_lrclib;
+mod play_log_store;
 mod playlist_store;
 mod playlist_store_disk;
 mod presence;
@@ -91,6 +92,7 @@ pub use lyrics_lrclib::{
     duration_similarity, lrclib_get_url, match_confidence, normalize_text, parse_lrc,
     payload_matches, text_similarity,
 };
+pub use play_log_store::{DiskPlayLogStore, MemoryPlayLogStore, PLAY_LOG_FILE_NAME, PlayLogStore};
 pub use playlist_store::{MemoryPlaylistStore, PlaylistStore};
 pub use playlist_store_disk::{
     DiskPlaylistStore, PLAYLISTS_FILE, PLAYLISTS_SCHEMA_VERSION, PlaylistFile,
