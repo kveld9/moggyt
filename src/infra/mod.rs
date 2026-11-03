@@ -62,7 +62,7 @@ mod updater;
 mod updater_github;
 mod ytdlp;
 
-pub use audio::{AudioBackend, AudioStub, clamp_speed};
+pub use audio::{AudioBackend, AudioStub, NullAudio, clamp_speed};
 pub use audio_dsp::{
     DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, LoudnessNormalizer,
     SkipSilence, TARGET_LUFS_DB, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
