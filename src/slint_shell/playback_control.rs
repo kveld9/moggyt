@@ -3,14 +3,13 @@
 //!
 //! Hexagonal invariant: non-blocking audio port calls and presence sync without UI event loop stalls.
 
-use std::sync::Arc;
 use std::time::Instant;
 
 use slint::{ModelRc, VecModel};
 
-use crate::domain::{SLEEP_FADE_WINDOW_SECS, Track, faded_volume};
+use crate::domain::Track;
 use crate::i18n::tr;
-use crate::infra::{AudioBackend, AudioQuality, Catalog, Presence, should_scrobble};
+use crate::infra::{AudioBackend, AudioQuality, Catalog};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::current_unix_secs;
 use crate::slint_shell::platform::rgba_to_image;
@@ -135,16 +134,6 @@ impl SlintAppState {
         let _ = self.settings_store.save(&settings);
     }
 
-    /// Restores user volume if a progressive sleep fade-out was active, without persisting.
-    pub fn restore_sleep_fade_volume(&mut self) {
-        let Some(vol) = self.sleep_fade_base_volume.take() else {
-            return;
-        };
-        if let Ok(mut audio) = self.audio.lock() {
-            audio.set_volume(vol);
-        }
-    }
-
     /// Updates audio quality preference and persists preference to disk.
     pub fn set_audio_quality(&mut self, quality: AudioQuality) {
         if let Ok(mut a) = self.audio.lock() {
@@ -256,94 +245,6 @@ impl SlintAppState {
         self.queue.advance();
         self.play_current_quiet();
     }
-
-    /// Submits scrobble record to active scrobbler if playback elapsed threshold was met.
-    pub fn maybe_scrobble_current(&mut self) {
-        let Some(started) = self.started_at.take() else {
-            return;
-        };
-        let elapsed = started.instant.elapsed().as_secs();
-        self.record_play(&started, elapsed);
-        let duration = started.track.duration_secs.map(u64::from);
-        if should_scrobble(elapsed, duration) {
-            self.submit_scrobble(&started.track.artist, &started.track.title, started.unix_secs);
-        }
-    }
-
-    fn submit_scrobble(&self, artist: &str, title: &str, unix_secs: u64) {
-        if let Ok(mut s) = self.scrobbler.lock() {
-            s.scrobble(artist, title, unix_secs);
-        }
-        if let Some(sec) = &self.secondary_scrobbler {
-            if let Ok(mut s) = sec.lock() {
-                s.scrobble(artist, title, unix_secs);
-            }
-        }
-    }
-
-    /// Synchronizes active track metadata with desktop presence and Discord presence.
-    pub fn sync_presence_track(&mut self, artist: &str, title: &str, is_playing: bool) {
-        let key = (artist.to_string(), title.to_string());
-        if self.last_presence_key.as_ref() != Some(&key) {
-            self.presence.set_track(artist, title);
-            self.discord.set_track(artist, title);
-            self.last_presence_key = Some(key);
-        }
-        self.presence.set_playing(is_playing);
-    }
-
-    /// Synchronizes playback status with desktop presence.
-    pub fn sync_presence_playing(&mut self, is_playing: bool) {
-        self.presence.set_playing(is_playing);
-    }
-
-    /// Evaluates sleep timer duration, applies progressive volume fade-out, and pauses audio on expiration.
-    pub fn poll_sleep_timer(&mut self) {
-        let audio_arc = Arc::clone(&self.audio);
-        let Ok(mut audio) = audio_arc.try_lock() else {
-            return;
-        };
-        if !self.is_sleep_timer_active(audio.is_playing()) {
-            return;
-        }
-        let elapsed = audio.position_secs();
-        let effective = self
-            .sleep_timer_accumulated
-            .saturating_add(elapsed.saturating_sub(self.sleep_timer_base_offset));
-        if self.sleep_timer.poll_elapsed(effective) {
-            audio.pause();
-            restore_captured_volume(&mut **audio, &mut self.sleep_fade_base_volume);
-            drop(audio);
-            self.sync_presence_playing(false);
-            return;
-        }
-        apply_sleep_fade(
-            &mut **audio,
-            &mut self.sleep_fade_base_volume,
-            self.sleep_timer.remaining_secs(),
-        );
-    }
-
-    fn is_sleep_timer_active(&self, is_playing: bool) -> bool {
-        self.sleep_timer.is_armed() && is_playing
-    }
-}
-
-fn restore_captured_volume(audio: &mut dyn AudioBackend, base: &mut Option<u8>) {
-    if let Some(vol) = base.take() {
-        audio.set_volume(vol);
-    }
-}
-
-fn apply_sleep_fade(audio: &mut dyn AudioBackend, base: &mut Option<u8>, remaining: Option<u64>) {
-    let Some(r) = remaining else {
-        return;
-    };
-    if r >= SLEEP_FADE_WINDOW_SECS {
-        return;
-    }
-    let base_vol = *base.get_or_insert_with(|| audio.volume());
-    audio.set_volume(faded_volume(base_vol, r));
 }
 
 /// Applies completed playback worker results back to the Slint window on the event loop.
@@ -403,12 +304,11 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
-    use std::time::Duration;
 
     use super::*;
 
     use crate::domain::{SkipRanges, SkipSegment, Track};
-    use crate::infra::{Scrobbler, SkipStore};
+    use crate::infra::SkipStore;
     use crate::slint_shell::test_support::test_wired;
 
     #[derive(Debug)]
@@ -524,102 +424,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sleep_timer_expiry() {
-        let mut state = test_wired();
-        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
-        state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
-        assert!(state.sleep_timer.is_armed());
-
-        state.seek_by(900);
-        state.poll_sleep_timer();
-        assert!(!state.audio.lock().unwrap().is_playing());
-    }
-
-    #[test]
-    fn test_sleep_timer_fade_reduces_volume_inside_window() {
-        let mut state = test_wired();
-        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
-        state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
-        assert!(state.sleep_timer.is_armed());
-
-        state.seek_by(885);
-        state.poll_sleep_timer();
-
-        assert_eq!(state.audio.lock().unwrap().volume(), 50);
-        assert_eq!(state.settings_store.load().volume, 100);
-        assert_eq!(state.sleep_fade_base_volume, Some(100));
-    }
-
-    #[test]
-    fn test_sleep_timer_fade_restores_volume_on_fire() {
-        let mut state = test_wired();
-        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
-        state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
-
-        state.seek_by(885);
-        state.poll_sleep_timer();
-        assert_eq!(state.audio.lock().unwrap().volume(), 50);
-
-        state.seek_by(15);
-        state.poll_sleep_timer();
-
-        assert!(!state.audio.lock().unwrap().is_playing());
-        assert_eq!(state.audio.lock().unwrap().volume(), 100);
-        assert_eq!(state.sleep_fade_base_volume, None);
-    }
-
-    #[test]
-    fn test_sleep_timer_restore_on_cancel() {
-        let mut state = test_wired();
-        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
-        state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
-
-        state.seek_by(885);
-        state.poll_sleep_timer();
-        assert_eq!(state.audio.lock().unwrap().volume(), 50);
-
-        crate::slint_shell::callbacks::handle_sleep_timer_selection(&mut state, 0);
-        assert_eq!(state.audio.lock().unwrap().volume(), 100);
-        assert_eq!(state.sleep_fade_base_volume, None);
-    }
-
-    #[test]
-    fn test_sleep_timer_set_volume_during_fade_updates_base() {
-        let mut state = test_wired();
-        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
-        state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
-
-        state.seek_by(885);
-        state.poll_sleep_timer();
-        assert_eq!(state.sleep_fade_base_volume, Some(100));
-
-        state.set_volume(80);
-        assert_eq!(state.sleep_fade_base_volume, Some(80));
-        assert_eq!(state.settings_store.load().volume, 80);
-
-        state.poll_sleep_timer();
-        assert_eq!(state.audio.lock().unwrap().volume(), 40);
-
-        state.seek_by(15);
-        state.poll_sleep_timer();
-        assert_eq!(state.audio.lock().unwrap().volume(), 80);
-        assert_eq!(state.sleep_fade_base_volume, None);
-    }
-
-    #[test]
-    fn test_restore_sleep_fade_volume_noop_when_not_fading() {
-        let mut state = test_wired();
-        state.audio.lock().unwrap().set_volume(70);
-        state.restore_sleep_fade_volume();
-        assert_eq!(state.audio.lock().unwrap().volume(), 70);
-    }
-
-    #[test]
     fn test_cycle_playback_speed_in_state() {
         let mut state = test_wired();
         assert_eq!(state.audio.lock().unwrap().speed(), 1.0);
@@ -717,75 +521,5 @@ mod tests {
 
         assert_eq!(state.queue.len(), 2);
         assert_eq!(state.queue.tracks()[1].id, "song-atv");
-    }
-
-    #[derive(Debug)]
-    struct RecordingScrobbler {
-        scrobbles: Arc<Mutex<Vec<(String, String, u64)>>>,
-    }
-
-    impl Scrobbler for RecordingScrobbler {
-        fn now_playing(&mut self, _artist: &str, _title: &str) {}
-
-        fn scrobble(&mut self, artist: &str, title: &str, timestamp_secs: u64) {
-            self.scrobbles.lock().unwrap().push((
-                artist.to_string(),
-                title.to_string(),
-                timestamp_secs,
-            ));
-        }
-    }
-
-    #[test]
-    fn test_maybe_scrobble_current_credits_started_track_after_queue_advance() {
-        let mut state = test_wired();
-        let track_a = Track::new("a", "A title", "A artist").with_duration(200);
-        let track_b = Track::new("b", "B title", "B artist").with_duration(200);
-        state.queue.push(track_a.clone());
-        state.queue.push(track_b);
-
-        let scrobbles = Arc::new(Mutex::new(Vec::new()));
-        let rec = RecordingScrobbler { scrobbles: Arc::clone(&scrobbles) };
-        state.scrobbler = Arc::new(Mutex::new(Box::new(rec)));
-        state.started_at = Some(StartedPlay {
-            instant: Instant::now().checked_sub(Duration::from_secs(150)).unwrap(),
-            unix_secs: 1_000,
-            track: track_a,
-        });
-
-        state.queue.advance();
-        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("b"));
-
-        state.maybe_scrobble_current();
-
-        assert_eq!(
-            *scrobbles.lock().unwrap(),
-            vec![("A artist".to_string(), "A title".to_string(), 1_000)]
-        );
-        assert!(state.started_at.is_none());
-    }
-
-    #[test]
-    fn test_maybe_scrobble_current_below_threshold_does_not_scrobble_and_resets() {
-        let mut state = test_wired();
-        let track_a = Track::new("a", "A title", "A artist").with_duration(200);
-        let track_b = Track::new("b", "B title", "B artist").with_duration(200);
-        state.queue.push(track_a.clone());
-        state.queue.push(track_b);
-
-        let scrobbles = Arc::new(Mutex::new(Vec::new()));
-        let rec = RecordingScrobbler { scrobbles: Arc::clone(&scrobbles) };
-        state.scrobbler = Arc::new(Mutex::new(Box::new(rec)));
-        state.started_at = Some(StartedPlay {
-            instant: Instant::now().checked_sub(Duration::from_secs(10)).unwrap(),
-            unix_secs: 1_000,
-            track: track_a,
-        });
-
-        state.queue.advance();
-        state.maybe_scrobble_current();
-
-        assert!(scrobbles.lock().unwrap().is_empty());
-        assert!(state.started_at.is_none());
     }
 }

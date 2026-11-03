@@ -27,6 +27,8 @@ src/
 │   ├── app.rs         # Shell composition root: SlintAppState, event handlers, and window wiring
 │   ├── history.rs     # Account history playlist entry projection, detail labeling, and subtitles
 │   ├── lastfm_connect.rs # Last.fm desktop authentication and connect flow
+│   ├── scrobble_control.rs # Scrobble submission and presence sync for the playing track
+│   ├── sleep_fade.rs  # Sleep timer polling and the volume fade applied before it fires
 │   ├── stats.rs       # Wrapped-style listening statistics UI view model and refresh wiring
 │   ├── stream_prefetch.rs # Next-track stream URL prefetching thread spawner
 │   └── bridges/       # Platform and domain integration bridges
