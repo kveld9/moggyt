@@ -11,7 +11,8 @@ Building `moggyt` from source requires:
 - Operating system development headers:
   - **Linux**: ALSA development headers (`libasound2-dev` on Debian/Ubuntu, `alsa-lib` on Arch Linux) for audio
     output via `rodio`, and Ayatana AppIndicator headers (`libayatana-appindicator3-dev` on Debian/Ubuntu,
-    `libayatana-appindicator` on Arch Linux) for system tray support.
+    `libayatana-appindicator` on Arch Linux) for system tray support, and D-Bus headers (`libdbus-1-dev` and
+    `pkg-config` on Debian/Ubuntu, `dbus` on Arch Linux) for the Secret Service keyring backend.
   - **Windows**: standard MSVC or GNU toolchain with Windows SDK.
 
 Refer to your distribution package manager or project CI workflows (`.github/workflows/ci.yml`) for package naming.

@@ -120,7 +120,7 @@ jobs:
       # (plus GTK/glib transitively) for tray-icon/libappindicator build scripts.
       - name: Install Linux system dev headers
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev libdbus-1-dev pkg-config
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
