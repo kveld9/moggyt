@@ -75,6 +75,7 @@ usage details, see the [User Guide](docs/05-user-guide.md).
 - **Linux / Unix**: `$XDG_DATA_HOME/moggyt` (falling back to `~/.local/share/moggyt`).
 - **Windows**: `%APPDATA%\moggyt`.
 - **Covers Cache**: `<data_dir>/covers` (with automated temporary directory fallback).
+- **Play Log**: `<data_dir>/play-log.jsonl` (local listening history, JSON Lines).
 - **Credentials**: imported cookies live exclusively in the operating system credential store (never in plain files or
   logs). Streaming requests remain strictly anonymous.
 - **Diagnostics**: control log verbosity via the `RUST_LOG` environment variable (e.g. `RUST_LOG=debug cargo run`).

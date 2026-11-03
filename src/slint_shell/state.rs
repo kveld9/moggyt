@@ -16,9 +16,9 @@ use crate::domain::{
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CustomThemeFile, DesktopPresence, DiscordPresence,
-    LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, QueueStore, ReleaseInfo, Scrobbler,
-    SessionStore, SettingsStore, SkipStore, TrayAction, TrayHandle, decode_cover, decode_handoff,
-    fetch_artwork, sanitize_cookie_input,
+    LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, PlayLogStore, QueueStore,
+    ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipStore, TrayAction, TrayHandle,
+    decode_cover, decode_handoff, fetch_artwork, sanitize_cookie_input,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
@@ -49,6 +49,7 @@ pub struct SlintAppState {
     pub settings_store: Box<dyn SettingsStore>,
     pub queue_store: Box<dyn QueueStore>,
     pub skip_store: Box<dyn SkipStore>,
+    pub play_log_store: Box<dyn PlayLogStore>,
     pub updater_rx: Option<std::sync::mpsc::Receiver<Option<ReleaseInfo>>>,
 
     pub page: SlintPage,

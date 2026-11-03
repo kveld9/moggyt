@@ -10,8 +10,9 @@ use slint::ComponentHandle;
 
 use crate::domain::ThemeId;
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, CustomThemeFile, LyricOverrideDir, LyricsSource, QueueStore,
-    Scrobbler, SessionStore, Settings, SettingsStore, SingleInstanceGuard, SkipStore, TrayHandle,
+    AudioBackend, Catalog, CoverCache, CustomThemeFile, LyricOverrideDir, LyricsSource,
+    PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings, SettingsStore,
+    SingleInstanceGuard, SkipStore, TrayHandle,
 };
 
 pub use crate::slint_shell::covers::{
@@ -48,6 +49,7 @@ pub struct AppDependencies<C, A, S, L, K> {
     pub settings_store: Box<dyn SettingsStore>,
     pub queue_store: Box<dyn QueueStore>,
     pub skip_store: Box<dyn SkipStore>,
+    pub play_log_store: Box<dyn PlayLogStore>,
     pub scrobbler: Box<dyn Scrobbler>,
     pub secondary_scrobbler: Option<Box<dyn Scrobbler>>,
     pub lyric_overrides: Option<LyricOverrideDir>,
@@ -83,6 +85,7 @@ pub fn run(
         settings_store,
         queue_store,
         skip_store,
+        play_log_store,
         scrobbler,
         secondary_scrobbler,
         lyric_overrides,
@@ -124,6 +127,7 @@ pub fn run(
     state.queue_store = queue_store;
 
     state.skip_store = skip_store;
+    state.play_log_store = play_log_store;
 
     state.scrobbler = Arc::new(Mutex::new(scrobbler));
     state.secondary_scrobbler = secondary_scrobbler.map(|s| Arc::new(Mutex::new(s)));

@@ -29,6 +29,7 @@ src/
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
 │   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)
+│   ├── play_log.rs    # Listening history models and duration clamping
 │   ├── queue.rs       # Pure playback queue (add, next, previous, shuffle, repeat)
 │   ├── search.rs      # Search models (immutable query, track model)
 │   └── theme.rs       # Color palette data and ThemeId domain models
@@ -42,6 +43,7 @@ src/
     ├── instance.rs    # SingleInstanceGuard lock
     ├── lyrics*.rs     # LyricsSource port and LRCLIB synced lyrics client
     ├── lyrics_cache.rs # LyricsSource decorator with bounded FIFO cache
+    ├── play_log_store.rs # PlayLogStore port and JSON Lines file persistence
     ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence
     ├── scrobble.rs    # Scrobbler port and Last.fm client adapter
     ├── session*.rs    # SessionStore port and Keyring cookie persistence
