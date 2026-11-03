@@ -29,6 +29,18 @@ const fn default_playback_speed() -> f32 {
     1.0
 }
 
+/// Maximum allowed crossfade duration in seconds.
+pub const MAX_CROSSFADE_SECONDS: u32 = 15;
+
+/// Clamps crossfade duration in seconds to the valid `0..=15` range.
+pub const fn clamp_crossfade_seconds(seconds: u32) -> u32 {
+    if seconds > MAX_CROSSFADE_SECONDS { MAX_CROSSFADE_SECONDS } else { seconds }
+}
+
+const fn default_crossfade_seconds() -> u32 {
+    0
+}
+
 /// Persistent user settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -43,6 +55,9 @@ pub struct Settings {
     /// Playback speed factor (0.5..=2.0).
     #[serde(default = "default_playback_speed")]
     pub playback_speed: f32,
+    /// Duration of crossfade transition between tracks in seconds (0..=15, 0 = disabled).
+    #[serde(default = "default_crossfade_seconds")]
+    pub crossfade_seconds: u32,
     /// Preferred audio streaming quality.
     #[serde(default)]
     pub quality: AudioQuality,
@@ -110,6 +125,7 @@ impl Default for Settings {
             locale: Locale::English,
             volume: 100,
             playback_speed: 1.0,
+            crossfade_seconds: 0,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             discord_presence_enabled: false,
@@ -141,6 +157,7 @@ impl Settings {
             locale: Locale::detect(),
             volume: 100,
             playback_speed: 1.0,
+            crossfade_seconds: 0,
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             discord_presence_enabled: false,
@@ -189,6 +206,7 @@ impl SettingsStore for MemorySettingsStore {
         let mut settings = self.inner.lock().map(|g| g.clone()).unwrap_or_default();
         settings.volume = settings.volume.min(100);
         settings.playback_speed = clamp_speed(settings.playback_speed);
+        settings.crossfade_seconds = clamp_crossfade_seconds(settings.crossfade_seconds);
         settings
     }
 
@@ -238,6 +256,7 @@ impl SettingsStore for DiskSettingsStore {
             serde_json::from_slice(&bytes).unwrap_or_else(|_| Settings::fallback());
         settings.volume = settings.volume.min(100);
         settings.playback_speed = clamp_speed(settings.playback_speed);
+        settings.crossfade_seconds = clamp_crossfade_seconds(settings.crossfade_seconds);
         settings
     }
 
@@ -338,6 +357,7 @@ mod tests {
             locale: Locale::Spanish,
             volume: 75,
             playback_speed: 1.25,
+            crossfade_seconds: 5,
             quality: AudioQuality::High,
             keyboard_shortcuts: false,
             discord_presence_enabled: true,
@@ -508,6 +528,7 @@ mod tests {
         assert!(!loaded.player_bar_show_skip_seconds);
         assert!(loaded.player_bar_show_queue);
         assert!(loaded.player_bar_show_volume);
+        assert_eq!(loaded.crossfade_seconds, 0);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
@@ -657,5 +678,48 @@ mod tests {
         let loaded: Settings = serde_json::from_str(&json).expect("deserialize settings");
         assert_eq!(loaded.recent_searches, recents);
         assert_eq!(loaded.recent_searches.entries(), &["third", "second", "first"]);
+    }
+
+    #[test]
+    fn test_crossfade_seconds_serde_defaults_and_explicit_deserialization() {
+        let explicit: Settings =
+            serde_json::from_str(r#"{"crossfade_seconds": 8}"#).expect("deserialize explicit");
+        assert_eq!(explicit.crossfade_seconds, 8);
+
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(omitted.crossfade_seconds, 0);
+
+        let roundtrip = serde_json::to_string(&explicit).expect("serialize settings");
+        let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
+        assert_eq!(decoded.crossfade_seconds, 8);
+    }
+
+    #[test]
+    fn test_crossfade_seconds_clamped_on_load_from_disk() {
+        let temp_dir = std::env::temp_dir()
+            .join(format!("moggyt-test-crossfade-clamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let store = DiskSettingsStore::new(temp_dir.clone());
+
+        std::fs::write(store.file_path(), r#"{"crossfade_seconds": 99}"#).unwrap();
+        assert_eq!(store.load().crossfade_seconds, MAX_CROSSFADE_SECONDS);
+
+        std::fs::write(store.file_path(), r#"{"crossfade_seconds": 0}"#).unwrap();
+        assert_eq!(store.load().crossfade_seconds, 0);
+
+        std::fs::write(store.file_path(), r#"{"crossfade_seconds": 7}"#).unwrap();
+        assert_eq!(store.load().crossfade_seconds, 7);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_clamp_crossfade_seconds_boundary_cases() {
+        assert_eq!(clamp_crossfade_seconds(0), 0);
+        assert_eq!(clamp_crossfade_seconds(1), 1);
+        assert_eq!(clamp_crossfade_seconds(15), 15);
+        assert_eq!(clamp_crossfade_seconds(16), 15);
+        assert_eq!(clamp_crossfade_seconds(100), 15);
     }
 }
