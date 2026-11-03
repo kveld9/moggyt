@@ -17,6 +17,12 @@ pub fn clamp_speed(speed: f32) -> f32 {
 /// Playback port: stream control and observable playback state.
 pub trait AudioBackend {
     fn play(&mut self, track_id: &str);
+    /// Begins playback of a track with crossfade transition from current audio.
+    ///
+    /// Implementations that do not support crossfading fall back to immediate playback via [`play`](Self::play).
+    fn play_crossfade(&mut self, track_id: &str, _duration: std::time::Duration) {
+        self.play(track_id);
+    }
     fn pause(&mut self);
     fn resume_play(&mut self);
     fn seek(&mut self, position_secs: u64);
@@ -46,6 +52,9 @@ pub trait AudioBackend {
         None
     }
 }
+
+/// In-memory no-op audio stub alias.
+pub type NullAudio = AudioStub;
 
 /// Recording stub: captures intent without touching audio hardware.
 #[derive(Debug)]
@@ -87,6 +96,11 @@ impl AudioStub {
     pub fn loudness_normalization(&self) -> bool {
         self.loudness_normalization
     }
+
+    /// Returns the last requested track identifier, if any.
+    pub fn last_requested_id(&self) -> Option<&str> {
+        self.last_requested.as_deref()
+    }
 }
 
 impl AudioBackend for AudioStub {
@@ -94,6 +108,10 @@ impl AudioBackend for AudioStub {
         self.last_requested = Some(track_id.to_owned());
         self.playing = true;
         self.position_secs = 0;
+    }
+
+    fn play_crossfade(&mut self, track_id: &str, _duration: std::time::Duration) {
+        self.play(track_id);
     }
 
     fn pause(&mut self) {
@@ -247,5 +265,19 @@ mod tests {
     fn audio_stub_stream_prefetcher_default_is_none() {
         let audio = AudioStub::new();
         assert!(audio.stream_prefetcher().is_none());
+    }
+
+    #[test]
+    fn null_audio_play_crossfade_updates_state() {
+        let mut audio = NullAudio::new();
+        assert!(!audio.is_playing());
+        assert_eq!(audio.last_requested(), None);
+        assert_eq!(audio.last_requested_id(), None);
+
+        audio.play_crossfade("t-cross-1", std::time::Duration::from_secs(5));
+        assert!(audio.is_playing());
+        assert_eq!(audio.last_requested(), Some("t-cross-1"));
+        assert_eq!(audio.last_requested_id(), Some("t-cross-1"));
+        assert_eq!(audio.position_secs(), 0);
     }
 }

@@ -100,6 +100,7 @@ The configuration file uses JSON serialization with atomic replacement:
   "theme": "white",
   "locale": "en",
   "volume": 100,
+  "crossfade_seconds": 0,
   "quality": "standard",
   "songs_only": false,
   "keyboard_shortcuts": true,
@@ -132,6 +133,9 @@ The configuration file uses JSON serialization with atomic replacement:
     falling back to English; explicitly saved choices in `settings.json` take precedence.
 - **Volume (`volume`)**:
   - Integer audio level between `0` and `100` (default `100`). Clamped to `0..=100` on load.
+- **Track Crossfade (`crossfade_seconds`)**:
+  - Integer crossfade transition duration in seconds between `0` and `15` (default `0` = disabled). Clamped to
+    `0..=15` on load. When enabled, smoothly crossfades between tracks using dual-sink volume ramps.
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.
   - `"compact"`: Low-bandwidth audio stream using yt-dlp selector

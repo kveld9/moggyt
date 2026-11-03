@@ -105,6 +105,7 @@ pub fn run(
         a.set_skip_silence(settings.skip_silence);
         a.set_loudness_normalization(settings.loudness_normalization);
     }
+    state.crossfade_seconds = settings.crossfade_seconds;
     state.hi_res_covers = settings.hi_res_covers;
     state.songs_only = settings.songs_only;
     state.keyboard_shortcuts = settings.keyboard_shortcuts;

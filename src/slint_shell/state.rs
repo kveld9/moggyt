@@ -78,6 +78,8 @@ pub struct SlintAppState {
     /// User volume captured when progressive sleep timer fade started; None when no fade is active.
     pub sleep_fade_base_volume: Option<u8>,
     pub autoplay: bool,
+    pub crossfade_seconds: u32,
+    pub last_crossfaded_track: Option<String>,
     pub hi_res_covers: bool,
     pub songs_only: bool,
     pub keyboard_shortcuts: bool,
@@ -119,6 +121,15 @@ impl SlintAppState {
         self.theme = theme;
         let mut settings = self.settings_store.load();
         settings.theme = theme;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Updates the crossfade duration setting and persists preference to disk settings store.
+    pub fn set_crossfade_seconds(&mut self, seconds: u32) {
+        let clamped = crate::infra::clamp_crossfade_seconds(seconds);
+        self.crossfade_seconds = clamped;
+        let mut settings = self.settings_store.load();
+        settings.crossfade_seconds = clamped;
         let _ = self.settings_store.save(&settings);
     }
 

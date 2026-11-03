@@ -62,7 +62,7 @@ mod updater;
 mod updater_github;
 mod ytdlp;
 
-pub use audio::{AudioBackend, AudioStub, clamp_speed};
+pub use audio::{AudioBackend, AudioStub, NullAudio, clamp_speed};
 pub use audio_dsp::{
     DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, LoudnessNormalizer,
     SkipSilence, TARGET_LUFS_DB, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
@@ -122,7 +122,8 @@ pub use scrobble::{
 pub use session::{MemorySessionStore, SessionStore};
 pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
 pub use settings::{
-    DiskSettingsStore, MemorySettingsStore, Settings, SettingsStore, default_config_dir,
+    DiskSettingsStore, MAX_CROSSFADE_SECONDS, MemorySettingsStore, Settings, SettingsStore,
+    clamp_crossfade_seconds, default_config_dir,
 };
 pub use skip_store::{DiskSkipStore, MemorySkipStore, SkipStore};
 pub use spotify_csv::{
