@@ -8,9 +8,10 @@ use std::time::{Duration, Instant};
 use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink};
 
-use super::audio::{AudioBackend, AudioStub, clamp_speed};
+use super::audio::{AudioBackend, clamp_speed};
 use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
 use super::stream::{AudioQuality, open_audio_stream};
+use super::stream_disk_cache::StreamDiskCache;
 use super::ytdlp::YtDlpResolver;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
@@ -42,6 +43,7 @@ pub struct RodioBackend {
     _stream: OutputStream,
     sink: Arc<Sink>,
     resolver: YtDlpResolver,
+    stream_cache: Option<Arc<StreamDiskCache>>,
     last_requested: Option<String>,
     volume: u8,
     speed: f32,
@@ -58,6 +60,14 @@ impl RodioBackend {
     /// Fails loud with descriptive context when running in headless environments
     /// where no default audio output device is present.
     pub fn new(binary: impl Into<PathBuf>) -> anyhow::Result<Self> {
+        Self::with_cache(binary, None)
+    }
+
+    /// Acquires output stream with an optional disk-backed stream cache.
+    pub fn with_cache(
+        binary: impl Into<PathBuf>,
+        stream_cache: Option<Arc<StreamDiskCache>>,
+    ) -> anyhow::Result<Self> {
         let stream = rodio::OutputStreamBuilder::open_default_stream()
             .context("failed to acquire default audio output stream")?;
         let sink = Sink::connect_new(stream.mixer());
@@ -68,6 +78,7 @@ impl RodioBackend {
             _stream: stream,
             sink: Arc::new(sink),
             resolver: YtDlpResolver::new(binary),
+            stream_cache,
             last_requested: None,
             volume: 100,
             speed: 1.0,
@@ -77,6 +88,16 @@ impl RodioBackend {
             loudness_normalization: false,
             fade_generation: Arc::new(AtomicU64::new(0)),
         })
+    }
+
+    /// Configures or clears the backing stream disk cache.
+    pub fn set_stream_cache(&mut self, cache: Option<Arc<StreamDiskCache>>) {
+        self.stream_cache = cache;
+    }
+
+    /// Returns the backing stream disk cache if configured.
+    pub fn stream_cache(&self) -> Option<&Arc<StreamDiskCache>> {
+        self.stream_cache.as_ref()
     }
 
     fn append_dsp_to_sink<R>(&self, sink: &Sink, source: Decoder<R>)
@@ -135,29 +156,10 @@ impl RodioBackend {
         Decoder::new(stream).map_err(|err| log_decode_stream_error(track_id, err))
     }
 
-    /// Downloads and decodes audio from `url`, immediately starting playback.
-    ///
-    /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
-    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
-    #[allow(clippy::cognitive_complexity)]
-    pub fn play_url(&mut self, track_id: &str, url: &str) -> anyhow::Result<()> {
-        let source = self.decode_source(url, track_id)?;
-        self.apply_playback_source(track_id, source);
-        Ok(())
-    }
-
-    /// Downloads and decodes audio from `url`, crossfading with the currently active audio sink.
-    ///
-    /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
-    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
-    #[allow(clippy::cognitive_complexity)]
-    pub fn play_url_crossfade(
-        &mut self,
-        track_id: &str,
-        url: &str,
-        duration: Duration,
-    ) -> anyhow::Result<()> {
-        let source = self.decode_source(url, track_id)?;
+    fn apply_crossfade_source<R>(&mut self, track_id: &str, source: Decoder<R>, duration: Duration)
+    where
+        R: std::io::Read + std::io::Seek + Send + Sync + 'static,
+    {
         let new_sink = Sink::connect_new(self._stream.mixer());
         let new_sink_arc = Arc::new(new_sink);
         let old_sink = std::mem::replace(&mut self.sink, Arc::clone(&new_sink_arc));
@@ -182,6 +184,34 @@ impl RodioBackend {
         self.anchor = Some(Instant::now());
         self.paused_accum = Duration::ZERO;
         self.last_requested = Some(track_id.to_owned());
+    }
+
+    /// Downloads and decodes audio from `url`, immediately starting playback.
+    ///
+    /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
+    pub fn play_url(&mut self, track_id: &str, url: &str) -> anyhow::Result<()> {
+        let source = self.decode_source(url, track_id)?;
+        self.apply_playback_source(track_id, source);
+        self.maybe_spawn_cache_download(track_id, url);
+        Ok(())
+    }
+
+    /// Downloads and decodes audio from `url`, crossfading with the currently active audio sink.
+    ///
+    /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
+    pub fn play_url_crossfade(
+        &mut self,
+        track_id: &str,
+        url: &str,
+        duration: Duration,
+    ) -> anyhow::Result<()> {
+        let source = self.decode_source(url, track_id)?;
+        self.apply_crossfade_source(track_id, source, duration);
+        self.maybe_spawn_cache_download(track_id, url);
         Ok(())
     }
 
@@ -219,6 +249,52 @@ impl RodioBackend {
         self.loudness_normalization
     }
 
+    fn decode_cached_file(
+        path: &std::path::Path,
+        track_id: &str,
+    ) -> anyhow::Result<Decoder<std::io::BufReader<std::fs::File>>> {
+        let file = std::fs::File::open(path)
+            .with_context(|| format!("failed to open cached stream at '{}'", path.display()))?;
+        Decoder::new(std::io::BufReader::new(file))
+            .map_err(|err| log_decode_stream_error(track_id, err))
+    }
+
+    fn cached_source(&self, track_id: &str) -> Option<Decoder<std::io::BufReader<std::fs::File>>> {
+        let path = self.stream_cache.as_ref()?.get(track_id)?;
+        Self::decode_cached_file(&path, track_id).ok()
+    }
+
+    fn try_play_cached(&mut self, track_id: &str) -> bool {
+        let Some(source) = self.cached_source(track_id) else {
+            return false;
+        };
+        self.apply_playback_source(track_id, source);
+        true
+    }
+
+    fn try_play_crossfade_cached(&mut self, track_id: &str, duration: Duration) -> bool {
+        let Some(source) = self.cached_source(track_id) else {
+            return false;
+        };
+        self.apply_crossfade_source(track_id, source, duration);
+        true
+    }
+
+    fn maybe_spawn_cache_download(&self, track_id: &str, url: &str) {
+        let Some(cache) = self.stream_cache.clone() else {
+            return;
+        };
+        if cache.max_bytes() == 0 || cache.get(track_id).is_some() {
+            return;
+        }
+        let track_id = track_id.to_string();
+        let url = url.to_string();
+        std::thread::Builder::new()
+            .name("stream-cache-download".to_string())
+            .spawn(move || cache_download_worker(cache, &track_id, &url))
+            .ok();
+    }
+
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
     fn retry_play_with_fresh_url(&mut self, track_id: &str) {
@@ -229,6 +305,30 @@ impl RodioBackend {
         };
         if let Err(err) = self.play_url(track_id, &url) {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream on retry");
+        }
+    }
+}
+
+fn download_stream_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
+    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(120)).build()?;
+    let resp = client.get(url).send()?;
+    if !resp.status().is_success() {
+        anyhow::bail!("stream download returned HTTP {}", resp.status());
+    }
+    Ok(resp.bytes()?.to_vec())
+}
+
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+fn cache_download_worker(cache: Arc<StreamDiskCache>, track_id: &str, url: &str) {
+    match download_stream_bytes(url) {
+        Ok(data) => {
+            if let Err(err) = cache.put(track_id, &data) {
+                tracing::warn!(track_id = %track_id, error = ?err, "failed to cache stream to disk");
+            }
+        }
+        Err(err) => {
+            tracing::warn!(track_id = %track_id, error = ?err, "failed to download stream for caching");
         }
     }
 }
@@ -293,6 +393,9 @@ impl AudioBackend for RodioBackend {
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
     fn play(&mut self, track_id: &str) {
+        if self.try_play_cached(track_id) {
+            return;
+        }
         let Some(url) = self.resolver.resolve(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL");
             return;
@@ -308,6 +411,9 @@ impl AudioBackend for RodioBackend {
     fn play_crossfade(&mut self, track_id: &str, duration: Duration) {
         if duration.is_zero() {
             self.play(track_id);
+            return;
+        }
+        if self.try_play_crossfade_cached(track_id, duration) {
             return;
         }
         let Some(url) = self.resolver.resolve(track_id) else {
@@ -391,150 +497,19 @@ impl AudioBackend for RodioBackend {
     }
 }
 
-/// Dual-mode audio backend: hardware playback with graceful fallback to an in-memory stub.
-pub enum LiveAudio {
-    /// Live rodio backend connected to audio hardware.
-    Live(RodioBackend),
-    /// Muted fallback storing state in memory when hardware or dependencies are unavailable.
-    Muted(AudioStub),
-}
-
-impl LiveAudio {
-    /// Creates a muted backend variant.
-    pub fn muted() -> Self {
-        Self::Muted(AudioStub::new())
-    }
-
-    /// Returns whether this backend is actively backed by audio hardware.
-    pub fn is_live(&self) -> bool {
-        matches!(self, Self::Live(_))
-    }
-}
-
-impl AudioBackend for LiveAudio {
-    fn play(&mut self, track_id: &str) {
-        match self {
-            Self::Live(backend) => backend.play(track_id),
-            Self::Muted(stub) => stub.play(track_id),
-        }
-    }
-
-    fn play_crossfade(&mut self, track_id: &str, duration: std::time::Duration) {
-        match self {
-            Self::Live(backend) => backend.play_crossfade(track_id, duration),
-            Self::Muted(stub) => stub.play_crossfade(track_id, duration),
-        }
-    }
-
-    fn pause(&mut self) {
-        match self {
-            Self::Live(backend) => backend.pause(),
-            Self::Muted(stub) => stub.pause(),
-        }
-    }
-
-    fn resume_play(&mut self) {
-        match self {
-            Self::Live(backend) => backend.resume_play(),
-            Self::Muted(stub) => stub.resume_play(),
-        }
-    }
-
-    fn seek(&mut self, position_secs: u64) {
-        match self {
-            Self::Live(backend) => backend.seek(position_secs),
-            Self::Muted(stub) => stub.seek(position_secs),
-        }
-    }
-
-    fn set_volume(&mut self, volume: u8) {
-        match self {
-            Self::Live(backend) => backend.set_volume(volume),
-            Self::Muted(stub) => stub.set_volume(volume),
-        }
-    }
-
-    fn volume(&self) -> u8 {
-        match self {
-            Self::Live(backend) => backend.volume(),
-            Self::Muted(stub) => stub.volume(),
-        }
-    }
-
-    fn set_speed(&mut self, speed: f32) {
-        match self {
-            Self::Live(backend) => backend.set_speed(speed),
-            Self::Muted(stub) => stub.set_speed(speed),
-        }
-    }
-
-    fn speed(&self) -> f32 {
-        match self {
-            Self::Live(backend) => backend.speed(),
-            Self::Muted(stub) => stub.speed(),
-        }
-    }
-
-    fn position_secs(&self) -> u64 {
-        match self {
-            Self::Live(backend) => backend.position_secs(),
-            Self::Muted(stub) => stub.position_secs(),
-        }
-    }
-
-    fn is_playing(&self) -> bool {
-        match self {
-            Self::Live(backend) => backend.is_playing(),
-            Self::Muted(stub) => stub.is_playing(),
-        }
-    }
-
-    fn last_requested(&self) -> Option<&str> {
-        match self {
-            Self::Live(backend) => backend.last_requested(),
-            Self::Muted(stub) => stub.last_requested(),
-        }
-    }
-
-    fn set_quality(&mut self, quality: AudioQuality) {
-        match self {
-            Self::Live(backend) => backend.set_quality(quality),
-            Self::Muted(stub) => stub.set_quality(quality),
-        }
-    }
-
-    fn quality(&self) -> AudioQuality {
-        match self {
-            Self::Live(backend) => backend.quality(),
-            Self::Muted(stub) => stub.quality(),
-        }
-    }
-
-    fn set_skip_silence(&mut self, on: bool) {
-        match self {
-            Self::Live(backend) => backend.set_skip_silence(on),
-            Self::Muted(stub) => stub.set_skip_silence(on),
-        }
-    }
-
-    fn set_loudness_normalization(&mut self, on: bool) {
-        match self {
-            Self::Live(backend) => backend.set_loudness_normalization(on),
-            Self::Muted(stub) => stub.set_loudness_normalization(on),
-        }
-    }
-
-    fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
-        match self {
-            Self::Live(backend) => backend.stream_prefetcher(),
-            Self::Muted(stub) => stub.stream_prefetcher(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_backend() -> Option<RodioBackend> {
+        match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
+            Ok(backend) => Some(backend),
+            Err(err) => {
+                eprintln!("Skipping audio hardware assertions in headless environment: {err:#}");
+                None
+            }
+        }
+    }
 
     #[test]
     fn volume_to_amplitude_mapping() {
@@ -572,12 +547,8 @@ mod tests {
 
     #[test]
     fn play_soft_fails_on_missing_binary() {
-        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => backend,
-            Err(err) => {
-                eprintln!("Skipping play assertion in headless environment: {err:#}");
-                return;
-            }
+        let Some(mut backend) = test_backend() else {
+            return;
         };
 
         backend.play("dQw4w9WgXcQ");
@@ -588,12 +559,8 @@ mod tests {
 
     #[test]
     fn play_url_fails_loud_on_invalid_url_without_mutating_state() {
-        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => backend,
-            Err(err) => {
-                eprintln!("Skipping play_url assertion in headless environment: {err:#}");
-                return;
-            }
+        let Some(mut backend) = test_backend() else {
+            return;
         };
 
         let result = backend.play_url("track-fail", "not-a-valid-url-format");
@@ -605,12 +572,8 @@ mod tests {
 
     #[test]
     fn state_transitions_and_seeking_coherence() {
-        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => backend,
-            Err(err) => {
-                eprintln!("Skipping state transitions assertion in headless environment: {err:#}");
-                return;
-            }
+        let Some(mut backend) = test_backend() else {
+            return;
         };
 
         backend.set_volume(42);
@@ -630,61 +593,9 @@ mod tests {
     }
 
     #[test]
-    fn live_audio_muted_delegation_table() {
-        let mut audio = LiveAudio::muted();
-        assert!(!audio.is_live());
-        assert_eq!(audio.last_requested(), None);
-        assert!(!audio.is_playing());
-        assert_eq!(audio.position_secs(), 0);
-        assert_eq!(audio.volume(), 100);
-
-        audio.play("track-stub-1");
-        assert_eq!(audio.last_requested(), Some("track-stub-1"));
-        assert!(audio.is_playing());
-
-        audio.pause();
-        assert!(!audio.is_playing());
-
-        audio.resume_play();
-        assert!(audio.is_playing());
-
-        audio.seek(42);
-        assert_eq!(audio.position_secs(), 42);
-
-        audio.set_volume(80);
-        assert_eq!(audio.volume(), 80);
-
-        audio.set_volume(150);
-        assert_eq!(audio.volume(), 100);
-
-        assert_eq!(audio.speed(), 1.0);
-        audio.set_speed(1.25);
-        assert_eq!(audio.speed(), 1.25);
-        audio.set_speed(3.0);
-        assert_eq!(audio.speed(), 2.0);
-        audio.set_speed(0.1);
-        assert_eq!(audio.speed(), 0.5);
-        audio.set_speed(f32::NAN);
-        assert_eq!(audio.speed(), 1.0);
-
-        assert_eq!(audio.quality(), AudioQuality::Standard);
-        audio.set_quality(AudioQuality::High);
-        assert_eq!(audio.quality(), AudioQuality::High);
-        audio.set_quality(AudioQuality::Compact);
-        assert_eq!(audio.quality(), AudioQuality::Compact);
-        audio.set_skip_silence(true);
-        audio.set_loudness_normalization(true);
-        assert!(audio.stream_prefetcher().is_none());
-    }
-
-    #[test]
     fn play_invalidates_cache_and_retries_on_stream_failure() {
-        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => backend,
-            Err(err) => {
-                eprintln!("Skipping audio hardware assertions in headless environment: {err:#}");
-                return;
-            }
+        let Some(mut backend) = test_backend() else {
+            return;
         };
 
         let track_id = "test-fail-retry";
@@ -711,24 +622,9 @@ mod tests {
     }
 
     #[test]
-    fn live_audio_muted_play_crossfade_delegates() {
-        let mut audio = LiveAudio::muted();
-        assert!(!audio.is_playing());
-        assert_eq!(audio.last_requested(), None);
-
-        audio.play_crossfade("track-cf-muted", Duration::from_secs(4));
-        assert!(audio.is_playing());
-        assert_eq!(audio.last_requested(), Some("track-cf-muted"));
-    }
-
-    #[test]
     fn play_url_crossfade_fails_loud_on_invalid_url_without_mutating_state() {
-        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => backend,
-            Err(err) => {
-                eprintln!("Skipping play_url_crossfade assertion in headless environment: {err:#}");
-                return;
-            }
+        let Some(mut backend) = test_backend() else {
+            return;
         };
 
         let result =
@@ -740,12 +636,8 @@ mod tests {
 
     #[test]
     fn play_crossfade_invalidates_cache_and_retries_on_stream_failure() {
-        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => backend,
-            Err(err) => {
-                eprintln!("Skipping audio hardware assertions in headless environment: {err:#}");
-                return;
-            }
+        let Some(mut backend) = test_backend() else {
+            return;
         };
 
         let track_id = "test-cf-fail-retry";
@@ -765,15 +657,64 @@ mod tests {
 
     #[test]
     fn play_crossfade_zero_duration_fallback_handles_missing_binary() {
-        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => backend,
-            Err(err) => {
-                eprintln!("Skipping audio hardware assertions in headless environment: {err:#}");
-                return;
-            }
+        let Some(mut backend) = test_backend() else {
+            return;
         };
 
         backend.play_crossfade("zero-dur-track", Duration::ZERO);
         assert_eq!(backend.last_requested(), None);
+    }
+
+    const MINIMAL_WAV_HEADER: [u8; 44] = [
+        b'R', b'I', b'F', b'F', 36, 0, 0, 0, b'W', b'A', b'V', b'E', b'f', b'm', b't', b' ', 16, 0,
+        0, 0, 1, 0, 1, 0, 68, 172, 0, 0, 136, 88, 1, 0, 2, 0, 16, 0, b'd', b'a', b't', b'a', 0, 0,
+        0, 0,
+    ];
+
+    #[test]
+    fn backend_stream_cache_accessors() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-test-backend-cache-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let cache = Arc::new(StreamDiskCache::new(&temp_dir, 1024 * 1024).expect("cache init"));
+
+        let Some(mut backend) = test_backend() else {
+            let _ = std::fs::remove_dir_all(&temp_dir);
+            return;
+        };
+
+        assert!(backend.stream_cache().is_none());
+        backend.set_stream_cache(Some(Arc::clone(&cache)));
+        assert!(backend.stream_cache().is_some());
+        backend.set_stream_cache(None);
+        assert!(backend.stream_cache().is_none());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn play_cached_stream_bypasses_resolver_when_in_cache() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-test-cached-stream-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let cache = Arc::new(StreamDiskCache::new(&temp_dir, 1024 * 1024).expect("cache init"));
+        cache.put("cached-track-1", &MINIMAL_WAV_HEADER).expect("put wav in cache");
+
+        let mut backend =
+            match RodioBackend::with_cache("/definitely/missing/binary/yt-dlp", Some(cache)) {
+                Ok(backend) => backend,
+                Err(err) => {
+                    eprintln!(
+                        "Skipping audio hardware assertions in headless environment: {err:#}"
+                    );
+                    let _ = std::fs::remove_dir_all(&temp_dir);
+                    return;
+                }
+            };
+
+        backend.play("cached-track-1");
+        assert_eq!(backend.last_requested(), Some("cached-track-1"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
