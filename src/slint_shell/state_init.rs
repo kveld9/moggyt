@@ -50,7 +50,7 @@ impl SlintAppState {
             lyric_overrides: None,
             tray: None,
             presence: DesktopPresence::new(),
-            discord: DiscordPresence::new(),
+            discord: DiscordPresence::dormant(),
             scrobbler: Arc::new(Mutex::new(Box::new(StubScrobbler::new()))),
             secondary_scrobbler: None,
             settings_store,
