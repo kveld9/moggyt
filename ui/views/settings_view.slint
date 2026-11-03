@@ -2,6 +2,7 @@ import { ThemeSettings } from "../components/settings/theme_settings.slint";
 import { PlayerBarSettings } from "../components/settings/player_bar_settings.slint";
 import { PlaybackSettings } from "../components/settings/playback_settings.slint";
 import { SessionSettings } from "../components/settings/session_settings.slint";
+import { IntegrationSettings } from "../components/settings/integration_settings.slint";
 import { AboutSettings } from "../components/settings/about_settings.slint";
 
 export component SettingsView inherits VerticalLayout {
@@ -67,6 +68,8 @@ export component SettingsView inherits VerticalLayout {
         sign-in-submitted(text) => { root.sign-in-submitted(text); }
         sign-out => { root.sign-out(); }
     }
+
+    integration-panel := IntegrationSettings {}
 
     player-bar-panel := PlayerBarSettings {
         player-bar-mode: root.player-bar-mode;
