@@ -45,7 +45,8 @@ src/
 └── infra/
     ├── mod.rs         # Re-exports adapters and port traits
     ├── audio.rs       # AudioBackend trait definition (playback, crossfade, seeking, volume)
-    ├── audio_rodio.rs # rodio playback adapter with dual-sink crossfade and LiveAudio fallback
+    ├── audio_live.rs  # Dual-mode live rodio vs. muted audio backend fallback
+    ├── audio_rodio.rs # rodio playback adapter with dual-sink crossfade and stream cache support
     ├── browser.rs     # Platform browser opener adapter
     ├── cover*.rs      # CoverCache port and memory/disk caching adapters
     ├── custom_theme.rs # Custom theme JSON loader with file modification monitoring
@@ -60,6 +61,7 @@ src/
     ├── session*.rs    # SessionStore port and Keyring cookie persistence
     ├── settings.rs    # SettingsStore port and atomic JSON persistence
     ├── stream.rs      # StreamResolver trait definition
+    ├── stream_disk_cache.rs # Disk-backed audio stream cache with quota and LRU eviction
     ├── stream_url_cache.rs # Stream URL cache with TTL and capacity eviction
     ├── tray.rs        # System tray handle and action event loop
     ├── updater*.rs    # Updater port and GitHub Releases release checker

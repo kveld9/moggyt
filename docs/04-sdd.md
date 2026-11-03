@@ -77,8 +77,9 @@ Extended backlog requirements (milestones and port mappings):
      (dual-sink volume ramp, configurable `crossfade_seconds` in Settings) are live; sleep
      timer, persistent queue, skip-silence, and loudness normalization are v1.1 candidates;
      remainder V2.
-4. **Offline caching tiers** (`CoverCache` and future `DownloadCache` port; v1.1 / V2):
-   - Stream-cache LRU: configurable stream-cache byte budget for instant offline replay (v1.1).
+4. **Offline caching tiers** (`CoverCache`, `StreamDiskCache`, and future `DownloadCache` port; v1.1 / V2):
+   - Stream-cache LRU: configurable disk stream cache (`<cache_dir>/streams`) with default 512 MB quota
+     (`stream_cache_limit_mb`, clamped up to 10 GB) and LRU eviction by access timestamp for instant replay (v1.1).
    - Explicit tagged downloads: export audio files with Vorbis Comment and ID3 metadata into a standalone
      music library directory, combined with Smart Prefetch for upcoming queued tracks (V2; honors the v1
      non-goal of no downloads manager).
@@ -182,6 +183,7 @@ Ports (each a trait in `infra/`, with in-memory fakes in tests):
 - `SessionStore`: session cookies in the OS credential store, never in logs or plain files.
 - `LyricsSource`: LRCLIB lookup returning parsed LRC lines (FR-8).
 - `CoverCache`: memory LRU plus disk cache keyed by artwork URL hash (FR-9).
+- `StreamDiskCache`: disk-backed audio stream cache with configurable quota and LRU eviction (FR-16).
 - `Presence`: Discord status updates; a no-op implementation when disabled.
 - `Updater`: GitHub Releases check returning the latest version and asset URLs (FR-12).
 - `TrackSearcher`: InnerTube candidate search port for songs-filtered queries (FR-18).
@@ -444,7 +446,7 @@ Each milestone ships as small PRs under 400 lines:
 - Q-3: quality preference mapping (which `yt-dlp` audio format selector backs each setting).
 - Q-4: lyrics word-timing model: whether the canonical internal representation should normalize to an
   extended LRC structure or a TTML-style word span model `{timeMs, sungUntilMs}` for multi-source compatibility.
-- Q-5: stream-cache storage budget default size (e.g. 512 MB versus 2 GB) and eviction policy (LRU by
-  last access versus FIFO by creation date).
+- Q-5: (Resolved) Stream-cache storage budget default size is 512 MB (clamped between 0 and 10240 MB via
+  `stream_cache_limit_mb`), with an LRU eviction policy based on file access timestamp (`mtime`).
 - Q-6: collaborative listening room protocol: adopting a standardized WebSocket room protocol versus
   a simpler minimal LAN remote pairing mechanism for desktop remote control.
