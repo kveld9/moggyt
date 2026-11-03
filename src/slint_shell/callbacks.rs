@@ -112,6 +112,7 @@ pub(crate) fn wire_window_callbacks(
     wire_settings_callbacks(window, &state_rc, &worker_tx);
     super::shortcuts::wire_shortcut_callbacks(window, &state_rc);
     super::discord::wire_discord_callbacks(window, &state_rc);
+    super::lastfm_connect::wire_lastfm_callbacks(window, &state_rc);
 }
 
 /// Wires page navigation, back navigation, and queue panel drawer visibility callbacks.

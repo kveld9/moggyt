@@ -33,6 +33,63 @@ export component IntegrationSettings inherits VerticalLayout {
                 font-size: 12px;
                 wrap: word-wrap;
             }
+
+            if Integrations.lastfm-available : VerticalLayout {
+                spacing: 8px;
+
+                Text {
+                    text: Labels.lastfm-label;
+                    color: Theme.text;
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: Integrations.lastfm-status;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    alignment: start;
+
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 8px;
+                        background: lastfm-touch.pressed ? Theme.overlay : (lastfm-touch.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+                        opacity: Integrations.lastfm-busy ? 0.6 : 1.0;
+
+                        lastfm-touch := TouchArea {
+                            enabled: !Integrations.lastfm-busy;
+                            clicked => {
+                                if !Integrations.lastfm-busy {
+                                    if Integrations.lastfm-connected {
+                                        Integrations.lastfm-disconnect();
+                                    } else {
+                                        Integrations.lastfm-connect();
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+
+                            Text {
+                                text: Integrations.lastfm-connected ? Labels.lastfm-disconnect-label : Labels.lastfm-connect-label;
+                                color: Theme.text;
+                                font-size: 12px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

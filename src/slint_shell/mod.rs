@@ -48,6 +48,7 @@ pub mod import_state;
 pub mod import_worker;
 pub mod init;
 pub mod labels;
+pub mod lastfm_connect;
 pub mod page;
 pub mod platform;
 pub mod play_log;

@@ -67,6 +67,9 @@ pub struct StaticLabels {
     pub section_integrations: &'static str,
     pub discord_presence_label: &'static str,
     pub discord_presence_hint_label: &'static str,
+    pub lastfm_label: &'static str,
+    pub lastfm_connect_label: &'static str,
+    pub lastfm_disconnect_label: &'static str,
     pub section_session: &'static str,
     pub status_signed_in: &'static str,
     pub status_anonymous: &'static str,
@@ -180,6 +183,9 @@ impl StaticLabels {
                 locale,
                 "Shows the current track in your Discord status while Discord is running.",
             ),
+            lastfm_label: tr(locale, "Last.fm"),
+            lastfm_connect_label: tr(locale, "Connect with Last.fm"),
+            lastfm_disconnect_label: tr(locale, "Disconnect"),
             section_session: tr(locale, "Session"),
             status_signed_in: tr(locale, "Status: Signed in"),
             status_anonymous: tr(locale, "Status: Anonymous"),
@@ -296,6 +302,9 @@ impl StaticLabels {
         labels.set_section_integrations_label(self.section_integrations.into());
         labels.set_discord_presence_label(self.discord_presence_label.into());
         labels.set_discord_presence_hint_label(self.discord_presence_hint_label.into());
+        labels.set_lastfm_label(self.lastfm_label.into());
+        labels.set_lastfm_connect_label(self.lastfm_connect_label.into());
+        labels.set_lastfm_disconnect_label(self.lastfm_disconnect_label.into());
         labels.set_section_session_label(self.section_session.into());
         labels.set_status_signed_in_label(self.status_signed_in.into());
         labels.set_status_anonymous_label(self.status_anonymous.into());
@@ -364,6 +373,9 @@ mod tests {
             en_labels.discord_presence_hint_label,
             "Shows the current track in your Discord status while Discord is running."
         );
+        assert_eq!(en_labels.lastfm_label, "Last.fm");
+        assert_eq!(en_labels.lastfm_connect_label, "Connect with Last.fm");
+        assert_eq!(en_labels.lastfm_disconnect_label, "Disconnect");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -375,6 +387,9 @@ mod tests {
             es_labels.discord_presence_hint_label,
             "Muestra el tema actual en tu estado de Discord mientras Discord está abierto."
         );
+        assert_eq!(es_labels.lastfm_label, "Last.fm");
+        assert_eq!(es_labels.lastfm_connect_label, "Conectar con Last.fm");
+        assert_eq!(es_labels.lastfm_disconnect_label, "Desconectar");
     }
 
     #[test]

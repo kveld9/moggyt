@@ -113,11 +113,14 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Classic", "Clásica"),
     ("Clear history", "Borrar todo el historial"),
     ("Close", "Cerrar"),
+    ("Connect with Last.fm", "Conectar con Last.fm"),
+    ("Connected as", "Conectado como"),
     ("Custom", "Personalizado"),
     ("Custom theme loaded from {path}", "Tema personalizado cargado desde {path}"),
     ("Custom theme not loaded: {error}", "Tema personalizado no cargado: {error}"),
     ("Detail", "Detalle"),
     ("Discard", "Descartar"),
+    ("Disconnect", "Desconectar"),
     ("Discord Rich Presence", "Discord Rich Presence"),
     (
         "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
@@ -141,6 +144,8 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Integrations", "Integraciones"),
     ("Keyboard shortcuts", "Atajos de teclado"),
     ("Language", "Idioma"),
+    ("Last.fm connection failed", "Falló la conexión con Last.fm"),
+    ("Last.fm is not available in this build", "Last.fm no está disponible en esta compilación"),
     ("Library", "Biblioteca"),
     ("Loading...", "Cargando..."),
     ("Loading explore...", "Cargando exploracion..."),
@@ -164,6 +169,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No songs available.", "No hay canciones disponibles."),
     ("No track playing", "Sin reproducción"),
     ("No tracks available.", "No hay canciones disponibles."),
+    ("Not connected", "No conectado"),
     ("Now Playing", "Sonando"),
     ("Off", "Desactivado"),
     ("Paste session cookies...", "Pegar cookies de sesión..."),
@@ -227,6 +233,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Update available", "Actualización disponible"),
     ("Update available: {ver}", "Actualización disponible: {ver}"),
     ("Update status", "Estado de actualización"),
+    ("Waiting for authorization in your browser", "Esperando la autorización en tu navegador"),
     ("White", "Blanco"),
 ];
 
@@ -463,6 +470,33 @@ mod tests {
             ("Select a playlist file", "Selecciona un archivo de playlist"),
             ("Source", "Origen"),
             ("Swap", "Cambiar"),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_lastfm_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Connect with Last.fm", "Conectar con Last.fm"),
+            ("Connected as", "Conectado como"),
+            ("Disconnect", "Desconectar"),
+            ("Last.fm connection failed", "Falló la conexión con Last.fm"),
+            (
+                "Last.fm is not available in this build",
+                "Last.fm no está disponible en esta compilación",
+            ),
+            ("Not connected", "No conectado"),
+            (
+                "Waiting for authorization in your browser",
+                "Esperando la autorización en tu navegador",
+            ),
         ];
 
         for (key, expected_es) in keys_and_expected {
