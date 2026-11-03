@@ -66,6 +66,8 @@ export component PlayerBar inherits Rectangle {
     HorizontalLayout {
         padding-left: root.mode == 1 ? 18px : 20px;
         padding-right: root.mode == 1 ? 18px : 20px;
+        padding-top: root.mode == 1 ? 6px : 8px;
+        padding-bottom: root.mode == 1 ? 6px : 8px;
         spacing: 16px;
 
         // LEFT ZONE: Artwork, Title + Artist, Like toggle
@@ -167,7 +169,7 @@ export component PlayerBar inherits Rectangle {
 
         // RIGHT ZONE: Queue button, Volume Slider
         HorizontalLayout {
-            width: 200px;
+            width: root.mode == 1 ? 220px : 260px;
             horizontal-stretch: 0;
             alignment: end;
             spacing: 10px;
