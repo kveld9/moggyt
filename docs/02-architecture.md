@@ -26,6 +26,7 @@ src/
 ├── slint_shell/       # Slint UI shell: window controller, bridges, and app runner
 │   ├── app.rs         # Shell composition root: SlintAppState, event handlers, and window wiring
 │   ├── lastfm_connect.rs # Last.fm desktop authentication and connect flow
+│   ├── stats.rs       # Wrapped-style listening statistics UI view model and refresh wiring
 │   └── bridges/       # Platform and domain integration bridges
 ├── domain/
 │   ├── mod.rs         # Re-exports the public domain contract
@@ -59,6 +60,12 @@ src/
     ├── catalog.rs      # Catalog port trait definition
     ├── catalog_live.rs # Catalog API-backed live adapter
     └── catalog_stub.rs # Deterministic catalog stub for testing
+
+ui/
+├── shell.slint        # Thin import-only UI entry point
+├── stats.slint        # StatsData global and StatsEntryData model definitions
+└── views/
+    └── stats_view.slint # Wrapped-style statistics view with period chips and rankings
 ```
 
 ## Evolution rules

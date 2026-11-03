@@ -23,6 +23,8 @@
 //!     - crate::domain::PlayerBarMode (player bar presentation mode)
 //! - SlintPage::Explore:
 //!     - crate::domain::Shelf (explore category carousels and genre items)
+//! - SlintPage::Stats:
+//!     - crate::domain::ListeningStats (summary totals and top artist/track rankings)
 
 #[allow(clippy::cognitive_complexity)]
 mod generated {
@@ -60,6 +62,7 @@ pub mod search;
 pub mod shortcuts;
 pub mod state;
 pub mod state_init;
+pub mod stats;
 pub mod sync;
 #[cfg(test)]
 pub mod test_support;
@@ -113,12 +116,13 @@ mod tests {
         assert_eq!(SlintPage::from_index(3), SlintPage::Detail);
         assert_eq!(SlintPage::from_index(4), SlintPage::Settings);
         assert_eq!(SlintPage::from_index(5), SlintPage::Explore);
+        assert_eq!(SlintPage::from_index(6), SlintPage::Stats);
     }
 
     #[test]
     fn test_slint_page_from_index_out_of_bounds_fallback() {
         assert_eq!(SlintPage::from_index(-1), SlintPage::Search);
-        assert_eq!(SlintPage::from_index(6), SlintPage::Search);
+        assert_eq!(SlintPage::from_index(7), SlintPage::Search);
         assert_eq!(SlintPage::from_index(100), SlintPage::Search);
         assert_eq!(SlintPage::from_index(i32::MIN), SlintPage::Search);
         assert_eq!(SlintPage::from_index(i32::MAX), SlintPage::Search);
@@ -132,6 +136,7 @@ mod tests {
         assert_eq!(SlintPage::Detail.to_index(), 3);
         assert_eq!(SlintPage::Settings.to_index(), 4);
         assert_eq!(SlintPage::Explore.to_index(), 5);
+        assert_eq!(SlintPage::Stats.to_index(), 6);
     }
 
     #[test]
@@ -142,6 +147,7 @@ mod tests {
         assert_eq!(SlintPage::Detail.title(), "Detail");
         assert_eq!(SlintPage::Settings.title(), "Settings");
         assert_eq!(SlintPage::Explore.title(), "Explore");
+        assert_eq!(SlintPage::Stats.title(), "Stats");
 
         assert_eq!(SlintPage::Search.title_with_locale(crate::i18n::Locale::Spanish), "Buscar");
         assert_eq!(
@@ -155,5 +161,9 @@ mod tests {
         assert_eq!(SlintPage::Detail.title_with_locale(crate::i18n::Locale::Spanish), "Detalle");
         assert_eq!(SlintPage::Settings.title_with_locale(crate::i18n::Locale::Spanish), "Ajustes");
         assert_eq!(SlintPage::Explore.title_with_locale(crate::i18n::Locale::Spanish), "Explorar");
+        assert_eq!(
+            SlintPage::Stats.title_with_locale(crate::i18n::Locale::Spanish),
+            "Estadísticas"
+        );
     }
 }

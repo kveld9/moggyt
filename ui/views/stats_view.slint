@@ -1,0 +1,213 @@
+import { Labels } from "../labels.slint";
+import { Theme } from "../theme.slint";
+import { StatsData } from "../stats.slint";
+import { FilterChip } from "../components/controls.slint";
+
+component StatCard inherits Rectangle {
+    in property <string> value;
+    in property <string> caption;
+
+    background: Theme.surface;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Theme.border;
+    min-height: 80px;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 6px;
+        alignment: center;
+
+        Text {
+            text: root.value;
+            color: Theme.text;
+            font-size: 22px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.caption;
+            color: Theme.secondary;
+            font-size: 13px;
+            font-weight: 500;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+component StatsRow inherits Rectangle {
+    in property <string> rank;
+    in property <string> name;
+    in property <string> detail;
+    in property <string> plays;
+
+    height: 44px;
+    border-radius: 6px;
+    background: Theme.surface;
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        alignment: center;
+
+        Text {
+            width: 24px;
+            text: root.rank;
+            color: Theme.accent;
+            font-size: 14px;
+            font-weight: 700;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+
+            Text {
+                text: root.name;
+                color: Theme.text;
+                font-size: 14px;
+                font-weight: 600;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+
+            if root.detail != "" : Text {
+                text: root.detail;
+                color: Theme.secondary;
+                font-size: 12px;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+        }
+
+        Text {
+            text: root.plays;
+            color: Theme.secondary;
+            font-size: 13px;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+export component StatsView inherits VerticalLayout {
+    spacing: 20px;
+    alignment: start;
+
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+
+        FilterChip {
+            text: Labels.stats-last-4-weeks-label;
+            is-active: StatsData.period-index == 0;
+            clicked => { StatsData.period-selected(0); }
+        }
+
+        FilterChip {
+            text: Labels.stats-last-6-months-label;
+            is-active: StatsData.period-index == 1;
+            clicked => { StatsData.period-selected(1); }
+        }
+
+        FilterChip {
+            text: Labels.stats-all-time-label;
+            is-active: StatsData.period-index == 2;
+            clicked => { StatsData.period-selected(2); }
+        }
+    }
+
+    if StatsData.is-empty : VerticalLayout {
+        padding-top: 48px;
+        padding-bottom: 48px;
+        alignment: center;
+
+        Text {
+            text: Labels.stats-empty-label;
+            color: Theme.secondary;
+            font-size: 14px;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+
+    if !StatsData.is-empty : VerticalLayout {
+        spacing: 24px;
+        alignment: start;
+
+        HorizontalLayout {
+            spacing: 12px;
+
+            StatCard {
+                value: StatsData.total-plays;
+                caption: Labels.stats-plays-caption;
+            }
+
+            StatCard {
+                value: StatsData.total-time;
+                caption: Labels.stats-listening-time-caption;
+            }
+
+            StatCard {
+                value: StatsData.unique-tracks;
+                caption: Labels.stats-tracks-caption;
+            }
+
+            StatCard {
+                value: StatsData.unique-artists;
+                caption: Labels.stats-artists-caption;
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 24px;
+            alignment: start;
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 10px;
+                alignment: start;
+
+                Text {
+                    text: Labels.stats-top-artists-header;
+                    color: Theme.text;
+                    font-size: 18px;
+                    font-weight: 700;
+                }
+
+                for item[i] in StatsData.top-artists : StatsRow {
+                    rank: item.rank;
+                    name: item.name;
+                    detail: item.detail;
+                    plays: item.plays;
+                }
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 10px;
+                alignment: start;
+
+                Text {
+                    text: Labels.stats-top-tracks-header;
+                    color: Theme.text;
+                    font-size: 18px;
+                    font-weight: 700;
+                }
+
+                for item[i] in StatsData.top-tracks : StatsRow {
+                    rank: item.rank;
+                    name: item.name;
+                    detail: item.detail;
+                    plays: item.plays;
+                }
+            }
+        }
+    }
+}

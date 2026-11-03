@@ -97,6 +97,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Albums", "Álbumes"),
     ("All", "Todo"),
     ("All matched", "Todo coincidio"),
+    ("All time", "Todo el tiempo"),
     (
         "Anonymous session: paste cookies to unlock library",
         "Sesión anónima: pegar cookies para desbloquear la biblioteca",
@@ -144,9 +145,12 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Integrations", "Integraciones"),
     ("Keyboard shortcuts", "Atajos de teclado"),
     ("Language", "Idioma"),
+    ("Last 4 weeks", "Últimas 4 semanas"),
+    ("Last 6 months", "Últimos 6 meses"),
     ("Last.fm connection failed", "Falló la conexión con Last.fm"),
     ("Last.fm is not available in this build", "Last.fm no está disponible en esta compilación"),
     ("Library", "Biblioteca"),
+    ("Listening time", "Tiempo escuchado"),
     ("Loading...", "Cargando..."),
     ("Loading explore...", "Cargando exploracion..."),
     ("Low", "Baja"),
@@ -161,6 +165,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No cover", "Sin portada"),
     ("No details available.", "No hay detalles disponibles."),
     ("No match", "Sin coincidencia"),
+    (
+        "No plays recorded yet. Songs you listen to for at least 30 seconds show up here.",
+        "Todavía no hay reproducciones. Los temas que escuches al menos 30 segundos aparecen acá.",
+    ),
     ("No playlist store installed", "No hay almacen de playlists instalado"),
     ("No playlists found.", "No hay listas de reproducción."),
     ("No recent searches.", "Aún no hay búsquedas recientes."),
@@ -179,6 +187,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Playback speed", "Velocidad de reproducción"),
     ("Playlist", "LISTA"),
     ("Playlists", "Listas de reproducción"),
+    ("Plays", "Reproducciones"),
     ("Prefer songs over music videos", "Preferir canciones a videoclips"),
     ("Queue", "Cola"),
     ("Queue ({count})", "Cola ({count})"),
@@ -215,6 +224,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Spotify playlist or album link", "Enlace de playlist o album de Spotify"),
     ("Start import", "Iniciar importacion"),
     ("Standard", "Estándar"),
+    ("Stats", "Estadísticas"),
     ("Status: Anonymous", "Estado: Anónimo"),
     ("Status: Signed in", "Estado: Sesión iniciada"),
     ("Swap", "Cambiar"),
@@ -228,6 +238,9 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Timer: End of track", "Temporizador: Fin de la canción"),
     ("Timer: Off", "Temporizador: Desactivado"),
     ("Timer: {time}", "Temporizador: {time}"),
+    ("Top artists", "Artistas más escuchados"),
+    ("Top tracks", "Temas más escuchados"),
+    ("Tracks", "Temas"),
     ("Unresolved", "Sin resolver"),
     ("Up to date", "Actualizado"),
     ("Update available", "Actualización disponible"),
@@ -235,6 +248,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Update status", "Estado de actualización"),
     ("Waiting for authorization in your browser", "Esperando la autorización en tu navegador"),
     ("White", "Blanco"),
+    ("plays", "reproducciones"),
 ];
 
 fn translate_spanish(key: &str) -> &str {
@@ -276,6 +290,7 @@ mod tests {
         assert_eq!(tr(Locale::Spanish, "Detail"), "Detalle");
         assert_eq!(tr(Locale::Spanish, "Settings"), "Ajustes");
         assert_eq!(tr(Locale::Spanish, "Explore"), "Explorar");
+        assert_eq!(tr(Locale::Spanish, "Stats"), "Estadísticas");
 
         // Sentinels
         assert_eq!(tr(Locale::Spanish, "No track playing"), "Sin reproducción");
@@ -355,6 +370,25 @@ mod tests {
             "Preferir canciones a videoclips"
         );
         assert_eq!(tr(Locale::Spanish, "Keyboard shortcuts"), "Atajos de teclado");
+
+        // Stats page labels
+        assert_eq!(tr(Locale::Spanish, "Last 4 weeks"), "Últimas 4 semanas");
+        assert_eq!(tr(Locale::Spanish, "Last 6 months"), "Últimos 6 meses");
+        assert_eq!(tr(Locale::Spanish, "All time"), "Todo el tiempo");
+        assert_eq!(tr(Locale::Spanish, "Plays"), "Reproducciones");
+        assert_eq!(tr(Locale::Spanish, "Listening time"), "Tiempo escuchado");
+        assert_eq!(tr(Locale::Spanish, "Tracks"), "Temas");
+        assert_eq!(tr(Locale::Spanish, "Artists"), "Artistas");
+        assert_eq!(tr(Locale::Spanish, "Top artists"), "Artistas más escuchados");
+        assert_eq!(tr(Locale::Spanish, "Top tracks"), "Temas más escuchados");
+        assert_eq!(tr(Locale::Spanish, "plays"), "reproducciones");
+        assert_eq!(
+            tr(
+                Locale::Spanish,
+                "No plays recorded yet. Songs you listen to for at least 30 seconds show up here."
+            ),
+            "Todavía no hay reproducciones. Los temas que escuches al menos 30 segundos aparecen acá."
+        );
     }
 
     #[test]

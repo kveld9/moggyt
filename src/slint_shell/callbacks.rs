@@ -113,6 +113,26 @@ pub(crate) fn wire_window_callbacks(
     super::shortcuts::wire_shortcut_callbacks(window, &state_rc);
     super::discord::wire_discord_callbacks(window, &state_rc);
     super::lastfm_connect::wire_lastfm_callbacks(window, &state_rc);
+    super::stats::wire_stats_callbacks(window, &state_rc);
+}
+
+fn handle_page_selected(
+    win: &MoggytWindow,
+    st: &mut SlintAppState,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+    page: SlintPage,
+) {
+    match page {
+        SlintPage::Library => refresh_library_async(win, st, tx),
+        SlintPage::Explore if !st.explore_loaded && !st.explore_loading => {
+            load_explore_async(win, st, tx)
+        }
+        SlintPage::Explore => {
+            refresh_explore_covers_if_loaded(st, tx);
+        }
+        SlintPage::Stats => super::stats::refresh_active_stats(win, st),
+        _ => {}
+    }
 }
 
 /// Wires page navigation, back navigation, and queue panel drawer visibility callbacks.
@@ -129,13 +149,7 @@ fn wire_navigation_callbacks(
         let mut st = s.borrow_mut();
         let page = SlintPage::from_index(idx);
         st.page = page;
-        if page == SlintPage::Library {
-            refresh_library_async(&win, &mut st, &tx);
-        } else if page == SlintPage::Explore && !st.explore_loaded && !st.explore_loading {
-            load_explore_async(&win, &mut st, &tx);
-        } else if page == SlintPage::Explore {
-            refresh_explore_covers_if_loaded(&st, &tx);
-        }
+        handle_page_selected(&win, &mut st, &tx, page);
         sync_window(&win, &mut st);
     });
 

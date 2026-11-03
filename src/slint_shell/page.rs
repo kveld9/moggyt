@@ -20,6 +20,8 @@ pub enum SlintPage {
     Settings,
     /// Explore section with charts, genres, moods, and new releases.
     Explore,
+    /// Wrapped-style listening statistics computed from local playback history.
+    Stats,
 }
 
 impl SlintPage {
@@ -32,6 +34,7 @@ impl SlintPage {
             3 => Self::Detail,
             4 => Self::Settings,
             5 => Self::Explore,
+            6 => Self::Stats,
             _ => Self::Search,
         }
     }
@@ -45,6 +48,7 @@ impl SlintPage {
             Self::Detail => 3,
             Self::Settings => 4,
             Self::Explore => 5,
+            Self::Stats => 6,
         }
     }
 
@@ -57,6 +61,7 @@ impl SlintPage {
             Self::Detail => "Detail",
             Self::Settings => "Settings",
             Self::Explore => "Explore",
+            Self::Stats => "Stats",
         }
     }
 
@@ -90,6 +95,14 @@ mod tests {
     }
 
     #[test]
+    fn test_stats_page_indexing_and_titles() {
+        assert_eq!(SlintPage::from_index(6), SlintPage::Stats);
+        assert_eq!(SlintPage::Stats.to_index(), 6);
+        assert_eq!(SlintPage::Stats.title(), "Stats");
+        assert_eq!(SlintPage::Stats.title_with_locale(Locale::Spanish), "Estadísticas");
+    }
+
+    #[test]
     fn test_slint_page_all_variants_round_trip() {
         let pages = [
             (0, SlintPage::Search, "Search"),
@@ -98,6 +111,7 @@ mod tests {
             (3, SlintPage::Detail, "Detail"),
             (4, SlintPage::Settings, "Settings"),
             (5, SlintPage::Explore, "Explore"),
+            (6, SlintPage::Stats, "Stats"),
         ];
         for (idx, page, title) in pages {
             assert_eq!(SlintPage::from_index(idx), page);

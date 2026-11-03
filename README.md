@@ -27,6 +27,7 @@ session storage are functional.
 - **Desktop Integration**: system tray icon with playback controls and show/quit actions; outbound desktop media
   presence via MPRIS (Linux) and SMTC (Windows); opt-in Discord Rich Presence ("Listening to moggyt" activity with
   title and artist, lazy reconnection); opt-in Last.fm scrobbler with browser authorization and keyring storage.
+- **Listening Stats**: Wrapped-style stats with selectable periods computed locally from play history.
 - **Update Checks**: manual release checking against GitHub Releases with direct download links.
 - **Planned Features**: hi-res cover upgrades and compact floating player (v1.1); equalizer, crossfade, and quality
   selector (v2).
@@ -64,6 +65,7 @@ Launch `moggyt` to display the main interface. Navigation is organized into four
 - **Queue**: inspect, advance, retreat, and manage queued tracks.
 - **Now Playing**: view active track artwork, playback progress, and timestamped synced lyrics with offset controls.
 - **Library**: authenticate via cookie import, inspect saved playlists, liked tracks, albums, and check for updates.
+- **Stats**: view Wrapped-style listening totals and top artists/tracks across selectable periods.
 
 The persistent bottom player bar remains active across all views for uninterrupted transport control. For complete
 usage details, see the [User Guide](docs/05-user-guide.md).
