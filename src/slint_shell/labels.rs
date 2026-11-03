@@ -35,6 +35,8 @@ pub struct StaticLabels {
     pub sign_in: &'static str,
     pub session_signed_in_hint: &'static str,
     pub sign_out: &'static str,
+    pub library_signed_out_hint: &'static str,
+    pub open_settings_label: &'static str,
     pub section_playlists: &'static str,
     pub empty_playlists: &'static str,
     pub section_albums: &'static str,
@@ -163,6 +165,8 @@ impl StaticLabels {
             sign_in: tr(locale, "Sign in"),
             session_signed_in_hint: tr(locale, "Signed in: library unlocked"),
             sign_out: tr(locale, "Sign out"),
+            library_signed_out_hint: tr(locale, "Sign in from Settings to load your library."),
+            open_settings_label: tr(locale, "Open settings"),
             section_playlists: tr(locale, "Playlists"),
             empty_playlists: tr(locale, "No playlists found."),
             section_albums: tr(locale, "Albums"),
@@ -301,6 +305,8 @@ impl StaticLabels {
         labels.set_sign_in_label(self.sign_in.into());
         labels.set_session_signed_in_hint(self.session_signed_in_hint.into());
         labels.set_sign_out_label(self.sign_out.into());
+        labels.set_library_signed_out_hint(self.library_signed_out_hint.into());
+        labels.set_open_settings_label(self.open_settings_label.into());
         labels.set_section_playlists_label(self.section_playlists.into());
         labels.set_empty_playlists_text(self.empty_playlists.into());
         labels.set_section_albums_label(self.section_albums.into());
@@ -471,6 +477,11 @@ mod tests {
         assert_eq!(es.sign_in, "Iniciar sesión");
         assert_eq!(es.session_signed_in_hint, "Sesión iniciada: biblioteca desbloqueada");
         assert_eq!(es.sign_out, "Cerrar sesión");
+        assert_eq!(
+            es.library_signed_out_hint,
+            "Inicia sesión desde Ajustes para cargar tu biblioteca."
+        );
+        assert_eq!(es.open_settings_label, "Abrir ajustes");
         assert_eq!(es.section_playlists, "Listas de reproducción");
         assert_eq!(es.empty_playlists, "No hay listas de reproducción.");
         assert_eq!(es.section_albums, "Álbumes");
@@ -598,6 +609,8 @@ mod tests {
         assert_eq!(en.sign_in, "Sign in");
         assert_eq!(en.session_signed_in_hint, "Signed in: library unlocked");
         assert_eq!(en.sign_out, "Sign out");
+        assert_eq!(en.library_signed_out_hint, "Sign in from Settings to load your library.");
+        assert_eq!(en.open_settings_label, "Open settings");
         assert_eq!(en.section_playlists, "Playlists");
         assert_eq!(en.empty_playlists, "No playlists found.");
         assert_eq!(en.section_albums, "Albums");

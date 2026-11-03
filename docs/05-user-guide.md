@@ -65,13 +65,13 @@ The now playing view presents rich playback details for the track under the acti
 
 ### Library Page
 
-The library view manages account authentication, release update actions, and saved collection views:
+The library view lists the saved collection and hosts the import entry point. Session controls live in
+the Settings page, not here:
 
-- **Authentication / Sign-in**:
-  - Displays authentication status: `Signed in — library unlocked` or `Anonymous — paste cookies to unlock library`.
-  - Input field: paste raw cookie string from your browser session on `music.youtube.com`.
-  - `Save`: sanitizes input, stores session cookies securely in the OS credential store (keyring), and unlocks library.
-  - `Clear`: removes stored credentials from the keyring and signs out.
+- **Not signed in**: shows `Sign in from Settings to load your library.` next to an `Open settings`
+  button that switches to the Settings page, and hides the playlist and album sections.
+- **Authentication**: handled in `Settings` > `Session`, where the cookie string is pasted, stored in the
+  OS credential store (keyring), and cleared on sign-out.
 - **Updates Section**:
   - Displays current update status (`Never checked`, `moggyt is up to date`, `Update available: <version>`, or
     `Update check failed (offline?)`).
