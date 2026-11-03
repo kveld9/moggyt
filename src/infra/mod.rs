@@ -28,6 +28,7 @@ mod custom_theme;
 mod file_picker;
 mod handoff;
 mod instance;
+mod lastfm_auth;
 mod lyric_overrides;
 mod lyrics;
 mod lyrics_cache;
@@ -81,6 +82,11 @@ pub use handoff::{
     CHECKSUM_HEX_LEN, HANDOFF_PREFIX, MAX_HANDOFF_COOKIES, decode_handoff, encode_handoff,
 };
 pub use instance::{SingleInstanceGuard, instance_lock_name};
+pub use lastfm_auth::{
+    LASTFM_API_KEY_ENV, LASTFM_AUTH_URL, LASTFM_SECRET_ENV, LastFmAppKeys, LastFmSession,
+    SessionPoll, authorize_url, parse_session_response, parse_token_response, request_session,
+    request_token, session_request_params, token_request_params,
+};
 pub use lyric_overrides::{
     LyricOverrideDir, MAX_OVERRIDE_BYTES, default_lyrics_dir, sanitize_id, sanitize_video_id,
 };

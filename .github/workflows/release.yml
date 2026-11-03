@@ -124,6 +124,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build release binary
+        env:
+          MOGGYT_LASTFM_API_KEY: ${{ secrets.MOGGYT_LASTFM_API_KEY }}
+          MOGGYT_LASTFM_SECRET: ${{ secrets.MOGGYT_LASTFM_SECRET }}
         run: cargo build --release --locked
 
       - name: Package portable release archive
