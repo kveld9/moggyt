@@ -27,6 +27,20 @@ Artwork thumbnails displayed in the `Now Playing` page are cached on local stora
 - **Memory LRU**: an in-memory cache layer retains recent textures to prevent redundant disk reads and UI thread
   stalls.
 
+## Audio Stream Disk Cache
+
+Decoded and downloaded audio streams are cached on local storage to minimize redundant network bandwidth and bypass
+stream resolution for repeated plays:
+
+- **Cache Path**: `<cache_dir>/streams` (`$XDG_CACHE_HOME/moggyt/streams` on Linux, `%LOCALAPPDATA%\moggyt\streams` on
+  Windows; falling back to `<data_dir>/streams`).
+- **Naming Scheme**: cache filenames are derived by hashing video/track IDs using the FNV-1a 64-bit algorithm
+  (`<hash>.stream`, 16-char lowercase hex).
+- **Eviction Policy**: least-recently-used (LRU) based on file access timestamp (`mtime`). When the total size of cached
+  `.stream` files exceeds `stream_cache_limit_mb`, the oldest accessed files are pruned until cache usage falls within
+  the configured byte budget.
+- **Atomic Writes**: streams are written into temporary `.tmp.*` files and renamed atomically upon completion.
+
 ## Play Log
 
 Local listening history is recorded to an append-only JSON Lines file in the application data directory:
@@ -101,6 +115,7 @@ The configuration file uses JSON serialization with atomic replacement:
   "locale": "en",
   "volume": 100,
   "crossfade_seconds": 0,
+  "stream_cache_limit_mb": 512,
   "quality": "standard",
   "songs_only": false,
   "keyboard_shortcuts": true,
@@ -136,6 +151,9 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Track Crossfade (`crossfade_seconds`)**:
   - Integer crossfade transition duration in seconds between `0` and `15` (default `0` = disabled). Clamped to
     `0..=15` on load. When enabled, smoothly crossfades between tracks using dual-sink volume ramps.
+- **Stream Cache Quota (`stream_cache_limit_mb`)**:
+  - Integer maximum disk budget in megabytes for the audio stream cache (default `512`). Clamped to `0..=10240` (up to
+    10 GB) on load. Setting to `0` disables stream caching on disk.
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.
   - `"compact"`: Low-bandwidth audio stream using yt-dlp selector

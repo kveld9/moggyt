@@ -9,8 +9,9 @@ use anyhow::Context;
 
 use crate::infra::{
     CredentialStore, DiskCoverCache, DiskPlaylistStore, GithubUpdater, KeyringCredentialStore,
-    LastFmAppKeys, LastFmClient, LastFmCredentials, LiveAudio, ReleaseInfo, RodioBackend, Updater,
-    client_from_credentials, default_config_dir, ensure_sidecar, is_newer,
+    LastFmAppKeys, LastFmClient, LastFmCredentials, LiveAudio, ReleaseInfo, RodioBackend,
+    StreamDiskCache, Updater, client_from_credentials, default_config_dir, ensure_sidecar,
+    is_newer,
 };
 use crate::slint_shell::import_cli::{ImportCli, parse_import_args, report_to_json, run_headless};
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
@@ -37,6 +38,27 @@ pub fn app_data_dir() -> PathBuf {
     }
 }
 
+/// Resolves the application cache directory using standard platform conventions.
+pub fn app_cache_dir() -> PathBuf {
+    #[cfg(windows)]
+    {
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            return PathBuf::from(local).join("moggyt");
+        }
+        app_data_dir()
+    }
+    #[cfg(not(windows))]
+    {
+        if let Some(xdg) = std::env::var_os("XDG_CACHE_HOME") {
+            return PathBuf::from(xdg).join("moggyt");
+        }
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home).join(".cache/moggyt");
+        }
+        app_data_dir()
+    }
+}
+
 /// Creates directory tree if missing, ignoring AlreadyExists.
 pub fn ensure_data_dir(data_dir: &Path) -> anyhow::Result<()> {
     std::fs::create_dir_all(data_dir).with_context(|| {
@@ -44,19 +66,23 @@ pub fn ensure_data_dir(data_dir: &Path) -> anyhow::Result<()> {
     })
 }
 
-/// Attempts to initialize the live rodio backend and yt-dlp sidecar.
-pub fn init_rodio_backend(data_dir: &Path) -> anyhow::Result<RodioBackend> {
+/// Attempts to initialize the live rodio backend and yt-dlp sidecar with an optional stream cache.
+pub fn init_rodio_backend(
+    data_dir: &Path,
+    stream_cache: Option<Arc<StreamDiskCache>>,
+) -> anyhow::Result<RodioBackend> {
     ensure_data_dir(data_dir)?;
     let binary =
         ensure_sidecar(data_dir).context("failed to locate or download yt-dlp sidecar binary")?;
-    RodioBackend::new(binary).context("failed to initialize rodio audio output stream")
+    RodioBackend::with_cache(binary, stream_cache)
+        .context("failed to initialize rodio audio output stream")
 }
 
 /// Initializes audio backend with live rodio playback, falling back to muted stub on any failure.
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-pub fn init_live_audio(data_dir: &Path) -> LiveAudio {
-    match init_rodio_backend(data_dir) {
+pub fn init_live_audio(data_dir: &Path, stream_cache: Option<Arc<StreamDiskCache>>) -> LiveAudio {
+    match init_rodio_backend(data_dir, stream_cache) {
         Ok(backend) => LiveAudio::Live(backend),
         Err(err) => {
             tracing::warn!("audio initialization failed; running with muted stub: {err:#}");

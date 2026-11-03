@@ -5,14 +5,16 @@
 //! Domain logic lives in [`moggyt::domain`]; all I/O hides behind ports implemented
 //! in [`moggyt::infra`].
 
+use std::sync::Arc;
+
 use moggyt::infra::{
     CachedLyrics, CustomThemeFile, DiskPlayLogStore, DiskQueueStore, DiskSettingsStore,
     DiskSkipStore, KeyringSessionStore, LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir,
-    Scrobbler, SettingsStore, SingleInstanceGuard, TrayHandle, default_config_dir,
+    Scrobbler, SettingsStore, SingleInstanceGuard, StreamDiskCache, TrayHandle, default_config_dir,
 };
 use moggyt::slint_shell::app::AppDependencies;
 use moggyt::slint_shell::init::{
-    app_data_dir, init_cover_cache, init_lastfm_scrobbler, init_live_audio,
+    app_cache_dir, app_data_dir, init_cover_cache, init_lastfm_scrobbler, init_live_audio,
     init_secondary_lastfm_scrobbler, run_import_cli_if_requested, tracing_subscriber_setup,
 };
 
@@ -50,11 +52,18 @@ fn main() -> anyhow::Result<()> {
 
     let data_dir = app_data_dir();
     let config_dir = default_config_dir();
+    let cache_dir = app_cache_dir();
 
     let settings_store = DiskSettingsStore::new(config_dir.clone());
     let settings = settings_store.load();
 
-    let audio = init_live_audio(&data_dir);
+    let stream_cache_bytes = (settings.stream_cache_limit_mb as u64) * 1024 * 1024;
+    let stream_cache = StreamDiskCache::new(cache_dir.join("streams"), stream_cache_bytes)
+        .map_err(|err| tracing::warn!("failed to initialize stream disk cache: {err:#}"))
+        .ok()
+        .map(Arc::new);
+
+    let audio = init_live_audio(&data_dir, stream_cache);
     let catalog = LiveCatalog::new();
     let session = KeyringSessionStore::moggyt();
     let lyrics = CachedLyrics::new(LrclibClient::new());

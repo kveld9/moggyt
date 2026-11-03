@@ -6,6 +6,7 @@
 
 mod audio;
 mod audio_dsp;
+mod audio_live;
 mod audio_rodio;
 mod browser;
 mod catalog;
@@ -53,6 +54,7 @@ mod spotify_csv;
 mod spotify_embed;
 mod spotify_search;
 mod stream;
+pub mod stream_disk_cache;
 mod stream_reader;
 mod stream_reqwest;
 mod stream_stub;
@@ -68,7 +70,8 @@ pub use audio_dsp::{
     SkipSilence, TARGET_LUFS_DB, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
     is_silent_sample, linear_to_db, rms_to_db,
 };
-pub use audio_rodio::{LiveAudio, RodioBackend, volume_to_amplitude};
+pub use audio_live::LiveAudio;
+pub use audio_rodio::{RodioBackend, volume_to_amplitude};
 pub use browser::{open_url, opener_command};
 pub use catalog::Catalog;
 pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
@@ -140,6 +143,7 @@ pub use spotify_search::{
     video_type_from,
 };
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
+pub use stream_disk_cache::StreamDiskCache;
 pub use stream_url_cache::{STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
