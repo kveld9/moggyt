@@ -11,6 +11,17 @@ use super::presence::Presence;
 /// activity will be attempted. Set to a valid Discord application client ID to activate.
 pub const DISCORD_APP_ID: u64 = 1566973935109541999;
 
+/// Returns custom Discord application ID if present, valid u64, and non-zero; otherwise defaults to `DISCORD_APP_ID`.
+pub fn effective_app_id(custom: Option<&str>) -> u64 {
+    match custom {
+        Some(raw) => match raw.trim().parse::<u64>() {
+            Ok(val) if val != 0 => val,
+            _ => DISCORD_APP_ID,
+        },
+        None => DISCORD_APP_ID,
+    }
+}
+
 fn clean_text<'a>(value: &'a str, fallback: &'static str) -> &'a str {
     let trimmed = value.trim();
     if trimmed.is_empty() { fallback } else { trimmed }
@@ -42,6 +53,11 @@ impl DiscordPresence {
     /// Dormant when [`DISCORD_APP_ID`] is zero; otherwise safely attempts IPC connection.
     pub fn new() -> Self {
         Self::with_app_id(DISCORD_APP_ID)
+    }
+
+    /// Returns custom Discord application ID if present, valid u64, and non-zero; otherwise defaults to [`DISCORD_APP_ID`].
+    pub fn effective_app_id(custom: Option<&str>) -> u64 {
+        effective_app_id(custom)
     }
 
     /// Initializes Discord Rich Presence in a dormant state (app ID 0) that never touches IPC.
@@ -203,5 +219,16 @@ mod tests {
     fn discord_app_id_is_configured() {
         assert_ne!(DISCORD_APP_ID, 0);
         assert_eq!(DISCORD_APP_ID, 1566973935109541999);
+    }
+
+    #[test]
+    fn effective_app_id_parses_valid_or_falls_back() {
+        assert_eq!(effective_app_id(None), DISCORD_APP_ID);
+        assert_eq!(effective_app_id(Some("")), DISCORD_APP_ID);
+        assert_eq!(effective_app_id(Some("   ")), DISCORD_APP_ID);
+        assert_eq!(effective_app_id(Some("invalid")), DISCORD_APP_ID);
+        assert_eq!(effective_app_id(Some("0")), DISCORD_APP_ID);
+        assert_eq!(effective_app_id(Some(" 123456789 ")), 123456789);
+        assert_eq!(DiscordPresence::effective_app_id(Some(" 123456789 ")), 123456789);
     }
 }

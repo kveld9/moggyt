@@ -12,7 +12,7 @@ use crate::domain::ThemeId;
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CustomThemeFile, DiscordPresence, LyricOverrideDir,
     LyricsSource, PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings, SettingsStore,
-    SingleInstanceGuard, SkipStore, TrayHandle,
+    SingleInstanceGuard, SkipStore, TrayHandle, effective_app_id,
 };
 
 pub use crate::slint_shell::covers::{
@@ -111,7 +111,8 @@ pub fn run(
     state.songs_only = settings.songs_only;
     state.keyboard_shortcuts = settings.keyboard_shortcuts;
     if settings.discord_presence_enabled {
-        state.discord = DiscordPresence::new();
+        let app_id = effective_app_id(settings.discord_app_id.as_deref());
+        state.discord = DiscordPresence::with_app_id(app_id);
     }
     state.theme = settings.theme;
     state.locale = settings.locale;

@@ -2,6 +2,7 @@ import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
 import { Integrations } from "../../integrations.slint";
 import { SettingsToggleRow } from "../settings_rows.slint";
+import { StyledInputField } from "../controls.slint";
 
 export component IntegrationSettings inherits VerticalLayout {
     spacing: 10px;
@@ -19,7 +20,7 @@ export component IntegrationSettings inherits VerticalLayout {
 
         VerticalLayout {
             padding: 16px;
-            spacing: 8px;
+            spacing: 12px;
 
             SettingsToggleRow {
                 label: Labels.discord-presence-label;
@@ -34,8 +35,27 @@ export component IntegrationSettings inherits VerticalLayout {
                 wrap: word-wrap;
             }
 
-            if Integrations.lastfm-available : VerticalLayout {
-                spacing: 8px;
+            VerticalLayout {
+                spacing: 6px;
+
+                Text {
+                    text: Labels.discord-app-id-label;
+                    color: Theme.text;
+                    font-size: 13px;
+                    font-weight: 600;
+                }
+
+                StyledInputField {
+                    height: 32px;
+                    text <=> Integrations.discord-app-id-input;
+                    placeholder-text: Labels.discord-app-id-placeholder;
+                    edited(t) => { Integrations.discord-app-id-edited(t); }
+                    accepted(t) => { Integrations.discord-app-id-edited(t); }
+                }
+            }
+
+            VerticalLayout {
+                spacing: 10px;
 
                 Text {
                     text: Labels.lastfm-label;
@@ -51,7 +71,77 @@ export component IntegrationSettings inherits VerticalLayout {
                     wrap: word-wrap;
                 }
 
+                VerticalLayout {
+                    spacing: 6px;
+
+                    Text {
+                        text: Labels.lastfm-api-key-label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 600;
+                    }
+
+                    StyledInputField {
+                        height: 32px;
+                        text <=> Integrations.lastfm-api-key-input;
+                        placeholder-text: Labels.lastfm-api-key-placeholder;
+                        edited(t) => { Integrations.lastfm-api-key-edited(t); }
+                        accepted(t) => { Integrations.lastfm-api-key-edited(t); }
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 6px;
+
+                    Text {
+                        text: Labels.lastfm-api-secret-label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 600;
+                    }
+
+                    StyledInputField {
+                        height: 32px;
+                        text <=> Integrations.lastfm-api-secret-input;
+                        placeholder-text: Labels.lastfm-api-secret-placeholder;
+                        input-type: InputType.password;
+                        edited(t) => { Integrations.lastfm-api-secret-edited(t); }
+                        accepted(t) => { Integrations.lastfm-api-secret-edited(t); }
+                    }
+                }
+
                 HorizontalLayout {
+                    alignment: start;
+
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 8px;
+                        background: save-touch.pressed ? Theme.overlay : (save-touch.has-hover ? Theme.hover : Theme.accent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        save-touch := TouchArea {
+                            clicked => {
+                                Integrations.save-integrations-clicked();
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+
+                            Text {
+                                text: Labels.save-integrations-label;
+                                color: save-touch.has-hover ? Theme.text : Theme.window;
+                                font-size: 12px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                if Integrations.lastfm-available : HorizontalLayout {
                     alignment: start;
 
                     Rectangle {

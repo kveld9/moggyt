@@ -79,6 +79,7 @@ export component StyledInputField inherits Rectangle {
     in property <InputType> input-type: InputType.text;
     out property <bool> has-focus: input.has-focus;
     callback accepted(string);
+    callback edited(string);
 
     border-radius: 8px;
     border-width: 1px;
@@ -99,6 +100,7 @@ export component StyledInputField inherits Rectangle {
             color: Theme.text;
             vertical-alignment: center;
             accepted => { root.accepted(self.text); }
+            edited => { root.edited(self.text); }
         }
     }
 

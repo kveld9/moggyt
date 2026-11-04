@@ -11,9 +11,9 @@ use slint::ComponentHandle;
 
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    CredentialStore, KeyringCredentialStore, LastFmAppKeys, LastFmClient, LastFmCredentials,
-    LastFmSession, Scrobbler, SessionPoll, StubScrobbler, authorize_url, open_url, request_session,
-    request_token,
+    CredentialStore, DiscordPresence, KeyringCredentialStore, LastFmAppKeys, LastFmClient,
+    LastFmCredentials, LastFmSession, Presence, Scrobbler, SessionPoll, StubScrobbler,
+    authorize_url, open_url, request_session, request_token, resolve_app_keys,
 };
 use crate::slint_shell::platform::dispatch_to_ui;
 use crate::slint_shell::state::{SharedState, SlintAppState};
@@ -110,7 +110,8 @@ impl SlintAppState {
 pub(crate) fn refresh_lastfm_globals(window: &MoggytWindow, state: &SlintAppState) {
     let integrations = window.global::<Integrations>();
     let settings = state.settings_store.load();
-    let is_available = LastFmAppKeys::from_build_env().is_some();
+    let is_available =
+        resolve_app_keys(&settings.lastfm_api_key, &settings.lastfm_api_secret).is_some();
     let is_connected = !settings.lastfm_username.is_empty() && settings.lastfm_enabled;
     let status = lastfm_status_text(state.locale, is_available, &settings.lastfm_username);
 
@@ -118,6 +119,8 @@ pub(crate) fn refresh_lastfm_globals(window: &MoggytWindow, state: &SlintAppStat
     integrations.set_lastfm_connected(is_connected);
     integrations.set_lastfm_busy(false);
     integrations.set_lastfm_status(status.into());
+    integrations.set_lastfm_api_key_input(settings.lastfm_api_key.into());
+    integrations.set_lastfm_api_secret_input(settings.lastfm_api_secret.into());
 }
 
 fn poll_session_loop(keys: &LastFmAppKeys, token: &str) -> Result<LastFmSession, String> {
@@ -197,7 +200,9 @@ pub(crate) fn wire_lastfm_callbacks(window: &MoggytWindow, state_rc: &SharedStat
         if integrations.get_lastfm_busy() {
             return;
         }
-        let Some(keys) = LastFmAppKeys::from_build_env() else {
+        let settings = s.borrow().settings_store.load();
+        let Some(keys) = resolve_app_keys(&settings.lastfm_api_key, &settings.lastfm_api_secret)
+        else {
             return;
         };
         let locale = s.borrow().locale;
@@ -216,6 +221,64 @@ pub(crate) fn wire_lastfm_callbacks(window: &MoggytWindow, state_rc: &SharedStat
         let mut st = s.borrow_mut();
         let mut store = KeyringCredentialStore::moggyt();
         st.disconnect_lastfm(&mut store);
+        refresh_lastfm_globals(&win, &st);
+    });
+
+    let w = window.as_weak();
+    let s = Rc::clone(state_rc);
+    integrations.on_lastfm_api_key_edited(move |key| {
+        let Some(win) = w.upgrade() else {
+            return;
+        };
+        let st = s.borrow();
+        let mut settings = st.settings_store.load();
+        settings.lastfm_api_key = key.trim().to_string();
+        if let Err(err) = st.settings_store.save(&settings) {
+            tracing::warn!("failed to persist Last.fm api key: {err:#}");
+        }
+        refresh_lastfm_globals(&win, &st);
+    });
+
+    let w = window.as_weak();
+    let s = Rc::clone(state_rc);
+    integrations.on_lastfm_api_secret_edited(move |sec| {
+        let Some(win) = w.upgrade() else {
+            return;
+        };
+        let st = s.borrow();
+        let mut settings = st.settings_store.load();
+        settings.lastfm_api_secret = sec.trim().to_string();
+        if let Err(err) = st.settings_store.save(&settings) {
+            tracing::warn!("failed to persist Last.fm api secret: {err:#}");
+        }
+        refresh_lastfm_globals(&win, &st);
+    });
+
+    let w = window.as_weak();
+    let s = Rc::clone(state_rc);
+    integrations.on_save_integrations_clicked(move || {
+        let Some(win) = w.upgrade() else {
+            return;
+        };
+        let mut st = s.borrow_mut();
+        let mut settings = st.settings_store.load();
+        let g = win.global::<Integrations>();
+        let discord_trimmed = g.get_discord_app_id_input().trim().to_string();
+        settings.discord_app_id =
+            if discord_trimmed.is_empty() { None } else { Some(discord_trimmed) };
+        settings.lastfm_api_key = g.get_lastfm_api_key_input().trim().to_string();
+        settings.lastfm_api_secret = g.get_lastfm_api_secret_input().trim().to_string();
+        if let Err(err) = st.settings_store.save(&settings) {
+            tracing::warn!("failed to persist integrations settings: {err:#}");
+        }
+        if settings.discord_presence_enabled {
+            let app_id = DiscordPresence::effective_app_id(settings.discord_app_id.as_deref());
+            st.discord.shutdown();
+            st.discord = DiscordPresence::with_app_id(app_id);
+            if let Some((artist, title)) = st.last_presence_key.clone() {
+                st.discord.set_track(&artist, &title);
+            }
+        }
         refresh_lastfm_globals(&win, &st);
     });
 }
@@ -311,5 +374,20 @@ mod tests {
         let settings = state.settings_store.load();
         assert!(!settings.lastfm_enabled);
         assert!(settings.lastfm_username.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_app_keys_from_settings_state() {
+        let state = test_wired();
+        let mut settings = state.settings_store.load();
+        settings.lastfm_api_key = "my_key".to_string();
+        settings.lastfm_api_secret = "my_sec".to_string();
+        state.settings_store.save(&settings).unwrap();
+
+        let loaded = state.settings_store.load();
+        let keys = resolve_app_keys(&loaded.lastfm_api_key, &loaded.lastfm_api_secret)
+            .expect("keys must resolve");
+        assert_eq!(keys.api_key, "my_key");
+        assert_eq!(keys.secret, "my_sec");
     }
 }

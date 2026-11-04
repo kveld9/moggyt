@@ -176,10 +176,7 @@ impl Default for Settings {
 impl Settings {
     /// Default fallback settings resolving the locale from system environment.
     pub fn fallback() -> Self {
-        Self {
-            locale: Locale::detect(),
-            ..Self::default()
-        }
+        Self { locale: Locale::detect(), ..Self::default() }
     }
 
     /// Sanitizes and clamps setting values to their valid operational bounds.
