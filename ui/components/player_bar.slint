@@ -178,7 +178,7 @@ export component PlayerBar inherits Rectangle {
                 alignment: center;
 
                 Rectangle {
-                    width: root.queue-count > 0 ? 44px : 32px;
+                    width: 32px;
                     height: 32px;
                     border-radius: 16px;
                     background: q-touch.pressed ? Theme.overlay : (q-touch.has-hover ? Theme.hover : transparent);
@@ -188,25 +188,11 @@ export component PlayerBar inherits Rectangle {
                         clicked => { root.toggle-queue-panel(); }
                     }
 
-                    HorizontalLayout {
-                        alignment: center;
-                        spacing: 4px;
-
-                        VerticalLayout {
-                            alignment: center;
-                            IconQueue {
-                                size: 16px;
-                                tint: q-touch.has-hover || root.is-queue-open ? Theme.accent : Theme.secondary;
-                            }
-                        }
-
-                        if root.queue-count > 0 : Text {
-                            text: "\{root.queue-count}";
-                            color: q-touch.has-hover ? Theme.accent : Theme.secondary;
-                            font-size: 11px;
-                            font-weight: 700;
-                            vertical-alignment: center;
-                        }
+                    IconQueue {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 16px;
+                        tint: q-touch.has-hover || root.is-queue-open ? Theme.accent : Theme.secondary;
                     }
                 }
             }
