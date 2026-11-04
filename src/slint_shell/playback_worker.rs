@@ -461,6 +461,54 @@ mod tests {
         }
     }
 
+    struct BadgeVideoSearchCatalog;
+
+    impl Catalog for BadgeVideoSearchCatalog {
+        fn search(&self, _: &str) -> Vec<crate::domain::Track> {
+            Vec::new()
+        }
+        fn search_filtered(&self, _: &SearchQuery) -> Vec<crate::domain::SearchResult> {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/catalog_search_badges.json");
+            let raw = std::fs::read_to_string(path).expect("fixture readable");
+            let payload: serde_json::Value = serde_json::from_str(&raw).expect("fixture json");
+            let hits = crate::infra::catalog_parse_search::parse_search_all(&payload);
+            crate::infra::LiveCatalog::map_hits(hits, crate::domain::SearchFilter::All)
+        }
+        fn radio(&self, _: &str) -> Vec<crate::domain::Track> {
+            Vec::new()
+        }
+        fn home_shelves(&self) -> Vec<Shelf> {
+            Vec::new()
+        }
+        fn playlists(&self) -> Vec<crate::domain::Playlist> {
+            Vec::new()
+        }
+        fn saved_albums(&self) -> Vec<crate::domain::Album> {
+            Vec::new()
+        }
+        fn detail(&self, _: &str, _: DetailKind) -> Option<Detail> {
+            None
+        }
+    }
+
+    #[test]
+    fn test_execute_search_with_songs_only_drops_video_classified_by_badge() {
+        let catalog = Arc::new(Mutex::new(BadgeVideoSearchCatalog));
+        let (_, _, unfiltered) = execute_search(1, "bachata", &catalog, Locale::English, false);
+        let (_, _, filtered) = execute_search(1, "bachata", &catalog, Locale::English, true);
+
+        let contains_video = |shelves: &[Shelf]| {
+            shelves.iter().flat_map(|s| &s.items).any(|item| match item {
+                crate::domain::SearchResult::Track(t) => t.id == "video-vid-2",
+                _ => false,
+            })
+        };
+
+        assert!(contains_video(&unfiltered), "unfiltered search includes badge-classified video");
+        assert!(!contains_video(&filtered), "songs-only search drops badge-classified video");
+    }
+
     #[test]
     fn test_execute_detail_in_worker_thread() {
         let catalog = Arc::new(Mutex::new(CatalogStub::new()));

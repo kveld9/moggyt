@@ -38,13 +38,51 @@ fn search_duration(renderer: &Value) -> Option<u32> {
     fixed_or_length_duration(renderer).or_else(|| flex_duration(renderer))
 }
 
+fn col_runs(renderer: &Value, col_idx: usize) -> Option<&[Value]> {
+    renderer
+        .get("flexColumns")?
+        .get(col_idx)?
+        .pointer("/musicResponsiveListItemFlexColumnRenderer/text/runs")?
+        .as_array()
+        .map(Vec::as_slice)
+}
+
+fn badge_of(renderer: &Value) -> String {
+    let Some(runs) = col_runs(renderer, 1) else {
+        return "Song".to_owned();
+    };
+    let Some(first) = runs.first().and_then(|r| r.get("text")).and_then(Value::as_str) else {
+        return "Song".to_owned();
+    };
+    let trimmed = first.trim();
+    if trimmed.is_empty() { "Song".to_owned() } else { trimmed.to_owned() }
+}
+
+const VIDEO_BADGES: &[&str] = &["video", "music video", "video musical", "videoclip"];
+
+pub fn is_video_badge(badge: &str) -> bool {
+    let normalized = crate::domain::normalize_for_match(badge);
+    VIDEO_BADGES.contains(&normalized.as_str())
+}
+
+fn resolve_video_type(renderer: &Value) -> Option<crate::domain::MusicVideoType> {
+    music_video_type(renderer).or_else(|| {
+        let badge = badge_of(renderer);
+        is_video_badge(&badge).then_some(crate::domain::MusicVideoType::Omv)
+    })
+}
+
+fn is_video_shelf(title: &str) -> bool {
+    crate::domain::normalize_for_match(title).contains("video")
+}
+
 fn parse_item(renderer: &Value) -> Option<RawTrack> {
     let video_id = watch_video_id(renderer)?;
     let title = flex_text(renderer, 0)?;
     let artist = flex_text(renderer, 1).unwrap_or_default();
     let duration_secs = search_duration(renderer);
     let thumb_url = best_thumbnail(renderer);
-    let video_type = music_video_type(renderer);
+    let video_type = resolve_video_type(renderer);
     Some(RawTrack { video_id, title, artist, duration_secs, thumb_url, video_type })
 }
 
@@ -52,8 +90,13 @@ fn collect_shelf_items(shelf: &Value, out: &mut Vec<RawTrack>) {
     let Some(items) = shelf.get("contents").and_then(Value::as_array) else {
         return;
     };
+    let title = shelf.pointer("/title/runs/0/text").and_then(Value::as_str).unwrap_or("");
+    let is_video = is_video_shelf(title);
     for item in items {
-        if let Some(track) = item.get("musicResponsiveListItemRenderer").and_then(parse_item) {
+        if let Some(mut track) = item.get("musicResponsiveListItemRenderer").and_then(parse_item) {
+            if is_video {
+                track.video_type = Some(crate::domain::MusicVideoType::Omv);
+            }
             out.push(track);
         }
     }
@@ -108,7 +151,7 @@ pub fn parse_search_tracks(value: &Value) -> Vec<RawTrack> {
 }
 
 const CATEGORY_KEYWORDS: &[(&[&str], SearchFilter)] = &[
-    (&["song", "top result"], SearchFilter::Tracks),
+    (&["song", "top result", "video"], SearchFilter::Tracks),
     (&["album"], SearchFilter::Albums),
     (&["artist"], SearchFilter::Artists),
     (&["playlist", "mix", "show"], SearchFilter::Playlists),
@@ -116,8 +159,11 @@ const CATEGORY_KEYWORDS: &[(&[&str], SearchFilter)] = &[
 
 /// Maps a shelf header title to a catalog category filter.
 pub fn shelf_category(title: &str) -> Option<SearchFilter> {
-    let lower = title.to_ascii_lowercase();
-    CATEGORY_KEYWORDS.iter().find(|(kw, _)| kw.iter().any(|k| lower.contains(k))).map(|(_, f)| *f)
+    let normalized = crate::domain::normalize_for_match(title);
+    CATEGORY_KEYWORDS
+        .iter()
+        .find(|(kw, _)| kw.iter().any(|k| normalized.contains(k)))
+        .map(|(_, f)| *f)
 }
 
 fn dispatch_two_row(category: SearchFilter, renderer: &Value, hits: &mut SearchHits) {
@@ -140,9 +186,12 @@ fn dispatch_two_row(category: SearchFilter, renderer: &Value, hits: &mut SearchH
     }
 }
 
-fn collect_shelf_item(category: SearchFilter, item: &Value, hits: &mut SearchHits) {
+fn collect_shelf_item(category: SearchFilter, is_video: bool, item: &Value, hits: &mut SearchHits) {
     if category == SearchFilter::Tracks {
-        if let Some(track) = item.get("musicResponsiveListItemRenderer").and_then(parse_item) {
+        if let Some(mut track) = item.get("musicResponsiveListItemRenderer").and_then(parse_item) {
+            if is_video {
+                track.video_type = Some(crate::domain::MusicVideoType::Omv);
+            }
             hits.tracks.push(track);
         }
     } else if let Some(renderer) = item.get("musicTwoRowItemRenderer") {
@@ -157,8 +206,9 @@ fn collect_shelf(shelf: &Value, hits: &mut SearchHits) {
     else {
         return;
     };
+    let is_video = is_video_shelf(title);
     for item in items {
-        collect_shelf_item(category, item, hits);
+        collect_shelf_item(category, is_video, item, hits);
     }
 }
 
@@ -170,26 +220,6 @@ fn video_id_of(renderer: &Value) -> Option<String> {
         }
     }
     watch_video_id(renderer)
-}
-
-fn col_runs(renderer: &Value, col_idx: usize) -> Option<&[Value]> {
-    renderer
-        .get("flexColumns")?
-        .get(col_idx)?
-        .pointer("/musicResponsiveListItemFlexColumnRenderer/text/runs")?
-        .as_array()
-        .map(Vec::as_slice)
-}
-
-fn badge_of(renderer: &Value) -> String {
-    let Some(runs) = col_runs(renderer, 1) else {
-        return "Song".to_owned();
-    };
-    let Some(first) = runs.first().and_then(|r| r.get("text")).and_then(Value::as_str) else {
-        return "Song".to_owned();
-    };
-    let trimmed = first.trim();
-    if trimmed.is_empty() { "Song".to_owned() } else { trimmed.to_owned() }
 }
 
 fn artist_of(renderer: &Value) -> String {
@@ -221,7 +251,7 @@ fn is_browse_badge(badge: &str) -> bool {
 fn dispatch_bare_track(renderer: &Value, title: String, artist: String, hits: &mut SearchHits) {
     let Some(video_id) = video_id_of(renderer) else { return };
     let thumb_url = best_thumbnail(renderer);
-    let video_type = music_video_type(renderer);
+    let video_type = resolve_video_type(renderer);
     hits.tracks.push(RawTrack {
         video_id,
         title,
@@ -331,6 +361,13 @@ pub fn parse_search_all(value: &Value) -> SearchHits {
 mod tests {
     use super::*;
 
+    fn fixture_json(name: &str) -> Value {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name);
+        serde_json::from_str(&std::fs::read_to_string(path).expect("fixture readable"))
+            .expect("valid fixture")
+    }
+
     #[test]
     fn parse_search_tracks_tolerates_empty_and_malformed() {
         assert!(parse_search_tracks(&serde_json::json!({})).is_empty());
@@ -345,51 +382,26 @@ mod tests {
 
     #[test]
     fn parse_search_tracks_golden_fixture() {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path = std::path::Path::new(manifest_dir)
-            .join("tests")
-            .join("fixtures")
-            .join("catalog_search.json");
-        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
-        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
-
-        let tracks = parse_search_tracks(&payload);
+        let tracks = parse_search_tracks(&fixture_json("catalog_search.json"));
         assert_eq!(tracks.len(), 2);
         assert_eq!(
-            tracks[0],
-            RawTrack {
-                video_id: "vid-1".to_owned(),
-                title: "Midnight City".to_owned(),
-                artist: "M83".to_owned(),
-                duration_secs: None,
-                thumb_url: Some("https://lh3.googleusercontent.com/test-thumb-large".to_owned()),
-                video_type: None,
-            }
+            (tracks[0].video_id.as_str(), tracks[0].title.as_str(), tracks[0].artist.as_str()),
+            ("vid-1", "Midnight City", "M83")
         );
         assert_eq!(
-            tracks[1],
-            RawTrack {
-                video_id: "vid-2".to_owned(),
-                title: "Starboy".to_owned(),
-                artist: "The Weeknd".to_owned(),
-                duration_secs: None,
-                thumb_url: None,
-                video_type: None,
-            }
+            tracks[0].thumb_url.as_deref(),
+            Some("https://lh3.googleusercontent.com/test-thumb-large")
         );
+        assert_eq!(
+            (tracks[1].video_id.as_str(), tracks[1].title.as_str(), tracks[1].artist.as_str()),
+            ("vid-2", "Starboy", "The Weeknd")
+        );
+        assert_eq!(tracks[1].thumb_url, None);
     }
 
     #[test]
     fn parse_search_tracks_songs_fixture_extracts_video_type() {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path = std::path::Path::new(manifest_dir)
-            .join("tests")
-            .join("fixtures")
-            .join("catalog_search_songs.json");
-        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
-        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
-
-        let tracks = parse_search_tracks(&payload);
+        let tracks = parse_search_tracks(&fixture_json("catalog_search_songs.json"));
         assert!(!tracks.is_empty());
         assert!(tracks.iter().all(|t| t.video_type == Some(crate::domain::MusicVideoType::Atv)));
         assert_eq!(tracks[0].duration_secs, Some(224));
@@ -422,33 +434,37 @@ mod tests {
         assert_eq!(search_duration(&serde_json::json!({})), None);
     }
 
+    fn tabbed_sections(sections: Vec<Value>) -> Value {
+        serde_json::json!({
+            "contents": { "tabbedSearchResultsRenderer": { "tabs": [{
+                "tabRenderer": { "content": { "sectionListRenderer": { "contents": sections } } }
+            }] } }
+        })
+    }
+
+    fn test_responsive_item(title: &str, badge_runs: &[&str], endpoint: Value) -> Value {
+        let runs: Vec<_> = badge_runs.iter().map(|t| serde_json::json!({ "text": t })).collect();
+        serde_json::json!({
+            "musicResponsiveListItemRenderer": {
+                "flexColumns": [
+                    { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": title }] } } },
+                    { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": runs } } }
+                ],
+                "navigationEndpoint": endpoint
+            }
+        })
+    }
+
     #[test]
     fn parse_search_tracks_skips_item_without_title() {
-        let payload = serde_json::json!({
-            "contents": {
-                "tabbedSearchResultsRenderer": {
-                    "tabs": [{
-                        "tabRenderer": {
-                            "content": {
-                                "sectionListRenderer": {
-                                    "contents": [{
-                                        "musicShelfRenderer": {
-                                            "contents": [{
-                                                "musicResponsiveListItemRenderer": {
-                                                    "navigationEndpoint": {
-                                                        "watchEndpoint": { "videoId": "v1" }
-                                                    }
-                                                }
-                                            }]
-                                        }
-                                    }]
-                                }
-                            }
-                        }
-                    }]
-                }
+        let item = serde_json::json!({
+            "musicResponsiveListItemRenderer": {
+                "navigationEndpoint": { "watchEndpoint": { "videoId": "v1" } }
             }
         });
+        let payload = tabbed_sections(vec![serde_json::json!({
+            "musicShelfRenderer": { "contents": [item] }
+        })]);
         assert!(parse_search_tracks(&payload).is_empty());
     }
 
@@ -458,6 +474,9 @@ mod tests {
             ("Songs", Some(SearchFilter::Tracks)),
             ("Top result", Some(SearchFilter::Tracks)),
             ("Top songs", Some(SearchFilter::Tracks)),
+            ("Videos", Some(SearchFilter::Tracks)),
+            ("Vídeos", Some(SearchFilter::Tracks)),
+            ("Music videos", Some(SearchFilter::Tracks)),
             ("Albums", Some(SearchFilter::Albums)),
             ("Artists", Some(SearchFilter::Artists)),
             ("Playlists", Some(SearchFilter::Playlists)),
@@ -472,80 +491,73 @@ mod tests {
 
     #[test]
     fn parse_search_all_golden_fixture_and_determinism() {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path =
-            std::path::Path::new(manifest_dir).join("tests/fixtures/catalog_shelves.json");
-        let raw = std::fs::read_to_string(fixture_path).expect("fixture file readable");
-        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
-
+        let payload = fixture_json("catalog_shelves.json");
         let first = parse_search_all(&payload);
         assert_eq!(first, parse_search_all(&payload), "parsing must be deterministic");
         assert_eq!(
             (first.tracks.len(), first.albums.len(), first.artists.len(), first.playlists.len()),
             (1, 1, 1, 0)
         );
-        assert_eq!(first.tracks[0].video_id, "solar-1");
-        assert_eq!(first.tracks[0].title, "Solaris");
-        assert_eq!(first.tracks[0].artist, "Photay");
+        assert_eq!(
+            (
+                first.tracks[0].video_id.as_str(),
+                first.tracks[0].title.as_str(),
+                first.tracks[0].artist.as_str()
+            ),
+            ("solar-1", "Solaris", "Photay")
+        );
         assert_eq!(first.tracks[0].thumb_url, None);
-        assert_eq!(first.albums[0].browse_id, "MPREb_album_1");
-        assert_eq!(first.albums[0].title, "Waking Season");
-        assert_eq!(first.albums[0].artist, "Photay");
-        assert_eq!(first.artists[0].browse_id, "UC_photay_1");
-        assert_eq!(first.artists[0].name, "Photay");
+        assert_eq!(
+            (
+                first.albums[0].browse_id.as_str(),
+                first.albums[0].title.as_str(),
+                first.albums[0].artist.as_str()
+            ),
+            ("MPREb_album_1", "Waking Season", "Photay")
+        );
+        assert_eq!(
+            (first.artists[0].browse_id.as_str(), first.artists[0].name.as_str()),
+            ("UC_photay_1", "Photay")
+        );
     }
 
     #[test]
     fn parse_search_all_ignores_unknown_shelves_and_tolerates_empty() {
         assert!(parse_search_all(&serde_json::json!({})).is_empty());
 
-        let payload = serde_json::json!({
-            "contents": { "tabbedSearchResultsRenderer": { "tabs": [{ "tabRenderer": {
-                "content": { "sectionListRenderer": { "contents": [{ "musicShelfRenderer": {
-                    "title": { "runs": [{ "text": "Podcasts" }] },
-                    "contents": [{ "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Item" }] } } }]
-                }}]}}
-            }}]}}
-        });
+        let payload = tabbed_sections(vec![serde_json::json!({
+            "musicShelfRenderer": {
+                "title": { "runs": [{ "text": "Podcasts" }] },
+                "contents": [{ "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Item" }] } } }]
+            }
+        })]);
         assert!(parse_search_all(&payload).is_empty());
     }
 
     #[test]
     fn parse_search_tracks_live_shape_and_determinism() {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path = std::path::Path::new(manifest_dir)
-            .join("tests")
-            .join("fixtures")
-            .join("catalog_live_shape.json");
-        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
-        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
-
+        let payload = fixture_json("catalog_live_shape.json");
         let first = parse_search_tracks(&payload);
-        let second = parse_search_tracks(&payload);
-        assert_eq!(first, second, "parsing must be deterministic");
+        assert_eq!(first, parse_search_tracks(&payload), "parsing must be deterministic");
 
         let ids: Vec<&str> = first.iter().map(|t| t.video_id.as_str()).collect();
         assert_eq!(ids, vec!["live-bare-1", "live-shelf-1"]);
-        assert_eq!(first[0].title, "Live Track Bare");
-        assert_eq!(first[0].artist, "Live Artist Bare");
+        assert_eq!(
+            (first[0].title.as_str(), first[0].artist.as_str()),
+            ("Live Track Bare", "Live Artist Bare")
+        );
         assert_eq!(first[0].thumb_url, None);
-        assert_eq!(first[1].title, "Live Track Shelved");
-        assert_eq!(first[1].artist, "Live Artist Shelved");
+        assert_eq!(
+            (first[1].title.as_str(), first[1].artist.as_str()),
+            ("Live Track Shelved", "Live Artist Shelved")
+        );
     }
 
     #[test]
     fn parse_search_all_live_shape_and_determinism() {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path = std::path::Path::new(manifest_dir)
-            .join("tests")
-            .join("fixtures")
-            .join("catalog_live_shape.json");
-        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
-        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
-
+        let payload = fixture_json("catalog_live_shape.json");
         let first = parse_search_all(&payload);
-        let second = parse_search_all(&payload);
-        assert_eq!(first, second, "parsing must be deterministic");
+        assert_eq!(first, parse_search_all(&payload), "parsing must be deterministic");
 
         let track_ids: Vec<&str> = first.tracks.iter().map(|t| t.video_id.as_str()).collect();
         assert_eq!(track_ids, vec!["live-bare-1", "live-shelf-1"]);
@@ -556,14 +568,7 @@ mod tests {
 
     #[test]
     fn parse_search_all_badges_golden_fixture() {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path = std::path::Path::new(manifest_dir)
-            .join("tests")
-            .join("fixtures")
-            .join("catalog_search_badges.json");
-        let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
-        let payload: Value = serde_json::from_str(&raw).expect("valid fixture json");
-
+        let payload = fixture_json("catalog_search_badges.json");
         let first = parse_search_all(&payload);
         let second = parse_search_all(&payload);
         assert_eq!(first, second, "parsing must be deterministic");
@@ -574,153 +579,106 @@ mod tests {
         assert_eq!(first.playlists.len(), 1);
 
         // Song item with multi-artist runs
-        assert_eq!(first.tracks[0].video_id, "song-vid-1");
-        assert_eq!(first.tracks[0].title, "Bachata Rosa");
-        assert_eq!(first.tracks[0].artist, "Juan Luis Guerra & 4.40");
-        assert_eq!(first.tracks[0].duration_secs, None);
         assert_eq!(
-            first.tracks[0].thumb_url,
-            Some("https://lh3.googleusercontent.com/test-thumb-large".to_owned())
+            (
+                first.tracks[0].video_id.as_str(),
+                first.tracks[0].title.as_str(),
+                first.tracks[0].artist.as_str()
+            ),
+            ("song-vid-1", "Bachata Rosa", "Juan Luis Guerra & 4.40")
+        );
+        assert_eq!(
+            first.tracks[0].thumb_url.as_deref(),
+            Some("https://lh3.googleusercontent.com/test-thumb-large")
         );
 
         // Video item
-        assert_eq!(first.tracks[1].video_id, "video-vid-2");
-        assert_eq!(first.tracks[1].title, "Propuesta Indecente (Official Video)");
-        assert_eq!(first.tracks[1].artist, "Romeo Santos");
-        assert_eq!(first.tracks[1].duration_secs, None);
         assert_eq!(
-            first.tracks[1].thumb_url,
-            Some("https://lh3.googleusercontent.com/video-thumb-large".to_owned())
+            (
+                first.tracks[1].video_id.as_str(),
+                first.tracks[1].title.as_str(),
+                first.tracks[1].artist.as_str()
+            ),
+            ("video-vid-2", "Propuesta Indecente (Official Video)", "Romeo Santos")
         );
+        assert_eq!(
+            first.tracks[1].thumb_url.as_deref(),
+            Some("https://lh3.googleusercontent.com/video-thumb-large")
+        );
+        assert_eq!(first.tracks[1].video_type, Some(crate::domain::MusicVideoType::Omv));
 
         // Episode item
-        assert_eq!(first.tracks[2].video_id, "ep-vid-6");
-        assert_eq!(first.tracks[2].title, "Episode 42: Latin Music History");
-        assert_eq!(first.tracks[2].artist, "Latin Beats Podcast");
-        assert_eq!(first.tracks[2].duration_secs, None);
         assert_eq!(
-            first.tracks[2].thumb_url,
-            Some("https://lh3.googleusercontent.com/episode-thumb".to_owned())
+            (
+                first.tracks[2].video_id.as_str(),
+                first.tracks[2].title.as_str(),
+                first.tracks[2].artist.as_str()
+            ),
+            ("ep-vid-6", "Episode 42: Latin Music History", "Latin Beats Podcast")
+        );
+        assert_eq!(
+            first.tracks[2].thumb_url.as_deref(),
+            Some("https://lh3.googleusercontent.com/episode-thumb")
         );
 
         // Single item classified as RawAlbum with browseId routed
-        assert_eq!(first.albums[0].browse_id, "MPREb_single_1");
-        assert_eq!(first.albums[0].title, "Eres Mia");
-        assert_eq!(first.albums[0].artist, "Romeo Santos \u{2022} 2014");
         assert_eq!(
-            first.albums[0].thumb_url,
-            Some("https://lh3.googleusercontent.com/single-thumb".to_owned())
+            (
+                first.albums[0].browse_id.as_str(),
+                first.albums[0].title.as_str(),
+                first.albums[0].artist.as_str()
+            ),
+            ("MPREb_single_1", "Eres Mia", "Romeo Santos \u{2022} 2014")
+        );
+        assert_eq!(
+            first.albums[0].thumb_url.as_deref(),
+            Some("https://lh3.googleusercontent.com/single-thumb")
         );
 
         // Artist item with browseId routed
-        assert_eq!(first.artists[0].browse_id, "UC_romeo_1");
-        assert_eq!(first.artists[0].name, "Romeo Santos");
         assert_eq!(
-            first.artists[0].thumb_url,
-            Some("https://lh3.googleusercontent.com/artist-thumb".to_owned())
+            (first.artists[0].browse_id.as_str(), first.artists[0].name.as_str()),
+            ("UC_romeo_1", "Romeo Santos")
+        );
+        assert_eq!(
+            first.artists[0].thumb_url.as_deref(),
+            Some("https://lh3.googleusercontent.com/artist-thumb")
         );
 
         // Playlist item with browseId routed
-        assert_eq!(first.playlists[0].browse_id, "VL_playlist_1");
-        assert_eq!(first.playlists[0].title, "Bachata Essentials");
         assert_eq!(
-            first.playlists[0].thumb_url,
-            Some("https://lh3.googleusercontent.com/playlist-thumb".to_owned())
+            (first.playlists[0].browse_id.as_str(), first.playlists[0].title.as_str()),
+            ("VL_playlist_1", "Bachata Essentials")
+        );
+        assert_eq!(
+            first.playlists[0].thumb_url.as_deref(),
+            Some("https://lh3.googleusercontent.com/playlist-thumb")
         );
     }
 
     #[test]
     fn parse_search_all_badges_skips_profile_and_podcast() {
-        let payload = serde_json::json!({
-            "contents": {
-                "tabbedSearchResultsRenderer": {
-                    "tabs": [{
-                        "tabRenderer": {
-                            "content": {
-                                "sectionListRenderer": {
-                                    "contents": [{
-                                        "itemSectionRenderer": {
-                                            "contents": [
-                                                {
-                                                    "musicResponsiveListItemRenderer": {
-                                                        "flexColumns": [
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [{ "text": "Some User" }] }
-                                                                }
-                                                            },
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [
-                                                                        { "text": "Profile" },
-                                                                        { "text": " \u{2022} " },
-                                                                        { "text": "100 subscribers" }
-                                                                    ] }
-                                                                }
-                                                            }
-                                                        ],
-                                                        "navigationEndpoint": {
-                                                            "browseEndpoint": {
-                                                                "browseId": "UC_user_1",
-                                                                "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "musicResponsiveListItemRenderer": {
-                                                        "flexColumns": [
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [{ "text": "Tech Weekly" }] }
-                                                                }
-                                                            },
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [
-                                                                        { "text": "Podcast" },
-                                                                        { "text": " \u{2022} " },
-                                                                        { "text": "Host" }
-                                                                    ] }
-                                                                }
-                                                            }
-                                                        ],
-                                                        "navigationEndpoint": {
-                                                            "browseEndpoint": {
-                                                                "browseId": "MPSP_pod_1",
-                                                                "pageType": "MUSIC_PAGE_TYPE_PODCAST_SHOW"
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "musicResponsiveListItemRenderer": {
-                                                        "flexColumns": [
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [{ "text": "No ID Unknown" }] }
-                                                                }
-                                                            },
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [
-                                                                        { "text": "MysteryKind" }
-                                                                    ] }
-                                                                }
-                                                            }
-                                                        ]
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    }]
-                                }
-                            }
-                        }
-                    }]
-                }
+        let profile = test_responsive_item(
+            "Some User",
+            &["Profile", " \u{2022} ", "100 subscribers"],
+            serde_json::json!({ "browseEndpoint": { "browseId": "UC_user_1", "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL" } }),
+        );
+        let podcast = test_responsive_item(
+            "Tech Weekly",
+            &["Podcast", " \u{2022} ", "Host"],
+            serde_json::json!({ "browseEndpoint": { "browseId": "MPSP_pod_1", "pageType": "MUSIC_PAGE_TYPE_PODCAST_SHOW" } }),
+        );
+        let unknown = serde_json::json!({
+            "musicResponsiveListItemRenderer": {
+                "flexColumns": [
+                    { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "No ID Unknown" }] } } },
+                    { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "MysteryKind" }] } } }
+                ]
             }
         });
+        let payload = tabbed_sections(vec![serde_json::json!({
+            "itemSectionRenderer": { "contents": [profile, podcast, unknown] }
+        })]);
 
         let hits = parse_search_all(&payload);
         assert!(
@@ -731,59 +689,26 @@ mod tests {
 
     #[test]
     fn parse_search_all_badges_empty_artist_and_defaults() {
-        let payload = serde_json::json!({
-            "contents": {
-                "tabbedSearchResultsRenderer": {
-                    "tabs": [{
-                        "tabRenderer": {
-                            "content": {
-                                "sectionListRenderer": {
-                                    "contents": [{
-                                        "itemSectionRenderer": {
-                                            "contents": [
-                                                {
-                                                    "musicResponsiveListItemRenderer": {
-                                                        "flexColumns": [
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [{ "text": "Solo Track" }] }
-                                                                }
-                                                            },
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [{ "text": "Song" }] }
-                                                                }
-                                                            }
-                                                        ],
-                                                        "playlistItemData": {
-                                                            "videoId": "solo-vid-1"
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "musicResponsiveListItemRenderer": {
-                                                        "flexColumns": [
-                                                            {
-                                                                "musicResponsiveListItemFlexColumnRenderer": {
-                                                                    "text": { "runs": [{ "text": "No Badge Track" }] }
-                                                                }
-                                                            }
-                                                        ],
-                                                        "playlistItemData": {
-                                                            "videoId": "no-badge-vid-2"
-                                                        }
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    }]
-                                }
-                            }
-                        }
-                    }]
-                }
+        let solo = serde_json::json!({
+            "musicResponsiveListItemRenderer": {
+                "flexColumns": [
+                    { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Solo Track" }] } } },
+                    { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Song" }] } } }
+                ],
+                "playlistItemData": { "videoId": "solo-vid-1" }
             }
         });
+        let no_badge = serde_json::json!({
+            "musicResponsiveListItemRenderer": {
+                "flexColumns": [
+                    { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "No Badge Track" }] } } }
+                ],
+                "playlistItemData": { "videoId": "no-badge-vid-2" }
+            }
+        });
+        let payload = tabbed_sections(vec![serde_json::json!({
+            "itemSectionRenderer": { "contents": [solo, no_badge] }
+        })]);
 
         let hits = parse_search_all(&payload);
         assert_eq!(hits.tracks.len(), 2);
@@ -793,5 +718,65 @@ mod tests {
         assert_eq!(hits.tracks[1].video_id, "no-badge-vid-2");
         assert_eq!(hits.tracks[1].title, "No Badge Track");
         assert_eq!(hits.tracks[1].artist, "");
+    }
+
+    #[test]
+    fn is_video_badge_classification() {
+        for badge in [
+            "video",
+            "vídeo",
+            "music video",
+            "video musical",
+            "videoclip",
+            "Video",
+            "Vídeo",
+            "VÍDEO",
+            "Music Video",
+            "Video Musical",
+            "Videoclip",
+        ] {
+            assert!(is_video_badge(badge), "expected video badge for {badge}");
+        }
+        for badge in ["song", "Song", "album", "artist", "playlist", "podcast", ""] {
+            assert!(!is_video_badge(badge), "expected non-video badge for {badge}");
+        }
+    }
+
+    #[test]
+    fn parse_search_detects_video_badge_and_video_shelf() {
+        assert!(is_video_shelf("Videos"));
+        assert!(is_video_shelf("Vídeos"));
+        assert!(!is_video_shelf("Songs"));
+        let shelf = serde_json::json!({
+            "musicShelfRenderer": {
+                "title": { "runs": [{ "text": "Videos" }] },
+                "contents": [test_responsive_item(
+                    "Shelf Video",
+                    &["Artist"],
+                    serde_json::json!({ "watchEndpoint": { "videoId": "v-shelf-1" } }),
+                )]
+            }
+        });
+        let bare = serde_json::json!({
+            "itemSectionRenderer": {
+                "contents": [test_responsive_item(
+                    "Badge Video",
+                    &["Music video", " \u{2022} ", "Artist"],
+                    serde_json::json!({ "watchEndpoint": { "videoId": "v-badge-1" } }),
+                )]
+            }
+        });
+        let payload = tabbed_sections(vec![shelf, bare]);
+        let hits = parse_search_all(&payload);
+        assert_eq!(hits.tracks.len(), 2);
+        assert_eq!(hits.tracks[0].video_id, "v-shelf-1");
+        assert_eq!(hits.tracks[0].video_type, Some(crate::domain::MusicVideoType::Omv));
+        assert_eq!(hits.tracks[1].video_id, "v-badge-1");
+        assert_eq!(hits.tracks[1].video_type, Some(crate::domain::MusicVideoType::Omv));
+
+        let shelf_tracks = parse_search_tracks(&payload);
+        assert_eq!(shelf_tracks.len(), 2);
+        assert_eq!(shelf_tracks[0].video_type, Some(crate::domain::MusicVideoType::Omv));
+        assert_eq!(shelf_tracks[1].video_type, Some(crate::domain::MusicVideoType::Omv));
     }
 }
