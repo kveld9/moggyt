@@ -156,6 +156,38 @@ pub fn parse_duration_secs(raw: &str) -> Option<u32> {
     }
 }
 
+/// Finds the first duration string in a slice of text runs.
+pub fn parse_runs_duration(runs: &[Value]) -> Option<u32> {
+    runs.iter()
+        .find_map(|run| run.get("text").and_then(Value::as_str).and_then(parse_duration_secs))
+}
+
+/// Extracts duration in seconds from a two-row item renderer (e.g. subtitle runs or lengthText).
+pub fn extract_two_row_duration(renderer: &Value) -> Option<u32> {
+    renderer
+        .pointer("/subtitle/runs")
+        .and_then(Value::as_array)
+        .and_then(|runs| parse_runs_duration(runs))
+        .or_else(|| {
+            renderer
+                .pointer("/lengthText/runs")
+                .and_then(Value::as_array)
+                .and_then(|runs| parse_runs_duration(runs))
+        })
+        .or_else(|| {
+            renderer
+                .pointer("/lengthText/simpleText")
+                .and_then(Value::as_str)
+                .and_then(parse_duration_secs)
+        })
+        .or_else(|| {
+            renderer
+                .pointer("/subtitle/simpleText")
+                .and_then(Value::as_str)
+                .and_then(parse_duration_secs)
+        })
+}
+
 /// Extracts panel artist text from byline text runs.
 pub fn panel_artist(renderer: &Value) -> String {
     const PATHS: &[&str] =
@@ -306,6 +338,44 @@ mod tests {
         ] {
             assert_eq!(parse_duration_secs(input), expected, "failed for: {input}");
         }
+    }
+
+    #[test]
+    fn parse_runs_duration_and_extract_two_row_duration_variants() {
+        let runs = vec![
+            serde_json::json!({ "text": "Artist Name" }),
+            serde_json::json!({ "text": " • " }),
+            serde_json::json!({ "text": "3:45" }),
+        ];
+        assert_eq!(parse_runs_duration(&runs), Some(225));
+        assert_eq!(parse_runs_duration(&[]), None);
+        assert_eq!(parse_runs_duration(&[serde_json::json!({ "text": "no duration here" })]), None);
+
+        let renderer_subtitle = serde_json::json!({
+            "subtitle": {
+                "runs": [
+                    { "text": "Band" },
+                    { "text": "4:20" }
+                ]
+            }
+        });
+        assert_eq!(extract_two_row_duration(&renderer_subtitle), Some(260));
+
+        let renderer_length = serde_json::json!({
+            "lengthText": {
+                "runs": [{ "text": "1:15" }]
+            }
+        });
+        assert_eq!(extract_two_row_duration(&renderer_length), Some(75));
+
+        let renderer_simple = serde_json::json!({
+            "lengthText": {
+                "simpleText": "2:30"
+            }
+        });
+        assert_eq!(extract_two_row_duration(&renderer_simple), Some(150));
+
+        assert_eq!(extract_two_row_duration(&serde_json::json!({})), None);
     }
 
     #[test]

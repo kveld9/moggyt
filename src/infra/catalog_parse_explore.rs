@@ -1,7 +1,8 @@
 //! Explore feed response parser for charts, releases, and genre shelves.
 
 use super::catalog_parse_common::{
-    best_thumbnail, browse_of, classify_home_item, parse_two_row, watch_video_id,
+    best_thumbnail, browse_of, classify_home_item, extract_two_row_duration, parse_two_row,
+    watch_video_id,
 };
 use super::catalog_parse_detail::{build_detail_track, detail_artist, detail_title};
 use crate::domain::{Playlist, SearchResult, Shelf, Track};
@@ -68,6 +69,9 @@ fn parse_explore_two_row(renderer: &Value) -> Option<SearchResult> {
     }
     let vid = watch_video_id(renderer)?;
     let mut track = Track::new(&vid, &title, &subtitle);
+    if let Some(dur) = extract_two_row_duration(renderer) {
+        track = track.with_duration(dur);
+    }
     if let Some(t) = thumb {
         track = track.with_artwork(t);
     }
@@ -432,5 +436,50 @@ mod tests {
             }
         });
         assert!(parse_explore_all(&payload).is_empty());
+    }
+
+    #[test]
+    fn parse_explore_two_row_extracts_duration_when_present() {
+        let payload = serde_json::json!({
+            "sectionListRenderer": {
+                "contents": [
+                    {
+                        "musicShelfRenderer": {
+                            "title": { "runs": [{ "text": "Trending Tracks" }] },
+                            "contents": [
+                                {
+                                    "musicTwoRowItemRenderer": {
+                                        "title": { "runs": [{ "text": "Explore Hit" }] },
+                                        "subtitle": {
+                                            "runs": [
+                                                { "text": "Artist" },
+                                                { "text": " • " },
+                                                { "text": "3:30" }
+                                            ]
+                                        },
+                                        "navigationEndpoint": {
+                                            "watchEndpoint": { "videoId": "explore-vid-99" }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        });
+
+        let shelves = parse_explore_all(&payload);
+        assert_eq!(shelves.len(), 1);
+        assert_eq!(shelves[0].items.len(), 1);
+        match &shelves[0].items[0] {
+            SearchResult::Track(t) => {
+                assert_eq!(t.id, "explore-vid-99");
+                assert_eq!(t.title, "Explore Hit");
+                assert_eq!(t.artist, "Artist");
+                assert_eq!(t.duration_secs, Some(210));
+            }
+            other => panic!("expected Track with duration, got {other:?}"),
+        }
     }
 }

@@ -229,7 +229,7 @@ export component PlayerCenterControls inherits VerticalLayout {
             min-width: 120px;
             minimum: 0;
             maximum: max(1, root.duration-secs);
-            value: min(root.position-secs, max(1, root.duration-secs));
+            value: root.duration-secs > 0 ? min(root.position-secs, root.duration-secs) : 0;
             enabled: root.duration-secs > 0;
             changed(val) => {
                 root.seek-to(round(val));
@@ -237,7 +237,7 @@ export component PlayerCenterControls inherits VerticalLayout {
         }
 
         Text {
-            text: root.duration-text;
+            text: root.duration-text != "" ? root.duration-text : "--:--";
             color: Theme.secondary;
             font-size: 11px;
             vertical-alignment: center;

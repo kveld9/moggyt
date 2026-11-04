@@ -41,7 +41,7 @@ export component NowPlayingView inherits VerticalLayout {
             HorizontalLayout {
                 Text { text: root.position-text; color: Theme.secondary; font-size: 11px; }
                 Rectangle {}
-                Text { text: root.duration-text; color: Theme.secondary; font-size: 11px; }
+                Text { text: root.duration-text != "" ? root.duration-text : "--:--"; color: Theme.secondary; font-size: 11px; }
             }
         }
     }
