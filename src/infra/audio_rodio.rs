@@ -123,26 +123,24 @@ impl RodioBackend {
         }
     }
 
-    fn append_dsp_source<R>(&self, source: Decoder<R>)
-    where
-        R: std::io::Read + std::io::Seek + Send + Sync + 'static,
-    {
-        self.append_dsp_to_sink(&self.sink, source);
-    }
-
     fn apply_playback_source<R>(&mut self, track_id: &str, source: Decoder<R>)
     where
         R: std::io::Read + std::io::Seek + Send + Sync + 'static,
     {
         self.fade_generation.fetch_add(1, Ordering::SeqCst);
-        self.sink.stop();
-        self.append_dsp_source(source);
-        self.sink.play();
+        let new_sink = Sink::connect_new(self._stream.mixer());
+        let new_sink_arc = Arc::new(new_sink);
+        let old_sink = std::mem::replace(&mut self.sink, Arc::clone(&new_sink_arc));
+        old_sink.stop();
+
+        new_sink_arc.set_speed(self.speed);
+        new_sink_arc.set_volume(volume_to_amplitude(self.volume));
+        self.append_dsp_to_sink(&new_sink_arc, source);
+        new_sink_arc.play();
+
         self.anchor = Some(Instant::now());
         self.paused_accum = Duration::ZERO;
         self.last_requested = Some(track_id.to_owned());
-        self.sink.set_volume(volume_to_amplitude(self.volume));
-        self.sink.set_speed(self.speed);
     }
 
     fn decode_source(
@@ -716,5 +714,31 @@ mod tests {
         assert_eq!(backend.last_requested(), Some("cached-track-1"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn sink_replacement_coherence_on_consecutive_playback() {
+        let Some(mut backend) = test_backend() else {
+            return;
+        };
+
+        let initial_sink = Arc::clone(&backend.sink);
+
+        let source1 =
+            Decoder::new(std::io::Cursor::new(MINIMAL_WAV_HEADER)).expect("valid wav decoder 1");
+        backend.apply_playback_source("track-1", source1);
+
+        assert!(!Arc::ptr_eq(&initial_sink, &backend.sink));
+        let second_sink = Arc::clone(&backend.sink);
+        assert_eq!(backend.last_requested(), Some("track-1"));
+        assert!(backend.is_playing());
+
+        let source2 =
+            Decoder::new(std::io::Cursor::new(MINIMAL_WAV_HEADER)).expect("valid wav decoder 2");
+        backend.apply_playback_source("track-2", source2);
+
+        assert!(!Arc::ptr_eq(&second_sink, &backend.sink));
+        assert_eq!(backend.last_requested(), Some("track-2"));
+        assert!(backend.is_playing());
     }
 }
