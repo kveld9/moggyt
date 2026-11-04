@@ -57,7 +57,22 @@ pub(crate) fn wire_settings_callbacks(
         }
         apply_palette(&win, &st.active_palette());
         win.set_custom_theme_status_text(st.custom_theme_status.clone().into());
+        let active_custom =
+            st.custom_theme.as_ref().and_then(|ct| ct.active_theme_name()).unwrap_or("");
+        win.set_active_custom_theme_name(active_custom.into());
         win.set_active_theme_index(idx);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_custom_theme_selected(move |name| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.set_custom_theme_name(Some(&name));
+        st.reload_custom_theme();
+        apply_palette(&win, &st.active_palette());
+        win.set_custom_theme_status_text(st.custom_theme_status.clone().into());
+        win.set_active_custom_theme_name(name);
     });
 
     let s = Rc::clone(state_rc);

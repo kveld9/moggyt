@@ -185,6 +185,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Off", "Desactivado"),
     ("Open settings", "Abrir ajustes"),
     ("Paste session cookies...", "Pegar cookies de sesión..."),
+    (
+        "Place theme JSON files in ~/.config/moggyt/themes/ or ~/.config/moggyt/custom-theme.json",
+        "Coloca archivos JSON de tema en ~/.config/moggyt/themes/ o ~/.config/moggyt/custom-theme.json",
+    ),
     ("Player bar", "Barra de reproducción"),
     ("Play", "Reproducir"),
     ("Playback", "Reproducción"),
@@ -591,5 +595,13 @@ mod tests {
             assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
             assert_ne!(en, es, "Spanish must differ from English for '{key}'");
         }
+    }
+
+    #[test]
+    fn test_tr_spanish_translations_exhaustive() {
+        let key = "Place theme JSON files in ~/.config/moggyt/themes/ or ~/.config/moggyt/custom-theme.json";
+        let expected = "Coloca archivos JSON de tema en ~/.config/moggyt/themes/ o ~/.config/moggyt/custom-theme.json";
+        assert_eq!(tr(Locale::English, key), key);
+        assert_eq!(tr(Locale::Spanish, key), expected);
     }
 }

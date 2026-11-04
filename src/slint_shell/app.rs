@@ -115,6 +115,11 @@ pub fn run(
     }
     state.theme = settings.theme;
     state.locale = settings.locale;
+    if let Some(ref name) = settings.custom_theme_name {
+        if let Some(ref mut ct) = state.custom_theme {
+            ct.select_theme(Some(name));
+        }
+    }
     if state.theme == ThemeId::Custom {
         state.reload_custom_theme();
     }

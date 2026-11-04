@@ -32,6 +32,15 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     apply_palette(window, &state.active_palette());
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_custom_theme_status_text(state.custom_theme_status.clone().into());
+    let custom_names: Vec<slint::SharedString> = state
+        .custom_theme
+        .as_ref()
+        .map(|ct| ct.available_themes().into_iter().map(slint::SharedString::from).collect())
+        .unwrap_or_default();
+    let active_custom =
+        state.custom_theme.as_ref().and_then(|ct| ct.active_theme_name()).unwrap_or("");
+    window.set_custom_theme_names(ModelRc::new(VecModel::from(custom_names)));
+    window.set_active_custom_theme_name(active_custom.into());
     window.set_active_page(state.page.to_index());
     window.set_header_title(tr(state.locale, state.page.title()).into());
     window.set_queue_panel_open(state.queue_panel_open);

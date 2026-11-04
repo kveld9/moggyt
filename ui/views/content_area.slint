@@ -44,6 +44,8 @@ export component ContentArea inherits Rectangle {
     in property <image> detail-cover;
     in property <int> active-theme-index: 0;
     in property <string> custom-theme-status-text: "";
+    in property <[string]> custom-theme-names: [];
+    in property <string> active-custom-theme-name: "";
     in property <string> playback-speed-text: "1.00x";
     in property <string> sleep-timer-status-text: "Timer: Off";
     in property <int> active-sleep-timer-index: 0;
@@ -84,6 +86,7 @@ export component ContentArea inherits Rectangle {
     callback sign-out();
     callback open-settings();
     callback theme-selected(int);
+    callback custom-theme-selected(string);
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
@@ -233,6 +236,8 @@ export component ContentArea inherits Rectangle {
             if root.active-page == 4 : SettingsView {
                 active-theme-index: root.active-theme-index;
                 custom-theme-status-text: root.custom-theme-status-text;
+                custom-theme-names: root.custom-theme-names;
+                active-custom-theme-name: root.active-custom-theme-name;
                 playback-speed-text: root.playback-speed-text;
                 signed-in: root.signed-in;
                 cookie-text <=> root.settings-cookie-text;
@@ -255,6 +260,7 @@ export component ContentArea inherits Rectangle {
                 player-bar-show-queue: root.player-bar-show-queue;
                 player-bar-show-volume: root.player-bar-show-volume;
                 theme-selected(idx) => { root.theme-selected(idx); }
+                custom-theme-selected(name) => { root.custom-theme-selected(name); }
                 cycle-playback-speed => { root.cycle-playback-speed(); }
                 sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
                 audio-quality-selected(idx) => { root.audio-quality-selected(idx); }

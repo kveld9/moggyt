@@ -51,6 +51,9 @@ const fn default_stream_cache_limit_mb() -> u32 {
 pub struct Settings {
     /// Active UI theme.
     pub theme: ThemeId,
+    /// Active custom theme name when Custom theme is selected.
+    #[serde(default)]
+    pub custom_theme_name: Option<String>,
     /// Active interface locale.
     pub locale: Locale,
     /// Playback volume level (0..=100).
@@ -129,6 +132,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: ThemeId::White,
+            custom_theme_name: None,
             locale: Locale::English,
             volume: 100,
             playback_speed: 1.0,
@@ -162,6 +166,7 @@ impl Settings {
     pub fn fallback() -> Self {
         Self {
             theme: ThemeId::White,
+            custom_theme_name: None,
             locale: Locale::detect(),
             volume: 100,
             playback_speed: 1.0,
@@ -368,6 +373,7 @@ mod tests {
 
         let modified = Settings {
             theme: ThemeId::BlackOled,
+            custom_theme_name: Some("rose-pine".to_string()),
             locale: Locale::Spanish,
             volume: 75,
             playback_speed: 1.25,
@@ -769,5 +775,19 @@ mod tests {
         assert_eq!(store.load().stream_cache_limit_mb, 10240);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_custom_theme_name_serde_defaults_and_explicit_deserialization() {
+        let explicit: Settings = serde_json::from_str(r#"{"custom_theme_name": "rose-pine"}"#)
+            .expect("deserialize explicit");
+        assert_eq!(explicit.custom_theme_name.as_deref(), Some("rose-pine"));
+
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(omitted.custom_theme_name, None);
+
+        let roundtrip = serde_json::to_string(&explicit).expect("serialize settings");
+        let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
+        assert_eq!(decoded.custom_theme_name.as_deref(), Some("rose-pine"));
     }
 }

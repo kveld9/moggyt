@@ -112,6 +112,7 @@ The configuration file uses JSON serialization with atomic replacement:
 ```json
 {
   "theme": "white",
+  "custom_theme_name": null,
   "locale": "en",
   "volume": 100,
   "crossfade_seconds": 0,
@@ -139,8 +140,11 @@ The configuration file uses JSON serialization with atomic replacement:
   - `"white"`: Clean light palette (tranche 1 default).
   - `"black-oled"`: Pure black background (`#000000`) designed for OLED panels.
   - `"mono"`: High-contrast monochromatic palette with zero color saturation across all slots.
-  - `"custom"`: Palette from `custom-theme.json` in the config directory, falling back to Black OLED until a valid
+  - `"custom"`: Palette loaded from the active custom theme JSON file, falling back to Black OLED until a valid
     file loads.
+- **Custom Theme Name (`custom_theme_name`)**:
+  - Optional string (default `null`). Identifies the selected custom theme name corresponding to a
+    `<config_dir>/themes/<name>.json` file or `"custom-theme"` for `<config_dir>/custom-theme.json`.
 - **Locales (`locale`)**:
   - `"en"`: English (fallback when system language is not Spanish or unparseable).
   - `"es"`: Spanish (`Español`).
@@ -187,9 +191,17 @@ The configuration file uses JSON serialization with atomic replacement:
   - `player_bar_show_queue` (boolean, default `true`): Whether queue button is shown.
   - `player_bar_show_volume` (boolean, default `true`): Whether speaker icon and volume slider are shown.
 
-### Custom Theme File
+### Custom Theme Files and Themes Directory
 
-User-defined color palettes are loaded from `custom-theme.json` located in the same directory as `settings.json`.
+User-defined color palettes can be loaded from individual theme files inside `<config_dir>/themes/*.json` or from
+`custom-theme.json` in the configuration directory:
+
+- **Themes Directory**: `<config_dir>/themes/` is scanned for `.json` files. The file stem becomes the theme identifier
+  (for example, `themes/rose-pine.json` becomes `rose-pine`).
+- **Legacy Fallback**: `<config_dir>/custom-theme.json` is automatically included as `"custom-theme"` when present.
+- **In-App Selection**: when Custom theme is active in Settings > Theme, an interactive selector displays all available
+  custom themes. Selecting a theme immediately activates it and persists `custom_theme_name` to `settings.json`. If no
+  custom themes are installed, an informational hint directs users to place `.json` theme files in `themes/`.
 
 ```json
 {
@@ -214,7 +226,8 @@ User-defined color palettes are loaded from `custom-theme.json` located in the s
 - Each slot value must be formatted as `"#rrggbb"` (case-insensitive 6-digit hex with leading `#`).
 - Missing slots inherit from a base palette: `Palette::black_oled()` when dark, `Palette::white()` when light.
 - Any unrecognized key causes a validation error for typo safety.
-- While the Custom theme is active, the application polls and reloads the file within about half a second of a change.
+- While the Custom theme is active, the application polls and reloads the active theme file within about half a second
+  of a change.
 - If a write or parse error occurs (such as a half-written file), the client logs a warning, keeps the last valid
   palette, and displays the error in the theme settings panel.
 

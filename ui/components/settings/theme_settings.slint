@@ -5,8 +5,11 @@ import { SettingsModeButton } from "../settings_rows.slint";
 export component ThemeSettings inherits VerticalLayout {
     in property <int> active-theme-index: 0;
     in property <string> custom-theme-status-text: "";
+    in property <[string]> custom-themes: [];
+    in property <string> active-custom-theme: "";
 
     callback theme-selected(int);
+    callback custom-theme-selected(string);
 
     spacing: 10px;
 
@@ -45,7 +48,23 @@ export component ThemeSettings inherits VerticalLayout {
         }
     }
 
-    if root.active-theme-index == 3: Text {
+    if root.active-theme-index == 3 && root.custom-themes.length > 0 : HorizontalLayout {
+        spacing: 8px;
+        for theme-name in root.custom-themes : SettingsModeButton {
+            label: theme-name;
+            is-active: theme-name == root.active-custom-theme;
+            clicked => { root.custom-theme-selected(theme-name); }
+        }
+    }
+
+    if root.active-theme-index == 3 && root.custom-themes.length == 0 : Text {
+        text: Labels.custom-theme-empty-hint-label;
+        color: Theme.secondary;
+        font-size: 12px;
+        wrap: word-wrap;
+    }
+
+    if root.active-theme-index == 3 && root.custom-theme-status-text != "" : Text {
         text: root.custom-theme-status-text;
         color: Theme.secondary;
         font-size: 12px;
