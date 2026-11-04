@@ -374,4 +374,51 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
+
+    #[test]
+    fn test_custom_theme_file_integration_available_themes() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        let temp_dir = std::env::temp_dir()
+            .join(format!("moggyt-test-shell-theme-avail-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let themes_dir = temp_dir.join("themes");
+        std::fs::create_dir_all(&themes_dir).unwrap();
+
+        std::fs::write(themes_dir.join("rose-pine.json"), r##"{"mode": "dark"}"##).unwrap();
+        std::fs::write(temp_dir.join("custom-theme.json"), r##"{"mode": "light"}"##).unwrap();
+
+        let custom = crate::infra::CustomThemeFile::new(&temp_dir);
+        state.custom_theme = Some(custom);
+
+        let available = state.custom_theme.as_ref().unwrap().available_themes();
+        assert_eq!(available, vec!["custom-theme".to_string(), "rose-pine".to_string()]);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_set_custom_theme_name_reloads_palette_and_persists() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        let temp_dir = std::env::temp_dir()
+            .join(format!("moggyt-test-shell-theme-persist-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let themes_dir = temp_dir.join("themes");
+        std::fs::create_dir_all(&themes_dir).unwrap();
+
+        std::fs::write(themes_dir.join("nord.json"), r##"{"mode": "dark", "window": "#2e3440"}"##)
+            .unwrap();
+
+        let custom = crate::infra::CustomThemeFile::new(&temp_dir);
+        state.custom_theme = Some(custom);
+        state.theme = ThemeId::Custom;
+
+        state.set_custom_theme_name(Some("nord"));
+        assert_eq!(state.settings_store.load().custom_theme_name.as_deref(), Some("nord"));
+        assert_eq!(state.custom_theme.as_ref().and_then(|ct| ct.active_theme_name()), Some("nord"));
+
+        state.reload_custom_theme();
+        assert_eq!(state.active_palette().window, [0x2e, 0x34, 0x40]);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 }

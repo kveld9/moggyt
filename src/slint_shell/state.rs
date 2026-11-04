@@ -414,6 +414,16 @@ impl SlintAppState {
         }
         self.signed_in = false;
     }
+
+    /// Sets active custom theme by name, updates handle, and persists preference.
+    pub fn set_custom_theme_name(&mut self, name: Option<&str>) {
+        if let Some(ref mut custom) = self.custom_theme {
+            custom.select_theme(name);
+        }
+        let mut settings = self.settings_store.load();
+        settings.custom_theme_name = name.map(ToString::to_string);
+        let _ = self.settings_store.save(&settings);
+    }
 }
 
 impl<T: ?Sized + Catalog> Catalog for Box<T> {
