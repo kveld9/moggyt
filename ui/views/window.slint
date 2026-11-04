@@ -1,7 +1,4 @@
-import {
-    Theme, TrackRowData, ShelfData, ExploreShelfData, LibraryItemData,
-    LyricLineData, ImportRowData, ImportAlternativeData,
-} from "../theme.slint";
+import { Theme, TrackRowData, ShelfData, ExploreShelfData, LibraryItemData, LyricLineData, ImportRowData, ImportAlternativeData } from "../theme.slint";
 import { Sidebar } from "../components/sidebar.slint";
 import { PlayerBar } from "../components/player_bar.slint";
 import { QueuePanel } from "../components/queue_panel.slint";
@@ -39,6 +36,8 @@ export component MoggytWindow inherits Window {
     in-out property <bool> show-settings: false;
     in-out property <int> active-theme-index: 0;
     in-out property <string> custom-theme-status-text: "";
+    in-out property <[string]> custom-theme-names: [];
+    in-out property <string> active-custom-theme-name: "";
     in-out property <string> playback-speed-text: "1.00x";
     in-out property <string> sleep-timer-status-text: "Timer: Off";
     in-out property <int> active-sleep-timer-index: 0;
@@ -124,6 +123,7 @@ export component MoggytWindow inherits Window {
     callback page-selected(int);
     callback back-pressed();
     callback theme-selected(int);
+    callback custom-theme-selected(string);
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
@@ -228,6 +228,8 @@ export component MoggytWindow inherits Window {
                     has-update: root.has-update;
                     active-theme-index: root.active-theme-index;
                     custom-theme-status-text: root.custom-theme-status-text;
+                    custom-theme-names: root.custom-theme-names;
+                    active-custom-theme-name: root.active-custom-theme-name;
                     playback-speed-text: root.playback-speed-text;
                     settings-cookie-text <=> root.settings-cookie-text;
                     app-version: root.app-version;
@@ -266,6 +268,7 @@ export component MoggytWindow inherits Window {
                     sign-in-submitted(t) => { root.sign-in-submitted(t); }
                     sign-out() => { root.sign-out(); }
                     theme-selected(idx) => { root.theme-selected(idx); }
+                    custom-theme-selected(name) => { root.custom-theme-selected(name); }
                     cycle-playback-speed => { root.cycle-playback-speed(); }
                     sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
                     audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
@@ -350,10 +353,7 @@ export component MoggytWindow inherits Window {
         status-text: root.import-status-text;
         browse-requested => { root.import-browse-requested(); }
         start-requested => { root.import-start-requested(); }
-        close-requested => {
-            root.show-import-modal = false;
-            root.import-close-requested();
-        }
+        close-requested => { root.show-import-modal = false; root.import-close-requested(); }
     }
 
     ImportProgress {
@@ -364,10 +364,7 @@ export component MoggytWindow inherits Window {
         high: root.import-high;
         review: root.import-review;
         unresolved: root.import-unresolved;
-        cancel-requested => {
-            root.import-running = false;
-            root.import-cancel-requested();
-        }
+        cancel-requested => { root.import-running = false; root.import-cancel-requested(); }
     }
 
     ImportReviewView {
