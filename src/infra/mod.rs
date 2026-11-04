@@ -95,7 +95,7 @@ pub use instance::{SingleInstanceGuard, instance_lock_name};
 pub use lastfm_auth::{
     LASTFM_API_KEY_ENV, LASTFM_AUTH_URL, LASTFM_SECRET_ENV, LastFmAppKeys, LastFmSession,
     SessionPoll, authorize_url, parse_session_response, parse_token_response, request_session,
-    request_token, session_request_params, token_request_params,
+    request_token, resolve_app_keys, session_request_params, token_request_params,
 };
 pub use lyric_overrides::{
     LyricOverrideDir, MAX_OVERRIDE_BYTES, default_lyrics_dir, sanitize_id, sanitize_video_id,
@@ -115,7 +115,7 @@ pub use playlist_store_disk::{
 };
 pub use presence::{NoopPresence, Presence};
 pub use presence_desktop::{DesktopPresence, MediaKeyAction, action_for, metadata_for, status_for};
-pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts};
+pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts, effective_app_id};
 pub use queue_store::{DiskQueueStore, MemoryQueueStore, QueueStore};
 pub use scrobble::{
     CredentialStore, KeyringCredentialStore, LastFmClient, LastFmCredentials,

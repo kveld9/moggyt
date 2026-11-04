@@ -77,6 +77,15 @@ pub struct Settings {
     /// Whether Discord Rich Presence is enabled.
     #[serde(default = "default_false")]
     pub discord_presence_enabled: bool,
+    /// Custom Discord Application ID (falls back to default when None or invalid).
+    #[serde(default)]
+    pub discord_app_id: Option<String>,
+    /// Last.fm API Key.
+    #[serde(default)]
+    pub lastfm_api_key: String,
+    /// Last.fm API Secret.
+    #[serde(default)]
+    pub lastfm_api_secret: String,
     /// Whether Last.fm live scrobbling is enabled.
     #[serde(default = "default_false")]
     pub lastfm_enabled: bool,
@@ -141,6 +150,9 @@ impl Default for Settings {
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             discord_presence_enabled: false,
+            discord_app_id: None,
+            lastfm_api_key: String::new(),
+            lastfm_api_secret: String::new(),
             lastfm_enabled: false,
             lastfm_username: String::new(),
             secondary_lastfm_enabled: false,
@@ -164,34 +176,7 @@ impl Default for Settings {
 impl Settings {
     /// Default fallback settings resolving the locale from system environment.
     pub fn fallback() -> Self {
-        Self {
-            theme: ThemeId::White,
-            custom_theme_name: None,
-            locale: Locale::detect(),
-            volume: 100,
-            playback_speed: 1.0,
-            crossfade_seconds: 0,
-            stream_cache_limit_mb: 512,
-            quality: AudioQuality::Standard,
-            keyboard_shortcuts: true,
-            discord_presence_enabled: false,
-            lastfm_enabled: false,
-            lastfm_username: String::new(),
-            secondary_lastfm_enabled: false,
-            hi_res_covers: false,
-            songs_only: false,
-            skip_silence: false,
-            loudness_normalization: false,
-            player_bar_mode: PlayerBarMode::Classic,
-            player_bar_show_artwork: true,
-            player_bar_show_like: true,
-            player_bar_show_shuffle: true,
-            player_bar_show_repeat: true,
-            player_bar_show_skip_seconds: false,
-            player_bar_show_queue: true,
-            player_bar_show_volume: true,
-            recent_searches: RecentSearches::default(),
-        }
+        Self { locale: Locale::detect(), ..Self::default() }
     }
 
     /// Sanitizes and clamps setting values to their valid operational bounds.
@@ -316,28 +301,6 @@ mod tests {
         let store = DiskSettingsStore::new(temp_dir.clone());
 
         let loaded = store.load();
-        assert_eq!(loaded.theme, ThemeId::White);
-        assert_eq!(loaded.locale, Locale::English);
-        assert_eq!(loaded.volume, 100);
-        assert_eq!(loaded.playback_speed, 1.0);
-        assert_eq!(loaded.stream_cache_limit_mb, 512);
-        assert_eq!(loaded.quality, AudioQuality::Standard);
-        assert!(loaded.keyboard_shortcuts);
-        assert!(!loaded.discord_presence_enabled);
-        assert!(!loaded.lastfm_enabled);
-        assert!(loaded.lastfm_username.is_empty());
-        assert!(!loaded.secondary_lastfm_enabled);
-        assert!(!loaded.hi_res_covers);
-        assert!(!loaded.skip_silence);
-        assert!(!loaded.loudness_normalization);
-        assert_eq!(loaded.player_bar_mode, PlayerBarMode::Classic);
-        assert!(loaded.player_bar_show_artwork);
-        assert!(loaded.player_bar_show_like);
-        assert!(loaded.player_bar_show_shuffle);
-        assert!(loaded.player_bar_show_repeat);
-        assert!(!loaded.player_bar_show_skip_seconds);
-        assert!(loaded.player_bar_show_queue);
-        assert!(loaded.player_bar_show_volume);
         assert_eq!(loaded, Settings::default());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -382,6 +345,9 @@ mod tests {
             quality: AudioQuality::High,
             keyboard_shortcuts: false,
             discord_presence_enabled: true,
+            discord_app_id: Some("123456789".to_string()),
+            lastfm_api_key: "api-key-abc".to_string(),
+            lastfm_api_secret: "api-secret-xyz".to_string(),
             lastfm_enabled: true,
             lastfm_username: "testuser".to_string(),
             secondary_lastfm_enabled: true,
@@ -417,54 +383,41 @@ mod tests {
         assert_eq!(fallback.theme, ThemeId::White);
         assert_eq!(fallback.locale, Locale::detect());
         assert_eq!(fallback.volume, 100);
-        assert_eq!(fallback.playback_speed, 1.0);
-        assert_eq!(fallback.quality, AudioQuality::Standard);
-        assert!(fallback.keyboard_shortcuts);
-        assert!(!fallback.discord_presence_enabled);
-        assert!(!fallback.lastfm_enabled);
-        assert!(!fallback.secondary_lastfm_enabled);
-        assert!(!fallback.hi_res_covers);
-        assert!(!fallback.songs_only);
-        assert!(!fallback.skip_silence);
-        assert!(!fallback.loudness_normalization);
-        assert_eq!(fallback.player_bar_mode, PlayerBarMode::Classic);
-        assert!(fallback.player_bar_show_artwork);
-        assert!(fallback.player_bar_show_like);
-        assert!(fallback.player_bar_show_shuffle);
-        assert!(fallback.player_bar_show_repeat);
-        assert!(!fallback.player_bar_show_skip_seconds);
-        assert!(fallback.player_bar_show_queue);
-        assert!(fallback.player_bar_show_volume);
+        assert_eq!(fallback, Settings { locale: Locale::detect(), ..Settings::default() });
     }
 
     #[test]
     fn test_old_schema_settings_json_backward_compatibility() {
         let json = r#"{"theme": "white", "locale": "en"}"#;
         let loaded: Settings = serde_json::from_str(json).expect("deserialization succeeds");
-        assert_eq!(loaded.theme, ThemeId::White);
-        assert_eq!(loaded.locale, Locale::English);
-        assert_eq!(loaded.volume, 100);
-        assert_eq!(loaded.playback_speed, 1.0);
-        assert_eq!(loaded.stream_cache_limit_mb, 512);
-        assert_eq!(loaded.quality, AudioQuality::Standard);
-        assert!(loaded.keyboard_shortcuts);
-        assert!(!loaded.discord_presence_enabled);
-        assert!(!loaded.lastfm_enabled);
-        assert!(loaded.lastfm_username.is_empty());
-        assert!(!loaded.secondary_lastfm_enabled);
-        assert!(!loaded.hi_res_covers);
-        assert!(!loaded.songs_only);
-        assert!(!loaded.skip_silence);
-        assert!(!loaded.loudness_normalization);
-        assert_eq!(loaded.player_bar_mode, PlayerBarMode::Classic);
-        assert!(loaded.player_bar_show_artwork);
-        assert!(loaded.player_bar_show_like);
-        assert!(loaded.player_bar_show_shuffle);
-        assert!(loaded.player_bar_show_repeat);
-        assert!(!loaded.player_bar_show_skip_seconds);
-        assert!(loaded.player_bar_show_queue);
-        assert!(loaded.player_bar_show_volume);
+        assert_eq!(loaded.discord_app_id, None);
+        assert!(loaded.lastfm_api_key.is_empty());
+        assert!(loaded.lastfm_api_secret.is_empty());
         assert_eq!(loaded, Settings::default());
+    }
+
+    #[test]
+    fn test_discord_app_id_and_lastfm_credentials_serde_defaults_and_roundtrip() {
+        let empty: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(empty.discord_app_id, None);
+        assert!(empty.lastfm_api_key.is_empty());
+        assert!(empty.lastfm_api_secret.is_empty());
+
+        let json = r#"{
+            "discord_app_id": "1234567890",
+            "lastfm_api_key": "my-key",
+            "lastfm_api_secret": "my-secret"
+        }"#;
+        let loaded: Settings = serde_json::from_str(json).expect("deserialize explicit");
+        assert_eq!(loaded.discord_app_id.as_deref(), Some("1234567890"));
+        assert_eq!(loaded.lastfm_api_key, "my-key");
+        assert_eq!(loaded.lastfm_api_secret, "my-secret");
+
+        let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
+        let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
+        assert_eq!(decoded.discord_app_id.as_deref(), Some("1234567890"));
+        assert_eq!(decoded.lastfm_api_key, "my-key");
+        assert_eq!(decoded.lastfm_api_secret, "my-secret");
     }
 
     #[test]

@@ -39,16 +39,43 @@ impl SlintAppState {
 
     /// Toggles Discord Rich Presence preference, recreating or shutting down the adapter.
     pub fn toggle_discord_presence(&mut self) {
-        let current = self.settings_store.load().discord_presence_enabled;
-        self.set_discord_presence(!current, DiscordPresence::new);
+        let settings = self.settings_store.load();
+        let current = settings.discord_presence_enabled;
+        let app_id = DiscordPresence::effective_app_id(settings.discord_app_id.as_deref());
+        self.set_discord_presence(!current, move || DiscordPresence::with_app_id(app_id));
+    }
+
+    /// Reconnects Discord presence with the configured application ID if currently enabled.
+    pub(crate) fn reconnect_discord_if_enabled(&mut self) {
+        let settings = self.settings_store.load();
+        if !settings.discord_presence_enabled {
+            return;
+        }
+        let app_id = DiscordPresence::effective_app_id(settings.discord_app_id.as_deref());
+        self.discord.shutdown();
+        self.discord = DiscordPresence::with_app_id(app_id);
+        if let Some((artist, title)) = self.last_presence_key.clone() {
+            self.discord.set_track(&artist, &title);
+        }
+    }
+
+    /// Updates the custom Discord application ID in persistent settings and reconnects if active.
+    pub(crate) fn update_discord_app_id(&mut self, val: &str) {
+        let mut settings = self.settings_store.load();
+        let trimmed = val.trim();
+        settings.discord_app_id = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
+        let _ = self.settings_store.save(&settings);
+        self.reconnect_discord_if_enabled();
     }
 }
 
 /// Wires Discord Rich Presence toggle callbacks to the Slint window.
 pub(crate) fn wire_discord_callbacks(window: &MoggytWindow, state_rc: &SharedState) {
     let integrations = window.global::<Integrations>();
-    let initial_enabled = state_rc.borrow().settings_store.load().discord_presence_enabled;
-    integrations.set_discord_presence_enabled(initial_enabled);
+    let initial_settings = state_rc.borrow().settings_store.load();
+    integrations.set_discord_presence_enabled(initial_settings.discord_presence_enabled);
+    integrations
+        .set_discord_app_id_input(initial_settings.discord_app_id.as_deref().unwrap_or("").into());
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
@@ -60,6 +87,16 @@ pub(crate) fn wire_discord_callbacks(window: &MoggytWindow, state_rc: &SharedSta
         st.toggle_discord_presence();
         let enabled = st.settings_store.load().discord_presence_enabled;
         win.global::<Integrations>().set_discord_presence_enabled(enabled);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    integrations.on_discord_app_id_edited(move |val| {
+        let Some(win) = w.upgrade() else {
+            return;
+        };
+        s.borrow_mut().update_discord_app_id(val.as_str());
+        win.global::<Integrations>().set_discord_app_id_input(val);
     });
 }
 
@@ -102,5 +139,26 @@ mod tests {
 
         state.set_discord_presence(false, DiscordPresence::dormant);
         assert_eq!(state.discord.last_published(), None);
+    }
+
+    #[test]
+    fn test_toggle_discord_presence_respects_custom_app_id() {
+        let mut state = test_wired();
+        let mut settings = state.settings_store.load();
+        settings.discord_app_id = Some("987654321".to_string());
+        state.settings_store.save(&settings).unwrap();
+
+        state.toggle_discord_presence();
+        assert!(state.settings_store.load().discord_presence_enabled);
+    }
+
+    #[test]
+    fn test_update_discord_app_id_updates_settings_and_trims() {
+        let mut state = test_wired();
+        state.update_discord_app_id("  123456789  ");
+        assert_eq!(state.settings_store.load().discord_app_id.as_deref(), Some("123456789"));
+
+        state.update_discord_app_id("   ");
+        assert_eq!(state.settings_store.load().discord_app_id, None);
     }
 }

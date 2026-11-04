@@ -44,6 +44,12 @@ impl LastFmAppKeys {
     }
 }
 
+/// Resolves Last.fm application keys from settings, falling back to compile-time build environment.
+pub fn resolve_app_keys(settings_key: &str, settings_secret: &str) -> Option<LastFmAppKeys> {
+    LastFmAppKeys::from_parts(Some(settings_key), Some(settings_secret))
+        .or_else(LastFmAppKeys::from_build_env)
+}
+
 /// Builds the web browser authorization URL for an unauthorized desktop request token.
 pub fn authorize_url(api_key: &str, token: &str) -> String {
     format!("{LASTFM_AUTH_URL}?api_key={api_key}&token={token}")
@@ -345,5 +351,17 @@ mod tests {
     fn test_parse_session_response_garbage_and_missing() {
         assert!(matches!(parse_session_response("not-valid-json"), SessionPoll::Failed(_)));
         assert!(matches!(parse_session_response("{}"), SessionPoll::Failed(_)));
+    }
+
+    #[test]
+    fn test_resolve_app_keys_prefers_custom_and_trims() {
+        let keys = resolve_app_keys(" my_key ", " my_secret ").expect("resolved keys");
+        assert_eq!(keys.api_key, "my_key");
+        assert_eq!(keys.secret, "my_secret");
+
+        // Blank settings key/secret falls back to build env (which is None in test environment)
+        assert_eq!(resolve_app_keys("", "sec"), LastFmAppKeys::from_build_env());
+        assert_eq!(resolve_app_keys("key", "   "), LastFmAppKeys::from_build_env());
+        assert_eq!(resolve_app_keys("", ""), LastFmAppKeys::from_build_env());
     }
 }

@@ -74,7 +74,14 @@ pub struct StaticLabels {
     pub section_integrations: &'static str,
     pub discord_presence_label: &'static str,
     pub discord_presence_hint_label: &'static str,
+    pub discord_app_id_label: &'static str,
+    pub discord_app_id_placeholder: &'static str,
     pub lastfm_label: &'static str,
+    pub lastfm_api_key_label: &'static str,
+    pub lastfm_api_key_placeholder: &'static str,
+    pub lastfm_api_secret_label: &'static str,
+    pub lastfm_api_secret_placeholder: &'static str,
+    pub save_integrations_label: &'static str,
     pub lastfm_connect_label: &'static str,
     pub lastfm_disconnect_label: &'static str,
     pub section_session: &'static str,
@@ -211,7 +218,14 @@ impl StaticLabels {
                 locale,
                 "Shows the current track in your Discord status while Discord is running.",
             ),
+            discord_app_id_label: tr(locale, "Custom Discord Application ID"),
+            discord_app_id_placeholder: tr(locale, "Default: 1566973935109541999"),
             lastfm_label: tr(locale, "Last.fm"),
+            lastfm_api_key_label: tr(locale, "Last.fm API Key"),
+            lastfm_api_key_placeholder: tr(locale, "API Key"),
+            lastfm_api_secret_label: tr(locale, "Last.fm Shared Secret"),
+            lastfm_api_secret_placeholder: tr(locale, "Shared Secret"),
+            save_integrations_label: tr(locale, "Save Credentials"),
             lastfm_connect_label: tr(locale, "Connect with Last.fm"),
             lastfm_disconnect_label: tr(locale, "Disconnect"),
             section_session: tr(locale, "Session"),
@@ -351,7 +365,14 @@ impl StaticLabels {
         labels.set_section_integrations_label(self.section_integrations.into());
         labels.set_discord_presence_label(self.discord_presence_label.into());
         labels.set_discord_presence_hint_label(self.discord_presence_hint_label.into());
+        labels.set_discord_app_id_label(self.discord_app_id_label.into());
+        labels.set_discord_app_id_placeholder(self.discord_app_id_placeholder.into());
         labels.set_lastfm_label(self.lastfm_label.into());
+        labels.set_lastfm_api_key_label(self.lastfm_api_key_label.into());
+        labels.set_lastfm_api_key_placeholder(self.lastfm_api_key_placeholder.into());
+        labels.set_lastfm_api_secret_label(self.lastfm_api_secret_label.into());
+        labels.set_lastfm_api_secret_placeholder(self.lastfm_api_secret_placeholder.into());
+        labels.set_save_integrations_label(self.save_integrations_label.into());
         labels.set_lastfm_connect_label(self.lastfm_connect_label.into());
         labels.set_lastfm_disconnect_label(self.lastfm_disconnect_label.into());
         labels.set_section_session_label(self.section_session.into());
@@ -436,6 +457,13 @@ mod tests {
         assert_eq!(en_labels.lastfm_label, "Last.fm");
         assert_eq!(en_labels.lastfm_connect_label, "Connect with Last.fm");
         assert_eq!(en_labels.lastfm_disconnect_label, "Disconnect");
+        assert_eq!(en_labels.discord_app_id_label, "Custom Discord Application ID");
+        assert_eq!(en_labels.discord_app_id_placeholder, "Default: 1566973935109541999");
+        assert_eq!(en_labels.lastfm_api_key_label, "Last.fm API Key");
+        assert_eq!(en_labels.lastfm_api_key_placeholder, "API Key");
+        assert_eq!(en_labels.lastfm_api_secret_label, "Last.fm Shared Secret");
+        assert_eq!(en_labels.lastfm_api_secret_placeholder, "Shared Secret");
+        assert_eq!(en_labels.save_integrations_label, "Save Credentials");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -450,6 +478,13 @@ mod tests {
         assert_eq!(es_labels.lastfm_label, "Last.fm");
         assert_eq!(es_labels.lastfm_connect_label, "Conectar con Last.fm");
         assert_eq!(es_labels.lastfm_disconnect_label, "Desconectar");
+        assert_eq!(es_labels.discord_app_id_label, "ID de aplicación personalizada de Discord");
+        assert_eq!(es_labels.discord_app_id_placeholder, "Por defecto: 1566973935109541999");
+        assert_eq!(es_labels.lastfm_api_key_label, "Clave API de Last.fm");
+        assert_eq!(es_labels.lastfm_api_key_placeholder, "Clave API");
+        assert_eq!(es_labels.lastfm_api_secret_label, "Clave secreta de Last.fm");
+        assert_eq!(es_labels.lastfm_api_secret_placeholder, "Clave secreta");
+        assert_eq!(es_labels.save_integrations_label, "Guardar credenciales");
     }
 
     #[test]
