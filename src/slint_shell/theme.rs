@@ -148,6 +148,9 @@ impl SlintAppState {
         let Some(ref mut custom) = self.custom_theme else {
             return;
         };
+        if custom.active_theme_name().is_none() && !custom.path().exists() {
+            return;
+        }
         let path_display = custom.path().display().to_string();
         match custom.load() {
             Ok(palette) => {
@@ -418,6 +421,27 @@ mod tests {
 
         state.reload_custom_theme();
         assert_eq!(state.active_palette().window, [0x2e, 0x34, 0x40]);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_reload_custom_theme_early_return_when_no_theme_and_missing_file() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        let temp_dir = std::env::temp_dir()
+            .join(format!("moggyt-test-shell-theme-missing-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let custom = crate::infra::CustomThemeFile::new(&temp_dir);
+        state.custom_theme = Some(custom);
+        state.theme = ThemeId::Custom;
+        state.custom_theme_status = String::new();
+
+        state.reload_custom_theme();
+
+        assert!(state.custom_palette.is_none());
+        assert!(state.custom_theme_status.is_empty());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
