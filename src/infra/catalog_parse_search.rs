@@ -2,18 +2,50 @@
 
 use super::catalog_model::{RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits};
 use super::catalog_parse_common::{
-    best_thumbnail, browse_of, flex_text, music_video_type, parse_two_row, watch_video_id,
+    best_thumbnail, browse_of, flex_text, music_video_type, parse_duration_secs, parse_two_row,
+    watch_video_id,
 };
 use crate::domain::SearchFilter;
 use serde_json::Value;
+
+const DURATION_PATHS: &[&str] = &[
+    "/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text",
+    "/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/simpleText",
+    "/lengthText/runs/0/text",
+    "/lengthText/simpleText",
+];
+
+fn fixed_or_length_duration(renderer: &Value) -> Option<u32> {
+    DURATION_PATHS
+        .iter()
+        .find_map(|p| renderer.pointer(p).and_then(Value::as_str).and_then(parse_duration_secs))
+}
+
+fn run_duration(run: &Value) -> Option<u32> {
+    run.get("text").and_then(Value::as_str).and_then(parse_duration_secs)
+}
+
+fn col_duration(col: &Value) -> Option<u32> {
+    let runs = col.pointer("/musicResponsiveListItemFlexColumnRenderer/text/runs")?.as_array()?;
+    runs.iter().find_map(run_duration)
+}
+
+fn flex_duration(renderer: &Value) -> Option<u32> {
+    renderer.get("flexColumns")?.as_array()?.iter().find_map(col_duration)
+}
+
+fn search_duration(renderer: &Value) -> Option<u32> {
+    fixed_or_length_duration(renderer).or_else(|| flex_duration(renderer))
+}
 
 fn parse_item(renderer: &Value) -> Option<RawTrack> {
     let video_id = watch_video_id(renderer)?;
     let title = flex_text(renderer, 0)?;
     let artist = flex_text(renderer, 1).unwrap_or_default();
+    let duration_secs = search_duration(renderer);
     let thumb_url = best_thumbnail(renderer);
     let video_type = music_video_type(renderer);
-    Some(RawTrack { video_id, title, artist, duration_secs: None, thumb_url, video_type })
+    Some(RawTrack { video_id, title, artist, duration_secs, thumb_url, video_type })
 }
 
 fn collect_shelf_items(shelf: &Value, out: &mut Vec<RawTrack>) {
@@ -194,7 +226,7 @@ fn dispatch_bare_track(renderer: &Value, title: String, artist: String, hits: &m
         video_id,
         title,
         artist,
-        duration_secs: None,
+        duration_secs: search_duration(renderer),
         thumb_url,
         video_type,
     });
@@ -360,6 +392,34 @@ mod tests {
         let tracks = parse_search_tracks(&payload);
         assert!(!tracks.is_empty());
         assert!(tracks.iter().all(|t| t.video_type == Some(crate::domain::MusicVideoType::Atv)));
+        assert_eq!(tracks[0].duration_secs, Some(224));
+        assert_eq!(tracks[2].duration_secs, Some(156));
+    }
+
+    #[test]
+    fn search_duration_extracts_from_fixed_length_and_flex_columns() {
+        let fixed_run = serde_json::json!({
+            "fixedColumns": [{"musicResponsiveListItemFixedColumnRenderer": {"text": {"runs": [{"text": "3:45"}]}}}]
+        });
+        let fixed_simple = serde_json::json!({
+            "fixedColumns": [{"musicResponsiveListItemFixedColumnRenderer": {"text": {"simpleText": "1:20"}}}]
+        });
+        let length_run = serde_json::json!({"lengthText": {"runs": [{"text": "2:30"}]}});
+        let length_simple = serde_json::json!({"lengthText": {"simpleText": "4:00"}});
+        let flex = serde_json::json!({
+            "flexColumns": [{
+                "musicResponsiveListItemFlexColumnRenderer": {
+                    "text": {"runs": [{"text": "Artist"}, {"text": "3:44"}]}
+                }
+            }]
+        });
+
+        assert_eq!(search_duration(&fixed_run), Some(225));
+        assert_eq!(search_duration(&fixed_simple), Some(80));
+        assert_eq!(search_duration(&length_run), Some(150));
+        assert_eq!(search_duration(&length_simple), Some(240));
+        assert_eq!(search_duration(&flex), Some(224));
+        assert_eq!(search_duration(&serde_json::json!({})), None);
     }
 
     #[test]
