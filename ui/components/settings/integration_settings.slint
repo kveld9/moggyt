@@ -36,25 +36,6 @@ export component IntegrationSettings inherits VerticalLayout {
             }
 
             VerticalLayout {
-                spacing: 6px;
-
-                Text {
-                    text: Labels.discord-app-id-label;
-                    color: Theme.text;
-                    font-size: 13px;
-                    font-weight: 600;
-                }
-
-                StyledInputField {
-                    height: 32px;
-                    text <=> Integrations.discord-app-id-input;
-                    placeholder-text: Labels.discord-app-id-placeholder;
-                    edited(t) => { Integrations.discord-app-id-edited(t); }
-                    accepted(t) => { Integrations.discord-app-id-edited(t); }
-                }
-            }
-
-            VerticalLayout {
                 spacing: 10px;
 
                 Text {

@@ -115,7 +115,7 @@ pub use playlist_store_disk::{
 };
 pub use presence::{NoopPresence, Presence};
 pub use presence_desktop::{DesktopPresence, MediaKeyAction, action_for, metadata_for, status_for};
-pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts, effective_app_id};
+pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts};
 pub use queue_store::{DiskQueueStore, MemoryQueueStore, QueueStore};
 pub use scrobble::{
     CredentialStore, KeyringCredentialStore, LastFmClient, LastFmCredentials,

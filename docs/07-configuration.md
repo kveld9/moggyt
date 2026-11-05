@@ -176,12 +176,10 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Keyboard Shortcuts (`keyboard_shortcuts`)**:
   - `true`: Global transport and playback shortcuts enabled (default).
   - `false`: Shortcuts disabled.
-- **Discord Rich Presence (`discord_presence_enabled`, `discord_app_id`)**:
+- **Discord Rich Presence (`discord_presence_enabled`)**:
   - `discord_presence_enabled` (boolean, default `false`):
     - `false`: Discord Rich Presence disabled; no IPC connection is attempted (default).
     - `true`: Outbound Rich Presence enabled; broadcasts a "Listening to moggyt" activity with track title and artist.
-  - `discord_app_id` (optional string, default `null`): Custom Discord application client ID. When set to a valid,
-    non-zero numerical ID string, moggyt connects to this Discord Application instead of the default client ID.
 - **Last.fm Integration (`lastfm_enabled`, `lastfm_username`, `lastfm_api_key`, `lastfm_api_secret`)**:
   - `lastfm_enabled` (boolean, default `false`): Whether live scrobbling to Last.fm is enabled.
   - `lastfm_username` (string, default `""`): Display name of the connected Last.fm account.

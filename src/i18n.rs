@@ -122,7 +122,6 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Custom Discord Application ID", "ID de aplicación personalizada de Discord"),
     ("Custom theme loaded from {path}", "Tema personalizado cargado desde {path}"),
     ("Custom theme not loaded: {error}", "Tema personalizado no cargado: {error}"),
-    ("Default: 1566973935109541999", "Por defecto: 1566973935109541999"),
     ("Detail", "Detalle"),
     ("Discard", "Descartar"),
     ("Disconnect", "Desconectar"),
@@ -140,7 +139,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Floating", "Flotante"),
     ("From file", "Desde archivo"),
     ("From link", "Desde enlace"),
-    ("High", "Alta"),
+    ("High (>=192 kbps)", "Alta (>=192 kbps)"),
     ("High confidence", "Confianza alta"),
     ("History", "Historial"),
     ("Import", "Importar"),
@@ -149,7 +148,6 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Import progress", "Progreso de importacion"),
     ("Importing matches...", "Importando coincidencias..."),
     ("Integrations", "Integraciones"),
-    ("Keyboard shortcuts", "Atajos de teclado"),
     ("Language", "Idioma"),
     ("Last 4 weeks", "Últimas 4 semanas"),
     ("Last 6 months", "Últimos 6 meses"),
@@ -161,7 +159,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Listening time", "Tiempo escuchado"),
     ("Loading...", "Cargando..."),
     ("Loading explore...", "Cargando exploracion..."),
-    ("Low", "Baja"),
+    ("Low (<=64 kbps)", "Baja (<=64 kbps)"),
     ("Low confidence", "Confianza baja"),
     ("Lyrics unavailable", "Letras no disponibles"),
     ("Matched", "Coincidencias"),
@@ -243,7 +241,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Spanish", "Español"),
     ("Spotify playlist or album link", "Enlace de playlist o album de Spotify"),
     ("Start import", "Iniciar importacion"),
-    ("Standard", "Estándar"),
+    ("Standard (~128 kbps)", "Estándar (~128 kbps)"),
     ("Stats", "Estadísticas"),
     ("Status: Anonymous", "Estado: Anónimo"),
     ("Status: Signed in", "Estado: Sesión iniciada"),
@@ -391,7 +389,6 @@ mod tests {
             tr(Locale::Spanish, "Prefer songs over music videos"),
             "Preferir canciones a videoclips"
         );
-        assert_eq!(tr(Locale::Spanish, "Keyboard shortcuts"), "Atajos de teclado");
 
         // Stats page labels
         assert_eq!(tr(Locale::Spanish, "Last 4 weeks"), "Últimas 4 semanas");
@@ -479,7 +476,13 @@ mod tests {
 
     #[test]
     fn test_audio_quality_i18n_strings_exist_and_differ() {
-        let keys = ["Audio quality", "Applies from the next track", "Low", "Standard", "High"];
+        let keys = [
+            "Audio quality",
+            "Applies from the next track",
+            "Low (<=64 kbps)",
+            "Standard (~128 kbps)",
+            "High (>=192 kbps)",
+        ];
         for key in keys {
             let en = tr(Locale::English, key);
             let es = tr(Locale::Spanish, key);
@@ -616,8 +619,6 @@ mod tests {
     fn test_custom_integrations_i18n_strings_exist_and_differ() {
         let keys_and_expected = [
             ("API Key", "Clave API"),
-            ("Custom Discord Application ID", "ID de aplicación personalizada de Discord"),
-            ("Default: 1566973935109541999", "Por defecto: 1566973935109541999"),
             ("Last.fm API Key", "Clave API de Last.fm"),
             ("Last.fm Shared Secret", "Clave secreta de Last.fm"),
             ("Save Credentials", "Guardar credenciales"),
