@@ -3,6 +3,19 @@
 Native YouTube Music client in Rust (Slint). Hexagonal skeleton:
 UI shell (`src/slint_shell/`) → pure domain (`src/domain/`) ← ports ← adapters (`src/infra/`).
 
+## Tech stack
+
+- **Core & Toolchain**: Rust (edition 2024, `rust-version = "1.85"`), Slint 1.13 (`slint`, `slint-build`).
+- **Audio & Streaming**: `rodio` 0.21 (dual-sink crossfade, ALSA backend `libasound2`), `yt-dlp` sidecar
+  (standalone, auto-managed under app data; requires `deno` for JS extraction), `reqwest` 0.12 (HTTP streaming
+  with `rustls-tls`).
+- **Desktop Integrations**: `souvlaki` 0.8 (MPRIS / SMTC media keys and presence), `tray-icon` 0.24 (GTK system
+  tray), `discord-rich-presence` 1.1, `single-instance` 0.3, `rfd` 0.17 (`xdg-portal`).
+- **Security & Storage**: `keyring` 3 (OS credential store: Secret Service / Windows Credential Manager),
+  `play-log.jsonl` (JSON Lines listening history), atomic JSON configuration (`settings.json`, custom themes).
+- **External Services**: YouTube Music catalog API, LRCLIB REST API (synced lyrics with dynamic offset),
+  Last.fm API (scrobbling with MD5 signatures via `md-5`).
+
 ## Verify (same gates as CI)
 
 ```bash
@@ -11,9 +24,10 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
 ./scripts/check-repo.sh
 ./scripts/check-markdown.sh
+./scripts/check-i18n.sh
 ```
 
-Run all five before finishing. `cargo run` launches the window.
+Run all six before finishing. `cargo run` launches the window.
 
 ## Architecture invariants (see `docs/02-architecture.md`)
 
