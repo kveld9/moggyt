@@ -129,6 +129,27 @@ pub fn browse_id(renderer: &Value) -> Option<String> {
     browse_of(renderer)
 }
 
+/// Extracts a browse pageType string from navigation endpoints.
+pub fn browse_page_type(renderer: &Value) -> Option<&str> {
+    const PATHS: &[&str] = &[
+        "/navigationEndpoint/browseEndpoint/pageType",
+        "/navigationEndpoint/browseEndpoint/browseEndpointContextSupportedConfigs/browseEndpointContextMusicConfig/pageType",
+        "/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/browseEndpoint/pageType",
+        "/flexColumns/0/musicResponsiveListItemFlexColumnRenderer/text/runs/0/navigationEndpoint/browseEndpoint/browseEndpointContextSupportedConfigs/browseEndpointContextMusicConfig/pageType",
+        "/title/runs/0/navigationEndpoint/browseEndpoint/pageType",
+        "/title/runs/0/navigationEndpoint/browseEndpoint/browseEndpointContextSupportedConfigs/browseEndpointContextMusicConfig/pageType",
+    ];
+    for path in PATHS {
+        if let Some(pt) = renderer.pointer(path).and_then(Value::as_str) {
+            let trimmed = pt.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
 /// Parses title, subtitle, and optional browse ID from a two-row item renderer.
 pub fn parse_two_row(renderer: &Value) -> Option<(String, String, Option<String>)> {
     let title = two_row_title(renderer)?;
@@ -227,6 +248,57 @@ pub fn parse_track_count(text: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn browse_page_type_extraction() {
+        let direct = serde_json::json!({
+            "navigationEndpoint": {
+                "browseEndpoint": {
+                    "browseId": "MPREb_1",
+                    "pageType": "MUSIC_PAGE_TYPE_ALBUM"
+                }
+            }
+        });
+        assert_eq!(browse_page_type(&direct), Some("MUSIC_PAGE_TYPE_ALBUM"));
+
+        let nested = serde_json::json!({
+            "navigationEndpoint": {
+                "browseEndpoint": {
+                    "browseEndpointContextSupportedConfigs": {
+                        "browseEndpointContextMusicConfig": {
+                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                        }
+                    }
+                }
+            }
+        });
+        assert_eq!(browse_page_type(&nested), Some("MUSIC_PAGE_TYPE_ARTIST"));
+
+        let col = serde_json::json!({
+            "flexColumns": [
+                {
+                    "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {
+                            "runs": [
+                                {
+                                    "text": "Playlist",
+                                    "navigationEndpoint": {
+                                        "browseEndpoint": {
+                                            "pageType": "MUSIC_PAGE_TYPE_PLAYLIST"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        });
+        assert_eq!(browse_page_type(&col), Some("MUSIC_PAGE_TYPE_PLAYLIST"));
+
+        let empty = serde_json::json!({});
+        assert_eq!(browse_page_type(&empty), None);
+    }
 
     #[test]
     fn best_thumbnail_resolution_and_fallback_table() {

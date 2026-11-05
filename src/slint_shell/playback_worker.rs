@@ -302,21 +302,18 @@ pub fn execute_seek<A: AudioBackend>(position_secs: u64, audio: &Arc<Mutex<A>>) 
 /// Executes blocking search request off the UI thread and wraps results in a shelf.
 pub fn execute_search<C: Catalog>(
     generation: u64,
-    query: &str,
+    query: &SearchQuery,
     catalog: &Arc<Mutex<C>>,
     locale: Locale,
     songs_only: bool,
 ) -> (u64, String, Vec<Shelf>) {
-    let Some(parsed) = SearchQuery::parse(query) else {
-        return (generation, query.to_string(), Vec::new());
-    };
-    let mut items = catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
+    let mut items = catalog.lock().map(|c| c.search_filtered(query)).unwrap_or_default();
     if songs_only {
         items = crate::domain::retain_song_results(items);
     }
     let mut shelf = Shelf::new(tr(locale, "Search Results"));
     shelf.items = items;
-    (generation, query.to_string(), vec![shelf])
+    (generation, query.text().to_string(), vec![shelf])
 }
 
 /// Executes blocking detail lookup off the UI thread.
@@ -348,6 +345,7 @@ pub fn execute_refresh_library<C: Catalog>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::SearchFilter;
     use crate::infra::{AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, StubScrobbler};
 
     #[test]
@@ -395,9 +393,11 @@ mod tests {
     fn test_execute_search_in_worker_thread() {
         let catalog = Arc::new(Mutex::new(CatalogStub::new()));
         let cat_clone = Arc::clone(&catalog);
+        let q = SearchQuery::parse("rock").expect("valid query");
+        let q_clone = q.clone();
 
         let handle = std::thread::spawn(move || {
-            execute_search(42, "rock", &cat_clone, Locale::English, false)
+            execute_search(42, &q_clone, &cat_clone, Locale::English, false)
         });
 
         let (generation, query, shelves) = handle.join().expect("thread join succeeds");
@@ -406,11 +406,18 @@ mod tests {
         assert_eq!(shelves.len(), 1);
         assert_eq!(shelves[0].title, "Search Results");
 
-        let handle_es = std::thread::spawn(move || {
-            execute_search(43, "rock", &catalog, Locale::Spanish, false)
-        });
+        let cat_es = Arc::clone(&catalog);
+        let handle_es =
+            std::thread::spawn(move || execute_search(43, &q, &cat_es, Locale::Spanish, false));
         let (_, _, shelves_es) = handle_es.join().expect("thread join succeeds");
         assert_eq!(shelves_es[0].title, "Resultados de búsqueda");
+
+        let q_albums =
+            SearchQuery::parse("rock").expect("valid query").with_filter(SearchFilter::Albums);
+        let (_, _, shelves_albums) =
+            execute_search(44, &q_albums, &catalog, Locale::English, false);
+        assert_eq!(shelves_albums[0].items.len(), 1);
+        assert_eq!(shelves_albums[0].items[0].kind(), SearchFilter::Albums);
     }
 
     #[derive(Debug, Default)]
@@ -452,7 +459,8 @@ mod tests {
     #[test]
     fn test_execute_search_with_songs_only_drops_video() {
         let catalog = Arc::new(Mutex::new(VideoTrackSearchCatalog));
-        let (_, _, shelves) = execute_search(1, "query", &catalog, Locale::English, true);
+        let q = SearchQuery::parse("query").expect("valid query");
+        let (_, _, shelves) = execute_search(1, &q, &catalog, Locale::English, true);
         assert_eq!(shelves.len(), 1);
         assert_eq!(shelves[0].items.len(), 1);
         match &shelves[0].items[0] {
@@ -495,8 +503,9 @@ mod tests {
     #[test]
     fn test_execute_search_with_songs_only_drops_video_classified_by_badge() {
         let catalog = Arc::new(Mutex::new(BadgeVideoSearchCatalog));
-        let (_, _, unfiltered) = execute_search(1, "bachata", &catalog, Locale::English, false);
-        let (_, _, filtered) = execute_search(1, "bachata", &catalog, Locale::English, true);
+        let q = SearchQuery::parse("bachata").expect("valid query");
+        let (_, _, unfiltered) = execute_search(1, &q, &catalog, Locale::English, false);
+        let (_, _, filtered) = execute_search(1, &q, &catalog, Locale::English, true);
 
         let contains_video = |shelves: &[Shelf]| {
             shelves.iter().flat_map(|s| &s.items).any(|item| match item {

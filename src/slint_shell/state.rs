@@ -209,10 +209,15 @@ impl SlintAppState {
 
     /// Submits search query to catalog and wraps hits in a shelf.
     pub fn submit_search(&mut self, query: &str) {
+        self.submit_search_with_filter(query, SearchFilter::All);
+    }
+
+    /// Submits search query with a filter to catalog and wraps hits in a shelf.
+    pub fn submit_search_with_filter(&mut self, query: &str, filter: SearchFilter) {
         self.search_query = query.to_string();
-        self.search_filter = SearchFilter::All;
+        self.search_filter = filter;
         self.search_covers.clear();
-        let Some(parsed) = SearchQuery::parse(query) else {
+        let Some(parsed) = SearchQuery::parse(query).map(|q| q.with_filter(filter)) else {
             return;
         };
         self.search_active = true;
@@ -695,6 +700,9 @@ mod tests {
         state.submit_search("rock");
         assert_eq!(state.search_filter, SearchFilter::All);
         assert!(state.search_covers.is_empty());
+
+        state.submit_search_with_filter("rock", SearchFilter::Albums);
+        assert_eq!(state.search_filter, SearchFilter::Albums);
     }
 
     #[test]

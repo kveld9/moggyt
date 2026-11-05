@@ -10,9 +10,9 @@ use super::catalog_parse_search::{parse_search_all, parse_search_tracks};
 use super::catalog_requests::{
     CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
     LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_url, next_body,
-    next_url, search_body,
+    next_url, search_body, search_body_with_params, search_filter_params,
 };
-use crate::domain::{Album, Detail, DetailKind, Playlist, Shelf};
+use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, Shelf};
 use crate::i18n::Locale;
 use serde_json::Value;
 use std::time::Duration;
@@ -79,20 +79,31 @@ impl CatalogClient {
         self.cookies.is_some()
     }
 
-    /// Executes search request and returns the unparsed JSON response payload.
-    pub fn search_payload(&self, query: &str) -> anyhow::Result<Value> {
+    fn execute_search_payload(&self, body: &Value) -> anyhow::Result<Value> {
         let url = format!(
             "https://music.youtube.com/youtubei/v1/search?key={}&prettyPrint=false",
             self.api_key
         );
-        let body = search_body(query, self.locale);
-        let response = self.client.post(&url).json(&body).send()?;
+        let response = self.client.post(&url).json(body).send()?;
         let status = response.status();
         if !status.is_success() {
             anyhow::bail!("CatalogClient search request failed with status: {status}");
         }
         let payload: Value = response.json()?;
         Ok(payload)
+    }
+
+    /// Executes search request and returns the unparsed JSON response payload.
+    pub fn search_payload(&self, query: &str) -> anyhow::Result<Value> {
+        let body = search_body(query, self.locale);
+        self.execute_search_payload(&body)
+    }
+
+    /// Executes filtered search request and returns the unparsed JSON response payload.
+    pub fn search_payload_filtered(&self, query: &SearchQuery) -> anyhow::Result<Value> {
+        let params = search_filter_params(query.filter());
+        let body = search_body_with_params(query.text(), self.locale, params);
+        self.execute_search_payload(&body)
     }
 
     /// Performs search for `query` and returns parsed tracks.

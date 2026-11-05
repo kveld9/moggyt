@@ -52,9 +52,9 @@ impl LiveCatalog {
         self.client.is_authenticated()
     }
 
-    fn fetch_hits(&self, query_text: &str) -> SearchHits {
+    fn fetch_hits(&self, query: &SearchQuery) -> SearchHits {
         self.client
-            .search_payload(query_text)
+            .search_payload_filtered(query)
             .map_or_else(|_| SearchHits::empty(), |p| parse_search_all(&p))
     }
 
@@ -118,7 +118,7 @@ impl Catalog for LiveCatalog {
 
     /// Returns catalog hits matching the query text and filter. Network failures map to an empty vector.
     fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
-        Self::map_hits(self.fetch_hits(query.text()), query.filter())
+        Self::map_hits(self.fetch_hits(query), query.filter())
     }
 
     /// Returns radio continuation tracks seeded by `seed_track_id`. Network failures map to an empty vector.
