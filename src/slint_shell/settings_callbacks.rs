@@ -181,6 +181,15 @@ mod tests {
         assert_eq!(state.crossfade_seconds, 5);
         assert_eq!(state.settings_store.load().crossfade_seconds, 5);
 
+        // Slider 1..=12 bounds emitted by UI
+        handle_crossfade_change(&mut state, 1);
+        assert_eq!(state.crossfade_seconds, 1);
+        assert_eq!(state.settings_store.load().crossfade_seconds, 1);
+
+        handle_crossfade_change(&mut state, 12);
+        assert_eq!(state.crossfade_seconds, 12);
+        assert_eq!(state.settings_store.load().crossfade_seconds, 12);
+
         // Clamping negative to 0
         handle_crossfade_change(&mut state, -3);
         assert_eq!(state.crossfade_seconds, 0);
