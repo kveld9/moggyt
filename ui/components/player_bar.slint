@@ -74,7 +74,7 @@ export component PlayerBar inherits Rectangle {
         HorizontalLayout {
             width: root.mode == 1 ? 220px : 260px;
             horizontal-stretch: 0;
-            spacing: 12px;
+            spacing: 10px;
 
             // Slint layout rule: a layout's `alignment` also places fixed-size children on
             // the cross axis, so a 40px thumbnail inside a 72px bar is centered by its own
@@ -98,47 +98,53 @@ export component PlayerBar inherits Rectangle {
                 }
             }
 
-            VerticalLayout {
+            HorizontalLayout {
                 horizontal-stretch: 1;
-                alignment: center;
-                spacing: 2px;
-
-                Text {
-                    text: root.active-track-title;
-                    color: Theme.text;
-                    font-size: 13px;
-                    font-weight: 700;
-                    overflow: elide;
-                }
-
-                if root.active-track-artist != "" : Text {
-                    text: root.active-track-artist;
-                    color: Theme.secondary;
-                    font-size: 11px;
-                    overflow: elide;
-                }
-            }
-
-            if root.show-like : VerticalLayout {
+                spacing: 6px;
                 alignment: center;
 
-                Rectangle {
-                    width: 32px;
-                    height: 32px;
-                    border-radius: 16px;
-                    background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (root.is-liked ? Theme.surface : transparent));
-                    animate background { duration: 150ms; easing: ease-in-out; }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: 2px;
 
-                    like-touch := TouchArea {
-                        clicked => { root.toggle-like(); }
+                    Text {
+                        text: root.active-track-title;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 700;
+                        overflow: elide;
                     }
 
-                    IconHeart {
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                        tint: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
-                        size: 16px;
-                        is-filled: root.is-liked;
+                    if root.active-track-artist != "" : Text {
+                        text: root.active-track-artist;
+                        color: Theme.secondary;
+                        font-size: 11px;
+                        overflow: elide;
+                    }
+                }
+
+                if root.show-like : VerticalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        width: 28px;
+                        height: 28px;
+                        border-radius: 14px;
+                        background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (root.is-liked ? Theme.surface : transparent));
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        like-touch := TouchArea {
+                            clicked => { root.toggle-like(); }
+                        }
+
+                        IconHeart {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            tint: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
+                            size: 14px;
+                            is-filled: root.is-liked;
+                        }
                     }
                 }
             }
