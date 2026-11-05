@@ -71,7 +71,9 @@ pub struct Settings {
     /// Preferred audio streaming quality.
     #[serde(default)]
     pub quality: AudioQuality,
-
+    /// Whether global keyboard shortcuts are enabled.
+    #[serde(default = "default_true")]
+    pub keyboard_shortcuts: bool,
     /// Whether Discord Rich Presence is enabled.
     #[serde(default = "default_false")]
     pub discord_presence_enabled: bool,
@@ -132,7 +134,7 @@ pub struct Settings {
 }
 
 impl Default for Settings {
-    /// Tranche 1 default settings: White theme + English locale + volume 100 + speed 1.0 + High quality.
+    /// Tranche 1 default settings: White theme + English locale + volume 100 + speed 1.0 + Standard quality.
     fn default() -> Self {
         Self {
             theme: ThemeId::White,
@@ -142,7 +144,8 @@ impl Default for Settings {
             playback_speed: 1.0,
             crossfade_seconds: 0,
             stream_cache_limit_mb: 512,
-            quality: AudioQuality::High,
+            quality: AudioQuality::Standard,
+            keyboard_shortcuts: true,
             discord_presence_enabled: false,
             lastfm_api_key: String::new(),
             lastfm_api_secret: String::new(),
@@ -336,6 +339,7 @@ mod tests {
             crossfade_seconds: 5,
             stream_cache_limit_mb: 1024,
             quality: AudioQuality::High,
+            keyboard_shortcuts: false,
             discord_presence_enabled: true,
             lastfm_api_key: "api-key-abc".to_string(),
             lastfm_api_secret: "api-secret-xyz".to_string(),
@@ -473,6 +477,7 @@ mod tests {
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.playback_speed, 1.0);
         assert_eq!(loaded.quality, AudioQuality::Compact);
+        assert!(loaded.keyboard_shortcuts);
         assert!(!loaded.discord_presence_enabled);
         assert!(!loaded.lastfm_enabled);
         assert!(loaded.lastfm_username.is_empty());
@@ -491,6 +496,20 @@ mod tests {
         assert_eq!(loaded.crossfade_seconds, 0);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_keyboard_shortcuts_serde_defaults_and_explicit_deserialization() {
+        let with_false: Settings =
+            serde_json::from_str(r#"{"keyboard_shortcuts": false}"#).expect("deserialize false");
+        assert!(!with_false.keyboard_shortcuts);
+
+        let with_true: Settings =
+            serde_json::from_str(r#"{"keyboard_shortcuts": true}"#).expect("deserialize true");
+        assert!(with_true.keyboard_shortcuts);
+
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert!(omitted.keyboard_shortcuts);
     }
 
     #[test]
