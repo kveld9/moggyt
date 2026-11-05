@@ -1,5 +1,6 @@
 //! Catalog API request builders, endpoint URLs, and mutation handlers.
 
+use crate::domain::SearchFilter;
 use crate::i18n::Locale;
 use serde_json::Value;
 
@@ -54,14 +55,46 @@ pub fn client_context(locale: Locale) -> Value {
     })
 }
 
-/// Builds the minimal WEB_REMIX search payload for `query` with `locale`.
-pub fn search_body(query: &str, locale: Locale) -> Value {
-    serde_json::json!({
+/// InnerTube search filter params for songs.
+pub const SEARCH_PARAMS_SONGS: &str = "EgWKAQIIAWoSEAUQAxAJEAQQChAOEBUQEBAR";
+
+/// InnerTube search filter params for albums.
+pub const SEARCH_PARAMS_ALBUMS: &str = "EgWKAQIYAWoSEAUQAxAJEAQQChAOEBUQEBAR";
+
+/// InnerTube search filter params for artists.
+pub const SEARCH_PARAMS_ARTISTS: &str = "EgWKAQIgAWoSEAUQAxAJEAQQChAOEBUQEBAR";
+
+/// InnerTube search filter params for community playlists.
+pub const SEARCH_PARAMS_PLAYLISTS: &str = "EgeKAQQoAEABahIQBRADEAkQBBAKEA4QFRAQEBE%3D";
+
+/// Maps a domain [`SearchFilter`] to InnerTube search request params, or `None` for [`SearchFilter::All`].
+pub fn search_filter_params(filter: SearchFilter) -> Option<&'static str> {
+    match filter {
+        SearchFilter::All => None,
+        SearchFilter::Tracks => Some(SEARCH_PARAMS_SONGS),
+        SearchFilter::Albums => Some(SEARCH_PARAMS_ALBUMS),
+        SearchFilter::Artists => Some(SEARCH_PARAMS_ARTISTS),
+        SearchFilter::Playlists => Some(SEARCH_PARAMS_PLAYLISTS),
+    }
+}
+
+/// Builds the minimal WEB_REMIX search payload for `query` with `locale` and optional `params`.
+pub fn search_body_with_params(query: &str, locale: Locale, params: Option<&str>) -> Value {
+    let mut body = serde_json::json!({
         "context": {
             "client": client_context(locale),
         },
         "query": query,
-    })
+    });
+    if let Some(p) = params {
+        body["params"] = Value::String(p.to_owned());
+    }
+    body
+}
+
+/// Builds the minimal WEB_REMIX search payload for `query` with `locale`.
+pub fn search_body(query: &str, locale: Locale) -> Value {
+    search_body_with_params(query, locale, None)
 }
 
 /// Builds the minimal WEB_REMIX next payload for `video_id` with `locale`.
@@ -114,7 +147,40 @@ mod tests {
             assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
             assert_eq!(body["context"]["client"]["hl"], expected_hl);
             assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
+            assert!(body.get("params").is_none());
         }
+    }
+
+    #[test]
+    fn search_body_with_params_structure() {
+        let body = search_body_with_params("midnight", Locale::English, Some("test_params"));
+        assert_eq!(body["query"], "midnight");
+        assert_eq!(body["params"], "test_params");
+
+        let body_none = search_body_with_params("midnight", Locale::English, None);
+        assert_eq!(body_none["query"], "midnight");
+        assert!(body_none.get("params").is_none());
+    }
+
+    #[test]
+    fn search_filter_params_mapping() {
+        assert_eq!(search_filter_params(crate::domain::SearchFilter::All), None);
+        assert_eq!(
+            search_filter_params(crate::domain::SearchFilter::Tracks),
+            Some("EgWKAQIIAWoSEAUQAxAJEAQQChAOEBUQEBAR")
+        );
+        assert_eq!(
+            search_filter_params(crate::domain::SearchFilter::Albums),
+            Some("EgWKAQIYAWoSEAUQAxAJEAQQChAOEBUQEBAR")
+        );
+        assert_eq!(
+            search_filter_params(crate::domain::SearchFilter::Artists),
+            Some("EgWKAQIgAWoSEAUQAxAJEAQQChAOEBUQEBAR")
+        );
+        assert_eq!(
+            search_filter_params(crate::domain::SearchFilter::Playlists),
+            Some("EgeKAQQoAEABahIQBRADEAkQBBAKEA4QFRAQEBE%3D")
+        );
     }
 
     #[test]

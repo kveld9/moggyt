@@ -10,7 +10,9 @@ use std::sync::Arc;
 use anyhow::Context;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::{Detail, DetailKind, SearchResult, Shelf, is_local_playlist_id};
+use crate::domain::{
+    Detail, DetailKind, SearchFilter, SearchQuery, SearchResult, Shelf, is_local_playlist_id,
+};
 use crate::i18n::tr;
 use crate::infra::{
     AudioBackend, CoverCache, DiskPlaylistStore, LyricsSource, PlaylistStore, default_config_dir,
@@ -142,11 +144,22 @@ pub(crate) fn trigger_playback(
     let _ = worker_tx.send(PlaybackWorkerCommand::Play(req));
 }
 
-/// Dispatches asynchronous search query off the UI thread.
-pub(crate) fn submit_search_async(
+fn search_filter_index(filter: SearchFilter) -> i32 {
+    match filter {
+        SearchFilter::All => 0,
+        SearchFilter::Tracks => 1,
+        SearchFilter::Albums => 2,
+        SearchFilter::Artists => 3,
+        SearchFilter::Playlists => 4,
+    }
+}
+
+/// Dispatches asynchronous search query with a category filter off the UI thread.
+pub(crate) fn submit_search_with_filter_async(
     window: &MoggytWindow,
     state: &mut SlintAppState,
     query: &str,
+    filter: SearchFilter,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     let trimmed = query.trim();
@@ -159,25 +172,27 @@ pub(crate) fn submit_search_async(
     sync_recent_searches(window, state);
 
     state.search_query = query.to_string();
-    state.search_filter = crate::domain::SearchFilter::All;
+    state.search_filter = filter;
     state.search_covers.clear();
     state.search_generation = state.search_generation.wrapping_add(1);
     let generation = state.search_generation;
 
     window.set_query(query.into());
-    window.set_search_filter(0);
+    window.set_search_filter(search_filter_index(filter));
     state.home_shelves = vec![Shelf::new(tr(state.locale, "Searching..."))];
     sync_shelves_and_queue(window, state);
 
+    let Some(parsed_query) = SearchQuery::parse(trimmed).map(|q| q.with_filter(filter)) else {
+        return;
+    };
     let cat = Arc::clone(&state.catalog);
-    let q = query.to_string();
     let weak = window.as_weak();
     let tx = worker_tx.clone();
     let loc = state.locale;
     let songs_only = state.songs_only;
 
     std::thread::spawn(move || {
-        let (g, q_res, shelves) = execute_search(generation, &q, &cat, loc, songs_only);
+        let (g, q_res, shelves) = execute_search(generation, &parsed_query, &cat, loc, songs_only);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
@@ -200,6 +215,16 @@ pub(crate) fn submit_search_async(
             });
         });
     });
+}
+
+/// Dispatches asynchronous search query off the UI thread (defaults to All filter).
+pub(crate) fn submit_search_async(
+    window: &MoggytWindow,
+    state: &mut SlintAppState,
+    query: &str,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    submit_search_with_filter_async(window, state, query, SearchFilter::All, worker_tx);
 }
 
 /// Resolves a local playlist detail model synchronously from the store if the id is local.

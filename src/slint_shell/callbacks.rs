@@ -28,7 +28,8 @@ use crate::slint_shell::sync::{
     persist_recent_searches, sync_recent_searches, sync_shelves_and_queue, sync_window,
 };
 use crate::slint_shell::window::{
-    open_detail_async, refresh_library_async, submit_search_async, trigger_playback,
+    open_detail_async, refresh_library_async, submit_search_async, submit_search_with_filter_async,
+    trigger_playback,
 };
 
 /// Maps a clicked search result item to playback or container detail view.
@@ -247,19 +248,30 @@ fn wire_search_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_filter_selected(move |filter_idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        st.search_filter = match filter_idx {
-            1 => SearchFilter::Tracks,
-            2 => SearchFilter::Albums,
-            3 => SearchFilter::Artists,
-            4 => SearchFilter::Playlists,
-            _ => SearchFilter::All,
-        };
+        let filter = filter_from_index(filter_idx);
+        st.search_filter = filter;
         win.set_search_filter(filter_idx);
+        if st.search_active && !st.search_query.trim().is_empty() {
+            let query = st.search_query.clone();
+            submit_search_with_filter_async(&win, &mut st, &query, filter, &tx);
+            return;
+        }
         sync_shelves_and_queue(&win, &st);
     });
+}
+
+fn filter_from_index(filter_idx: i32) -> SearchFilter {
+    match filter_idx {
+        1 => SearchFilter::Tracks,
+        2 => SearchFilter::Albums,
+        3 => SearchFilter::Artists,
+        4 => SearchFilter::Playlists,
+        _ => SearchFilter::All,
+    }
 }
 
 /// Wires library container and queue selection callbacks.
