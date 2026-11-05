@@ -62,21 +62,15 @@ mod tests {
         // lock del SO tomado bajo el nombre por defecto.
         let lock_name = format!("moggyt-single-instance-test-{}", id());
 
-        let first = SingleInstance::new(&lock_name)
-            .ok()
-            .filter(|g| g.is_single());
+        let first = SingleInstance::new(&lock_name).ok().filter(|g| g.is_single());
         assert!(first.is_some(), "first acquisition must succeed");
 
-        let second = SingleInstance::new(&lock_name)
-            .ok()
-            .filter(|g| g.is_single());
+        let second = SingleInstance::new(&lock_name).ok().filter(|g| g.is_single());
         assert!(second.is_none(), "second acquisition while first guard is alive must fail");
 
         drop(first);
 
-        let third = SingleInstance::new(&lock_name)
-            .ok()
-            .filter(|g| g.is_single());
+        let third = SingleInstance::new(&lock_name).ok().filter(|g| g.is_single());
         assert!(third.is_some(), "re-acquisition after dropping guard must succeed");
     }
 }
