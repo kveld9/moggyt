@@ -1,5 +1,6 @@
 import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
+import { ThemedSlider } from "../controls.slint";
 import { SettingsModeButton, SettingsToggleRow } from "../settings_rows.slint";
 
 export component PlaybackSettings inherits VerticalLayout {
@@ -219,38 +220,11 @@ export component PlaybackSettings inherits VerticalLayout {
                     font-size: 12px;
                 }
 
-                HorizontalLayout {
-                    spacing: 8px;
-
-                    SettingsModeButton {
-                        label: "Off";
-                        is-active: root.crossfade-seconds == 0;
-                        clicked => { root.crossfade-changed(0); }
-                    }
-
-                    SettingsModeButton {
-                        label: "2s";
-                        is-active: root.crossfade-seconds == 2;
-                        clicked => { root.crossfade-changed(2); }
-                    }
-
-                    SettingsModeButton {
-                        label: "5s";
-                        is-active: root.crossfade-seconds == 5;
-                        clicked => { root.crossfade-changed(5); }
-                    }
-
-                    SettingsModeButton {
-                        label: "8s";
-                        is-active: root.crossfade-seconds == 8;
-                        clicked => { root.crossfade-changed(8); }
-                    }
-
-                    SettingsModeButton {
-                        label: "12s";
-                        is-active: root.crossfade-seconds == 12;
-                        clicked => { root.crossfade-changed(12); }
-                    }
+                ThemedSlider {
+                    minimum: 0.0;
+                    maximum: 12.0;
+                    value: root.crossfade-seconds;
+                    changed(val) => { root.crossfade-changed(round(val)); }
                 }
             }
 
