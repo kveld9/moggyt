@@ -111,6 +111,11 @@ impl SlintAppState {
             explore_shelves: Vec::new(),
             explore_loaded: false,
             explore_loading: false,
+            category_shelves: Vec::new(),
+            category_title: String::new(),
+            category_loading: false,
+            category_generation: 0,
+            category_return: SlintPage::Explore,
             explore_columns: crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS,
             worker_tx: None,
         }

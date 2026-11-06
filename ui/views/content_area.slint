@@ -59,6 +59,8 @@ export component ContentArea inherits Rectangle {
     in property <string> update-status-text: "Up to date";
     in property <[ExploreShelfData]> explore-shelves: [];
     in property <bool> explore-loading: false;
+    in property <[ExploreShelfData]> category-shelves: [];
+    in property <bool> category-loading: false;
     in property <[string]> recent-searches: [];
     in property <bool> search-active: false;
     in property <int> player-bar-mode: 0;
@@ -77,6 +79,7 @@ export component ContentArea inherits Rectangle {
     callback recent-search-removed(string);
     callback recent-searches-cleared();
     callback explore-track-selected(int);
+    callback category-item-selected(int);
     callback playlist-selected(int);
     callback album-selected(int);
     callback detail-track-selected(int);
@@ -119,7 +122,7 @@ export component ContentArea inherits Rectangle {
                     spacing: 12px;
                     alignment: start;
 
-                    if root.active-page == 3 : VerticalLayout {
+                    if root.active-page == 3 || root.active-page == 7 : VerticalLayout {
                         alignment: center;
                         Rectangle {
                             width: 32px;
@@ -281,6 +284,12 @@ export component ContentArea inherits Rectangle {
             }
 
             if root.active-page == 6 : StatsView {}
+
+            if root.active-page == 7 : ExploreView {
+                shelves: root.category-shelves;
+                is-loading: root.category-loading;
+                track-selected(idx) => { root.category-item-selected(idx); }
+            }
         }
     }
 }

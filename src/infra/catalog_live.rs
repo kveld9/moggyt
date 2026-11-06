@@ -140,6 +140,11 @@ impl Catalog for LiveCatalog {
         self.client.explore_shelves()
     }
 
+    /// Returns category shelves for `browse_id` and optional `params`. Network failures map to empty.
+    fn category_shelves(&self, browse_id: &str, params: Option<&str>) -> Vec<Shelf> {
+        self.client.category_shelves(browse_id, params)
+    }
+
     /// Returns saved or owned playlists. Returns empty when unauthenticated or on failure.
     fn playlists(&self) -> Vec<Playlist> {
         self.client.library_playlists()

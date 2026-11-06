@@ -113,14 +113,23 @@ pub fn browse_url() -> String {
     format!("https://music.youtube.com/youtubei/v1/browse?key={CATALOG_API_KEY}&prettyPrint=false")
 }
 
-/// Builds the minimal WEB_REMIX browse payload for `browse_id` with `locale`.
-pub fn browse_body(browse_id: &str, locale: Locale) -> Value {
-    serde_json::json!({
+/// Builds the minimal WEB_REMIX browse payload for `browse_id` with optional `params` and `locale`.
+pub fn browse_body_with_params(browse_id: &str, params: Option<&str>, locale: Locale) -> Value {
+    let mut body = serde_json::json!({
         "context": {
             "client": client_context(locale),
         },
         "browseId": browse_id,
-    })
+    });
+    if let Some(p) = params {
+        body["params"] = Value::String(p.to_owned());
+    }
+    body
+}
+
+/// Builds the minimal WEB_REMIX browse payload for `browse_id` with `locale`.
+pub fn browse_body(browse_id: &str, locale: Locale) -> Value {
+    browse_body_with_params(browse_id, None, locale)
 }
 
 #[cfg(test)]
@@ -226,6 +235,14 @@ mod tests {
             assert_eq!(body["context"]["client"]["hl"], expected_hl);
             assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
         }
+    }
+
+    #[test]
+    fn browse_body_with_params_structure() {
+        let b = browse_body_with_params("FEmusic_moods", Some("p"), Locale::English);
+        assert_eq!(b["browseId"], "FEmusic_moods");
+        assert_eq!(b["params"], "p");
+        assert!(browse_body(HOME_BROWSE_ID, Locale::English).get("params").is_none());
     }
 
     #[test]

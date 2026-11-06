@@ -11,7 +11,7 @@ use crate::domain::{DetailKind, SearchFilter, SearchResult};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::explore::{
-    explore_item_at, load_explore_async, refresh_explore_covers_if_loaded,
+    explore_item_at, load_category_async, load_explore_async, refresh_explore_covers_if_loaded,
 };
 use crate::slint_shell::format::{
     audio_quality_from_index, audio_quality_to_index, format_playback_speed,
@@ -64,6 +64,22 @@ pub(crate) fn handle_filtered_item_click(
             open_detail_async(window, state, &playlist.id, DetailKind::Playlist, worker_tx);
         }
     }
+}
+
+/// Routes an explore or category item click to a category shelves page or standard detail/playback.
+pub(crate) fn handle_explore_item_click(
+    window: &MoggytWindow,
+    state: &mut SlintAppState,
+    item: SearchResult,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    if let SearchResult::Playlist(ref p) = item {
+        if p.id.starts_with("FEmusic_") {
+            load_category_async(window, state, &p.id, p.params.as_deref(), &p.title, worker_tx);
+            return;
+        }
+    }
+    handle_filtered_item_click(window, state, item, worker_tx);
 }
 
 /// Non-blocking handler for playback toggle (pause, resume, or start head track).
@@ -242,7 +258,19 @@ fn wire_search_callbacks(
         let mut st = s.borrow_mut();
         let item_opt = explore_item_at(&st.explore_shelves, idx as usize).cloned();
         if let Some(item) = item_opt {
-            handle_filtered_item_click(&win, &mut st, item, &tx);
+            handle_explore_item_click(&win, &mut st, item, &tx);
+        }
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
+    window.on_category_item_selected(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        let item_opt = explore_item_at(&st.category_shelves, idx as usize).cloned();
+        if let Some(item) = item_opt {
+            handle_explore_item_click(&win, &mut st, item, &tx);
         }
     });
 

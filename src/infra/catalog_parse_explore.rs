@@ -96,7 +96,15 @@ fn parse_explore_button(renderer: &Value) -> Option<SearchResult> {
         return None;
     }
     let thumb = best_thumbnail(renderer);
-    Some(SearchResult::Playlist(Playlist::new(browse_id, title, 0, thumb)))
+    let mut playlist = Playlist::new(browse_id, title, 0, thumb);
+    if let Some(params) = renderer
+        .pointer("/clickCommand/browseEndpoint/params")
+        .or_else(|| renderer.pointer("/navigationEndpoint/browseEndpoint/params"))
+        .and_then(Value::as_str)
+    {
+        playlist = playlist.with_params(params);
+    }
+    Some(SearchResult::Playlist(playlist))
 }
 
 fn parse_explore_item(item: &Value) -> Option<SearchResult> {
@@ -481,5 +489,31 @@ mod tests {
             }
             other => panic!("expected Track with duration, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_explore_button_carries_params_when_present_and_none_when_absent() {
+        let with_params = serde_json::json!({
+            "musicNavigationButtonRenderer": {
+                "buttonText": { "runs": [{ "text": "Calma" }] },
+                "clickCommand": { "browseEndpoint": { "browseId": "FEmusic_moods", "params": "p123" } }
+            }
+        });
+        let no_params = serde_json::json!({
+            "musicNavigationButtonRenderer": {
+                "buttonText": { "runs": [{ "text": "Chill" }] },
+                "clickCommand": { "browseEndpoint": { "browseId": "FEmusic_moods" } }
+            }
+        });
+        assert_eq!(
+            parse_explore_item(&with_params),
+            Some(SearchResult::Playlist(
+                Playlist::new("FEmusic_moods", "Calma", 0, None).with_params("p123")
+            ))
+        );
+        assert_eq!(
+            parse_explore_item(&no_params),
+            Some(SearchResult::Playlist(Playlist::new("FEmusic_moods", "Chill", 0, None)))
+        );
     }
 }

@@ -108,6 +108,13 @@ impl CatalogStub {
             },
         ]
     }
+
+    fn stub_category_shelves() -> Vec<Shelf> {
+        vec![Shelf {
+            title: "Chill Playlists".to_owned(),
+            items: vec![SearchResult::Playlist(Self::stub_playlist())],
+        }]
+    }
 }
 
 impl Catalog for CatalogStub {
@@ -158,6 +165,13 @@ impl Catalog for CatalogStub {
 
     fn explore_shelves(&self) -> Vec<Shelf> {
         Self::stub_explore_shelves()
+    }
+
+    fn category_shelves(&self, browse_id: &str, _params: Option<&str>) -> Vec<Shelf> {
+        match browse_id {
+            "FEmusic_moods_and_genres_category" => Self::stub_category_shelves(),
+            _ => Vec::new(),
+        }
     }
 
     fn playlists(&self) -> Vec<Playlist> {
@@ -356,5 +370,14 @@ mod tests {
             &LyricsSnippet::parse("completely unrelated lyrics not in index").unwrap(),
         );
         assert!(misses.is_empty());
+    }
+
+    #[test]
+    fn stub_category_shelves_seeded_and_empty() {
+        let stub = CatalogStub::new();
+        let s = stub.category_shelves("FEmusic_moods_and_genres_category", Some("calma"));
+        assert_eq!(s.len(), 1);
+        assert_eq!(s[0].title, "Chill Playlists");
+        assert!(stub.category_shelves("other_id", None).is_empty());
     }
 }
