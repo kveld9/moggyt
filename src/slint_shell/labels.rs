@@ -66,7 +66,6 @@ pub struct StaticLabels {
     pub audio_quality_standard_label: &'static str,
     pub audio_quality_high_label: &'static str,
     pub songs_only_label: &'static str,
-    pub keyboard_shortcuts_label: &'static str,
     pub crossfade: &'static str,
     pub crossfade_hint: &'static str,
     pub stream_cache: &'static str,
@@ -74,8 +73,6 @@ pub struct StaticLabels {
     pub section_integrations: &'static str,
     pub discord_presence_label: &'static str,
     pub discord_presence_hint_label: &'static str,
-    pub discord_app_id_label: &'static str,
-    pub discord_app_id_placeholder: &'static str,
     pub lastfm_label: &'static str,
     pub lastfm_api_key_label: &'static str,
     pub lastfm_api_key_placeholder: &'static str,
@@ -203,11 +200,10 @@ impl StaticLabels {
             sleep_timer_end_of_track_label: tr(locale, "End of track"),
             audio_quality_label: tr(locale, "Audio quality"),
             audio_quality_hint_label: tr(locale, "Applies from the next track"),
-            audio_quality_low_label: tr(locale, "Low"),
-            audio_quality_standard_label: tr(locale, "Standard"),
-            audio_quality_high_label: tr(locale, "High"),
+            audio_quality_low_label: tr(locale, "Low (<=64 kbps)"),
+            audio_quality_standard_label: tr(locale, "Standard (~128 kbps)"),
+            audio_quality_high_label: tr(locale, "High (>=192 kbps)"),
             songs_only_label: tr(locale, "Prefer songs over music videos"),
-            keyboard_shortcuts_label: tr(locale, "Keyboard shortcuts"),
             crossfade: tr(locale, "Crossfade"),
             crossfade_hint: tr(locale, "Smooth transition between tracks"),
             stream_cache: tr(locale, "Stream Cache Limit"),
@@ -218,8 +214,6 @@ impl StaticLabels {
                 locale,
                 "Shows the current track in your Discord status while Discord is running.",
             ),
-            discord_app_id_label: tr(locale, "Custom Discord Application ID"),
-            discord_app_id_placeholder: tr(locale, "Default: 1566973935109541999"),
             lastfm_label: tr(locale, "Last.fm"),
             lastfm_api_key_label: tr(locale, "Last.fm API Key"),
             lastfm_api_key_placeholder: tr(locale, "API Key"),
@@ -357,7 +351,6 @@ impl StaticLabels {
         labels.set_audio_quality_standard_label(self.audio_quality_standard_label.into());
         labels.set_audio_quality_high_label(self.audio_quality_high_label.into());
         labels.set_songs_only_label(self.songs_only_label.into());
-        labels.set_keyboard_shortcuts_label(self.keyboard_shortcuts_label.into());
         labels.set_crossfade_label(self.crossfade.into());
         labels.set_crossfade_hint_label(self.crossfade_hint.into());
         labels.set_stream_cache_label(self.stream_cache.into());
@@ -365,8 +358,6 @@ impl StaticLabels {
         labels.set_section_integrations_label(self.section_integrations.into());
         labels.set_discord_presence_label(self.discord_presence_label.into());
         labels.set_discord_presence_hint_label(self.discord_presence_hint_label.into());
-        labels.set_discord_app_id_label(self.discord_app_id_label.into());
-        labels.set_discord_app_id_placeholder(self.discord_app_id_placeholder.into());
         labels.set_lastfm_label(self.lastfm_label.into());
         labels.set_lastfm_api_key_label(self.lastfm_api_key_label.into());
         labels.set_lastfm_api_key_placeholder(self.lastfm_api_key_placeholder.into());
@@ -457,8 +448,6 @@ mod tests {
         assert_eq!(en_labels.lastfm_label, "Last.fm");
         assert_eq!(en_labels.lastfm_connect_label, "Connect with Last.fm");
         assert_eq!(en_labels.lastfm_disconnect_label, "Disconnect");
-        assert_eq!(en_labels.discord_app_id_label, "Custom Discord Application ID");
-        assert_eq!(en_labels.discord_app_id_placeholder, "Default: 1566973935109541999");
         assert_eq!(en_labels.lastfm_api_key_label, "Last.fm API Key");
         assert_eq!(en_labels.lastfm_api_key_placeholder, "API Key");
         assert_eq!(en_labels.lastfm_api_secret_label, "Last.fm Shared Secret");
@@ -478,8 +467,6 @@ mod tests {
         assert_eq!(es_labels.lastfm_label, "Last.fm");
         assert_eq!(es_labels.lastfm_connect_label, "Conectar con Last.fm");
         assert_eq!(es_labels.lastfm_disconnect_label, "Desconectar");
-        assert_eq!(es_labels.discord_app_id_label, "ID de aplicación personalizada de Discord");
-        assert_eq!(es_labels.discord_app_id_placeholder, "Por defecto: 1566973935109541999");
         assert_eq!(es_labels.lastfm_api_key_label, "Clave API de Last.fm");
         assert_eq!(es_labels.lastfm_api_key_placeholder, "Clave API");
         assert_eq!(es_labels.lastfm_api_secret_label, "Clave secreta de Last.fm");
@@ -551,11 +538,10 @@ mod tests {
         assert_eq!(es.sleep_timer_end_of_track_label, "Fin de la canción");
         assert_eq!(es.audio_quality_label, "Calidad de audio");
         assert_eq!(es.audio_quality_hint_label, "Se aplica desde la siguiente canción");
-        assert_eq!(es.audio_quality_low_label, "Baja");
-        assert_eq!(es.audio_quality_standard_label, "Estándar");
-        assert_eq!(es.audio_quality_high_label, "Alta");
+        assert_eq!(es.audio_quality_low_label, "Baja (<=64 kbps)");
+        assert_eq!(es.audio_quality_standard_label, "Estándar (~128 kbps)");
+        assert_eq!(es.audio_quality_high_label, "Alta (>=192 kbps)");
         assert_eq!(es.songs_only_label, "Preferir canciones a videoclips");
-        assert_eq!(es.keyboard_shortcuts_label, "Atajos de teclado");
         assert_eq!(es.crossfade, "Fundido cruzado");
         assert_eq!(es.crossfade_hint, "Transición suave entre temas");
         assert_eq!(es.stream_cache, "Límite de caché de streams");
@@ -684,11 +670,10 @@ mod tests {
         assert_eq!(en.sleep_timer_end_of_track_label, "End of track");
         assert_eq!(en.audio_quality_label, "Audio quality");
         assert_eq!(en.audio_quality_hint_label, "Applies from the next track");
-        assert_eq!(en.audio_quality_low_label, "Low");
-        assert_eq!(en.audio_quality_standard_label, "Standard");
-        assert_eq!(en.audio_quality_high_label, "High");
+        assert_eq!(en.audio_quality_low_label, "Low (<=64 kbps)");
+        assert_eq!(en.audio_quality_standard_label, "Standard (~128 kbps)");
+        assert_eq!(en.audio_quality_high_label, "High (>=192 kbps)");
         assert_eq!(en.songs_only_label, "Prefer songs over music videos");
-        assert_eq!(en.keyboard_shortcuts_label, "Keyboard shortcuts");
         assert_eq!(en.crossfade, "Crossfade");
         assert_eq!(en.crossfade_hint, "Smooth transition between tracks");
         assert_eq!(en.stream_cache, "Stream Cache Limit");

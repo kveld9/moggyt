@@ -120,16 +120,8 @@ impl SlintAppState {
     }
 
     /// Saves all custom integration credentials from UI inputs and reconnects Discord if enabled.
-    pub(crate) fn save_integrations_credentials(
-        &mut self,
-        discord_id: &str,
-        api_key: &str,
-        api_secret: &str,
-    ) {
+    pub(crate) fn save_integrations_credentials(&mut self, api_key: &str, api_secret: &str) {
         let mut settings = self.settings_store.load();
-        let trimmed_discord = discord_id.trim();
-        settings.discord_app_id =
-            if trimmed_discord.is_empty() { None } else { Some(trimmed_discord.to_string()) };
         settings.lastfm_api_key = api_key.trim().to_string();
         settings.lastfm_api_secret = api_secret.trim().to_string();
         let _ = self.settings_store.save(&settings);
@@ -286,7 +278,6 @@ pub(crate) fn wire_lastfm_callbacks(window: &MoggytWindow, state_rc: &SharedStat
         let g = win.global::<Integrations>();
         let mut st = s.borrow_mut();
         st.save_integrations_credentials(
-            g.get_discord_app_id_input().as_str(),
             g.get_lastfm_api_key_input().as_str(),
             g.get_lastfm_api_secret_input().as_str(),
         );
@@ -404,17 +395,11 @@ mod tests {
 
     #[test]
     fn test_update_and_save_credentials_methods() {
-        let mut state = test_wired();
+        let state = test_wired();
         state.update_lastfm_api_key(" key_abc ");
         assert_eq!(state.settings_store.load().lastfm_api_key, "key_abc");
 
         state.update_lastfm_api_secret(" sec_123 ");
         assert_eq!(state.settings_store.load().lastfm_api_secret, "sec_123");
-
-        state.save_integrations_credentials(" 9999 ", " new_key ", " new_sec ");
-        let settings = state.settings_store.load();
-        assert_eq!(settings.discord_app_id.as_deref(), Some("9999"));
-        assert_eq!(settings.lastfm_api_key, "new_key");
-        assert_eq!(settings.lastfm_api_secret, "new_sec");
     }
 }

@@ -77,9 +77,6 @@ pub struct Settings {
     /// Whether Discord Rich Presence is enabled.
     #[serde(default = "default_false")]
     pub discord_presence_enabled: bool,
-    /// Custom Discord Application ID (falls back to default when None or invalid).
-    #[serde(default)]
-    pub discord_app_id: Option<String>,
     /// Last.fm API Key.
     #[serde(default)]
     pub lastfm_api_key: String,
@@ -150,7 +147,6 @@ impl Default for Settings {
             quality: AudioQuality::Standard,
             keyboard_shortcuts: true,
             discord_presence_enabled: false,
-            discord_app_id: None,
             lastfm_api_key: String::new(),
             lastfm_api_secret: String::new(),
             lastfm_enabled: false,
@@ -345,7 +341,6 @@ mod tests {
             quality: AudioQuality::High,
             keyboard_shortcuts: false,
             discord_presence_enabled: true,
-            discord_app_id: Some("123456789".to_string()),
             lastfm_api_key: "api-key-abc".to_string(),
             lastfm_api_secret: "api-secret-xyz".to_string(),
             lastfm_enabled: true,
@@ -390,32 +385,27 @@ mod tests {
     fn test_old_schema_settings_json_backward_compatibility() {
         let json = r#"{"theme": "white", "locale": "en"}"#;
         let loaded: Settings = serde_json::from_str(json).expect("deserialization succeeds");
-        assert_eq!(loaded.discord_app_id, None);
         assert!(loaded.lastfm_api_key.is_empty());
         assert!(loaded.lastfm_api_secret.is_empty());
         assert_eq!(loaded, Settings::default());
     }
 
     #[test]
-    fn test_discord_app_id_and_lastfm_credentials_serde_defaults_and_roundtrip() {
+    fn test_lastfm_credentials_serde_defaults_and_roundtrip() {
         let empty: Settings = serde_json::from_str("{}").expect("deserialize empty");
-        assert_eq!(empty.discord_app_id, None);
         assert!(empty.lastfm_api_key.is_empty());
         assert!(empty.lastfm_api_secret.is_empty());
 
         let json = r#"{
-            "discord_app_id": "1234567890",
             "lastfm_api_key": "my-key",
             "lastfm_api_secret": "my-secret"
         }"#;
         let loaded: Settings = serde_json::from_str(json).expect("deserialize explicit");
-        assert_eq!(loaded.discord_app_id.as_deref(), Some("1234567890"));
         assert_eq!(loaded.lastfm_api_key, "my-key");
         assert_eq!(loaded.lastfm_api_secret, "my-secret");
 
         let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
         let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
-        assert_eq!(decoded.discord_app_id.as_deref(), Some("1234567890"));
         assert_eq!(decoded.lastfm_api_key, "my-key");
         assert_eq!(decoded.lastfm_api_secret, "my-secret");
     }
