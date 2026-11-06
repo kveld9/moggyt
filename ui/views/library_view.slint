@@ -16,17 +16,21 @@ export component LibraryView inherits VerticalLayout {
 
     if !root.signed-in : VerticalLayout {
         alignment: center;
-        padding-top: 80px;
-        padding-bottom: 80px;
+        padding-top: 48px;
+        padding-bottom: 48px;
         spacing: 16px;
 
         VerticalLayout {
             alignment: center;
             spacing: 12px;
 
-            IconLibrary {
-                size: 48px;
-                tint: Theme.secondary;
+            HorizontalLayout {
+                alignment: center;
+
+                IconLibrary {
+                    size: 48px;
+                    tint: Theme.secondary;
+                }
             }
 
             Text {
