@@ -48,6 +48,7 @@ pub fn try_acquire() -> Option<SingleInstanceGuard> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::id;
 
     #[test]
     fn lock_name_matches_expected_identifier() {
@@ -56,15 +57,20 @@ mod tests {
 
     #[test]
     fn single_instance_guard_lifecycle_acquire_conflict_and_reacquire() {
-        let first = try_acquire();
+        // Usamos un nombre de lock único por proceso de test para no colisionar
+        // con otras instancias de moggyt (u otros procesos) que puedan tener el
+        // lock del SO tomado bajo el nombre por defecto.
+        let lock_name = format!("moggyt-single-instance-test-{}", id());
+
+        let first = SingleInstance::new(&lock_name).ok().filter(|g| g.is_single());
         assert!(first.is_some(), "first acquisition must succeed");
 
-        let second = try_acquire();
+        let second = SingleInstance::new(&lock_name).ok().filter(|g| g.is_single());
         assert!(second.is_none(), "second acquisition while first guard is alive must fail");
 
         drop(first);
 
-        let third = try_acquire();
+        let third = SingleInstance::new(&lock_name).ok().filter(|g| g.is_single());
         assert!(third.is_some(), "re-acquisition after dropping guard must succeed");
     }
 }
