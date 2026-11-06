@@ -221,7 +221,7 @@ export component PlaybackSettings inherits VerticalLayout {
                 }
 
                 ThemedSlider {
-                    minimum: 1.0;
+                    minimum: 0.0;
                     maximum: 12.0;
                     value: root.crossfade-seconds;
                     changed(val) => { root.crossfade-changed(round(val)); }

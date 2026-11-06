@@ -158,7 +158,7 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Track Crossfade (`crossfade_seconds`)**:
   - Integer crossfade transition duration in seconds between `0` and `15` (default `0` = disabled). Clamped to
     `0..=15` on load. When enabled, smoothly crossfades between tracks using dual-sink volume ramps.
-  - In Settings it is adjusted with an interactive slider from `1` to `12` seconds; `0` keeps crossfade disabled.
+  - In Settings it is adjusted with an interactive slider from `0` to `12` seconds; `0` disables crossfade.
 - **Stream Cache Quota (`stream_cache_limit_mb`)**:
   - Integer maximum disk budget in megabytes for the audio stream cache (default `512`). Clamped to `0..=10240` (up to
     10 GB) on load. Setting to `0` disables stream caching on disk.
