@@ -18,6 +18,7 @@ use crate::slint_shell::format::{
 };
 use crate::slint_shell::history::library_item_subtitle;
 use crate::slint_shell::labels::sync_static_labels;
+use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
     format_position, format_track_duration, is_track_liked, progress_fraction, repeat_mode_to_int,
 };
@@ -42,7 +43,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_custom_theme_names(ModelRc::new(VecModel::from(custom_names)));
     window.set_active_custom_theme_name(active_custom.into());
     window.set_active_page(state.page.to_index());
-    window.set_header_title(tr(state.locale, state.page.title()).into());
+    window.set_header_title(resolve_header_title(state));
     window.set_queue_panel_open(state.queue_panel_open);
     let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
     window.set_is_playing(is_playing);
@@ -103,6 +104,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     sync_shelves_and_queue(window, state);
     sync_library_and_detail(window, state);
     sync_explore_shelves(window, state);
+    sync_category_shelves(window, state);
     sync_sleep_timer(window, state);
 }
 
@@ -273,6 +275,32 @@ pub(crate) fn sync_explore_shelves(window: &MoggytWindow, state: &SlintAppState)
     ))));
 }
 
+/// Synchronizes category shelves with Slint window models.
+pub(crate) fn sync_category_shelves(window: &MoggytWindow, state: &SlintAppState) {
+    window.set_category_shelves(ModelRc::new(VecModel::from(explore_card_shelves(
+        &state.category_shelves,
+        &state.search_covers,
+        state.explore_columns,
+    ))));
+}
+
+/// Resolves header title for active page, selecting custom title for Detail and Category views.
+pub(crate) fn resolve_header_title(state: &SlintAppState) -> slint::SharedString {
+    match state.page {
+        SlintPage::Category => {
+            let t = state.category_title.trim();
+            if t.is_empty() { tr(state.locale, "Category").into() } else { t.into() }
+        }
+        SlintPage::Detail => state
+            .detail
+            .as_ref()
+            .map(|d| d.title.trim())
+            .filter(|t| !t.is_empty())
+            .map_or_else(|| tr(state.locale, "Detail").into(), Into::into),
+        page => tr(state.locale, page.title()).into(),
+    }
+}
+
 /// Periodic playback tick syncing elapsed timestamps, progress, and lyrics line without blocking.
 pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppState) {
     let Ok(audio) = state.audio.try_lock() else {
@@ -335,5 +363,31 @@ mod tests {
         assert_eq!(row_data.title.as_str(), "Title");
         assert_eq!(row_data.artist.as_str(), "Artist");
         assert_eq!(row_data.kind.as_str(), "track");
+    }
+
+    #[test]
+    fn test_resolve_header_title_detail_and_category() {
+        use crate::domain::{Detail, DetailKind};
+        use crate::i18n::Locale;
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        assert_eq!(resolve_header_title(&state).as_str(), "Search");
+
+        state.page = SlintPage::Category;
+        state.category_title = "Calma".to_owned();
+        assert_eq!(resolve_header_title(&state).as_str(), "Calma");
+        state.category_title.clear();
+        assert_eq!(resolve_header_title(&state).as_str(), "Category");
+        state.locale = Locale::Spanish;
+        assert_eq!(resolve_header_title(&state).as_str(), "Categoria");
+
+        state.page = SlintPage::Detail;
+        state.detail = Some(Detail::new(DetailKind::Album, "Hits", "Artist", Vec::new()));
+        assert_eq!(resolve_header_title(&state).as_str(), "Hits");
+        state.detail = Some(Detail::new(DetailKind::Album, "   ", "Artist", Vec::new()));
+        assert_eq!(resolve_header_title(&state).as_str(), "Detalle");
+        state.detail = None;
+        assert_eq!(resolve_header_title(&state).as_str(), "Detalle");
     }
 }

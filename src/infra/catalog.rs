@@ -30,6 +30,11 @@ pub trait Catalog {
         Vec::new()
     }
 
+    /// Returns category shelves for `browse_id` and optional `params` (empty on failure).
+    fn category_shelves(&self, _browse_id: &str, _params: Option<&str>) -> Vec<Shelf> {
+        Vec::new()
+    }
+
     /// Returns saved or owned playlists.
     fn playlists(&self) -> Vec<Playlist>;
 
@@ -100,5 +105,11 @@ mod tests {
     fn default_explore_shelves_returns_empty_vec() {
         let pass_through = PassThroughCatalog::default();
         assert!(pass_through.explore_shelves().is_empty());
+    }
+
+    #[test]
+    fn default_category_shelves_returns_empty_vec() {
+        let pass_through = PassThroughCatalog::default();
+        assert!(pass_through.category_shelves("FEmusic_moods", None).is_empty());
     }
 }

@@ -111,6 +111,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Black OLED", "Negro OLED"),
     ("CSV file path", "Ruta del archivo CSV"),
     ("Cancel", "Cancelar"),
+    ("Category", "Categoria"),
     ("Choose a track", "Elegir una cancion"),
     ("Classic", "Clásica"),
     ("Clear history", "Borrar todo el historial"),

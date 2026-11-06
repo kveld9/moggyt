@@ -107,6 +107,11 @@ pub struct SlintAppState {
     pub explore_shelves: Vec<Shelf>,
     pub explore_loaded: bool,
     pub explore_loading: bool,
+    pub category_shelves: Vec<Shelf>,
+    pub category_title: String,
+    pub category_loading: bool,
+    pub category_generation: u64,
+    pub category_return: SlintPage,
     /// Explore grid columns for the current window width.
     pub(crate) explore_columns: usize,
 
@@ -249,13 +254,6 @@ impl SlintAppState {
         }
         self.detail = self.catalog.lock().map(|c| c.detail(trimmed, kind)).unwrap_or(None);
         self.page = SlintPage::Detail;
-    }
-
-    /// Returns from detail view to the previous page (defaults to Search).
-    pub fn go_back(&mut self) {
-        if self.page == SlintPage::Detail {
-            self.page = self.detail_return;
-        }
     }
 
     /// Enqueues all tracks from a playlist URL into the playback queue.
@@ -449,6 +447,9 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     }
     fn explore_shelves(&self) -> Vec<Shelf> {
         (**self).explore_shelves()
+    }
+    fn category_shelves(&self, id: &str, p: Option<&str>) -> Vec<Shelf> {
+        (**self).category_shelves(id, p)
     }
     fn playlists(&self) -> Vec<Playlist> {
         (**self).playlists()
@@ -665,28 +666,6 @@ mod tests {
         assert!(state.detail.is_some());
         state.go_back();
         assert_eq!(state.page, SlintPage::Search);
-    }
-
-    #[test]
-    fn test_detail_back_navigation_transitions_to_return_page() {
-        let mut state = test_wired();
-        assert_eq!(state.detail_return, SlintPage::Search);
-
-        state.open_detail("album-1", DetailKind::Album);
-        assert_eq!(state.page, SlintPage::Detail);
-        assert_eq!(state.detail_return, SlintPage::Search);
-        state.go_back();
-        assert_eq!(state.page, SlintPage::Search);
-
-        state.select_page(SlintPage::Library);
-        state.open_detail("artist-1", DetailKind::Artist);
-        assert_eq!(state.page, SlintPage::Detail);
-        assert_eq!(state.detail_return, SlintPage::Library);
-        state.go_back();
-        assert_eq!(state.page, SlintPage::Library);
-
-        state.go_back();
-        assert_eq!(state.page, SlintPage::Library);
     }
 
     #[test]

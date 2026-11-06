@@ -60,15 +60,23 @@ pub struct Playlist {
     pub track_count: usize,
     #[serde(default)]
     pub artwork: Option<String>,
+    #[serde(default)]
+    pub params: Option<String>,
 }
 
 impl Playlist {
     pub fn new(id: &str, title: &str, track_count: usize, artwork: Option<String>) -> Self {
-        Self { id: id.to_owned(), title: title.to_owned(), track_count, artwork }
+        Self { id: id.to_owned(), title: title.to_owned(), track_count, artwork, params: None }
     }
 
     pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {
         self.artwork = Some(artwork.into());
+        self
+    }
+
+    pub fn with_params(mut self, params: impl Into<String>) -> Self {
+        let p = params.into();
+        self.params = if p.trim().is_empty() { None } else { Some(p) };
         self
     }
 
@@ -318,5 +326,11 @@ mod tests {
         let res_playlist_some = SearchResult::Playlist(playlist_some);
         assert_eq!(res_playlist_some.kind(), SearchFilter::Playlists);
         assert_eq!(res_playlist_some.display(), "Playlist 2 (24 tracks)");
+    }
+
+    #[test]
+    fn playlist_with_params_stores_non_empty_trimmed() {
+        assert_eq!(Playlist::new("p1", "P", 0, None).with_params("p").params.as_deref(), Some("p"));
+        assert_eq!(Playlist::new("p2", "P", 0, None).with_params("   ").params, None);
     }
 }

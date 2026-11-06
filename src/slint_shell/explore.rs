@@ -3,19 +3,23 @@
 //! Hexagonal invariant: queries catalog port asynchronously off the UI thread and dispatches
 //! results back to Slint via the event loop.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::domain::{SearchResult, Shelf};
 use crate::infra::Catalog;
-use crate::slint_shell::covers::{request_explore_covers, resolve_row_cover_image};
+use crate::slint_shell::covers::{
+    dispatch_cover_with_generation_if_needed, iter_shelf_artwork_urls, request_explore_covers,
+    resolve_row_cover_image,
+};
+use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::platform::dispatch_to_ui;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::SearchRow;
 use crate::slint_shell::state::SlintAppState;
-use crate::slint_shell::sync::sync_explore_shelves;
+use crate::slint_shell::sync::{sync_category_shelves, sync_explore_shelves, sync_window};
 use crate::slint_shell::window::with_ui_state;
 use crate::slint_shell::{ExploreCardData, ExploreCardRow, ExploreShelfData, MoggytWindow};
 
@@ -31,9 +35,38 @@ pub fn execute_explore<T: ?Sized + Catalog>(
     (generation, shelves)
 }
 
+/// Queries catalog for category shelves asynchronously off the UI thread.
+pub fn execute_category<T: ?Sized + Catalog>(
+    generation: u64,
+    catalog: &Arc<Mutex<T>>,
+    browse_id: &str,
+    params: Option<&str>,
+) -> (u64, Vec<Shelf>) {
+    let shelves =
+        catalog.lock().map_or_else(|_| Vec::new(), |c| c.category_shelves(browse_id, params));
+    (generation, shelves)
+}
+
 /// Helper resolving an item in explore shelves by linear index.
 pub(crate) fn explore_item_at(shelves: &[Shelf], index: usize) -> Option<&SearchResult> {
     shelves.iter().flat_map(|s| s.items.iter()).nth(index)
+}
+
+/// Requests background cover decoding for all uncached artwork URLs in category shelves.
+pub(crate) fn request_category_covers(
+    state: &SlintAppState,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let mut seen = HashSet::new();
+    for url in iter_shelf_artwork_urls(&state.category_shelves) {
+        dispatch_cover_with_generation_if_needed(
+            url,
+            state.category_generation,
+            &state.search_covers,
+            tx,
+            &mut seen,
+        );
+    }
 }
 
 /// Applies completed explore shelves fetch to state and UI on main thread.
@@ -53,6 +86,27 @@ pub(crate) fn apply_explore_completion(
     win.set_explore_loading(false);
     request_explore_covers(st, tx);
     sync_explore_shelves(win, st);
+}
+
+/// Applies completed category shelves fetch to state and UI on main thread.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn apply_category_completion(
+    win: &MoggytWindow,
+    st: &mut SlintAppState,
+    generation: u64,
+    shelves: Vec<Shelf>,
+    title: String,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    if st.category_generation != generation {
+        return;
+    }
+    st.category_shelves = shelves;
+    st.category_title = title;
+    st.category_loading = false;
+    win.set_category_loading(false);
+    request_category_covers(st, tx);
+    sync_category_shelves(win, st);
 }
 
 /// Dispatches asynchronous explore shelves loading off the UI thread.
@@ -77,6 +131,41 @@ pub(crate) fn load_explore_async(
             with_ui_state(|st| {
                 apply_explore_completion(&win, st, g, shelves, &tx);
             });
+        });
+    });
+}
+
+/// Dispatches asynchronous category shelves loading off the UI thread.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn load_category_async(
+    window: &MoggytWindow,
+    state: &mut SlintAppState,
+    browse_id: &str,
+    params: Option<&str>,
+    title: &str,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    if state.page != SlintPage::Category {
+        state.category_return = state.page;
+    }
+    state.page = SlintPage::Category;
+    state.category_title = title.to_owned();
+    state.category_shelves.clear();
+    state.category_generation = state.category_generation.wrapping_add(1);
+    let generation = state.category_generation;
+    state.category_loading = true;
+    window.set_category_loading(true);
+    sync_window(window, state);
+
+    let (cat, weak, tx) = (Arc::clone(&state.catalog), window.as_weak(), worker_tx.clone());
+    let (id, p, t) = (browse_id.to_string(), params.map(str::to_string), title.to_string());
+
+    std::thread::spawn(move || {
+        let (g, shelves) = execute_category(generation, &cat, &id, p.as_deref());
+        let _ = dispatch_to_ui(move || {
+            if let Some(win) = weak.upgrade() {
+                with_ui_state(|st| apply_category_completion(&win, st, g, shelves, t, &tx));
+            }
         });
     });
 }
@@ -263,6 +352,15 @@ mod tests {
         assert_eq!(shelves.len(), 2);
         assert_eq!(shelves[0].title, "Charts");
         assert_eq!(shelves[1].title, "Moods & genres");
+    }
+
+    #[test]
+    fn test_execute_category_uses_catalog_port() {
+        let cat = Arc::new(Mutex::new(CatalogStub::new()));
+        let (g, s) = execute_category(99, &cat, "FEmusic_moods_and_genres_category", Some("calma"));
+        assert_eq!(g, 99);
+        assert_eq!(s.len(), 1);
+        assert_eq!(s[0].title, "Chill Playlists");
     }
 
     #[test]

@@ -9,8 +9,8 @@ use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::{parse_search_all, parse_search_tracks};
 use super::catalog_requests::{
     CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
-    LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_url, next_body,
-    next_url, search_body, search_body_with_params, search_filter_params,
+    LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_body_with_params,
+    browse_url, next_body, next_url, search_body, search_body_with_params, search_filter_params,
 };
 use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, Shelf};
 use crate::i18n::Locale;
@@ -140,10 +140,14 @@ impl CatalogClient {
         self.next_payload(trimmed).map_or_else(|_| Vec::new(), |p| parse_radio_all(&p))
     }
 
-    /// Executes browse endpoint request for `browse_id` and returns the unparsed JSON response payload.
-    pub fn browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
+    /// Executes browse endpoint request for `browse_id` with optional `params`, returning unparsed JSON.
+    pub fn browse_payload_with_params(
+        &self,
+        browse_id: &str,
+        params: Option<&str>,
+    ) -> anyhow::Result<Value> {
         let url = browse_url();
-        let body = browse_body(browse_id, self.locale);
+        let body = browse_body_with_params(browse_id, params, self.locale);
         let response = self.client.post(&url).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
@@ -151,6 +155,22 @@ impl CatalogClient {
         }
         let payload: Value = response.json()?;
         Ok(payload)
+    }
+
+    /// Executes browse endpoint request for `browse_id` and returns the unparsed JSON response payload.
+    pub fn browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
+        self.browse_payload_with_params(browse_id, None)
+    }
+
+    /// Queries the browse endpoint for category shelves with `browse_id` and optional `params`.
+    /// Returns an empty vector on blank id, network error, or parse failure.
+    pub fn category_shelves(&self, browse_id: &str, params: Option<&str>) -> Vec<Shelf> {
+        let trimmed = browse_id.trim();
+        if trimmed.is_empty() {
+            return Vec::new();
+        }
+        self.browse_payload_with_params(trimmed, params)
+            .map_or_else(|_| Vec::new(), |p| parse_explore_all(&p))
     }
 
     /// Queries the browse endpoint for home shelves and returns parsed shelves.
@@ -276,5 +296,33 @@ mod tests {
     fn catalog_client_history_detail_unauthenticated_returns_none() {
         let client = CatalogClient::new();
         assert_eq!(client.detail(HISTORY_BROWSE_ID, DetailKind::Playlist), None);
+    }
+
+    #[test]
+    fn catalog_client_category_shelves_parses_minimal_payload_and_guards() {
+        let client = CatalogClient::new();
+        assert!(client.category_shelves("", None).is_empty());
+        assert!(client.category_shelves("   ", Some("p")).is_empty());
+
+        let payload = serde_json::json!({
+            "sectionListRenderer": { "contents": [{
+                "musicCarouselShelfRenderer": {
+                    "header": { "musicCarouselShelfBasicHeaderRenderer": { "title": { "runs": [{ "text": "Calm" }] } } },
+                    "contents": [{ "musicTwoRowItemRenderer": {
+                        "title": { "runs": [{ "text": "Piano" }] },
+                        "navigationEndpoint": { "browseEndpoint": { "browseId": "VL_piano" } }
+                    }}]
+                }
+            }] }
+        });
+        let shelves = parse_explore_all(&payload);
+        assert_eq!(shelves.len(), 1);
+        assert_eq!(shelves[0].title, "Calm");
+        assert_eq!(
+            shelves[0].items[0],
+            crate::domain::SearchResult::Playlist(Playlist::new("VL_piano", "Piano", 0, None))
+        );
+        assert!(parse_explore_all(&serde_json::json!({})).is_empty());
+        assert!(parse_explore_all(&serde_json::json!({"error": {"code": 404}})).is_empty());
     }
 }

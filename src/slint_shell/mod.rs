@@ -36,6 +36,7 @@ pub use MoggytWindow as AppWindow;
 
 pub mod app;
 pub mod callbacks;
+pub mod category;
 pub mod cover_pool;
 pub mod covers;
 pub mod detail;
@@ -129,7 +130,8 @@ mod tests {
     #[test]
     fn test_slint_page_from_index_out_of_bounds_fallback() {
         assert_eq!(SlintPage::from_index(-1), SlintPage::Search);
-        assert_eq!(SlintPage::from_index(7), SlintPage::Search);
+        assert_eq!(SlintPage::from_index(7), SlintPage::Category);
+        assert_eq!(SlintPage::from_index(8), SlintPage::Search);
         assert_eq!(SlintPage::from_index(100), SlintPage::Search);
         assert_eq!(SlintPage::from_index(i32::MIN), SlintPage::Search);
         assert_eq!(SlintPage::from_index(i32::MAX), SlintPage::Search);
