@@ -182,12 +182,15 @@ The configuration file uses JSON serialization with atomic replacement:
     - `false`: Discord Rich Presence disabled; no IPC connection is attempted (default).
     - `true`: Outbound Rich Presence enabled; broadcasts a "Listening to moggyt" activity with track title and artist.
 - **Last.fm Integration (`lastfm_enabled`, `lastfm_username`, `lastfm_api_key`, `lastfm_api_secret`)**:
+  - Application keys are provided at compile time (release builds receive them from repository secrets; local builds may
+    set `MOGGYT_LASTFM_API_KEY` and `MOGGYT_LASTFM_SECRET`). The settings panel exposes only Connect and Disconnect
+    actions.
   - `lastfm_enabled` (boolean, default `false`): Whether live scrobbling to Last.fm is enabled.
   - `lastfm_username` (string, default `""`): Display name of the connected Last.fm account.
-  - `lastfm_api_key` (string, default `""`): Custom Last.fm API key. When configured in settings, takes precedence over
-    compile-time environment variables (`MOGGYT_LASTFM_API_KEY`).
-  - `lastfm_api_secret` (string, default `""`): Custom Last.fm API shared secret. When configured in settings, takes
-    precedence over compile-time environment variables (`MOGGYT_LASTFM_SECRET`).
+  - `lastfm_api_key` (string, default `""`): Optional manual override in `settings.json` taking precedence over the
+    compile-time environment variable (`MOGGYT_LASTFM_API_KEY`).
+  - `lastfm_api_secret` (string, default `""`): Optional manual override in `settings.json` taking precedence over the
+    compile-time environment variable (`MOGGYT_LASTFM_SECRET`).
 - **Player Bar Mode (`player_bar_mode`)**:
   - `"classic"`: Docked full-width bar flush with window bottom edge (default).
   - `"floating"`: Rounded, centered card floating above the bottom edge capped at 960px.

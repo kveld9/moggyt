@@ -104,29 +104,6 @@ impl SlintAppState {
         }
         replace_scrobbler(&self.scrobbler, Box::new(StubScrobbler::new()));
     }
-
-    /// Updates and persists the custom Last.fm API key.
-    pub(crate) fn update_lastfm_api_key(&self, key: &str) {
-        let mut settings = self.settings_store.load();
-        settings.lastfm_api_key = key.trim().to_string();
-        let _ = self.settings_store.save(&settings);
-    }
-
-    /// Updates and persists the custom Last.fm API shared secret.
-    pub(crate) fn update_lastfm_api_secret(&self, sec: &str) {
-        let mut settings = self.settings_store.load();
-        settings.lastfm_api_secret = sec.trim().to_string();
-        let _ = self.settings_store.save(&settings);
-    }
-
-    /// Saves all custom integration credentials from UI inputs and reconnects Discord if enabled.
-    pub(crate) fn save_integrations_credentials(&mut self, api_key: &str, api_secret: &str) {
-        let mut settings = self.settings_store.load();
-        settings.lastfm_api_key = api_key.trim().to_string();
-        settings.lastfm_api_secret = api_secret.trim().to_string();
-        let _ = self.settings_store.save(&settings);
-        self.reconnect_discord_if_enabled();
-    }
 }
 
 /// Refreshes all Last.fm integration properties in the Slint window.
@@ -142,8 +119,6 @@ pub(crate) fn refresh_lastfm_globals(window: &MoggytWindow, state: &SlintAppStat
     integrations.set_lastfm_connected(is_connected);
     integrations.set_lastfm_busy(false);
     integrations.set_lastfm_status(status.into());
-    integrations.set_lastfm_api_key_input(settings.lastfm_api_key.into());
-    integrations.set_lastfm_api_secret_input(settings.lastfm_api_secret.into());
 }
 
 fn poll_session_loop(keys: &LastFmAppKeys, token: &str) -> Result<LastFmSession, String> {
@@ -244,43 +219,6 @@ pub(crate) fn wire_lastfm_callbacks(window: &MoggytWindow, state_rc: &SharedStat
         let mut st = s.borrow_mut();
         let mut store = KeyringCredentialStore::moggyt();
         st.disconnect_lastfm(&mut store);
-        refresh_lastfm_globals(&win, &st);
-    });
-
-    let w = window.as_weak();
-    let s = Rc::clone(state_rc);
-    integrations.on_lastfm_api_key_edited(move |key| {
-        let Some(win) = w.upgrade() else {
-            return;
-        };
-        let st = s.borrow();
-        st.update_lastfm_api_key(key.as_str());
-        refresh_lastfm_globals(&win, &st);
-    });
-
-    let w = window.as_weak();
-    let s = Rc::clone(state_rc);
-    integrations.on_lastfm_api_secret_edited(move |sec| {
-        let Some(win) = w.upgrade() else {
-            return;
-        };
-        let st = s.borrow();
-        st.update_lastfm_api_secret(sec.as_str());
-        refresh_lastfm_globals(&win, &st);
-    });
-
-    let w = window.as_weak();
-    let s = Rc::clone(state_rc);
-    integrations.on_save_integrations_clicked(move || {
-        let Some(win) = w.upgrade() else {
-            return;
-        };
-        let g = win.global::<Integrations>();
-        let mut st = s.borrow_mut();
-        st.save_integrations_credentials(
-            g.get_lastfm_api_key_input().as_str(),
-            g.get_lastfm_api_secret_input().as_str(),
-        );
         refresh_lastfm_globals(&win, &st);
     });
 }
@@ -391,15 +329,5 @@ mod tests {
             .expect("keys must resolve");
         assert_eq!(keys.api_key, "my_key");
         assert_eq!(keys.secret, "my_sec");
-    }
-
-    #[test]
-    fn test_update_and_save_credentials_methods() {
-        let state = test_wired();
-        state.update_lastfm_api_key(" key_abc ");
-        assert_eq!(state.settings_store.load().lastfm_api_key, "key_abc");
-
-        state.update_lastfm_api_secret(" sec_123 ");
-        assert_eq!(state.settings_store.load().lastfm_api_secret, "sec_123");
     }
 }
