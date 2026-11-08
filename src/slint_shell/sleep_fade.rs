@@ -44,6 +44,29 @@ impl SlintAppState {
         );
     }
 
+    /// Handles sleep timer elapsed time accumulation and StopAfterTrack transition when a track changes.
+    /// Returns `true` if the sleep timer expired and playback should halt instead of playing the new track.
+    pub fn on_track_changing_sleep_timer(&mut self, next_track_id: &str) -> bool {
+        if !self.sleep_timer.is_armed() {
+            return false;
+        }
+        if let Ok(audio) = self.audio.lock() {
+            let pos = audio.position_secs();
+            let delta = pos.saturating_sub(self.sleep_timer_base_offset);
+            self.sleep_timer_accumulated = self.sleep_timer_accumulated.saturating_add(delta);
+            self.sleep_timer_base_offset = 0;
+        }
+        if self.sleep_timer.notify_track_changed(next_track_id) {
+            if let Ok(mut audio) = self.audio.lock() {
+                audio.pause();
+                restore_captured_volume(&mut **audio, &mut self.sleep_fade_base_volume);
+            }
+            self.sync_presence_playing(false);
+            return true;
+        }
+        false
+    }
+
     fn is_sleep_timer_active(&self, is_playing: bool) -> bool {
         self.sleep_timer.is_armed() && is_playing
     }
@@ -167,5 +190,86 @@ mod tests {
         state.audio.lock().unwrap().set_volume(70);
         state.restore_sleep_fade_volume();
         assert_eq!(state.audio.lock().unwrap().volume(), 70);
+    }
+
+    #[test]
+    fn test_sleep_timer_stop_after_track_on_next_track_halts_playback() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
+        state.play_current_quiet();
+        assert!(state.audio.lock().unwrap().is_playing());
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t1"));
+
+        state
+            .sleep_timer
+            .set_preset_with_track(crate::domain::TimerPreset::StopAfterTrack, Some("t1"));
+        assert!(state.sleep_timer.is_armed());
+
+        state.sleep_fade_base_volume = Some(100);
+        state.audio.lock().unwrap().set_volume(40);
+
+        state.next_track();
+
+        assert!(!state.audio.lock().unwrap().is_playing());
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t1"));
+        assert_eq!(state.audio.lock().unwrap().volume(), 100);
+        assert_eq!(state.sleep_fade_base_volume, None);
+        assert!(!state.sleep_timer.is_armed());
+    }
+
+    #[test]
+    fn test_sleep_timer_stop_after_track_on_play_track_at_index_halts_playback() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
+        state.play_current_quiet();
+        assert!(state.audio.lock().unwrap().is_playing());
+
+        state
+            .sleep_timer
+            .set_preset_with_track(crate::domain::TimerPreset::StopAfterTrack, Some("t1"));
+        assert!(state.sleep_timer.is_armed());
+
+        state.sleep_fade_base_volume = Some(90);
+        state.audio.lock().unwrap().set_volume(30);
+
+        state.play_track_at_index(1);
+
+        assert!(!state.audio.lock().unwrap().is_playing());
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t1"));
+        assert_eq!(state.audio.lock().unwrap().volume(), 90);
+        assert_eq!(state.sleep_fade_base_volume, None);
+        assert!(!state.sleep_timer.is_armed());
+    }
+
+    #[test]
+    fn test_sleep_timer_multi_track_accumulation() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(1000));
+        state.play_current_quiet();
+
+        state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
+        state.sleep_timer_accumulated = 0;
+        state.sleep_timer_base_offset = 0;
+
+        state.seek_by(100);
+        assert_eq!(state.audio.lock().unwrap().position_secs(), 100);
+
+        state.next_track();
+
+        assert_eq!(state.sleep_timer_accumulated, 100);
+        assert_eq!(state.sleep_timer_base_offset, 0);
+        assert!(state.audio.lock().unwrap().is_playing());
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t2"));
+        assert_eq!(state.audio.lock().unwrap().position_secs(), 0);
+
+        state.seek_by(800);
+        assert_eq!(state.audio.lock().unwrap().position_secs(), 800);
+
+        state.poll_sleep_timer();
+        assert!(!state.audio.lock().unwrap().is_playing());
+        assert!(!state.sleep_timer.is_armed());
     }
 }

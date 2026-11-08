@@ -77,6 +77,9 @@ impl SlintAppState {
             return;
         };
         let (id, artist, title) = (track.id.clone(), track.artist.clone(), track.title.clone());
+        if self.on_track_changing_sleep_timer(&id) {
+            return;
+        }
         if let Ok(mut a) = self.audio.lock() {
             dispatch_audio_play(&mut **a, &id, self.crossfade_seconds);
         }
