@@ -7,11 +7,6 @@ export global Integrations {
     in-out property <bool> lastfm-connected: false;
     in-out property <bool> lastfm-busy: false;
     in-out property <string> lastfm-status: "";
-    in-out property <string> lastfm-api-key-input: "";
-    callback lastfm-api-key-edited(string);
-    in-out property <string> lastfm-api-secret-input: "";
-    callback lastfm-api-secret-edited(string);
-    callback save-integrations-clicked();
     callback lastfm-connect();
     callback lastfm-disconnect();
 }

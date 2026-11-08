@@ -43,19 +43,6 @@ impl SlintAppState {
         let current = settings.discord_presence_enabled;
         self.set_discord_presence(!current, DiscordPresence::new);
     }
-
-    /// Reconnects Discord presence with the default application ID if currently enabled.
-    pub(crate) fn reconnect_discord_if_enabled(&mut self) {
-        let settings = self.settings_store.load();
-        if !settings.discord_presence_enabled {
-            return;
-        }
-        self.discord.shutdown();
-        self.discord = DiscordPresence::new();
-        if let Some((artist, title)) = self.last_presence_key.clone() {
-            self.discord.set_track(&artist, &title);
-        }
-    }
 }
 
 /// Wires Discord Rich Presence toggle callbacks to the Slint window.

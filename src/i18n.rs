@@ -102,7 +102,6 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
         "Anonymous session: paste cookies to unlock library",
         "Sesión anónima: pegar cookies para desbloquear la biblioteca",
     ),
-    ("API Key", "Clave API"),
     ("App version", "Versión de la app"),
     ("Applies from the next track", "Se aplica desde la siguiente canción"),
     ("Artist", "ARTISTA"),
@@ -152,10 +151,8 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Language", "Idioma"),
     ("Last 4 weeks", "Últimas 4 semanas"),
     ("Last 6 months", "Últimos 6 meses"),
-    ("Last.fm API Key", "Clave API de Last.fm"),
     ("Last.fm connection failed", "Falló la conexión con Last.fm"),
     ("Last.fm is not available in this build", "Last.fm no está disponible en esta compilación"),
-    ("Last.fm Shared Secret", "Clave secreta de Last.fm"),
     ("Library", "Biblioteca"),
     ("Listening time", "Tiempo escuchado"),
     ("Loading...", "Cargando..."),
@@ -205,7 +202,6 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Queue ({count})", "Cola ({count})"),
     ("Recent searches", "Búsquedas recientes"),
     ("Review matches", "Revisar coincidencias"),
-    ("Save Credentials", "Guardar credenciales"),
     ("Save playlist", "Guardar playlist"),
     ("Saved playlist", "Playlist guardada"),
     ("Search", "Buscar"),
@@ -215,7 +211,6 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Select a playlist file", "Selecciona un archivo de playlist"),
     ("Session", "Sesión"),
     ("Settings", "Ajustes"),
-    ("Shared Secret", "Clave secreta"),
     ("Show artwork", "Mostrar portada"),
     ("Show like button", "Mostrar botón Me gusta"),
     ("Show queue button", "Mostrar botón de cola"),
@@ -614,24 +609,5 @@ mod tests {
         let expected = "Coloca archivos JSON de tema en ~/.config/moggyt/themes/ o ~/.config/moggyt/custom-theme.json";
         assert_eq!(tr(Locale::English, key), key);
         assert_eq!(tr(Locale::Spanish, key), expected);
-    }
-
-    #[test]
-    fn test_custom_integrations_i18n_strings_exist_and_differ() {
-        let keys_and_expected = [
-            ("API Key", "Clave API"),
-            ("Last.fm API Key", "Clave API de Last.fm"),
-            ("Last.fm Shared Secret", "Clave secreta de Last.fm"),
-            ("Save Credentials", "Guardar credenciales"),
-            ("Shared Secret", "Clave secreta"),
-        ];
-
-        for (key, expected_es) in keys_and_expected {
-            let en = tr(Locale::English, key);
-            let es = tr(Locale::Spanish, key);
-            assert_eq!(en, key, "English must return source key");
-            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
-            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
-        }
     }
 }
