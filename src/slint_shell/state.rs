@@ -95,6 +95,7 @@ pub struct SlintAppState {
     pub liked_ids: HashSet<String>,
     pub now_playing_cover: Option<slint::Image>,
     pub is_shuffle: bool,
+    pub unshuffled_tracks: Option<Vec<crate::domain::Track>>,
     pub update_available: bool,
     pub latest_version: Option<String>,
 

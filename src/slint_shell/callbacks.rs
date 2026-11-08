@@ -414,8 +414,8 @@ fn wire_playback_callbacks(
     let w = window.as_weak();
     window.on_toggle_shuffle(move || {
         with_window_state(&w, &s, |win, st| {
-            st.is_shuffle = !st.is_shuffle;
-            win.set_is_shuffle(st.is_shuffle);
+            st.toggle_shuffle();
+            sync_window(win, st);
         });
     });
 
@@ -563,5 +563,21 @@ mod tests {
         let m3 = cycle_repeat_mode(state.queue.repeat());
         state.queue.set_repeat(m3);
         assert_eq!(state.queue.repeat(), crate::domain::RepeatMode::Off);
+    }
+
+    #[test]
+    fn test_toggle_shuffle_callback_action() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        assert!(!state.is_shuffle);
+
+        state.toggle_shuffle();
+        assert!(state.is_shuffle);
+        assert!(state.unshuffled_tracks.is_some());
+
+        state.toggle_shuffle();
+        assert!(!state.is_shuffle);
+        assert!(state.unshuffled_tracks.is_none());
     }
 }
