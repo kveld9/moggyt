@@ -4,7 +4,7 @@
 ; Parameters:
 ;   /DVERSION=X.Y.Z   (Optional) Application version; defaults to 0.0.0
 ;   /DOUTFILE=path    (Optional) Target installer path; defaults to <script-dir>\\..\\..\\dist\\moggyt-${VERSION}-x64-setup.exe
-; Note: all default on-disk paths anchor on ${__FILEDIR__}, so the script works
+; Note: all default on-disk paths are relative to the script directory, so the script works
 ; regardless of the directory makensis is invoked from.
 ; ==============================================================================
 
@@ -37,7 +37,7 @@ ManifestDPIAware true
 Name "${PRODUCT_NAME}"
 
 !ifndef OUTFILE
-  !define OUTFILE "${__FILEDIR__}\\..\\..\\dist\\moggyt-${VERSION}-x64-setup.exe"
+  !define OUTFILE "..\\..\\dist\\moggyt-${VERSION}-x64-setup.exe"
 !endif
 OutFile "${OUTFILE}"
 
@@ -113,7 +113,7 @@ Section "MainSection" SEC01
 
   ; Install application files (path anchored on the script directory)
   SetOutPath "$INSTDIR"
-  File "${__FILEDIR__}\\..\\..\\target\\release\\moggyt.exe"
+  File "..\\..\\target\\release\\moggyt.exe"
 
   ; Create uninstaller executable
   WriteUninstaller "$INSTDIR\Uninstall.exe"
