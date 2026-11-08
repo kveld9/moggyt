@@ -55,6 +55,11 @@ Run all six before finishing. `cargo run` launches the window.
   non-English text; translate instead.
 - No emojis in code, scripts, configs, CI, or commits — docs/releases only.
 - `Cargo.lock` is committed; never add dependencies without justification.
+- Slint threading & syntax: Slint UI components and handles are not `Send` or `Sync`.
+  Never wrap UI components or handles in `Arc<Mutex<_>>`. Always communicate background
+  threads with the UI via `window.as_weak()` and `slint::invoke_from_event_loop` (or the
+  in-tree helper `crate::slint_shell::platform::dispatch_to_ui`). Do not use CSS or QML
+  syntax that does not exist in Slint 1.x.
 - Slint unknowns go to the source first: when Slint language, layout, binding,
   or compiler behavior is unclear, consult the official Slint documentation
   (<https://docs.slint.dev/>) before guessing (covers enums, layouts, callbacks,

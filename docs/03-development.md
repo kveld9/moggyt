@@ -91,6 +91,12 @@ git config core.hooksPath .githooks
 Distilled rules from Slint behavior that surprised us. Consult the linked source before
 guessing; every rule here was verified against a build or the official documentation.
 
+- Thread safety and background communication: Slint UI components and window handles do not implement `Send` or
+  `Sync`. Never wrap them in `Arc<Mutex<_>>`. To dispatch updates from background worker threads or asynchronous
+  runtimes to the UI, obtain a weak handle on the UI thread via `window.as_weak()` and transfer it to the worker,
+  then marshal UI mutations back onto the Slint event loop using `slint::invoke_from_event_loop` (or the helper
+  `crate::slint_shell::platform::dispatch_to_ui`). Do not use CSS or QML syntax that does not exist in Slint 1.x.
+  Source: <https://docs.slint.dev/latest/docs/rust/slint/fn.invoke_from_event_loop/>.
 - A card grid built from a runtime model cannot use `GridLayout` `row` / `col`: both are
   cell properties whose bindings must be compile-time constants, so an index-derived grid
   (`row: i / 5`) does not compile. Use one `Flickable` whose `viewport-width` is computed
