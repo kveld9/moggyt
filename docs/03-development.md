@@ -14,6 +14,7 @@ cargo fmt --all -- --check                 # formatting (CI fails on drift)
 cargo clippy --all-targets --all-features -- -D warnings
 ./scripts/check-repo.sh                    # repo standards and modularity audit
 ./scripts/check-markdown.sh                # markdown lint (CI fails on drift)
+./scripts/check-i18n.sh                    # i18n and static chrome audit
 ```
 
 CI additionally runs markdown quality checks using `markdownlint-cli2`.

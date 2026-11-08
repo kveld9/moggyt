@@ -32,4 +32,11 @@ else
   bash ./scripts/check-markdown.sh
 fi
 
+echo "Pre-push gate: i18n..."
+if [ -x "./scripts/check-i18n.sh" ]; then
+  ./scripts/check-i18n.sh
+else
+  bash ./scripts/check-i18n.sh
+fi
+
 echo "Pre-push gate: all green."

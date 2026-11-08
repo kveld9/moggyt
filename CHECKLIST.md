@@ -32,7 +32,7 @@ Fast repo audit. Check only what is verified with evidence (green command, revie
 
 ## Pending (later phases, not blocking the scaffold)
 
-- [ ] Real YouTube Music adapter behind the `Catalog` port (dedicated PR).
-- [ ] Real audio backend behind the `AudioBackend` port (dedicated PR).
+- [x] Real YouTube Music adapter behind the `Catalog` port (dedicated PR).
+- [x] Real audio backend behind the `AudioBackend` port (dedicated PR).
 - [ ] Enable rulesets on GitHub per `.github/settings.example.yml` (1 approval, strict checks, immutable `v*` tags).
 - [ ] Release pipeline with checksums + Sigstore attestation (see `release.yml.example`).
