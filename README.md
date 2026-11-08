@@ -1,130 +1,69 @@
 # moggyt
 
-Native YouTube Music desktop client written in Rust, featuring a lightweight Slint user interface.
+Native YouTube Music desktop client in Rust and Slint.
 
-`moggyt` is an unofficial desktop client with no affiliation with Google or YouTube. It provides a fast, standalone
-desktop listening experience without bundling a web browser or Electron runtime. The project is currently at the v0.1
-stage, evolving toward the v1 Software Design Document: core hexagonal architecture, UI navigation, playback via
-`rodio` with a `yt-dlp` stream resolution sidecar, LRCLIB synced lyrics, disk cover art caching, and OS keyring
-session storage are functional.
+Fast, lightweight desktop audio player with no web engine or Electron overhead.
 
-> **Personal project:** `moggyt` is a personal project built to cover the author's own needs.
-> Contributions are welcome, but maintenance is best-effort: expect limited review capacity
-> rather than commercial-grade polish or support.
+> **Project Context:** `moggyt` is a personal learning project built to satisfy the author's own music playback needs.
+> The codebase is largely LLM-generated and assisted as an exploratory project in AI-driven systems programming with
+> Rust and Slint. Maintenance is best-effort.
 
-## Features
+## Highlights
 
-- **Playback & Transport**: persistent player bar with play, pause, next, previous, seek (-10s / +10s), volume
-  adjustment, and elapsed position reporting.
-- **Queue Management**: ordered in-memory playback queue with cursor navigation, shuffle, and repeat modes (off, all,
-  one).
-- **Search & Catalog**: catalog search powered by catalog API queries with client-side query sanitization.
-- **Library & Authentication**: anonymous browsing by default; optional session cookie import into the OS credential
-  store (Secret Service on Linux, Credential Manager on Windows) for library collections. Authenticated library
-  endpoints are interim anonymous empty readers.
-- **Account History**: read-only YouTube Music listening history entry in the Library view when signed in.
-- **Synced Lyrics & Artwork**: synchronized timestamped lyrics from LRCLIB with dynamic user timing offset controls;
-  cover art rendering with memory LRU and disk caching.
-- **Desktop Integration**: system tray icon with playback controls and show/quit actions; outbound desktop media
-  presence via MPRIS (Linux) and SMTC (Windows); opt-in Discord Rich Presence ("Listening to moggyt" activity with
-  title and artist, lazy reconnection); opt-in Last.fm scrobbler with browser authorization and keyring storage.
-- **Listening Stats**: Wrapped-style stats with selectable periods computed locally from play history.
-- **Update Checks**: manual release checking against GitHub Releases with direct download links.
-- **Planned Features**: hi-res cover upgrades and compact floating player (v1.1); equalizer, crossfade, and quality
-  selector (v2).
+- **Audio Engine**: Dual-sink Rodio playback with gapless crossfade support and automated `yt-dlp` stream resolution.
+- **Interface**: Lightweight declarative Slint GUI with native theme support, system tray, and media keys (MPRIS/SMTC).
+- **Synced Lyrics & Scrobbling**: Real-time synchronized lyrics via LRCLIB with dynamic offset timing, Last.fm
+  scrobbling, and Discord Rich Presence.
+- **Library & Search**: Fast catalog search, albums, artists, local playlist storage, listening history, and OS keyring
+  credentials.
 
-## Quickstart (< 5 minutes)
+## Quickstart
 
-Prerequisites: stable Rust toolchain (version 1.85 or newer, including `rustfmt` and `clippy`) and Git.
+### Prerequisites
+
+- Rust 1.85+ (`cargo`, `rustc`, `rustfmt`, `clippy`)
+- Git
+- ALSA development libraries (`libasound2-dev` on Debian/Ubuntu, `alsa-lib` on Fedora/Arch)
+- Recommended: `deno` (for `yt-dlp` JavaScript extraction)
+
+### Build and Run
 
 ```bash
 git clone https://github.com/kveld9/moggyt
 cd moggyt
-cargo run
+cargo run --release
 ```
 
-## Installation
-
-`moggyt` can be compiled from source or installed using pre-built binary packages from GitHub Releases:
-
-- **From Source**: build release binaries with `cargo build --release`.
-- **Release Packages**: standalone `.AppImage` and `.deb` packages, plus portable tarballs for Linux x86_64;
-  NSIS installer (`.exe`) and portable zip for 64-bit Windows.
-- **Arch Linux**: packaging definition available under `packaging/arch/moggyt-bin/PKGBUILD` which repackages the
-  official Linux release tarball via `makepkg -si` (AUR publishing pending).
-- **Stream Resolver Sidecar**: on first launch, `moggyt` automatically downloads a standalone `yt-dlp` binary into the
-  app data directory with a ~3-day update check. Upstream `yt-dlp` (2026.10.21+) deprecates YouTube extraction without
-  a JavaScript runtime; installing `deno` is recommended.
-
-For step-by-step instructions across all platforms, see [Installation](docs/06-installation.md).
-
-## Usage
-
-Launch `moggyt` to display the main interface. Navigation is organized into four primary pages:
-
-- **Search**: query tracks, albums, and artists.
-- **Queue**: inspect, advance, retreat, and manage queued tracks.
-- **Now Playing**: view active track artwork, playback progress, and timestamped synced lyrics with offset controls.
-- **Library**: authenticate via cookie import, inspect saved playlists, liked tracks, albums, and check for updates.
-- **Stats**: view Wrapped-style listening totals and top artists/tracks across selectable periods.
-
-The persistent bottom player bar remains active across all views for uninterrupted transport control. For complete
-usage details, see the [User Guide](docs/05-user-guide.md).
-
-## Configuration
-
-`moggyt` adheres to standard platform conventions for storage and configuration:
-
-- **Linux / Unix**: `$XDG_DATA_HOME/moggyt` (falling back to `~/.local/share/moggyt`).
-- **Windows**: `%APPDATA%\moggyt`.
-- **Covers Cache**: `<data_dir>/covers` (with automated temporary directory fallback).
-- **Play Log**: `<data_dir>/play-log.jsonl` (local listening history, JSON Lines).
-- **Credentials**: imported cookies live exclusively in the operating system credential store (never in plain files or
-  logs). Streaming requests remain strictly anonymous.
-- **Diagnostics**: control log verbosity via the `RUST_LOG` environment variable (e.g. `RUST_LOG=debug cargo run`).
-
-For in-depth configuration and directory layouts, see [Configuration](docs/07-configuration.md).
+Pre-built binaries (`.deb`, `.AppImage`, tarballs, `.exe`, zip) are available on
+[GitHub Releases](https://github.com/kveld9/moggyt/releases).
+For detailed setup across all platforms, see the [Installation Guide](docs/06-installation.md).
 
 ## Architecture
 
-The codebase enforces a strict hexagonal architecture:
+`moggyt` follows a strict hexagonal architecture separating UI and external services from domain logic:
 
 ```text
-UI Shell (src/slint_shell/, Slint) --> Pure Domain (src/domain/) <-- Ports <-- Adapters (src/infra/)
+UI Shell (src/slint_shell/)  ──>  Pure Domain (src/domain/)  <──  Ports  <──  Adapters (src/infra/)
 ```
 
-`src/main.rs` is the sole composition root, assembling dependencies and bootstrapping the Slint window. Pure
-business logic in `domain/` contains zero I/O or wall-clock dependencies.
-
-For architectural invariants and design documents, see [Architecture](docs/02-architecture.md) and the
+`src/main.rs` serves as the composition root. The domain layer contains zero I/O or wall-clock dependencies.
+For architectural invariants, see [Architecture](docs/02-architecture.md) and the
 [Software Design Document (SDD)](docs/04-sdd.md).
 
 ## Documentation
 
-Comprehensive project documentation is maintained in the [`docs/`](docs/) directory:
+Comprehensive project documentation is organized in the [`docs/`](docs/) directory:
 
-| Document | Description |
-| --- | --- |
-| [Documentation Index](docs/README.md) | Overview and recommended reading paths for users and contributors |
-| [Vision and Scope](docs/01-vision.md) | High-level goals, guiding principles, and scope boundaries |
-| [Architecture](docs/02-architecture.md) | Hexagonal architecture, module map, port boundaries, and dependency rules |
-| [Development](docs/03-development.md) | Toolchain setup, verification gates, TDD flow, and branch conventions |
-| [Software Design Document (SDD)](docs/04-sdd.md) | Comprehensive v1 technical design, reference analysis, and requirements |
-| [User Guide](docs/05-user-guide.md) | Interface navigation, transport controls, queue operations, and library sign-in |
-| [Installation](docs/06-installation.md) | Building from source, release artifacts, package managers, and runtime setup |
-| [Configuration](docs/07-configuration.md) | Platform data paths, cover cache, credential storage, and logging filters |
-| [Troubleshooting](docs/08-troubleshooting.md) | Diagnostic matrix mapping operational symptoms to causes and solutions |
-| [Releases and Packaging](docs/09-releases.md) | CI build pipelines, distribution artifacts, signing status, and update checks |
-| [ADR Index](docs/adr/README.md) | Architecture Decision Records, including [ADR-001](docs/adr/001-update-check-releases.md) |
+- [Documentation Hub](docs/README.md): Documentation map and recommended reading order.
+- [User Guide](docs/05-user-guide.md): Navigation, transport controls, and library sessions.
+- [Architecture](docs/02-architecture.md) & [SDD](docs/04-sdd.md): Port boundaries, module invariants, and specifications.
+- [Configuration](docs/07-configuration.md): Data paths, cover cache, credentials, and diagnostics.
+- [Troubleshooting](docs/08-troubleshooting.md): Operational symptoms, causes, and solutions.
+- [Development](docs/03-development.md): Verification gates, TDD guidelines, and branch policies.
 
-## Development
+## Verification
 
-The project enforces test-driven development (TDD) for domain logic and intent handlers using in-memory fakes. All
-contributions must enter via Pull Requests adhering to [Conventional Commits](https://www.conventionalcommits.org/)
-in English (see [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md)). Direct commits to `main` are
-prohibited.
-
-Local verification gates matching continuous integration:
+Run local verification gates before submitting changes:
 
 ```bash
 cargo fmt --all -- --check
@@ -135,12 +74,16 @@ cargo test --all-features
 ./scripts/check-i18n.sh
 ```
 
-## Security
+All contributions must follow [Conventional Commits](https://www.conventionalcommits.org/)
+and enter through pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 
-`moggyt` is an unofficial, independent client with no affiliation with Google or YouTube. Account cookies are stored
-only in the OS credential store and are never sent with audio stream requests; the client includes no telemetry.
-Report vulnerabilities confidentially per [SECURITY.md](SECURITY.md); do not open public issues.
+## Security & Disclaimer
+
+`moggyt` is an independent project and is not affiliated with Google or YouTube.
+Account cookies reside strictly in the operating system credential store and are
+never sent with media stream requests. Disclose vulnerabilities privately per
+[SECURITY.md](SECURITY.md).
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE).
