@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use crate::domain::RepeatMode;
 
 use super::search::format_duration;
+use super::state::SlintAppState;
 
 /// Cycles repeat mode in the canonical sequence: Off -> All -> One -> Off.
 pub fn cycle_repeat_mode(mode: RepeatMode) -> RepeatMode {
@@ -95,6 +96,79 @@ pub fn format_track_duration(duration_secs: Option<u32>) -> String {
     format_duration(duration_secs)
 }
 
+/// Generates a randomized permutation of indices `0..len` using Fisher-Yates with a system-clock PRNG.
+/// If `keep_first` is provided, that index is placed at position 0 so the active track stays selected.
+pub fn shuffle_permutation(len: usize, keep_first: Option<usize>) -> Vec<usize> {
+    if len <= 1 {
+        return (0..len).collect();
+    }
+    let mut indices: Vec<usize> = (0..len).collect();
+    if let Some(first) = keep_first.filter(|&k| k < len) {
+        indices.swap(0, first);
+        shuffle_slice(&mut indices[1..]);
+    } else {
+        shuffle_slice(&mut indices);
+    }
+    indices
+}
+
+fn shuffle_slice(slice: &mut [usize]) {
+    let mut seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    for i in (1..slice.len()).rev() {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        let j = (seed as usize) % (i + 1);
+        slice.swap(i, j);
+    }
+}
+
+impl SlintAppState {
+    /// Toggles queue shuffle state, permuting or restoring tracks accordingly.
+    pub fn toggle_shuffle(&mut self) {
+        self.is_shuffle = !self.is_shuffle;
+        if self.is_shuffle {
+            self.shuffle_current_queue();
+        } else {
+            self.restore_unshuffled_queue();
+        }
+    }
+
+    /// Shuffles the current queue, preserving the currently playing track at cursor 0.
+    pub fn shuffle_current_queue(&mut self) {
+        if self.queue.len() <= 1 {
+            return;
+        }
+        if self.unshuffled_tracks.is_none() {
+            self.unshuffled_tracks = Some(self.queue.tracks().to_vec());
+        }
+        let order = shuffle_permutation(self.queue.len(), Some(self.queue.cursor()));
+        self.queue.shuffle_with(&order);
+    }
+
+    /// Restores the queue to its original unshuffled order if captured.
+    pub fn restore_unshuffled_queue(&mut self) {
+        let Some(original) = self.unshuffled_tracks.take() else {
+            return;
+        };
+        let current_id = self.queue.current().map(|t| t.id.clone());
+        self.queue.clear();
+        for track in original {
+            self.queue.push(track);
+        }
+        if let Some(id) = current_id {
+            if let Some(idx) = self.queue.tracks().iter().position(|t| t.id == id) {
+                for _ in 0..idx {
+                    self.queue.advance();
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,5 +237,106 @@ mod tests {
         assert!(should_seek(10, 8));
         assert!(should_seek(10, 12));
         assert!(should_seek(0, 50));
+    }
+
+    #[test]
+    fn test_shuffle_permutation_empty_and_single() {
+        assert_eq!(shuffle_permutation(0, None), Vec::<usize>::new());
+        assert_eq!(shuffle_permutation(0, Some(0)), Vec::<usize>::new());
+        assert_eq!(shuffle_permutation(1, None), vec![0]);
+        assert_eq!(shuffle_permutation(1, Some(0)), vec![0]);
+        assert_eq!(shuffle_permutation(1, Some(5)), vec![0]);
+    }
+
+    #[test]
+    fn test_shuffle_permutation_validity_and_no_duplicates() {
+        for len in [2, 5, 10, 50] {
+            let perm = shuffle_permutation(len, None);
+            assert_eq!(perm.len(), len);
+            let mut sorted = perm.clone();
+            sorted.sort_unstable();
+            let expected: Vec<usize> = (0..len).collect();
+            assert_eq!(sorted, expected);
+        }
+    }
+
+    #[test]
+    fn test_shuffle_permutation_preserves_keep_first_at_index_0() {
+        for len in [3, 8, 20] {
+            for keep in [0, 1, len - 1] {
+                let perm = shuffle_permutation(len, Some(keep));
+                assert_eq!(perm.len(), len);
+                assert_eq!(perm[0], keep);
+                let mut sorted = perm.clone();
+                sorted.sort_unstable();
+                let expected: Vec<usize> = (0..len).collect();
+                assert_eq!(sorted, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn test_toggle_shuffle_lifecycle() {
+        use crate::domain::Track;
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        let t1 = Track::new("t1", "Track 1", "Artist 1");
+        let t2 = Track::new("t2", "Track 2", "Artist 2");
+        let t3 = Track::new("t3", "Track 3", "Artist 3");
+        let t4 = Track::new("t4", "Track 4", "Artist 4");
+        state.queue.push(t1.clone());
+        state.queue.push(t2.clone());
+        state.queue.push(t3.clone());
+        state.queue.push(t4.clone());
+
+        // Advance to t3 (cursor index 2)
+        state.queue.advance();
+        state.queue.advance();
+        assert_eq!(state.queue.cursor(), 2);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t3"));
+
+        // Toggle shuffle ON
+        state.toggle_shuffle();
+        assert!(state.is_shuffle);
+        assert!(state.unshuffled_tracks.is_some());
+        assert_eq!(state.queue.len(), 4);
+        // The track that was active (t3) must be preserved at index 0 and cursor 0
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t3"));
+
+        // Advance in the shuffled queue
+        state.queue.advance();
+        let second_track_id = state.queue.current().map(|t| t.id.clone()).unwrap();
+
+        // Toggle shuffle OFF -> should restore original track order and keep second_track active
+        state.toggle_shuffle();
+        assert!(!state.is_shuffle);
+        assert!(state.unshuffled_tracks.is_none());
+        let original_ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(original_ids, vec!["t1", "t2", "t3", "t4"]);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some(second_track_id.as_str()));
+    }
+
+    #[test]
+    fn test_toggle_shuffle_single_or_empty_queue() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        // Empty queue
+        state.toggle_shuffle();
+        assert!(state.is_shuffle);
+        assert!(state.unshuffled_tracks.is_none());
+        state.toggle_shuffle();
+        assert!(!state.is_shuffle);
+
+        // Single track queue
+        state.queue.push(crate::domain::Track::new("t1", "Track 1", "Artist 1"));
+        state.toggle_shuffle();
+        assert!(state.is_shuffle);
+        assert!(state.unshuffled_tracks.is_none());
+        assert_eq!(state.queue.len(), 1);
+        state.toggle_shuffle();
+        assert!(!state.is_shuffle);
     }
 }

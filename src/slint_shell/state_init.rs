@@ -100,6 +100,7 @@ impl SlintAppState {
             liked_ids: HashSet::new(),
             now_playing_cover: None,
             is_shuffle: false,
+            unshuffled_tracks: None,
             update_available: false,
             latest_version: None,
             play_generation: 0,
