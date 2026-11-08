@@ -23,15 +23,9 @@ export component IntegrationSettings inherits VerticalLayout {
 
             SettingsToggleRow {
                 label: Labels.discord-presence-label;
+                description: Labels.discord-presence-hint-label;
                 checked: Integrations.discord-presence-enabled;
                 toggled => { Integrations.discord-presence-toggled(); }
-            }
-
-            Text {
-                text: Labels.discord-presence-hint-label;
-                color: Theme.secondary;
-                font-size: 12px;
-                wrap: word-wrap;
             }
 
             VerticalLayout {
