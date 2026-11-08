@@ -141,6 +141,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
 ./scripts/check-repo.sh
 ./scripts/check-markdown.sh
+./scripts/check-i18n.sh
 ```
 
 `Cargo.lock` is committed as the single source of truth for reproducible builds.

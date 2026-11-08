@@ -12,7 +12,7 @@ This guide provides diagnosis and remediation steps for common operational issue
 | System tray icon does not appear | Desktop environment or compositor does not support Ayatana / AppIndicator protocols | Normal behavior; the app logs a warning and runs fully functional without a tray icon. |
 | Cover art shows "Cover art unavailable" | Network request failed, track lacks artwork, or offline | Verify internet connection; artwork will reload automatically when available. |
 | Update check shows "Update check failed (offline?)" | GitHub API unauthenticated request returned 404 (expected for private repo pre-launch) | Expected behavior prior to public release launch per ADR-001. No action required. |
-| Inbound multimedia keys or media buttons do not control playback | MPRIS / SMTC inbound key routing is currently attach-no-op | Known limitation in v1: MPRIS and SMTC publish outbound metadata only; inbound controls are deferred. |
+| Inbound multimedia keys or media buttons do not control playback | Another running application or browser tab has acquired exclusive focus on media keys or desktop presence daemon | Close conflicting players or browser tabs, or verify desktop environment media key shortcut bindings. |
 | "Queue is empty" appears in Now Playing view | Playback attempted without queued tracks | Navigate to the Search page, type a query, and press Enter to enqueue a track first. |
 
 ## Inspecting Runtime Logs
