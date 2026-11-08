@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
-use rodio::{Decoder, OutputStream, Sink};
+use rodio::{Decoder, OutputStream, Sink, Source};
 
 use super::audio::{AudioBackend, clamp_speed};
 use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
@@ -45,6 +45,7 @@ pub struct RodioBackend {
     resolver: YtDlpResolver,
     stream_cache: Option<Arc<StreamDiskCache>>,
     last_requested: Option<String>,
+    track_duration: Option<Duration>,
     volume: u8,
     speed: f32,
     anchor: Option<Instant>,
@@ -80,6 +81,7 @@ impl RodioBackend {
             resolver: YtDlpResolver::new(binary),
             stream_cache,
             last_requested: None,
+            track_duration: None,
             volume: 100,
             speed: 1.0,
             anchor: None,
@@ -127,6 +129,7 @@ impl RodioBackend {
     where
         R: std::io::Read + std::io::Seek + Send + Sync + 'static,
     {
+        let total_duration = source.total_duration();
         self.fade_generation.fetch_add(1, Ordering::SeqCst);
         let new_sink = Sink::connect_new(self._stream.mixer());
         let new_sink_arc = Arc::new(new_sink);
@@ -141,6 +144,7 @@ impl RodioBackend {
         self.anchor = Some(Instant::now());
         self.paused_accum = Duration::ZERO;
         self.last_requested = Some(track_id.to_owned());
+        self.track_duration = total_duration;
     }
 
     fn decode_source(
@@ -158,6 +162,7 @@ impl RodioBackend {
     where
         R: std::io::Read + std::io::Seek + Send + Sync + 'static,
     {
+        let total_duration = source.total_duration();
         let new_sink = Sink::connect_new(self._stream.mixer());
         let new_sink_arc = Arc::new(new_sink);
         let old_sink = std::mem::replace(&mut self.sink, Arc::clone(&new_sink_arc));
@@ -182,6 +187,7 @@ impl RodioBackend {
         self.anchor = Some(Instant::now());
         self.paused_accum = Duration::ZERO;
         self.last_requested = Some(track_id.to_owned());
+        self.track_duration = total_duration;
     }
 
     /// Downloads and decodes audio from `url`, immediately starting playback.
@@ -470,8 +476,16 @@ impl AudioBackend for RodioBackend {
         self.current_position().as_secs()
     }
 
+    fn duration_secs(&self) -> u64 {
+        self.track_duration.map_or(0, |d| d.as_secs())
+    }
+
     fn is_playing(&self) -> bool {
         !self.sink.is_paused() && !self.sink.empty()
+    }
+
+    fn is_paused(&self) -> bool {
+        self.sink.is_paused() && !self.sink.empty()
     }
 
     fn last_requested(&self) -> Option<&str> {

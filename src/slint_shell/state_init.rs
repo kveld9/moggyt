@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use crate::domain::{PlaybackQueue, SearchFilter, SleepTimer, ThemeId};
+use crate::domain::{PlaybackPhase, PlaybackQueue, SearchFilter, SleepTimer, ThemeId};
 use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, LyricsSource,
@@ -70,6 +70,7 @@ impl SlintAppState {
             library_albums: Vec::new(),
             detail: None,
             detail_return: SlintPage::Search,
+            playback_phase: PlaybackPhase::Empty,
             lyrics_lines: Vec::new(),
             lyrics_key: None,
             cover_key: None,

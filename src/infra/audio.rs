@@ -30,6 +30,18 @@ pub trait AudioBackend {
     fn volume(&self) -> u8;
     fn position_secs(&self) -> u64;
     fn is_playing(&self) -> bool;
+    /// Returns whether playback is currently paused. Exposes raw facts only; adapters must never derive the phase.
+    fn is_paused(&self) -> bool {
+        self.last_requested().is_some() && !self.is_playing()
+    }
+    /// Returns whether the backend is empty. Exposes raw facts only; adapters must never derive the phase.
+    fn is_empty(&self) -> bool {
+        self.last_requested().is_none()
+    }
+    /// Returns track duration in seconds (0 means unknown). Exposes raw facts only; adapters must never derive the phase.
+    fn duration_secs(&self) -> u64 {
+        0
+    }
     fn last_requested(&self) -> Option<&str>;
     fn set_quality(&mut self, _q: AudioQuality) {}
     /// Returns current audio streaming quality preference (defaults to [`AudioQuality::Standard`]).

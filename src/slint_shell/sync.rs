@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use slint::{ModelRc, VecModel};
 
-use crate::domain::{SearchFilter, Track};
+use crate::domain::{PlaybackFacts, SearchFilter, Track};
 use crate::i18n::tr;
 use crate::infra::GithubUpdater;
 use crate::slint_shell::covers::resolve_row_cover_image;
@@ -322,6 +322,27 @@ pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppStat
     window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
     window.set_is_playing(is_playing);
     sync_sleep_timer(window, state);
+    observe_playback_phase(state);
+}
+
+/// Samples raw backend facts and advances the stored playback phase.
+pub(crate) fn observe_playback_phase(state: &mut SlintAppState) {
+    let duration_secs = state.queue.current().and_then(|t| t.duration_secs).map_or(0, u64::from);
+    let Ok(audio) = state.audio.try_lock() else {
+        return;
+    };
+    let facts = PlaybackFacts {
+        is_empty: audio.is_empty(),
+        is_paused: audio.is_paused(),
+        is_playing: audio.is_playing(),
+        position_secs: audio.position_secs(),
+        duration_secs: audio.duration_secs().max(duration_secs),
+    };
+    drop(audio);
+    let Some(event) = facts.event() else {
+        return;
+    };
+    state.set_playback_phase(state.playback_phase.next(event));
 }
 
 /// Synchronizes sleep timer preset selection index and formatted status text with Slint window.
@@ -410,5 +431,50 @@ mod tests {
 
         state.detail = Some(Detail::new(DetailKind::Album, "Okupas", "Diel Paris", Vec::new()));
         assert_eq!(resolve_header_title(&state).as_str(), "Okupas");
+    }
+
+    #[test]
+    fn observe_keeps_empty_phase_without_tracks() {
+        use crate::domain::PlaybackPhase;
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        observe_playback_phase(&mut state);
+        assert_eq!(state.playback_phase, PlaybackPhase::Empty);
+    }
+
+    #[test]
+    fn observe_marks_paused_after_pause() {
+        use crate::domain::PlaybackPhase;
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.queue.push(Track::new("t", "Title", "Artist").with_duration(200));
+        state.set_playback_phase(PlaybackPhase::Playing);
+        {
+            let mut audio = state.audio.lock().unwrap();
+            audio.play("t");
+            audio.seek(10);
+            audio.pause();
+        }
+        observe_playback_phase(&mut state);
+        assert_eq!(state.playback_phase, PlaybackPhase::Paused);
+    }
+
+    #[test]
+    fn observe_marks_playing_while_audible() {
+        use crate::domain::PlaybackPhase;
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.queue.push(Track::new("t", "Title", "Artist").with_duration(200));
+        state.set_playback_phase(PlaybackPhase::Resolving);
+        {
+            let mut audio = state.audio.lock().unwrap();
+            audio.play("t");
+            audio.seek(10);
+        }
+        observe_playback_phase(&mut state);
+        assert_eq!(state.playback_phase, PlaybackPhase::Playing);
     }
 }
