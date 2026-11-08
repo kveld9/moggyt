@@ -103,18 +103,18 @@ impl SlintAppState {
             unshuffled_tracks: None,
             update_available: false,
             latest_version: None,
-            play_generation: 0,
-            search_generation: 0,
-            detail_generation: 0,
-            library_generation: 0,
-            explore_generation: 0,
+            play_generation: crate::slint_shell::cover_pool::CoverDomain::Play.base(),
+            search_generation: crate::slint_shell::cover_pool::CoverDomain::Search.base(),
+            detail_generation: crate::slint_shell::cover_pool::CoverDomain::Detail.base(),
+            library_generation: crate::slint_shell::cover_pool::CoverDomain::Library.base(),
+            explore_generation: crate::slint_shell::cover_pool::CoverDomain::Explore.base(),
             explore_shelves: Vec::new(),
             explore_loaded: false,
             explore_loading: false,
             category_shelves: Vec::new(),
             category_title: String::new(),
             category_loading: false,
-            category_generation: 0,
+            category_generation: crate::slint_shell::cover_pool::CoverDomain::Category.base(),
             category_return: SlintPage::Explore,
             explore_columns: crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS,
             worker_tx: None,
@@ -125,6 +125,7 @@ impl SlintAppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::slint_shell::cover_pool::CoverDomain;
     use crate::slint_shell::test_support::LocaleTrackingCatalog;
 
     #[test]
@@ -142,5 +143,11 @@ mod tests {
         assert!(state.home_shelves.is_empty());
         assert!(!state.search_active);
         assert!(state.recent_searches.is_empty());
+        assert_eq!(state.play_generation, CoverDomain::Play.base());
+        assert_eq!(state.search_generation, CoverDomain::Search.base());
+        assert_eq!(state.detail_generation, CoverDomain::Detail.base());
+        assert_eq!(state.library_generation, CoverDomain::Library.base());
+        assert_eq!(state.explore_generation, CoverDomain::Explore.base());
+        assert_eq!(state.category_generation, CoverDomain::Category.base());
     }
 }
