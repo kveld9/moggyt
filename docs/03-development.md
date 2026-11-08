@@ -154,12 +154,10 @@ guessing; every rule here was verified against a build or the official documenta
   the Window's `forward-focus`, and a layout inside a non-layout parent needs explicit
   `width: parent.width; height: parent.height`.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/keyboard-input/focusscope/>.
-- In the pinned Slint 1.13 a nested `VerticalLayout` that holds a fixed-width child
+- Centering fixed-size children in vertical layouts: a nested `VerticalLayout` that holds a fixed-width child
   collapses to its content's preferred width and sits at the start of its parent, so a
   "centered" empty state renders left-shifted: a 48px icon ends up further left than the
   hint text and the CTA button. Center a fixed-size child by wrapping it in
   `HorizontalLayout { alignment: center; ... }`: the wrapper takes the full width and the
-  icon centers inside it. `cross-axis-alignment` does not exist in 1.13 (it appears only
-  in newer releases), so read `Cargo.lock` and the docs for that pinned version before
-  using a property.
-  Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/verticallayout/>
+  icon centers inside it.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/verticallayout/>.
