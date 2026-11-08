@@ -30,6 +30,7 @@ updates:
       time: "04:00"
       timezone: "Etc/UTC"
     open-pull-requests-limit: 10
+    versioning-strategy: increase-if-necessary
     commit-message:
       prefix: "chore(deps)"
       include: "scope"
@@ -41,5 +42,6 @@ updates:
         patterns:
           - "*"
         update-types:
+          - "major"
           - "minor"
           - "patch"
