@@ -24,10 +24,10 @@ tray-icon = { version = "0.24", default-features = false, features = ["gtk"] }
 discord-rich-presence = "1.1"
 md-5 = "0.11"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-slint = "1.13"
+slint = "1.18"
 
 [build-dependencies]
-slint-build = "1.13"
+slint-build = "1.18"
 
 [package.metadata.deb]
 maintainer = "kveld9 <179108235+kveld9@users.noreply.github.com>"

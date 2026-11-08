@@ -5,7 +5,7 @@ UI shell (`src/slint_shell/`) → pure domain (`src/domain/`) ← ports ← adap
 
 ## Tech stack
 
-- **Core & Toolchain**: Rust (edition 2024, `rust-version = "1.85"`), Slint 1.13 (`slint`, `slint-build`).
+- **Core & Toolchain**: Rust (edition 2024, `rust-version = "1.85"`), Slint 1.18 (`slint`, `slint-build`).
 - **Audio & Streaming**: `rodio` 0.21 (dual-sink crossfade, ALSA backend `libasound2`), `yt-dlp` sidecar
   (standalone, auto-managed under app data; requires `deno` for JS extraction), `reqwest` 0.12 (HTTP streaming
   with `rustls-tls`).
