@@ -98,12 +98,11 @@ Run all six before finishing. `cargo run` launches the window.
 - Merge only with green CI (`fmt`, `clippy`, `test`, standards audit, markdownlint).
   Merge method is Squash (default) or Rebase — never Merge commits
   (`gh pr merge --squash`, never `--merge`; repo setting `allow_merge_commit: false`).
-  Agents open PRs — the owner reviews (self-review checklist in `CONTRIBUTING.md`)
-  and merges. Exception: when the owner has explicitly granted merge autonomy for
-  a work sequence, the agent may merge only PRs it authored, only with all CI
-  checks green, and only via Squash (`gh pr merge --squash`, never `--merge`).
-  It must never merge PRs from other authors, bypass checks, or push version tags.
+  Autonomous merge: agents have standing authorization to push branches, open PRs,
+  and squash-merge (`gh pr merge --squash --delete-branch`, never `--merge`) PRs they
+  authored once all CI checks are green. Agents must never merge PRs from other authors,
+  bypass checks, or create/push version tags.
 - Never publish releases unless explicitly asked.
 - Releases are tag-triggered only: merging to main never ships; the owner cuts a release by pushing tag vX.Y.Z.
-- Agents may push branches and open PRs, but must never create or push version tags unless explicitly asked.
+- Agents must never create or push version tags unless explicitly asked.
 - Never commit secrets, `.env`, debug output, or foreign files; keep the diff minimal.
