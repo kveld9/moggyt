@@ -61,9 +61,10 @@ Run all six before finishing. `cargo run` launches the window.
   in-tree helper `crate::slint_shell::platform::dispatch_to_ui`). Do not use CSS or QML
   syntax that does not exist in Slint 1.x.
 - Slint unknowns go to the source first: when Slint language, layout, binding,
-  or compiler behavior is unclear, consult the deployed `slint` skill or official
-  Slint documentation (<https://docs.slint.dev/>) before guessing (covers enums, layouts,
-  callbacks, and property semantics). Do not invent Slint syntax from memory.
+  or compiler behavior is unclear, consult the deployed `slint` skill, the
+  `slint-docs` MCP tool (`search`/`fetch`), or official Slint documentation
+  (<https://docs.slint.dev/>) before guessing (covers enums, layouts, callbacks,
+  and property semantics). Do not invent Slint syntax from memory.
 - Slint lessons stick: when Slint behavior surprises you (layout, binding,
   i18n, compiler), verify against the official Slint documentation
   (<https://docs.slint.dev/>) and record the distilled rule plus the doc link in

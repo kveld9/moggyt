@@ -99,8 +99,8 @@ guessing; every rule here was verified against a build or the official documenta
   Source: <https://docs.slint.dev/latest/docs/rust/slint/fn.invoke_from_event_loop/>.
 - A card grid built from a runtime model cannot use `GridLayout` `row` / `col`: both are
   cell properties whose bindings must be compile-time constants, so an index-derived grid
-  (`row: i / 5`) does not compile. Use one `Flickable` whose `viewport-width` is computed
-  from the model length, with a single `HorizontalLayout` of fixed-size cards inside.
+  (`row: i / 5`) does not compile. Use one `Flickable` whose `content-width` (formerly `viewport-width` in Slint < 1.18)
+  is computed from the model length, with a single `HorizontalLayout` of fixed-size cards inside.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/gridlayout/>.
 - Rows of cards only wrap when each card has a real width: a `HorizontalLayout` of cards
   without a width sizes them from their own preferred width, so the row overflows the window
@@ -143,17 +143,17 @@ guessing; every rule here was verified against a build or the official documenta
   In a fixed-height container (such as a 72px bar holding a 56px controls block), specifying explicit
   symmetric vertical padding (`padding-top: root.mode == 1 ? 6px : 8px; padding-bottom: root.mode == 1 ? 6px : 8px;`)
   ensures the inner controls block is vertically centered instead of flush against the top border.
-- `Flickable` viewport content-sizing and layout interaction: a `Flickable` does not provide an intrinsic
-  content height to enclosing layouts or intermediate containers; its `viewport-height` is computed from its
-  children, while its own outer `height` defaults to 100% of the parent element or must be allocated by layout stretch.
-  Wrapping a `Flickable` inside an intermediate `Rectangle` with circular height constraints (`height: parent.height`)
-  or placing it in a layout with explicit alignment (such as `alignment: start`) collapses the container to zero height
-  because `vertical-stretch` is ignored and `Flickable`'s preferred height is zero. To allow vertical scrolling without
-  clipping or collapse, place `Flickable` directly in the stretching layout with `vertical-stretch: 1` (leaving the parent
-  layout at default `stretch` alignment). Inside `Flickable`, keep the inner `VerticalLayout` free of explicit `height`
-  and explicit `width` so its height follows content rows naturally, enabling `viewport-height` to be derived accurately.
-  Empty states that do not scroll should be rendered outside `Flickable` in a dedicated layout with `vertical-stretch: 1`
-  so they cannot collapse when the list is empty.
+- `Flickable` content-sizing and layout interaction: a `Flickable` does not provide an intrinsic
+  content height to enclosing layouts or intermediate containers; its `content-height` (formerly `viewport-height` in
+  Slint < 1.18) is computed from its children, while its own outer `height` defaults to 100% of the parent element or
+  must be allocated by layout stretch. Wrapping a `Flickable` inside an intermediate `Rectangle` with circular height
+  constraints (`height: parent.height`) or placing it in a layout with explicit alignment (such as `alignment: start`)
+  collapses the container to zero height because `vertical-stretch` is ignored and `Flickable`'s preferred height is zero.
+  To allow vertical scrolling without clipping or collapse, place `Flickable` directly in the stretching layout with
+  `vertical-stretch: 1` (leaving the parent layout at default `stretch` alignment). Inside `Flickable`, keep the inner
+  `VerticalLayout` free of explicit `height` and explicit `width` so its height follows content rows naturally, enabling
+  `content-height` to be derived accurately. Empty states that do not scroll should be rendered outside `Flickable` in
+  a dedicated layout with `vertical-stretch: 1` so they cannot collapse when the list is empty.
   Source: <https://docs.slint.dev/latest/docs/slint/src/language/builtins/elements#flickable>.
 - Global shortcuts belong in a bubbling `key-pressed` handler on a `FocusScope` that wraps the main layout
   (focused text inputs consume their keys first, unhandled keys bubble up), the scope is made the initial focus via
