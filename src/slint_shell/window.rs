@@ -41,8 +41,8 @@ use crate::slint_shell::playback_worker::{
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::stream_prefetch::spawn_stream_prefetch;
 use crate::slint_shell::sync::{
-    persist_recent_searches, sync_library_and_detail, sync_playback_tick, sync_recent_searches,
-    sync_shelves_and_queue, sync_update_status, sync_window,
+    persist_recent_searches, sync_header_title, sync_library_and_detail, sync_playback_tick,
+    sync_recent_searches, sync_shelves_and_queue, sync_update_status, sync_window,
 };
 use crate::slint_shell::theme::apply_custom_theme_if_changed;
 
@@ -284,6 +284,7 @@ pub(crate) fn open_detail_async(
                     st.detail = apply_detail_result(detail, &id, st.locale);
                     request_detail_covers(st, &tx);
                     sync_library_and_detail(&win, st);
+                    sync_header_title(&win, st);
                 }
             });
         });

@@ -43,7 +43,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_custom_theme_names(ModelRc::new(VecModel::from(custom_names)));
     window.set_active_custom_theme_name(active_custom.into());
     window.set_active_page(state.page.to_index());
-    window.set_header_title(resolve_header_title(state));
+    sync_header_title(window, state);
     window.set_queue_panel_open(state.queue_panel_open);
     let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
     window.set_is_playing(is_playing);
@@ -300,6 +300,11 @@ pub(crate) fn resolve_header_title(state: &SlintAppState) -> slint::SharedString
     }
 }
 
+/// Pushes the resolved header title for the active page into the window.
+pub(crate) fn sync_header_title(window: &MoggytWindow, state: &SlintAppState) {
+    window.set_header_title(resolve_header_title(state));
+}
+
 /// Periodic playback tick syncing elapsed timestamps, progress, and lyrics line without blocking.
 pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppState) {
     let Ok(audio) = state.audio.try_lock() else {
@@ -388,5 +393,22 @@ mod tests {
         assert_eq!(resolve_header_title(&state).as_str(), "Detalle");
         state.detail = None;
         assert_eq!(resolve_header_title(&state).as_str(), "Detalle");
+    }
+
+    #[test]
+    fn test_resolve_header_title_replaces_detail_loading_placeholder() {
+        use crate::domain::{Detail, DetailKind};
+        use crate::i18n::Locale;
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.locale = Locale::Spanish;
+        state.page = SlintPage::Detail;
+        state.detail =
+            Some(Detail::new(DetailKind::Album, tr(Locale::Spanish, "Loading..."), "", Vec::new()));
+        assert_eq!(resolve_header_title(&state).as_str(), "Cargando...");
+
+        state.detail = Some(Detail::new(DetailKind::Album, "Okupas", "Diel Paris", Vec::new()));
+        assert_eq!(resolve_header_title(&state).as_str(), "Okupas");
     }
 }
