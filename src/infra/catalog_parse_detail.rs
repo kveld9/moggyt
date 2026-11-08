@@ -280,6 +280,25 @@ fn with_optional_detail_fields(mut detail: Detail, value: &Value) -> Detail {
     detail
 }
 
+/// Fills tracks without their own artwork with the container artwork.
+///
+/// Album tracklist items carry no thumbnail in the catalog API, so every track would
+/// otherwise render an empty cover square.
+fn fill_missing_track_artwork(mut detail: Detail) -> Detail {
+    let Some(artwork) = detail.artwork.clone() else {
+        return detail;
+    };
+    if artwork.trim().is_empty() {
+        return detail;
+    }
+    for track in &mut detail.tracks {
+        if track.artwork.as_deref().is_none_or(|url| url.trim().is_empty()) {
+            track.artwork = Some(artwork.clone());
+        }
+    }
+    detail
+}
+
 /// Parses a detail view (album, artist, or playlist) from catalog API browse response payload.
 ///
 /// Returns `None` when neither a header title nor any valid track items are found.
@@ -291,7 +310,7 @@ pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
         return None;
     }
     let detail = Detail::new(kind, &title, &subtitle, tracks);
-    Some(with_optional_detail_fields(detail, value))
+    Some(fill_missing_track_artwork(with_optional_detail_fields(detail, value)))
 }
 
 #[cfg(test)]
@@ -325,6 +344,41 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn parse_detail_all_fills_missing_track_artwork_from_microformat() {
+        let raw = include_str!("../../tests/fixtures/catalog_detail.json");
+        let mut payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        payload["microformat"] = serde_json::json!({
+            "microformatDataRenderer": {
+                "title": "Test Album Title",
+                "thumbnail": {
+                    "thumbnails": [
+                        { "url": "https://img.local/header.jpg", "width": 544, "height": 544 }
+                    ]
+                }
+            }
+        });
+
+        let detail = parse_detail_all(&payload, DetailKind::Album).expect("parsed detail");
+        assert_eq!(detail.artwork.as_deref(), Some("https://img.local/header.jpg"));
+        assert_eq!(
+            detail.tracks[0].artwork.as_deref(),
+            Some("https://img.local/t1.jpg"),
+            "track with its own artwork keeps it"
+        );
+        assert_eq!(
+            detail.tracks[1].artwork.as_deref(),
+            Some("https://img.local/header.jpg"),
+            "track without artwork inherits the container artwork"
+        );
+
+        let no_art =
+            parse_detail_all(&serde_json::from_str(raw).expect("fixture"), DetailKind::Album)
+                .expect("parsed detail");
+        assert_eq!(no_art.artwork, None);
+        assert_eq!(no_art.tracks[1].artwork, None, "no fallback without container artwork");
     }
 
     #[test]

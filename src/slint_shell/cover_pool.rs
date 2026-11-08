@@ -8,7 +8,7 @@ use crate::slint_shell::playback_worker::{
 };
 use crate::slint_shell::state::{SharedCovers, SlintAppState};
 use crate::slint_shell::sync::{
-    sync_explore_shelves, sync_library_and_detail, sync_shelves_and_queue,
+    sync_category_shelves, sync_explore_shelves, sync_library_and_detail, sync_shelves_and_queue,
 };
 use crate::slint_shell::window::with_ui_state;
 use crate::slint_shell::{CoverArtData, MoggytWindow};
@@ -40,12 +40,13 @@ struct CoverTargets {
     shelves_and_queue: bool,
     library_and_detail: bool,
     explore: bool,
+    category: bool,
 }
 
 impl CoverTargets {
     /// True when the cover belongs to at least one live view.
     fn any(self) -> bool {
-        self.shelves_and_queue || self.library_and_detail || self.explore
+        self.shelves_and_queue || self.library_and_detail || self.explore || self.category
     }
 }
 
@@ -56,11 +57,29 @@ fn cover_targets(st: &SlintAppState, generation: u64) -> CoverTargets {
     let is_library = st.library_generation == generation;
     let is_play = st.play_generation == generation;
     let is_explore = st.explore_generation == generation;
+    let is_category = st.category_generation == generation;
 
     CoverTargets {
         shelves_and_queue: is_search || is_play,
         library_and_detail: is_detail || is_library,
         explore: is_explore,
+        category: is_category,
+    }
+}
+
+/// Resyncs the views selected by cover generation targets.
+fn sync_target_views(win: &MoggytWindow, st: &mut SlintAppState, targets: CoverTargets) {
+    if targets.shelves_and_queue {
+        sync_shelves_and_queue(win, st);
+    }
+    if targets.library_and_detail {
+        sync_library_and_detail(win, st);
+    }
+    if targets.explore {
+        sync_explore_shelves(win, st);
+    }
+    if targets.category {
+        sync_category_shelves(win, st);
     }
 }
 
@@ -77,15 +96,7 @@ pub(crate) fn apply_fetched_cover_to_state(
     let targets = cover_targets(st, generation);
     if targets.any() {
         st.search_covers.insert(cover.url.clone(), img.clone());
-        if targets.shelves_and_queue {
-            sync_shelves_and_queue(win, st);
-        }
-        if targets.library_and_detail {
-            sync_library_and_detail(win, st);
-        }
-        if targets.explore {
-            sync_explore_shelves(win, st);
-        }
+        sync_target_views(win, st, targets);
     }
     sync_now_playing_after_cover_fetch(win, st, &cover.url, &img);
 }
@@ -179,6 +190,7 @@ mod tests {
         st.detail_generation = 30;
         st.library_generation = 40;
         st.explore_generation = 50;
+        st.category_generation = 60;
 
         // Matching search generation
         let search_targets = cover_targets(&st, 10);
@@ -186,6 +198,7 @@ mod tests {
         assert!(search_targets.shelves_and_queue);
         assert!(!search_targets.library_and_detail);
         assert!(!search_targets.explore);
+        assert!(!search_targets.category);
 
         // Matching play generation
         let play_targets = cover_targets(&st, 20);
@@ -193,6 +206,7 @@ mod tests {
         assert!(play_targets.shelves_and_queue);
         assert!(!play_targets.library_and_detail);
         assert!(!play_targets.explore);
+        assert!(!play_targets.category);
 
         // Matching detail generation
         let detail_targets = cover_targets(&st, 30);
@@ -200,6 +214,7 @@ mod tests {
         assert!(!detail_targets.shelves_and_queue);
         assert!(detail_targets.library_and_detail);
         assert!(!detail_targets.explore);
+        assert!(!detail_targets.category);
 
         // Matching library generation
         let library_targets = cover_targets(&st, 40);
@@ -207,6 +222,7 @@ mod tests {
         assert!(!library_targets.shelves_and_queue);
         assert!(library_targets.library_and_detail);
         assert!(!library_targets.explore);
+        assert!(!library_targets.category);
 
         // Matching explore generation
         let explore_targets = cover_targets(&st, 50);
@@ -214,6 +230,15 @@ mod tests {
         assert!(!explore_targets.shelves_and_queue);
         assert!(!explore_targets.library_and_detail);
         assert!(explore_targets.explore);
+        assert!(!explore_targets.category);
+
+        // Matching category generation
+        let category_targets = cover_targets(&st, 60);
+        assert!(category_targets.any());
+        assert!(!category_targets.shelves_and_queue);
+        assert!(!category_targets.library_and_detail);
+        assert!(!category_targets.explore);
+        assert!(category_targets.category);
 
         // Non-matching generation
         let non_matching = cover_targets(&st, 999);
@@ -221,5 +246,6 @@ mod tests {
         assert!(!non_matching.shelves_and_queue);
         assert!(!non_matching.library_and_detail);
         assert!(!non_matching.explore);
+        assert!(!non_matching.category);
     }
 }
