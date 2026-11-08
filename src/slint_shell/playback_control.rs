@@ -232,6 +232,63 @@ impl SlintAppState {
         }
     }
 
+    fn track_remaining_secs(&self, audio: &dyn AudioBackend) -> Option<u64> {
+        let dur = self.queue.current()?.duration_secs? as u64;
+        let pos = audio.position_secs();
+        (dur > pos).then(|| dur - pos)
+    }
+
+    fn can_crossfade_track(&self, track_id: &str) -> bool {
+        if self.last_crossfaded_track.as_deref() == Some(track_id) {
+            return false;
+        }
+        self.queue.peek_next().is_some() || self.autoplay
+    }
+
+    fn crossfade_candidate(&self, audio: &dyn AudioBackend) -> Option<(String, bool)> {
+        let remaining = self.track_remaining_secs(audio)?;
+        if remaining > self.crossfade_seconds as u64 {
+            return None;
+        }
+        let current_id = &self.queue.current()?.id;
+        if !self.can_crossfade_track(current_id) {
+            return None;
+        }
+        Some((current_id.clone(), self.queue.peek_next().is_some()))
+    }
+
+    fn handle_playing_crossfade(&self, audio: &dyn AudioBackend) -> Option<(String, bool)> {
+        if self.crossfade_seconds == 0 {
+            return None;
+        }
+        self.crossfade_candidate(audio)
+    }
+
+    fn execute_crossfade(&mut self, current_id: String, has_next: bool) {
+        self.last_crossfaded_track = Some(current_id.clone());
+        if !has_next && self.autoplay {
+            self.append_autoplay_radio(&current_id);
+        }
+        self.next_track();
+    }
+
+    fn advance_ended_playback(&mut self) {
+        if self.queue.peek_next().is_some() {
+            self.next_track();
+            return;
+        }
+        if !self.autoplay {
+            return;
+        }
+        let Some(current) = self.queue.current() else {
+            return;
+        };
+        let current_id = current.id.clone();
+        self.append_autoplay_radio(&current_id);
+        self.queue.advance();
+        self.play_current_quiet();
+    }
+
     /// Advances queue or appends radio recommendations when active track ends or reaches crossfade boundary.
     pub fn continue_autoplay_if_ended(&mut self) {
         let Ok(audio) = self.audio.try_lock() else {
@@ -240,55 +297,16 @@ impl SlintAppState {
         if self.queue.is_empty() {
             return;
         }
-
-        if self.crossfade_seconds > 0 && audio.is_playing() {
-            let Some(current) = self.queue.current() else {
-                return;
-            };
-            let Some(dur) = current.duration_secs else {
-                return;
-            };
-            let pos = audio.position_secs();
-            let dur = dur as u64;
-            if dur > pos && (dur - pos) <= self.crossfade_seconds as u64 {
-                if self.last_crossfaded_track.as_deref() == Some(&current.id) {
-                    return;
-                }
-                let current_id = current.id.clone();
-                let has_next = self.queue.peek_next().is_some();
-                if !has_next && !self.autoplay {
-                    return;
-                }
-                self.last_crossfaded_track = Some(current_id.clone());
-                drop(audio);
-                if !has_next && self.autoplay {
-                    self.append_autoplay_radio(&current_id);
-                }
-                self.next_track();
+        if audio.is_playing() {
+            let candidate = self.handle_playing_crossfade(&**audio);
+            drop(audio);
+            if let Some((id, has_next)) = candidate {
+                self.execute_crossfade(id, has_next);
             }
             return;
         }
-
-        if !self.autoplay || audio.is_playing() {
-            return;
-        }
-        let (Some(current), Some(last)) = (self.queue.current(), self.queue.tracks().last()) else {
-            return;
-        };
-        if !std::ptr::eq(current, last) {
-            return;
-        }
-        let Some(dur) = current.duration_secs else {
-            return;
-        };
-        if audio.position_secs() < dur as u64 {
-            return;
-        }
-        let current_id = current.id.clone();
         drop(audio);
-        self.append_autoplay_radio(&current_id);
-        self.queue.advance();
-        self.play_current_quiet();
+        self.advance_ended_playback();
     }
 }
 
@@ -653,5 +671,49 @@ mod tests {
             state.settings_store.load().crossfade_seconds,
             crate::infra::MAX_CROSSFADE_SECONDS
         );
+    }
+
+    #[test]
+    fn test_continue_autoplay_advances_queue_when_crossfade_zero_and_ended() {
+        let mut state = test_wired();
+        state.crossfade_seconds = 0;
+
+        let t1 = Track::new("t1", "Track 1", "Artist 1").with_duration(180);
+        let t2 = Track::new("t2", "Track 2", "Artist 2").with_duration(200);
+        state.queue.push(t1);
+        state.queue.push(t2);
+
+        state.play_track_at_index(0);
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t1"));
+
+        state.audio.lock().unwrap().pause();
+        assert!(!state.audio.lock().unwrap().is_playing());
+
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.cursor(), 1);
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t2"));
+        assert!(state.audio.lock().unwrap().is_playing());
+    }
+
+    #[test]
+    fn test_continue_autoplay_no_advance_when_last_track_and_autoplay_disabled() {
+        let mut state = test_wired();
+        state.crossfade_seconds = 0;
+        state.autoplay = false;
+
+        let t1 = Track::new("t1", "Track 1", "Artist 1").with_duration(180);
+        state.queue.push(t1);
+
+        state.play_track_at_index(0);
+        assert_eq!(state.queue.cursor(), 0);
+
+        state.audio.lock().unwrap().pause();
+        assert!(!state.audio.lock().unwrap().is_playing());
+
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.queue.len(), 1);
+        assert!(!state.audio.lock().unwrap().is_playing());
     }
 }
