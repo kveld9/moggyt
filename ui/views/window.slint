@@ -45,7 +45,6 @@ export component MoggytWindow inherits Window {
     in-out property <int> crossfade-seconds: 0;
     in-out property <int> stream-cache-limit-mb: 512;
     in-out property <bool> songs-only: false;
-    in-out property <bool> keyboard-shortcuts: true;
     in-out property <string> settings-cookie-text: "";
     in-out property <string> app-version: "0.1.0";
     in-out property <string> update-status-text: "Up to date";
@@ -132,7 +131,6 @@ export component MoggytWindow inherits Window {
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
     callback songs-only-toggled();
-    callback keyboard-shortcuts-toggled();
     callback shortcut-pressed(string, bool) -> bool;
     callback query-submitted(string);
     callback track-selected(int);
@@ -180,7 +178,6 @@ export component MoggytWindow inherits Window {
     changed width => { root.width-changed(self.width / 1px); }
 
     shortcuts := ShortcutScope {
-        shortcuts-enabled: root.keyboard-shortcuts;
         shortcut-pressed(text, modified) => { return root.shortcut-pressed(text, modified); }
         VerticalLayout {
             width: parent.width;
@@ -247,7 +244,6 @@ export component MoggytWindow inherits Window {
                     crossfade-seconds: root.crossfade-seconds;
                     stream-cache-limit-mb: root.stream-cache-limit-mb;
                     songs-only: root.songs-only;
-                    keyboard-shortcuts: root.keyboard-shortcuts;
                     player-bar-mode: root.player-bar-mode;
                     player-bar-show-artwork: root.player-bar-show-artwork;
                     player-bar-show-like: root.player-bar-show-like;
@@ -281,7 +277,6 @@ export component MoggytWindow inherits Window {
                     crossfade-changed(secs) => { root.crossfade-changed(secs); }
                     stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
                     songs-only-toggled => { root.songs-only-toggled(); }
-                    keyboard-shortcuts-toggled => { root.keyboard-shortcuts-toggled(); }
                     back-pressed => { root.back-pressed(); }
                     player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
                     player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }

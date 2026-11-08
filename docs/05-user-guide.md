@@ -240,21 +240,20 @@ Users can customize the player bar appearance and element visibility under **Set
 
 ## Keyboard Shortcuts
 
-Global keyboard shortcuts provide transport and playback control when single-line text inputs are not focused:
+Keyboard shortcuts are always enabled and cannot be disabled. They provide transport and playback control whenever a
+text input does not have focus. Any shortcut pressed with Ctrl, Alt, or Meta held is ignored.
 
 | Key | Action | Context / Notes |
 | --- | --- | --- |
-| `Space` | Play / Pause | Toggles playback state of current track. |
-| `Left Arrow` | Seek backward | Rewinds position by 10 seconds (clamped at 0). |
-| `Right Arrow` | Seek forward | Advances position by 10 seconds. |
-| `Up Arrow` | Volume up | Increases playback volume by 5% (up to 100%). |
-| `Down Arrow` | Volume down | Decreases playback volume by 5% (down to 0%). |
+| `Space` | Toggle play/pause | Toggles playback state of current track. |
+| `Left` | Seek -10s | Rewinds playback position by 10 seconds (clamped at 0). |
+| `Right` | Seek +10s | Advances playback position forward by 10 seconds. |
+| `Up` | Volume +5% | Increases playback volume by 5% (max 100). |
+| `Down` | Volume -5% | Decreases playback volume by 5% (min 0). |
 | `N` | Next track | Skips to next track in queue (requires queued tracks). |
 | `P` | Previous track | Skips to previous track in queue (requires queued tracks). |
 | `L` | Toggle like | Adds or removes current track from liked songs. |
-| `Esc` | Leave text field | Returns focus from the search field so shortcuts apply again. |
-
-Keyboard shortcuts can be toggled in the `Playback` settings section and are enabled by default.
+| `Esc` | Return focus | Returns focus from an active text input so shortcuts apply again. |
 
 ## Desktop Integration
 

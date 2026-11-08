@@ -122,7 +122,7 @@ pub(crate) fn wire_window_callbacks(
     super::detail_callbacks::wire_detail_callbacks(window, &state_rc, &worker_tx);
     wire_playback_callbacks(window, &state_rc, &worker_tx);
     super::settings_callbacks::wire_settings_callbacks(window, &state_rc, &worker_tx);
-    super::shortcuts::wire_shortcut_callbacks(window, &state_rc);
+    super::shortcuts::wire_shortcut_callbacks(window);
     super::discord::wire_discord_callbacks(window, &state_rc);
     super::lastfm_connect::wire_lastfm_callbacks(window, &state_rc);
     super::stats::wire_stats_callbacks(window, &state_rc);

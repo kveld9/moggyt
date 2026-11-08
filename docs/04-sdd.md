@@ -143,7 +143,7 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
   Note: authenticated library endpoints are pending; interim implementation operates as anonymous empty readers.
 - FR-8: display synced lyrics with a user-adjustable offset when LRCLIB has a match.
 - FR-9: load cover art progressively with placeholder, memory LRU, and disk cache.
-- FR-10: persist settings (volume, theme, quality preference, shortcuts) across restarts.
+- FR-10: persist settings (volume, theme, quality preference) across restarts.
 - FR-11: single instance; tray icon with play/pause/next and show/hide actions.
 - FR-12: check GitHub Releases for updates and offer the download page (no silent install).
   Note: unauthenticated checks return 404 on private repo and soft-fail to CheckFailed (see ADR-001).
@@ -380,8 +380,7 @@ image decoding runs off the UI thread with placeholders. Theming is a single nat
 
 - Linux: MPRIS via D-Bus, tray icon, single instance via socket lock, secrets via Secret Service.
 - Windows: SMTC integration, tray icon with thumbnail controls, single instance via named mutex.
-- Shared: media keys, desktop notifications, configurable global shortcuts (off by default
-  where the compositor restricts them, with an explanatory note).
+- Shared: media keys, desktop notifications; transport shortcuts are always enabled and not configurable.
   Note: inbound MPRIS/SMTC media-key routing is live (non-blocking dispatch to UI thread).
 
 ## 10 Packaging and releases

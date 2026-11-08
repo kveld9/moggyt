@@ -88,7 +88,6 @@ impl SlintAppState {
             stream_cache_limit_mb: 512,
             hi_res_covers: false,
             songs_only: false,
-            keyboard_shortcuts: true,
             signed_in,
             theme: ThemeId::default(),
             custom_theme: None,
