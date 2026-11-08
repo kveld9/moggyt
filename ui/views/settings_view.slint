@@ -22,7 +22,6 @@ export component SettingsView inherits VerticalLayout {
     in property <int> crossfade-seconds: 0;
     in property <int> stream-cache-limit-mb: 512;
     in property <bool> songs-only: false;
-    in property <bool> keyboard-shortcuts: true;
     in property <int> player-bar-mode: 0;
     in property <bool> player-bar-show-artwork: true;
     in property <bool> player-bar-show-like: true;
@@ -40,7 +39,6 @@ export component SettingsView inherits VerticalLayout {
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
     callback songs-only-toggled();
-    callback keyboard-shortcuts-toggled();
     callback sign-in-submitted(string);
     callback sign-out();
     callback player-bar-mode-selected(int);
@@ -66,14 +64,12 @@ export component SettingsView inherits VerticalLayout {
         crossfade-seconds: root.crossfade-seconds;
         stream-cache-limit-mb: root.stream-cache-limit-mb;
         songs-only: root.songs-only;
-        keyboard-shortcuts: root.keyboard-shortcuts;
         cycle-playback-speed => { root.cycle-playback-speed(); }
         sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
         audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
         crossfade-changed(secs) => { root.crossfade-changed(secs); }
         stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
         songs-only-toggled => { root.songs-only-toggled(); }
-        keyboard-shortcuts-toggled => { root.keyboard-shortcuts-toggled(); }
     }
 
     session-panel := SessionSettings {

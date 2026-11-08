@@ -3,14 +3,10 @@
 //! Hexagonal invariant: pure in-memory event mapping and Slint callback dispatch
 //! without blocking I/O or direct audio hardware access.
 
-use std::rc::Rc;
-
 use slint::ComponentHandle;
 use slint::platform::Key;
 
 use crate::slint_shell::MoggytWindow;
-use crate::slint_shell::state::{SharedState, SlintAppState};
-use crate::slint_shell::sync::sync_window;
 
 /// Actions triggered by global keyboard shortcuts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,18 +97,8 @@ fn dispatch_shortcut(window: &MoggytWindow, action: ShortcutAction) {
     }
 }
 
-impl SlintAppState {
-    /// Toggles the keyboard shortcuts preference and persists it to disk.
-    pub fn toggle_keyboard_shortcuts(&mut self) {
-        self.keyboard_shortcuts = !self.keyboard_shortcuts;
-        let mut settings = self.settings_store.load();
-        settings.keyboard_shortcuts = self.keyboard_shortcuts;
-        let _ = self.settings_store.save(&settings);
-    }
-}
-
-/// Wires shortcut pressed and shortcut toggled event callbacks to MoggytWindow.
-pub(crate) fn wire_shortcut_callbacks(window: &MoggytWindow, state_rc: &SharedState) {
+/// Wires shortcut pressed event callback to MoggytWindow.
+pub(crate) fn wire_shortcut_callbacks(window: &MoggytWindow) {
     let w = window.as_weak();
     window.on_shortcut_pressed(move |text, has_modifier| {
         let Some(win) = w.upgrade() else {
@@ -124,23 +110,11 @@ pub(crate) fn wire_shortcut_callbacks(window: &MoggytWindow, state_rc: &SharedSt
         dispatch_shortcut(&win, action);
         true
     });
-
-    let s = Rc::clone(state_rc);
-    let w = window.as_weak();
-    window.on_keyboard_shortcuts_toggled(move || {
-        let Some(win) = w.upgrade() else {
-            return;
-        };
-        let mut st = s.borrow_mut();
-        st.toggle_keyboard_shortcuts();
-        sync_window(&win, &mut st);
-    });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::slint_shell::test_support::test_wired;
 
     #[test]
     fn test_shortcut_action_mapping() {
@@ -188,20 +162,5 @@ mod tests {
         assert_eq!(stepped_volume(3, -5), 0);
         assert_eq!(stepped_volume(50, 5), 55);
         assert_eq!(stepped_volume(50, -5), 45);
-    }
-
-    #[test]
-    fn test_toggle_keyboard_shortcuts_persistence() {
-        let mut state = test_wired();
-        assert!(state.keyboard_shortcuts);
-        assert!(state.settings_store.load().keyboard_shortcuts);
-
-        state.toggle_keyboard_shortcuts();
-        assert!(!state.keyboard_shortcuts);
-        assert!(!state.settings_store.load().keyboard_shortcuts);
-
-        state.toggle_keyboard_shortcuts();
-        assert!(state.keyboard_shortcuts);
-        assert!(state.settings_store.load().keyboard_shortcuts);
     }
 }

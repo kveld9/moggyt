@@ -83,7 +83,6 @@ pub struct SlintAppState {
     pub stream_cache_limit_mb: u32,
     pub hi_res_covers: bool,
     pub songs_only: bool,
-    pub keyboard_shortcuts: bool,
     pub signed_in: bool,
     pub theme: ThemeId,
     pub custom_theme: Option<CustomThemeFile>,

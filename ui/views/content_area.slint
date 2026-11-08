@@ -53,7 +53,6 @@ export component ContentArea inherits Rectangle {
     in property <int> crossfade-seconds: 0;
     in property <int> stream-cache-limit-mb: 512;
     in property <bool> songs-only: false;
-    in property <bool> keyboard-shortcuts: true;
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Up to date";
@@ -96,7 +95,6 @@ export component ContentArea inherits Rectangle {
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
     callback songs-only-toggled();
-    callback keyboard-shortcuts-toggled();
     callback back-pressed();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
@@ -253,7 +251,6 @@ export component ContentArea inherits Rectangle {
                 crossfade-seconds: root.crossfade-seconds;
                 stream-cache-limit-mb: root.stream-cache-limit-mb;
                 songs-only: root.songs-only;
-                keyboard-shortcuts: root.keyboard-shortcuts;
                 player-bar-mode: root.player-bar-mode;
                 player-bar-show-artwork: root.player-bar-show-artwork;
                 player-bar-show-like: root.player-bar-show-like;
@@ -270,7 +267,6 @@ export component ContentArea inherits Rectangle {
                 crossfade-changed(secs) => { root.crossfade-changed(secs); }
                 stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
                 songs-only-toggled => { root.songs-only-toggled(); }
-                keyboard-shortcuts-toggled => { root.keyboard-shortcuts-toggled(); }
                 sign-in-submitted(t) => { root.sign-in-submitted(t); }
                 sign-out => { root.sign-out(); }
                 player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }

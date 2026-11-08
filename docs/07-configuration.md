@@ -119,7 +119,6 @@ The configuration file uses JSON serialization with atomic replacement:
   "stream_cache_limit_mb": 512,
   "quality": "standard",
   "songs_only": false,
-  "keyboard_shortcuts": true,
   "discord_presence_enabled": false,
   "discord_app_id": null,
   "lastfm_enabled": false,
@@ -174,9 +173,6 @@ The configuration file uses JSON serialization with atomic replacement:
   - `true`: Search results and autoplay radio drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks
     (`ATV`) and unknown types. If dropping music videos would remove every track from a result list, the fallback
     preserves the original list unfiltered so playback and autoplay do not stall.
-- **Keyboard Shortcuts (`keyboard_shortcuts`)**:
-  - `true`: Global transport and playback shortcuts enabled (default).
-  - `false`: Shortcuts disabled.
 - **Discord Rich Presence (`discord_presence_enabled`)**:
   - `discord_presence_enabled` (boolean, default `false`):
     - `false`: Discord Rich Presence disabled; no IPC connection is attempted (default).
@@ -202,6 +198,8 @@ The configuration file uses JSON serialization with atomic replacement:
   - `player_bar_show_skip_seconds` (boolean, default `false`): Whether `-10s` / `+10s` buttons are shown.
   - `player_bar_show_queue` (boolean, default `true`): Whether queue button is shown.
   - `player_bar_show_volume` (boolean, default `true`): Whether speaker icon and volume slider are shown.
+
+Note: Keyboard shortcuts are always on and have no configuration key.
 
 ### Custom Theme Files and Themes Directory
 
