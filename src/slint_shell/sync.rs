@@ -6,9 +6,9 @@ use std::collections::HashMap;
 
 use slint::{ModelRc, VecModel};
 
-use crate::domain::{PlaybackFacts, SearchFilter, Track};
+use crate::domain::{Album, PlaybackFacts, Playlist, SearchFilter, Track};
 use crate::i18n::{Locale, tr};
-use crate::infra::{GithubUpdater, StoreHealth};
+use crate::infra::{CatalogError, GithubUpdater, StoreHealth};
 use crate::slint_shell::covers::resolve_row_cover_image;
 use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::explore::explore_card_shelves;
@@ -30,10 +30,34 @@ use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData};
 
 fn derive_library_phase(state: &SlintAppState) -> ViewPhase {
+    if state.library_phase == ViewPhase::Error {
+        return ViewPhase::Error;
+    }
     if !state.library_playlists.is_empty() || !state.library_albums.is_empty() {
         ViewPhase::Ready
     } else {
         ViewPhase::Empty
+    }
+}
+
+impl SlintAppState {
+    /// Applies library query outcomes to state, setting phase and preserving data on error.
+    pub(crate) fn apply_library_outcome(
+        &mut self,
+        playlists: Result<Vec<Playlist>, CatalogError>,
+        albums: Result<Vec<Album>, CatalogError>,
+    ) {
+        match (playlists, albums) {
+            (Ok(playlists), Ok(albums)) => {
+                let is_empty = playlists.is_empty() && albums.is_empty();
+                self.library_playlists = playlists;
+                self.library_albums = albums;
+                self.library_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
+            }
+            _ => {
+                self.library_phase = ViewPhase::Error;
+            }
+        }
     }
 }
 
@@ -583,6 +607,16 @@ mod tests {
         let mut state = test_wired();
         observe_view_phases(&mut state);
         assert_eq!(state.library_phase, ViewPhase::Empty);
+    }
+
+    #[test]
+    fn library_phase_error_not_overwritten_by_derivation() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.library_phase = ViewPhase::Error;
+        observe_view_phases(&mut state);
+        assert_eq!(state.library_phase, ViewPhase::Error);
     }
 
     #[test]

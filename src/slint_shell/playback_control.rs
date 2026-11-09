@@ -564,11 +564,11 @@ mod tests {
         fn home_shelves(&self) -> Vec<crate::domain::Shelf> {
             Vec::new()
         }
-        fn playlists(&self) -> Vec<crate::domain::Playlist> {
-            Vec::new()
+        fn playlists(&self) -> Result<Vec<crate::domain::Playlist>, crate::infra::CatalogError> {
+            Ok(Vec::new())
         }
-        fn saved_albums(&self) -> Vec<crate::domain::Album> {
-            Vec::new()
+        fn saved_albums(&self) -> Result<Vec<crate::domain::Album>, crate::infra::CatalogError> {
+            Ok(Vec::new())
         }
         fn detail(&self, _: &str, _: crate::domain::DetailKind) -> Option<crate::domain::Detail> {
             None

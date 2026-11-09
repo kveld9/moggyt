@@ -4,6 +4,29 @@ use crate::domain::{
     Album, Detail, DetailKind, LyricsSnippet, Playlist, SearchQuery, SearchResult, Shelf, Track,
 };
 
+/// Failure of a catalog request at the port boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogError {
+    /// No usable session cookies (anonymous or expired).
+    Unauthenticated,
+    /// Network, timeout, or non-success HTTP status.
+    Transport,
+    /// The response could not be parsed into the expected model.
+    Malformed,
+}
+
+impl std::fmt::Display for CatalogError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unauthenticated => write!(f, "unauthenticated"),
+            Self::Transport => write!(f, "transport error"),
+            Self::Malformed => write!(f, "malformed response"),
+        }
+    }
+}
+
+impl std::error::Error for CatalogError {}
+
 /// Catalog port: search by free text and user library read/mutation access.
 pub trait Catalog {
     /// Returns catalog hits for `query` (empty when nothing matches).
@@ -36,10 +59,10 @@ pub trait Catalog {
     }
 
     /// Returns saved or owned playlists.
-    fn playlists(&self) -> Vec<Playlist>;
+    fn playlists(&self) -> Result<Vec<Playlist>, CatalogError>;
 
     /// Returns albums saved to the user's library.
-    fn saved_albums(&self) -> Vec<Album>;
+    fn saved_albums(&self) -> Result<Vec<Album>, CatalogError>;
 
     /// Returns detail view for `browse_id` and `kind` (None on blank id or failure).
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail>;
@@ -78,11 +101,11 @@ mod tests {
         fn home_shelves(&self) -> Vec<Shelf> {
             Vec::new()
         }
-        fn playlists(&self) -> Vec<Playlist> {
-            Vec::new()
+        fn playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
+            Ok(Vec::new())
         }
-        fn saved_albums(&self) -> Vec<Album> {
-            Vec::new()
+        fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
+            Ok(Vec::new())
         }
         fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
             None
@@ -111,5 +134,14 @@ mod tests {
     fn default_category_shelves_returns_empty_vec() {
         let pass_through = PassThroughCatalog::default();
         assert!(pass_through.category_shelves("FEmusic_moods", None).is_empty());
+    }
+
+    #[test]
+    fn catalog_error_display_and_equality() {
+        assert_eq!(CatalogError::Unauthenticated.to_string(), "unauthenticated");
+        assert_eq!(CatalogError::Transport.to_string(), "transport error");
+        assert_eq!(CatalogError::Malformed.to_string(), "malformed response");
+        assert_eq!(CatalogError::Unauthenticated, CatalogError::Unauthenticated);
+        assert_ne!(CatalogError::Unauthenticated, CatalogError::Transport);
     }
 }

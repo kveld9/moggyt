@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
 use crate::i18n::Locale;
 use crate::infra::{
-    AudioBackend, AudioError, AudioStub, Catalog, CatalogStub, LrclibStub, MemoryCoverCache,
-    MemorySessionStore,
+    AudioBackend, AudioError, AudioStub, Catalog, CatalogError, CatalogStub, LrclibStub,
+    MemoryCoverCache, MemorySessionStore,
 };
 use crate::slint_shell::state::SlintAppState;
 
@@ -73,12 +73,12 @@ impl Catalog for LocaleTrackingCatalog {
         vec![Shelf::new(title)]
     }
 
-    fn playlists(&self) -> Vec<Playlist> {
-        Vec::new()
+    fn playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
+        Ok(Vec::new())
     }
 
-    fn saved_albums(&self) -> Vec<Album> {
-        Vec::new()
+    fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
+        Ok(Vec::new())
     }
 
     fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
@@ -88,6 +88,52 @@ impl Catalog for LocaleTrackingCatalog {
     fn set_locale(&mut self, locale: Locale) {
         self.locales.lock().unwrap().push(locale);
         *self.current.lock().unwrap() = locale;
+    }
+}
+
+/// Mock catalog returning configurable library results for testing.
+#[derive(Debug, Clone)]
+pub struct MockLibraryCatalog {
+    pub playlists_res: Result<Vec<Playlist>, CatalogError>,
+    pub albums_res: Result<Vec<Album>, CatalogError>,
+}
+
+impl Default for MockLibraryCatalog {
+    fn default() -> Self {
+        Self { playlists_res: Ok(Vec::new()), albums_res: Ok(Vec::new()) }
+    }
+}
+
+impl MockLibraryCatalog {
+    pub fn new(
+        playlists: Result<Vec<Playlist>, CatalogError>,
+        albums: Result<Vec<Album>, CatalogError>,
+    ) -> Self {
+        Self { playlists_res: playlists, albums_res: albums }
+    }
+}
+
+impl Catalog for MockLibraryCatalog {
+    fn search(&self, _: &str) -> Vec<Track> {
+        Vec::new()
+    }
+    fn search_filtered(&self, _: &SearchQuery) -> Vec<SearchResult> {
+        Vec::new()
+    }
+    fn radio(&self, _: &str) -> Vec<Track> {
+        Vec::new()
+    }
+    fn home_shelves(&self) -> Vec<Shelf> {
+        Vec::new()
+    }
+    fn playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
+        self.playlists_res.clone()
+    }
+    fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
+        self.albums_res.clone()
+    }
+    fn detail(&self, _: &str, _: DetailKind) -> Option<Detail> {
+        None
     }
 }
 

@@ -76,7 +76,7 @@ pub use audio_dsp::{
 pub use audio_live::LiveAudio;
 pub use audio_rodio::{RodioBackend, volume_to_amplitude};
 pub use browser::{open_url, opener_command};
-pub use catalog::Catalog;
+pub use catalog::{Catalog, CatalogError};
 pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
 pub use catalog_live::LiveCatalog;
 pub use catalog_requests::{

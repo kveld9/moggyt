@@ -1,5 +1,6 @@
 //! HTTP client implementation for YouTube Music catalog endpoints.
 
+use super::catalog::CatalogError;
 use super::catalog_model::{RawTrack, SearchHits};
 use super::catalog_parse_detail::parse_detail_all;
 use super::catalog_parse_explore::parse_explore_all;
@@ -32,6 +33,33 @@ impl std::fmt::Debug for CatalogClient {
             .field("has_cookies", &self.cookies.is_some())
             .field("locale", &self.locale)
             .finish()
+    }
+}
+
+fn has_grid_items(section: &Value) -> bool {
+    const CANDIDATES: &[&str] = &[
+        "/gridRenderer/items",
+        "/musicGridRenderer/items",
+        "/musicShelfRenderer/contents",
+        "/itemSectionRenderer/contents",
+        "/gridRenderer",
+        "/musicGridRenderer",
+        "/musicShelfRenderer",
+        "/itemSectionRenderer",
+    ];
+    CANDIDATES.iter().any(|path| section.pointer(path).is_some())
+}
+
+fn has_library_section(value: &Value) -> bool {
+    super::catalog_parse_detail::detail_sections(value)
+        .map_or_else(|| has_grid_items(value), |sections| sections.iter().any(has_grid_items))
+}
+
+fn validate_library_result<T>(items: Vec<T>, payload: &Value) -> Result<Vec<T>, CatalogError> {
+    if !items.is_empty() || has_library_section(payload) {
+        Ok(items)
+    } else {
+        Err(CatalogError::Malformed)
     }
 }
 
@@ -222,23 +250,27 @@ impl CatalogClient {
     }
 
     /// Queries the browse endpoint for user's library playlists.
-    /// Returns an empty vector when unauthenticated or on network/parse failure.
-    pub fn library_playlists(&self) -> Vec<Playlist> {
+    pub fn library_playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
         if !self.is_authenticated() {
-            return Vec::new();
+            return Err(CatalogError::Unauthenticated);
         }
-        self.library_browse_payload(LIBRARY_PLAYLISTS_BROWSE_ID)
-            .map_or_else(|_| Vec::new(), |p| parse_library_playlists(&p))
+        let payload = self
+            .library_browse_payload(LIBRARY_PLAYLISTS_BROWSE_ID)
+            .map_err(|_| CatalogError::Transport)?;
+        let playlists = parse_library_playlists(&payload);
+        validate_library_result(playlists, &payload)
     }
 
     /// Queries the browse endpoint for user's saved albums.
-    /// Returns an empty vector when unauthenticated or on network/parse failure.
-    pub fn library_saved_albums(&self) -> Vec<Album> {
+    pub fn library_saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
         if !self.is_authenticated() {
-            return Vec::new();
+            return Err(CatalogError::Unauthenticated);
         }
-        self.library_browse_payload(LIBRARY_ALBUMS_BROWSE_ID)
-            .map_or_else(|_| Vec::new(), |p| parse_library_albums(&p))
+        let payload = self
+            .library_browse_payload(LIBRARY_ALBUMS_BROWSE_ID)
+            .map_err(|_| CatalogError::Transport)?;
+        let albums = parse_library_albums(&payload);
+        validate_library_result(albums, &payload)
     }
 
     /// Converts this catalog API client into a [`LiveCatalog`](super::catalog_live::LiveCatalog) adapter.
@@ -288,8 +320,40 @@ mod tests {
         assert!(debug_str.contains("has_cookies: true"));
 
         let anon = CatalogClient::new();
-        assert!(anon.library_playlists().is_empty());
-        assert!(anon.library_saved_albums().is_empty());
+        assert_eq!(anon.library_playlists(), Err(CatalogError::Unauthenticated));
+        assert_eq!(anon.library_saved_albums(), Err(CatalogError::Unauthenticated));
+    }
+
+    #[test]
+    fn unauthenticated_library_is_distinct_from_empty() {
+        let anon = CatalogClient::new();
+        assert_eq!(anon.library_playlists(), Err(CatalogError::Unauthenticated));
+        assert_eq!(anon.library_saved_albums(), Err(CatalogError::Unauthenticated));
+    }
+
+    #[test]
+    fn empty_library_section_is_ok_empty() {
+        let empty_payload = serde_json::json!({
+            "sectionListRenderer": {
+                "contents": [{
+                    "gridRenderer": {
+                        "items": []
+                    }
+                }]
+            }
+        });
+        let playlists = parse_library_playlists(&empty_payload);
+        assert_eq!(validate_library_result(playlists, &empty_payload), Ok(Vec::new()));
+
+        let albums = parse_library_albums(&empty_payload);
+        assert_eq!(validate_library_result(albums, &empty_payload), Ok(Vec::new()));
+
+        let malformed_payload = serde_json::json!({});
+        let malformed_playlists = parse_library_playlists(&malformed_payload);
+        assert_eq!(
+            validate_library_result(malformed_playlists, &malformed_payload),
+            Err(CatalogError::Malformed)
+        );
     }
 
     #[test]
