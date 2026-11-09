@@ -100,7 +100,7 @@ mod tests {
     fn test_sleep_timer_expiry() {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
+        state.request_current_play();
         state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
         assert!(state.sleep_timer.is_armed());
 
@@ -113,7 +113,7 @@ mod tests {
     fn test_sleep_timer_fade_reduces_volume_inside_window() {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
+        state.request_current_play();
         state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
         assert!(state.sleep_timer.is_armed());
 
@@ -129,7 +129,7 @@ mod tests {
     fn test_sleep_timer_fade_restores_volume_on_fire() {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
+        state.request_current_play();
         state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
 
         state.seek_by(885);
@@ -148,7 +148,7 @@ mod tests {
     fn test_sleep_timer_restore_on_cancel() {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
+        state.request_current_play();
         state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
 
         state.seek_by(885);
@@ -164,7 +164,7 @@ mod tests {
     fn test_sleep_timer_set_volume_during_fade_updates_base() {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.play_current_quiet();
+        state.request_current_play();
         state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
 
         state.seek_by(885);
@@ -197,7 +197,7 @@ mod tests {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
         state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
-        state.play_current_quiet();
+        state.request_current_play();
         assert!(state.audio.lock().unwrap().is_playing());
         assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t1"));
 
@@ -223,7 +223,7 @@ mod tests {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
         state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
-        state.play_current_quiet();
+        state.request_current_play();
         assert!(state.audio.lock().unwrap().is_playing());
 
         state
@@ -248,7 +248,7 @@ mod tests {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
         state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(1000));
-        state.play_current_quiet();
+        state.request_current_play();
 
         state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
         state.sleep_timer_accumulated = 0;

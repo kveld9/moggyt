@@ -9,8 +9,15 @@ use crate::slint_shell::state::SlintAppState;
 
 impl SlintAppState {
     /// Constructs a play request for the current track and bumps the playback generation.
+    ///
+    /// Runs the sleep-timer track-change hook for the target track before bumping the
+    /// generation. The hook pauses audio and returns true for `StopAfterTrack`; returning
+    /// `None` means no request is dispatched for that transition.
     pub fn begin_play_request(&mut self) -> Option<PlayTrackRequest> {
         let track = self.queue.current().cloned()?;
+        if self.on_track_changing_sleep_timer(&track.id) {
+            return None;
+        }
         self.play_generation = self.play_generation.wrapping_add(1);
         let generation = self.play_generation;
         self.maybe_scrobble_current();
@@ -107,5 +114,49 @@ mod tests {
         state.queue.push(Track::new("trk-wired", "Wired", "Artist"));
         assert!(state.request_current_play());
         assert_eq!(state.audio.lock().unwrap().last_requested(), Some("trk-wired"));
+    }
+
+    #[test]
+    fn sleep_timer_hook_blocks_play_request() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
+
+        assert!(state.request_current_play());
+        assert!(state.audio.lock().unwrap().is_playing());
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t1"));
+
+        state
+            .sleep_timer
+            .set_preset_with_track(crate::domain::TimerPreset::StopAfterTrack, Some("t1"));
+        assert!(state.sleep_timer.is_armed());
+
+        state.queue.advance();
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+
+        assert!(state.begin_play_request().is_none());
+        let audio = state.audio.lock().unwrap();
+        assert_eq!(audio.last_requested(), Some("t1"));
+        assert!(!audio.is_playing());
+    }
+
+    #[test]
+    fn sleep_timer_hook_does_not_block_regular_presets() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
+
+        assert!(state.request_current_play());
+        let gen_after_play = state.play_generation;
+
+        state.sleep_timer.set_preset(crate::domain::TimerPreset::Minutes15);
+        assert!(state.sleep_timer.is_armed());
+
+        state.queue.advance();
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+
+        let req = state.begin_play_request();
+        assert!(req.is_some());
+        assert_eq!(state.play_generation, gen_after_play.wrapping_add(1));
     }
 }
