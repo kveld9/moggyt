@@ -46,18 +46,16 @@ pub fn with_session<R>(f: impl FnOnce(&mut ImportSession) -> R) -> R {
 
 fn sync_import_progress(
     window: &MoggytWindow,
-    stage: ImportStage,
     status: &str,
     counts: &ImportCounts,
+    (done, total): (usize, usize),
     locale: Locale,
 ) {
-    window.set_import_running(matches!(stage, ImportStage::Matching | ImportStage::Cancelling));
     window.set_import_status_text(tr(locale, status).into());
-    window.set_import_total(counts.total as i32);
+    window.set_import_total(total as i32);
     window.set_import_high(counts.high as i32);
     window.set_import_review((counts.review + counts.low) as i32);
     window.set_import_unresolved(counts.unresolved as i32);
-    let done = counts.high + counts.review + counts.low + counts.unresolved;
     window.set_import_done(done as i32);
 }
 
@@ -113,17 +111,19 @@ fn sync_import_picker(
 
 /// Synchronizes the current import session state into the Slint window properties.
 pub fn sync_import(window: &MoggytWindow) {
-    let (stage, status, counts, picker_row, review_opt) =
-        with_session(|s| (s.stage, s.status.clone(), s.counts(), s.picker_row, s.review.clone()));
+    let (stage, status, counts, (done, total), picker_row, review_opt) = with_session(|s| {
+        (s.stage, s.status.clone(), s.counts(), s.progress(), s.picker_row, s.review.clone())
+    });
     let locale =
         crate::slint_shell::window::with_ui_state(|st| st.locale).unwrap_or(Locale::English);
     window.set_import_busy(matches!(
         stage,
         ImportStage::LoadingSource | ImportStage::Matching | ImportStage::Cancelling
     ));
+    window.set_import_running(matches!(stage, ImportStage::Matching | ImportStage::Cancelling));
     window.set_import_cancelling(matches!(stage, ImportStage::Cancelling));
     window.set_import_failed(matches!(stage, ImportStage::Failed));
-    sync_import_progress(window, stage, &status, &counts, locale);
+    sync_import_progress(window, &status, &counts, (done, total), locale);
     sync_import_modal_visibility(window, stage);
     sync_import_review(window, stage, review_opt.as_ref(), &counts, locale);
     sync_import_picker(window, picker_row, review_opt.as_ref(), locale);
@@ -374,13 +374,15 @@ mod tests {
             title: "Road Trip".to_string(),
             author: "Tester".to_string(),
             artwork: None,
-            tracks: vec![SpotifyTrack {
-                title: "Song 1".to_string(),
-                artist: "Artist 1".to_string(),
-                album: None,
-                duration_ms: 180000,
-                isrc: None,
-            }],
+            tracks: (0..10)
+                .map(|i| SpotifyTrack {
+                    title: format!("Song {}", i + 1),
+                    artist: format!("Artist {}", i + 1),
+                    album: None,
+                    duration_ms: 180000,
+                    isrc: None,
+                })
+                .collect(),
         }
     }
 
