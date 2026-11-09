@@ -56,6 +56,7 @@ mod spotify_credentials;
 mod spotify_csv;
 mod spotify_embed;
 mod spotify_search;
+mod spotify_source;
 mod store_health;
 mod stream;
 pub mod stream_disk_cache;
@@ -152,6 +153,7 @@ pub use spotify_search::{
     SpotifySongSearch, classify_failure, classify_status, parse_song_candidates, songs_search_body,
     video_type_from,
 };
+pub use spotify_source::load_spotify_link;
 pub use store_health::{HealthFlag, StoreHealth, quarantine};
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
 pub use stream_disk_cache::StreamDiskCache;

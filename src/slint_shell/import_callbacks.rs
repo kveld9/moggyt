@@ -6,13 +6,13 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-use anyhow::Context;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::{SpotifyPlaylist, parse_spotify_ref};
+use crate::domain::SpotifyPlaylist;
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    FilePicker, PlaylistStore, RfdFilePicker, SpotifyEmbedClient, load_playlist_file,
+    FilePicker, KeyringSpotifyCredentialStore, PlaylistStore, RfdFilePicker,
+    SpotifyCredentialStore, load_playlist_file, load_spotify_link,
 };
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
@@ -136,10 +136,8 @@ pub fn poll_import(window: &MoggytWindow) {
 }
 
 fn load_source_link(link_text: &str) -> anyhow::Result<SpotifyPlaylist> {
-    let spotify_ref = parse_spotify_ref(link_text)
-        .with_context(|| format!("invalid Spotify URL '{link_text}'"))?;
-    let client = SpotifyEmbedClient::new();
-    client.fetch(&spotify_ref)
+    let store = KeyringSpotifyCredentialStore::moggyt();
+    load_spotify_link(link_text, store.load().as_ref())
 }
 
 fn load_source_file(file_path: &str) -> anyhow::Result<SpotifyPlaylist> {

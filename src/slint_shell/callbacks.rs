@@ -125,6 +125,7 @@ pub(crate) fn wire_window_callbacks(
     super::shortcuts::wire_shortcut_callbacks(window);
     super::discord::wire_discord_callbacks(window, &state_rc);
     super::lastfm_connect::wire_lastfm_callbacks(window, &state_rc);
+    super::spotify_connect::wire_spotify_callbacks(window, &state_rc);
     super::stats::wire_stats_callbacks(window, &state_rc);
 }
 

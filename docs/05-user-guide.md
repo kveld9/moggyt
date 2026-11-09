@@ -132,6 +132,22 @@ Spotify embed pages limit returned tracklists to the first 100 tracks. For publi
 for private playlists, export the playlist using Exportify or a Spotify backup tool, and import the resulting CSV or
 JSON file using the **From file** tab to import all tracks without truncation.
 
+#### Spotify Web API Credentials (Optional)
+
+By default, link imports scrape Spotify embed pages without requiring any credentials. To import playlists longer than
+100 tracks directly from links or leverage ISRC catalog identifiers for improved matching:
+
+1. Create a developer application in the Spotify Developer Dashboard (<https://developer.spotify.com/dashboard>).
+2. Copy your **Client ID** and **Client Secret**.
+3. In moggyt, open **Settings -> Integrations -> Spotify Web API**.
+4. Paste the credentials into the respective input fields and click **Save credentials**.
+
+When saved, credentials are held securely in your OS credential manager (`Secret Service` on Linux, `Credential
+Manager` on Windows, or `Keychain` on macOS). With complete credentials configured, link imports automatically use the
+official Spotify Web API to fetch full playlists without the 100-track cap and match tracks using ISRC identifiers
+first. If credentials are absent or cleared via **Clear credentials**, link imports seamlessly fall back to the public
+embed page scraper.
+
 #### Progress Overlay
 
 Clicking `Start import` initiates the matching process and displays the progress overlay:
