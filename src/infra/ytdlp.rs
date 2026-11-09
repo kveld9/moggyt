@@ -299,23 +299,139 @@ fn download_sidecar(target_path: &Path, url: &str) -> anyhow::Result<()> {
     write_sidecar_atomically(target_path, &bytes)
 }
 
-/// Ensures the yt-dlp sidecar binary is provisioned and up to date in `data_dir`.
+#[cfg(unix)]
+fn is_executable_mode(metadata: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn is_executable_mode(_metadata: &std::fs::Metadata) -> bool {
+    true
+}
+
+fn is_non_empty_file(metadata: &std::fs::Metadata) -> bool {
+    if !metadata.is_file() {
+        return false;
+    }
+    metadata.len() > 0
+}
+
+fn has_html_prefix(path: &Path) -> bool {
+    use std::io::Read;
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return true;
+    };
+    let mut buffer = [0u8; 512];
+    let Ok(read_bytes) = file.read(&mut buffer) else {
+        return true;
+    };
+    buffer[..read_bytes].iter().find(|b| !b.is_ascii_whitespace()).is_some_and(|b| *b == b'<')
+}
+
+fn spawn_version_probe(path: &Path) -> Option<std::process::Child> {
+    std::process::Command::new(path)
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()
+}
+
+fn wait_child_bounded(mut child: std::process::Child, timeout: std::time::Duration) -> bool {
+    let start = Instant::now();
+    let step = std::time::Duration::from_millis(20);
+    while start.elapsed() < timeout {
+        match child.try_wait() {
+            Ok(Some(status)) => return status.success(),
+            Ok(None) => std::thread::sleep(step),
+            Err(_) => break,
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    false
+}
+
+fn probe_version(path: &Path) -> bool {
+    let Some(child) = spawn_version_probe(path) else {
+        return false;
+    };
+    wait_child_bounded(child, std::time::Duration::from_secs(5))
+}
+
+/// Returns whether a sidecar candidate is a usable executable.
+pub fn is_valid_sidecar(path: &Path) -> bool {
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return false;
+    };
+    if !is_non_empty_file(&metadata) {
+        return false;
+    }
+    if has_html_prefix(path) {
+        return false;
+    }
+    if !is_executable_mode(&metadata) {
+        return false;
+    }
+    probe_version(path)
+}
+
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+fn warn_invalid_existing(path: &Path) {
+    if path.exists() {
+        tracing::warn!(path = %path.display(), "existing yt-dlp sidecar is invalid; re-downloading");
+    }
+}
+
+/// Provisions the yt-dlp sidecar without requiring freshness.
 ///
-/// If the binary does not exist or its last modification age exceeds [`YTDLP_UPDATE_INTERVAL_SECS`],
-/// it is downloaded from the latest GitHub release and marked executable.
-pub fn ensure_sidecar(data_dir: &Path) -> anyhow::Result<PathBuf> {
+/// A valid existing binary is returned immediately (no download, no refresh).
+/// A missing or invalid binary is downloaded once and validated.
+pub fn provision_sidecar(data_dir: &Path) -> anyhow::Result<PathBuf> {
     std::fs::create_dir_all(data_dir)
         .with_context(|| format!("failed to create sidecar data directory at {data_dir:?}"))?;
 
-    let binary_path = data_dir.join(sidecar_binary_name());
-    if binary_path.exists() && !sidecar_file_needs_update(&binary_path) {
-        return Ok(binary_path);
+    let path = data_dir.join(sidecar_binary_name());
+    if is_valid_sidecar(&path) {
+        return Ok(path);
     }
 
-    let url = release_download_url();
-    download_sidecar(&binary_path, &url)?;
+    warn_invalid_existing(&path);
 
-    Ok(binary_path)
+    let url = release_download_url();
+    download_sidecar(&path, &url)?;
+
+    if !is_valid_sidecar(&path) {
+        anyhow::bail!("downloaded yt-dlp sidecar at '{}' is invalid", path.display());
+    }
+
+    Ok(path)
+}
+
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+fn refresh_thread_worker(binary: &Path) {
+    let outcome = refresh_sidecar_if_due(binary);
+    tracing::info!(binary = %binary.display(), refreshed = outcome, "sidecar background refresh finished");
+}
+
+// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+#[allow(clippy::cognitive_complexity)]
+/// Refreshes the sidecar in the background when it is stale; never blocks startup.
+pub fn spawn_sidecar_refresh(binary: PathBuf) {
+    if !sidecar_file_needs_update(&binary) {
+        return;
+    }
+
+    let spawn_result = std::thread::Builder::new()
+        .name("ytdlp-refresh".to_string())
+        .spawn(move || refresh_thread_worker(&binary));
+
+    if let Err(err) = spawn_result {
+        tracing::warn!(error = ?err, "failed to spawn sidecar refresh thread");
+    }
 }
 
 /// Global lock recording the timestamp of the last forced-refresh attempt.
@@ -356,7 +472,7 @@ fn execute_refresh(binary: &Path) -> bool {
 /// Attempts to force-refresh the sidecar binary from the latest GitHub release if due.
 ///
 /// Refreshes only when the binary file exists on disk (a missing binary is a provisioning
-/// failure owned by [`ensure_sidecar`] at startup, not an extraction breakage).
+/// failure owned by [`provision_sidecar`] at startup, not an extraction breakage).
 ///
 /// Holding [`REFRESH_STATE`] during download ensures concurrent resolvers wait and skip
 /// redundant downloads.
@@ -543,5 +659,106 @@ mod tests {
             Instant::now(),
         );
         assert!(resolver.prefetch(video_id));
+    }
+
+    #[cfg(unix)]
+    fn create_fake_sidecar(path: &Path) {
+        std::fs::write(path, b"#!/bin/sh\necho 2024.01.01\n").expect("write fake sidecar");
+        set_executable_permissions(path).expect("set executable permissions");
+    }
+
+    struct TempDirGuard(PathBuf);
+
+    impl Drop for TempDirGuard {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn test_temp_dir(tag: &str) -> (TempDirGuard, PathBuf) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir()
+            .join(format!("moggyt-test-ytdlp-{tag}-{}-{id}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).expect("create test temp dir");
+        (TempDirGuard(path.clone()), path)
+    }
+
+    #[test]
+    fn zero_byte_binary_rejected() {
+        let (_guard, dir) = test_temp_dir("zero-byte");
+        let binary = dir.join(sidecar_binary_name());
+        std::fs::write(&binary, b"").expect("write empty file");
+        let _ = set_executable_permissions(&binary);
+        assert!(!is_valid_sidecar(&binary));
+    }
+
+    #[test]
+    fn html_payload_rejected() {
+        let (_guard, dir) = test_temp_dir("html-payload");
+        let binary = dir.join(sidecar_binary_name());
+        std::fs::write(&binary, b"  \n<html><body>502 Bad Gateway</body></html>")
+            .expect("write html");
+        let _ = set_executable_permissions(&binary);
+        assert!(!is_valid_sidecar(&binary));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn stale_binary_used_when_refresh_fails() {
+        use std::fs::{File, FileTimes};
+        use std::time::{Duration, SystemTime};
+
+        let (_guard, data_dir) = test_temp_dir("stale-binary");
+        let binary = data_dir.join(sidecar_binary_name());
+        create_fake_sidecar(&binary);
+
+        let file = File::open(&binary).expect("open binary");
+        let two_days_ago = SystemTime::now() - Duration::from_secs(2 * 24 * 60 * 60);
+        file.set_times(FileTimes::new().set_modified(two_days_ago)).expect("set modified time");
+        drop(file);
+
+        let provisioned = provision_sidecar(&data_dir).expect("should provision usable binary");
+        assert_eq!(provisioned, binary);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn cooldown_does_not_block_usable_binary() {
+        let (_guard, data_dir) = test_temp_dir("cooldown");
+        let binary = data_dir.join(sidecar_binary_name());
+        create_fake_sidecar(&binary);
+
+        {
+            let mut guard = REFRESH_STATE.lock().unwrap();
+            *guard = Some(Instant::now());
+        }
+
+        let provisioned = provision_sidecar(&data_dir).expect("should provision usable binary");
+        assert_eq!(provisioned, binary);
+
+        {
+            let mut guard = REFRESH_STATE.lock().unwrap();
+            *guard = None;
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn provision_creates_data_dir() {
+        let (_guard, base) = test_temp_dir("creates-dir");
+        let sub_dir = base.join("nested_missing");
+        let _ = std::fs::remove_dir_all(&sub_dir);
+        assert!(!sub_dir.exists());
+
+        std::fs::create_dir_all(&sub_dir).expect("create sub_dir");
+        let binary = sub_dir.join(sidecar_binary_name());
+        create_fake_sidecar(&binary);
+
+        let provisioned = provision_sidecar(&sub_dir).expect("provision should succeed");
+        assert_eq!(provisioned, binary);
+        assert!(sub_dir.is_dir());
     }
 }

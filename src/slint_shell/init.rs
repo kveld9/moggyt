@@ -10,8 +10,8 @@ use anyhow::Context;
 use crate::infra::{
     CredentialStore, DiskCoverCache, DiskPlaylistStore, GithubUpdater, KeyringCredentialStore,
     LastFmAppKeys, LastFmClient, LastFmCredentials, LiveAudio, ReleaseInfo, RodioBackend,
-    StreamDiskCache, Updater, client_from_credentials, default_config_dir, ensure_sidecar,
-    is_newer,
+    StreamDiskCache, Updater, client_from_credentials, default_config_dir, is_newer,
+    provision_sidecar, spawn_sidecar_refresh,
 };
 use crate::slint_shell::import_cli::{ImportCli, parse_import_args, report_to_json, run_headless};
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
@@ -72,8 +72,9 @@ pub fn init_rodio_backend(
     stream_cache: Option<Arc<StreamDiskCache>>,
 ) -> anyhow::Result<RodioBackend> {
     ensure_data_dir(data_dir)?;
-    let binary =
-        ensure_sidecar(data_dir).context("failed to locate or download yt-dlp sidecar binary")?;
+    let binary = provision_sidecar(data_dir)
+        .context("failed to locate or download yt-dlp sidecar binary")?;
+    spawn_sidecar_refresh(binary.clone());
     RodioBackend::with_cache(binary, stream_cache)
         .context("failed to initialize rodio audio output stream")
 }

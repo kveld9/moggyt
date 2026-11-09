@@ -155,6 +155,7 @@ pub use updater_github::{
     GithubUpdater, UPDATE_OWNER_REPO, is_newer, latest_url, parse_release_payload,
 };
 pub use ytdlp::{
-    YTDLP_AUDIO_FORMAT, YTDLP_UPDATE_INTERVAL_SECS, YtDlpResolver, ensure_sidecar, format_args,
-    parse_version, release_asset_name, sidecar_needs_update, watch_url,
+    YTDLP_AUDIO_FORMAT, YTDLP_UPDATE_INTERVAL_SECS, YtDlpResolver, format_args, is_valid_sidecar,
+    parse_version, provision_sidecar, release_asset_name, sidecar_needs_update,
+    spawn_sidecar_refresh, watch_url,
 };
