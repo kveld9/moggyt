@@ -61,6 +61,8 @@ pub struct PlayTrackRequest {
     pub artwork_url: Option<String>,
     pub duration_secs: Option<u32>,
     pub hi_res_covers: bool,
+    /// Crossfade transition duration in seconds (0 = disabled).
+    pub crossfade_seconds: u32,
     pub lyric_overrides: Option<LyricOverrideDir>,
     pub prefetch_lyrics: Option<LyricsPrefetch>,
     /// Target video ID of the upcoming track for background stream URL prefetching.
@@ -231,6 +233,15 @@ impl<A, L, K> PlaybackWorkerAdapters<A, L, K> {
     }
 }
 
+fn dispatch_backend_play<A: AudioBackend>(audio: &mut A, track_id: &str, crossfade_seconds: u32) {
+    if audio.is_playing() && crossfade_seconds > 0 {
+        audio
+            .play_crossfade(track_id, std::time::Duration::from_secs(u64::from(crossfade_seconds)));
+    } else {
+        audio.play(track_id);
+    }
+}
+
 /// Executes blocking audio resolve/play, scrobbler, lyrics, and cover fetching on worker thread.
 pub fn execute_play_track<A, L, K>(
     req: PlayTrackRequest,
@@ -243,7 +254,7 @@ where
 {
     let success = match adapters.audio.lock() {
         Ok(mut a) => {
-            a.play(&req.track_id);
+            dispatch_backend_play(&mut *a, &req.track_id, req.crossfade_seconds);
             a.is_playing() || a.last_requested() == Some(req.track_id.as_str())
         }
         Err(_) => false,
@@ -351,8 +362,7 @@ mod tests {
     #[test]
     fn test_execute_play_track_in_worker_thread() {
         let audio = Arc::new(Mutex::new(AudioStub::new()));
-        let scrobbler: Arc<Mutex<Box<dyn Scrobbler>>> =
-            Arc::new(Mutex::new(Box::new(StubScrobbler::new())));
+        let scrobbler = Arc::new(Mutex::new(Box::new(StubScrobbler::new()) as Box<dyn Scrobbler>));
         let lyrics = Arc::new(LrclibStub::new());
         let covers = Arc::new(Mutex::new(MemoryCoverCache::new()));
 
@@ -364,6 +374,7 @@ mod tests {
             artwork_url: None,
             duration_secs: Some(180),
             hi_res_covers: false,
+            crossfade_seconds: 0,
             lyric_overrides: None,
             prefetch_lyrics: None,
             prefetch_stream_id: None,
@@ -392,10 +403,9 @@ mod tests {
     #[test]
     fn test_execute_search_in_worker_thread() {
         let catalog = Arc::new(Mutex::new(CatalogStub::new()));
-        let cat_clone = Arc::clone(&catalog);
-        let q = SearchQuery::parse("rock").expect("valid query");
+        let (cat_clone, q) =
+            (Arc::clone(&catalog), SearchQuery::parse("rock").expect("valid query"));
         let q_clone = q.clone();
-
         let handle = std::thread::spawn(move || {
             execute_search(42, &q_clone, &cat_clone, Locale::English, false)
         });
@@ -534,14 +544,11 @@ mod tests {
 
     #[test]
     fn test_execute_scrobble_in_worker_thread() {
-        let scrobbler: Arc<Mutex<Box<dyn Scrobbler>>> =
-            Arc::new(Mutex::new(Box::new(StubScrobbler::new())));
+        let scrobbler = Arc::new(Mutex::new(Box::new(StubScrobbler::new()) as Box<dyn Scrobbler>));
         let s_clone = Arc::clone(&scrobbler);
-
         let handle = std::thread::spawn(move || {
             execute_scrobble("Artist", "Song", 123456, &s_clone, &None);
         });
-
         handle.join().expect("thread join succeeds");
     }
 
@@ -553,15 +560,13 @@ mod tests {
         let handle = std::thread::spawn(move || {
             while let Ok(cmd) = rx.recv() {
                 match cmd {
-                    PlaybackWorkerCommand::Play(req) => {
-                        done_tx.send(req.generation).unwrap();
-                    }
+                    PlaybackWorkerCommand::Play(req) => done_tx.send(req.generation).unwrap(),
                     PlaybackWorkerCommand::Scrobble { .. } => {}
                     PlaybackWorkerCommand::FetchCover { generation, .. } => {
-                        done_tx.send(generation).unwrap();
+                        done_tx.send(generation).unwrap()
                     }
                     PlaybackWorkerCommand::Seek { position_secs } => {
-                        done_tx.send(position_secs).unwrap();
+                        done_tx.send(position_secs).unwrap()
                     }
                 }
             }
@@ -575,6 +580,7 @@ mod tests {
             artwork_url: None,
             duration_secs: None,
             hi_res_covers: false,
+            crossfade_seconds: 0,
             lyric_overrides: None,
             prefetch_lyrics: None,
             prefetch_stream_id: None,
@@ -646,11 +652,8 @@ mod tests {
 
     #[test]
     fn test_search_results_sections_resolve_art_from_golden_fixture() {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path = std::path::Path::new(manifest_dir)
-            .join("tests")
-            .join("fixtures")
-            .join("catalog_search_badges.json");
+        let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/catalog_search_badges.json");
         let raw = std::fs::read_to_string(&fixture_path).expect("fixture file readable");
         let payload: serde_json::Value = serde_json::from_str(&raw).expect("valid fixture json");
 

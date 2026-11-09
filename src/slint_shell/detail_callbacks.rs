@@ -79,7 +79,7 @@ fn handle_detail_track_selected(
             st.queue.push(track);
             let last = st.queue.len().saturating_sub(1);
             st.play_track_at_index_in_memory(last);
-            trigger_playback(win, st, tx);
+            trigger_playback(win, st);
         }
     }
     sync_window(win, st);
@@ -93,7 +93,7 @@ fn handle_detail_play(
     if st.detail.as_ref().is_some_and(|d| !d.tracks.is_empty()) {
         let start = enqueue_detail_tracks(st, tx);
         st.play_track_at_index_in_memory(start);
-        trigger_playback(win, st, tx);
+        trigger_playback(win, st);
     }
     sync_window(win, st);
 }
@@ -110,7 +110,7 @@ fn handle_detail_shuffle(
         let order = crate::slint_shell::playback::shuffle_permutation(st.queue.len(), Some(start));
         st.queue.shuffle_with(&order);
         st.play_track_at_index_in_memory(0);
-        trigger_playback(win, st, tx);
+        trigger_playback(win, st);
     }
     sync_window(win, st);
 }

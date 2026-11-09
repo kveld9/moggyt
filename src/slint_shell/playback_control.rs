@@ -33,15 +33,12 @@ impl StartedPlay {
     }
 }
 
-fn dispatch_audio_play(audio: &mut dyn AudioBackend, id: &str, crossfade_seconds: u32) {
-    if audio.is_playing() && crossfade_seconds > 0 {
-        audio.play_crossfade(id, std::time::Duration::from_secs(crossfade_seconds as u64));
-    } else {
-        audio.play(id);
-    }
-}
-
 impl SlintAppState {
+    /// Returns whether a worker play result matches the current play generation.
+    pub fn should_apply_play_result(&self, generation: u64) -> bool {
+        self.play_generation == generation
+    }
+
     fn notify_now_playing(&self, artist: &str, title: &str) {
         if let Ok(mut s) = self.scrobbler.lock() {
             s.now_playing(artist, title);
@@ -81,10 +78,11 @@ impl SlintAppState {
         if self.on_track_changing_sleep_timer(&id) {
             return;
         }
+        let Some(req) = self.begin_play_request() else {
+            return;
+        };
+        self.send_play_request(req);
         self.set_playback_phase(PlaybackPhase::Resolving);
-        if let Ok(mut a) = self.audio.lock() {
-            dispatch_audio_play(&mut **a, &id, self.crossfade_seconds);
-        }
         self.started_at = Some(StartedPlay::now(track));
         self.notify_now_playing(&artist, &title);
         self.last_skip_target = None;
@@ -116,14 +114,12 @@ impl SlintAppState {
 
     /// Advances cursor to next track, scrobbling the completed track if eligible.
     pub fn next_track(&mut self) {
-        self.maybe_scrobble_current();
         self.queue.advance();
         self.play_current_quiet();
     }
 
     /// Retreats cursor to previous track, scrobbling the completed track if eligible.
     pub fn prev_track(&mut self) {
-        self.maybe_scrobble_current();
         self.queue.retreat();
         self.play_current_quiet();
     }
@@ -386,6 +382,7 @@ mod tests {
 
     use crate::domain::{PlaybackPhase, SkipRanges, SkipSegment, Track};
     use crate::infra::SkipStore;
+    use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
     use crate::slint_shell::test_support::{EndedAudio, test_wired};
 
     #[derive(Debug)]
@@ -545,16 +542,16 @@ mod tests {
     struct RadioVideoCatalog;
 
     impl Catalog for RadioVideoCatalog {
-        fn search(&self, _query: &str) -> Vec<Track> {
+        fn search(&self, _: &str) -> Vec<Track> {
             Vec::new()
         }
         fn search_filtered(
             &self,
-            _query: &crate::domain::SearchQuery,
+            _: &crate::domain::SearchQuery,
         ) -> Vec<crate::domain::SearchResult> {
             Vec::new()
         }
-        fn radio(&self, _seed_track_id: &str) -> Vec<Track> {
+        fn radio(&self, _: &str) -> Vec<Track> {
             vec![
                 Track::new("vid-omv", "OMV Track", "Artist")
                     .with_duration(180)
@@ -573,11 +570,7 @@ mod tests {
         fn saved_albums(&self) -> Vec<crate::domain::Album> {
             Vec::new()
         }
-        fn detail(
-            &self,
-            _browse_id: &str,
-            _kind: crate::domain::DetailKind,
-        ) -> Option<crate::domain::Detail> {
+        fn detail(&self, _: &str, _: crate::domain::DetailKind) -> Option<crate::domain::Detail> {
             None
         }
     }
@@ -605,10 +598,8 @@ mod tests {
         let mut state = test_wired();
         state.crossfade_seconds = 5;
 
-        let t1 = Track::new("cf-1", "Track 1", "Artist").with_duration(100);
-        let t2 = Track::new("cf-2", "Track 2", "Artist").with_duration(120);
-        state.queue.push(t1);
-        state.queue.push(t2);
+        state.queue.push(Track::new("cf-1", "Track 1", "Artist").with_duration(100));
+        state.queue.push(Track::new("cf-2", "Track 2", "Artist").with_duration(120));
 
         state.play_track_at_index(0);
         assert_eq!(state.queue.cursor(), 0);
@@ -637,10 +628,8 @@ mod tests {
         let mut state = test_wired();
         state.crossfade_seconds = 0;
 
-        let t1 = Track::new("no-cf-1", "Track 1", "Artist").with_duration(100);
-        let t2 = Track::new("no-cf-2", "Track 2", "Artist").with_duration(120);
-        state.queue.push(t1);
-        state.queue.push(t2);
+        state.queue.push(Track::new("no-cf-1", "Track 1", "Artist").with_duration(100));
+        state.queue.push(Track::new("no-cf-2", "Track 2", "Artist").with_duration(120));
 
         state.play_track_at_index(0);
         // Seek to 98s (2s left): with crossfade_seconds == 0, audio is still playing so no advance
@@ -655,10 +644,8 @@ mod tests {
         let mut state = test_wired();
         state.crossfade_seconds = 8;
 
-        let t1 = Track::new("pq-1", "Track 1", "Artist").with_duration(100);
-        let t2 = Track::new("pq-2", "Track 2", "Artist").with_duration(120);
-        state.queue.push(t1);
-        state.queue.push(t2);
+        state.queue.push(Track::new("pq-1", "Track 1", "Artist").with_duration(100));
+        state.queue.push(Track::new("pq-2", "Track 2", "Artist").with_duration(120));
 
         // First play: audio is not playing yet, so immediate play
         state.play_track_at_index(0);
@@ -692,10 +679,8 @@ mod tests {
         let mut state = test_wired();
         state.crossfade_seconds = 0;
 
-        let t1 = Track::new("t1", "Track 1", "Artist 1").with_duration(180);
-        let t2 = Track::new("t2", "Track 2", "Artist 2").with_duration(200);
-        state.queue.push(t1);
-        state.queue.push(t2);
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
 
         state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("t1", 180))));
         assert_eq!(state.queue.cursor(), 0);
@@ -771,5 +756,41 @@ mod tests {
         state.continue_autoplay_if_ended();
         assert_eq!(state.queue.cursor(), 0);
         assert_eq!(state.playback_phase, PlaybackPhase::Empty);
+    }
+
+    #[test]
+    fn generation_bumped_on_every_transition() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.worker_tx = Some(tx);
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        state.next_track();
+        let g1 = state.play_generation;
+        state.prev_track();
+        let g2 = state.play_generation;
+        // state.drain_media_keys is not drivable without presence, so call next_track twice instead.
+        state.next_track();
+        let g3 = state.play_generation;
+        state.next_track();
+        let g4 = state.play_generation;
+        let gens: Vec<_> = (0..4)
+            .map(|_| match rx.recv().expect("cmd") {
+                PlaybackWorkerCommand::Play(req) => req.generation,
+                _ => panic!("expected Play"),
+            })
+            .collect();
+        assert!(gens.windows(2).all(|w| w[0] < w[1]));
+        assert_eq!(gens, vec![g1, g2, g3, g4]);
+    }
+
+    #[test]
+    fn stale_play_result_is_discarded() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        let old = state.play_generation;
+        let _ = state.begin_play_request().expect("request");
+        assert!(!state.should_apply_play_result(old));
+        assert!(state.should_apply_play_result(state.play_generation));
     }
 }
