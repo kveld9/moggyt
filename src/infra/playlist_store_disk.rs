@@ -9,13 +9,11 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use super::playlist_store::{PlaylistStore, sort_playlists};
+use super::store_health::{HealthFlag, StoreHealth};
 use crate::domain::{LocalPlaylist, is_local_playlist_id};
 
 /// File name used inside the config directory.
 pub const PLAYLISTS_FILE: &str = "playlists.json";
-
-/// Backup file name used when renaming a corrupt playlist file.
-pub const PLAYLISTS_CORRUPT_BACKUP_FILE: &str = "playlists.json.corrupt";
 
 /// On-disk schema version.
 pub const PLAYLISTS_SCHEMA_VERSION: u32 = 1;
@@ -31,12 +29,13 @@ pub struct PlaylistFile {
 #[derive(Debug, Clone)]
 pub struct DiskPlaylistStore {
     config_dir: PathBuf,
+    health: HealthFlag,
 }
 
 impl DiskPlaylistStore {
     /// Creates a disk store rooted in `config_dir`.
     pub fn new(config_dir: PathBuf) -> Self {
-        Self { config_dir }
+        Self { config_dir, health: HealthFlag::new() }
     }
 
     /// Full path to the `playlists.json` file.
@@ -44,22 +43,50 @@ impl DiskPlaylistStore {
         self.config_dir.join(PLAYLISTS_FILE)
     }
 
-    fn corrupt_backup_path(&self) -> PathBuf {
-        self.config_dir.join(PLAYLISTS_CORRUPT_BACKUP_FILE)
+    pub fn health(&self) -> StoreHealth {
+        self.health.get()
+    }
+
+    pub fn is_quarantined(&self) -> bool {
+        self.health.is_quarantined()
+    }
+
+    pub fn clear_health(&self) {
+        self.health.clear();
     }
 
     /// Loads all playlists from disk. Returns an empty list if absent, unreadable, or corrupt.
     pub fn load_all(&self) -> Vec<LocalPlaylist> {
         let path = self.file_path();
-        let bytes = match read_file_optional(&path) {
-            Ok(Some(bytes)) => bytes,
-            Ok(None) => return Vec::new(),
-            Err(err) => {
-                log_read_error(&path, &err);
-                return Vec::new();
-            }
+        let Some(bytes) = self.read_bytes(&path) else {
+            return Vec::new();
         };
-        parse_playlist_bytes(&bytes, &path)
+        match parse_envelope(&bytes) {
+            ParsedEnvelope::Valid(playlists) => {
+                self.health.set(StoreHealth::Ok);
+                playlists
+            }
+            ParsedEnvelope::UnsupportedVersion(version) => {
+                self.health.set(StoreHealth::Incompatible);
+                log_version_error(&path, version);
+                Vec::new()
+            }
+            ParsedEnvelope::Corrupt(err) => {
+                log_parse_error(&path, &err);
+                self.quarantine_corrupt(&path);
+                Vec::new()
+            }
+        }
+    }
+
+    fn read_bytes(&self, path: &Path) -> Option<Vec<u8>> {
+        match read_file_optional(path) {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                log_read_error(path, &err);
+                None
+            }
+        }
     }
 
     fn load_for_write(&self) -> anyhow::Result<Vec<LocalPlaylist>> {
@@ -74,8 +101,12 @@ impl DiskPlaylistStore {
 
     fn parse_for_write(&self, bytes: &[u8], path: &Path) -> anyhow::Result<Vec<LocalPlaylist>> {
         match parse_envelope(bytes) {
-            ParsedEnvelope::Valid(playlists) => Ok(playlists),
+            ParsedEnvelope::Valid(playlists) => {
+                self.health.set(StoreHealth::Ok);
+                Ok(playlists)
+            }
             ParsedEnvelope::UnsupportedVersion(version) => {
+                self.health.set(StoreHealth::Incompatible);
                 anyhow::bail!(
                     "unsupported playlist schema version {version} in {}",
                     path.display()
@@ -83,23 +114,23 @@ impl DiskPlaylistStore {
             }
             ParsedEnvelope::Corrupt(err) => {
                 log_parse_error(path, &err);
-                self.backup_corrupt_file(path)?;
+                self.quarantine_corrupt(path);
                 Ok(Vec::new())
             }
         }
     }
 
-    fn backup_corrupt_file(&self, path: &Path) -> anyhow::Result<()> {
-        let backup_path = self.corrupt_backup_path();
-        std::fs::rename(path, &backup_path).with_context(|| {
-            format!(
-                "failed to rename corrupt playlist file from {} to {}",
-                path.display(),
-                backup_path.display()
-            )
-        })?;
-        log_corrupt_backup(path, &backup_path);
-        Ok(())
+    fn quarantine_corrupt(&self, path: &Path) {
+        self.health.set(StoreHealth::Quarantined);
+        match super::store_health::quarantine(path) {
+            Ok(backup_path) => log_corrupt_backup(path, &backup_path),
+            Err(err) => {
+                tracing::warn!(
+                    "failed to quarantine corrupt playlist file at {}: {err}",
+                    path.display()
+                );
+            }
+        }
     }
 
     fn write_atomic(&self, data: &[u8]) -> anyhow::Result<()> {
@@ -166,20 +197,6 @@ fn parse_envelope(bytes: &[u8]) -> ParsedEnvelope {
         return ParsedEnvelope::UnsupportedVersion(envelope.version);
     }
     ParsedEnvelope::Valid(envelope.playlists)
-}
-
-fn parse_playlist_bytes(bytes: &[u8], path: &Path) -> Vec<LocalPlaylist> {
-    match parse_envelope(bytes) {
-        ParsedEnvelope::Valid(playlists) => playlists,
-        ParsedEnvelope::UnsupportedVersion(version) => {
-            log_version_error(path, version);
-            Vec::new()
-        }
-        ParsedEnvelope::Corrupt(err) => {
-            log_parse_error(path, &err);
-            Vec::new()
-        }
-    }
 }
 
 fn upsert_playlist(playlists: &mut Vec<LocalPlaylist>, playlist: &LocalPlaylist) {
@@ -345,19 +362,43 @@ mod tests {
     }
 
     #[test]
-    fn test_disk_store_corrupt_json_yields_empty_and_preserves_file() {
-        let temp = TempDir::new("playlist-corrupt");
+    fn test_disk_store_corrupt_read_sets_quarantine() {
+        let temp = TempDir::new("playlist-corrupt-read");
         std::fs::create_dir_all(temp.path()).unwrap();
         let store = DiskPlaylistStore::new(temp.path());
 
-        let corrupt_payload = "{not json";
+        let corrupt_payload = "{not json for read";
         std::fs::write(store.file_path(), corrupt_payload).unwrap();
 
         assert!(store.list().is_empty());
-        assert_eq!(store.get("local:any"), None);
+        assert!(store.is_quarantined());
+        assert!(!store.file_path().exists(), "original path must be gone");
 
-        let content_after = std::fs::read_to_string(store.file_path()).unwrap();
-        assert_eq!(content_after, corrupt_payload);
+        let entries: Vec<_> = std::fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.to_string_lossy().contains(".corrupt."))
+            .collect();
+        assert_eq!(entries.len(), 1, "exactly one .corrupt. backup must exist");
+        assert_eq!(std::fs::read_to_string(&entries[0]).unwrap(), corrupt_payload);
+    }
+
+    #[test]
+    fn test_disk_store_newer_schema_is_incompatible() {
+        let temp = TempDir::new("playlist-newer-read");
+        std::fs::create_dir_all(temp.path()).unwrap();
+        let store = DiskPlaylistStore::new(temp.path());
+
+        let future_version = PLAYLISTS_SCHEMA_VERSION + 1;
+        let future_payload = format!(
+            r#"{{"version": {future_version}, "playlists": [{{"id": "local:1", "title": "Future", "tracks": []}}]}}"#
+        );
+        std::fs::write(store.file_path(), &future_payload).unwrap();
+
+        assert!(store.list().is_empty());
+        assert_eq!(store.health(), StoreHealth::Incompatible);
+        assert!(!store.is_quarantined());
+        assert_eq!(std::fs::read_to_string(store.file_path()).unwrap(), future_payload);
     }
 
     #[test]
@@ -427,12 +468,6 @@ mod tests {
     }
 
     #[test]
-    fn test_corrupt_backup_file_constant_starts_with_playlists_file() {
-        assert!(PLAYLISTS_CORRUPT_BACKUP_FILE.starts_with(PLAYLISTS_FILE));
-        assert_eq!(PLAYLISTS_CORRUPT_BACKUP_FILE, "playlists.json.corrupt");
-    }
-
-    #[test]
     fn test_disk_store_save_backs_up_corrupt_file_and_saves_new_playlist() {
         let temp = TempDir::new("playlist-corrupt-save");
         std::fs::create_dir_all(temp.path()).unwrap();
@@ -444,9 +479,13 @@ mod tests {
         let new_playlist = LocalPlaylist::new("local:new", "New Playlist");
         store.save(&new_playlist).expect("save succeeds on corrupt file by backing it up");
 
-        let backup_path = temp.path().join(PLAYLISTS_CORRUPT_BACKUP_FILE);
-        assert!(backup_path.exists(), "corrupt backup file must exist");
-        let backup_content = std::fs::read_to_string(&backup_path).unwrap();
+        let entries: Vec<_> = std::fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.to_string_lossy().contains(".corrupt."))
+            .collect();
+        assert_eq!(entries.len(), 1, "corrupt backup file must exist");
+        let backup_content = std::fs::read_to_string(&entries[0]).unwrap();
         assert_eq!(backup_content, corrupt_payload);
 
         let list = store.list();
@@ -507,22 +546,29 @@ mod tests {
     }
 
     #[test]
-    fn test_disk_store_save_replaces_existing_corrupt_backup_file() {
-        let temp = TempDir::new("playlist-corrupt-replace");
+    fn test_disk_store_save_preserves_existing_corrupt_backup() {
+        let temp = TempDir::new("playlist-corrupt-preserve");
         std::fs::create_dir_all(temp.path()).unwrap();
         let store = DiskPlaylistStore::new(temp.path());
 
-        let backup_path = temp.path().join(PLAYLISTS_CORRUPT_BACKUP_FILE);
-        std::fs::write(&backup_path, "previous corrupt content").unwrap();
+        let corrupt_payload1 = "{first corrupt payload";
+        std::fs::write(store.file_path(), corrupt_payload1).unwrap();
+        store.save(&LocalPlaylist::new("local:new1", "New 1")).expect("first save succeeds");
 
-        let corrupt_payload = "{latest corrupt payload";
-        std::fs::write(store.file_path(), corrupt_payload).unwrap();
+        let corrupt_payload2 = "{second corrupt payload";
+        std::fs::write(store.file_path(), corrupt_payload2).unwrap();
+        store.save(&LocalPlaylist::new("local:new2", "New 2")).expect("second save succeeds");
 
-        let new_playlist = LocalPlaylist::new("local:new", "New Playlist");
-        store.save(&new_playlist).expect("save succeeds");
-
-        let backup_content = std::fs::read_to_string(&backup_path).unwrap();
-        assert_eq!(backup_content, corrupt_payload);
+        let entries: Vec<_> = std::fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.to_string_lossy().contains(".corrupt."))
+            .collect();
+        assert_eq!(entries.len(), 2, "two distinct .corrupt. files must exist");
+        let contents: Vec<String> =
+            entries.iter().map(|p| std::fs::read_to_string(p).unwrap()).collect();
+        assert!(contents.contains(&corrupt_payload1.to_string()));
+        assert!(contents.contains(&corrupt_payload2.to_string()));
     }
 
     #[test]
@@ -536,9 +582,17 @@ mod tests {
 
         store.delete("local:any").expect("delete handles corrupt file by backing it up");
 
-        let backup_path = temp.path().join(PLAYLISTS_CORRUPT_BACKUP_FILE);
-        assert!(backup_path.exists(), "corrupt backup file must exist after delete");
-        assert_eq!(std::fs::read_to_string(&backup_path).unwrap(), corrupt_payload);
+        let entries: Vec<_> = std::fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|s| s.starts_with("playlists.json.corrupt."))
+            })
+            .collect();
+        assert_eq!(entries.len(), 1, "corrupt backup file must exist after delete");
+        assert_eq!(std::fs::read_to_string(&entries[0]).unwrap(), corrupt_payload);
     }
 
     #[test]
