@@ -387,6 +387,7 @@ impl SlintAppState {
                             a.pause();
                         }
                     }
+                    self.pause_play_ledger();
                     self.set_playback_phase(PlaybackPhase::Paused);
                 }
             }

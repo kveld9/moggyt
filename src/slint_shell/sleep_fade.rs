@@ -34,6 +34,7 @@ impl SlintAppState {
             audio.pause();
             restore_captured_volume(&mut **audio, &mut self.sleep_fade_base_volume);
             drop(audio);
+            self.pause_play_ledger();
             self.sync_presence_playing(false);
             return;
         }
@@ -61,6 +62,7 @@ impl SlintAppState {
                 audio.pause();
                 restore_captured_volume(&mut **audio, &mut self.sleep_fade_base_volume);
             }
+            self.pause_play_ledger();
             self.sync_presence_playing(false);
             return true;
         }

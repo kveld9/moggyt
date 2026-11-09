@@ -91,6 +91,7 @@ pub(crate) fn handle_toggle_play(window: &MoggytWindow, state: &mut SlintAppStat
     if audio.is_playing() {
         audio.pause();
         drop(audio);
+        state.pause_play_ledger();
         state.set_playback_phase(PlaybackPhase::Paused);
         state.sync_presence_playing(false);
         window.set_is_playing(false);
@@ -99,6 +100,7 @@ pub(crate) fn handle_toggle_play(window: &MoggytWindow, state: &mut SlintAppStat
     if audio.last_requested().is_some() {
         audio.resume_play();
         drop(audio);
+        state.resume_play_ledger();
         state.set_playback_phase(PlaybackPhase::Resolving);
         state.sync_presence_playing(true);
         window.set_is_playing(true);

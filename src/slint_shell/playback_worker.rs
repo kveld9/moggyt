@@ -89,7 +89,6 @@ pub const COVER_FETCH_CONCURRENCY_LIMIT: usize = 4;
 #[derive(Debug)]
 pub enum PlaybackWorkerCommand {
     Play(PlayTrackRequest),
-    Scrobble { artist: String, title: String, started_unix: u64 },
     FetchCover { url: String, generation: u64 },
     Seek { position_secs: u64 },
 }
@@ -286,24 +285,6 @@ where
         lyrics_lines,
         cover_data,
         presence,
-    }
-}
-
-/// Submits completed scrobble record to primary and optional secondary scrobblers.
-pub fn execute_scrobble(
-    artist: &str,
-    title: &str,
-    started_unix: u64,
-    scrobbler: &Arc<Mutex<Box<dyn Scrobbler>>>,
-    secondary_scrobbler: &Option<Arc<Mutex<Box<dyn Scrobbler>>>>,
-) {
-    if let Ok(mut scrob) = scrobbler.lock() {
-        scrob.scrobble(artist, title, started_unix);
-    }
-    if let Some(sec) = secondary_scrobbler {
-        if let Ok(mut scrob) = sec.lock() {
-            scrob.scrobble(artist, title, started_unix);
-        }
     }
 }
 
@@ -572,16 +553,6 @@ mod tests {
     }
 
     #[test]
-    fn test_execute_scrobble_in_worker_thread() {
-        let scrobbler = Arc::new(Mutex::new(Box::new(StubScrobbler::new()) as Box<dyn Scrobbler>));
-        let s_clone = Arc::clone(&scrobbler);
-        let handle = std::thread::spawn(move || {
-            execute_scrobble("Artist", "Song", 123456, &s_clone, &None);
-        });
-        handle.join().expect("thread join succeeds");
-    }
-
-    #[test]
     fn test_worker_channel_dispatch_and_join() {
         let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
         let (done_tx, done_rx) = std::sync::mpsc::channel::<u64>();
@@ -590,7 +561,6 @@ mod tests {
             while let Ok(cmd) = rx.recv() {
                 match cmd {
                     PlaybackWorkerCommand::Play(req) => done_tx.send(req.generation).unwrap(),
-                    PlaybackWorkerCommand::Scrobble { .. } => {}
                     PlaybackWorkerCommand::FetchCover { generation, .. } => {
                         done_tx.send(generation).unwrap()
                     }

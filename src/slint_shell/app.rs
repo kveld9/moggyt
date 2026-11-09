@@ -157,7 +157,8 @@ pub fn run(
 }
 
 /// Persists the active playback queue to storage on application exit.
-pub fn persist_state_on_exit(state: &SlintAppState) -> anyhow::Result<()> {
+pub fn persist_state_on_exit(state: &mut SlintAppState) -> anyhow::Result<()> {
+    state.maybe_scrobble_current();
     state.queue_store.save(&state.queue)
 }
 
@@ -201,11 +202,36 @@ mod tests {
         state.queue.push(track1.clone());
         state.queue.push(track2.clone());
 
-        persist_state_on_exit(&state).expect("failed to persist queue on exit");
+        persist_state_on_exit(&mut state).expect("failed to persist queue on exit");
 
         let loaded = state.queue_store.load();
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded.tracks(), &[track1, track2]);
+    }
+
+    #[test]
+    fn exit_credits_current_track() {
+        let mut state = test_wired();
+        let memory_store = crate::infra::MemoryPlayLogStore::new();
+        state.play_log_store = Box::new(memory_store.clone());
+        let track = Track::new("t1", "Title 1", "Artist 1").with_duration(200);
+        state.started_at = Some(crate::slint_shell::playback_control::StartedPlay {
+            unix_secs: 1,
+            track,
+            listened: std::time::Duration::from_secs(120),
+            resumed_at: None,
+        });
+
+        persist_state_on_exit(&mut state).expect("persist succeeds");
+
+        let records = memory_store.load().expect("load succeeds");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].listened_secs, 120);
+        assert!(state.started_at.is_none());
+
+        persist_state_on_exit(&mut state).expect("persist succeeds second time");
+        let records2 = memory_store.load().expect("load succeeds second time");
+        assert_eq!(records2.len(), 1);
     }
 
     #[test]

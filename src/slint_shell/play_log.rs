@@ -22,7 +22,7 @@ impl SlintAppState {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
+    use std::time::Duration;
 
     use super::*;
     use crate::domain::Track;
@@ -38,7 +38,12 @@ mod tests {
         let track = Track::new("video-abc", "Midnight City", "M83")
             .with_album("Hurry Up, We're Dreaming")
             .with_duration(200);
-        let started = StartedPlay { instant: Instant::now(), unix_secs: 1_700_000_123, track };
+        let started = StartedPlay {
+            unix_secs: 1_700_000_123,
+            track,
+            listened: Duration::ZERO,
+            resumed_at: None,
+        };
 
         state.record_play(&started, 150);
 
@@ -61,7 +66,12 @@ mod tests {
         state.play_log_store = Box::new(memory_store.clone());
 
         let track = Track::new("video-xyz", "Short Clip", "Various").with_duration(200);
-        let started = StartedPlay { instant: Instant::now(), unix_secs: 1_700_000_500, track };
+        let started = StartedPlay {
+            unix_secs: 1_700_000_500,
+            track,
+            listened: Duration::ZERO,
+            resumed_at: None,
+        };
 
         state.record_play(&started, 10);
 

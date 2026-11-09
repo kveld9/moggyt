@@ -35,7 +35,7 @@ use crate::slint_shell::playback::{format_track_duration, is_track_liked};
 use crate::slint_shell::playback_control::apply_play_track_completion;
 use crate::slint_shell::playback_worker::{
     PlaybackWorkerAdapters, PlaybackWorkerCommand, execute_detail, execute_play_track,
-    execute_refresh_library, execute_scrobble, execute_search, execute_seek, spawn_lyrics_prefetch,
+    execute_refresh_library, execute_search, execute_seek, spawn_lyrics_prefetch,
     thumbnail_variant_for_row,
 };
 use crate::slint_shell::state::{SharedState, SlintAppState};
@@ -335,15 +335,6 @@ pub(crate) fn spawn_playback_worker(
                         });
                         spawn_lyrics_prefetch(prefetch, Arc::clone(&adapters.lyrics));
                         spawn_stream_prefetch(stream_id, &adapters.audio);
-                    }
-                    PlaybackWorkerCommand::Scrobble { artist, title, started_unix } => {
-                        execute_scrobble(
-                            &artist,
-                            &title,
-                            started_unix,
-                            &adapters.scrobbler,
-                            &adapters.secondary_scrobbler,
-                        );
                     }
                     PlaybackWorkerCommand::FetchCover { url, generation } => {
                         let _ = cover_tx.send((url, generation));

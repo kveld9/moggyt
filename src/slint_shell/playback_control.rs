@@ -3,7 +3,7 @@
 //!
 //! Hexagonal invariant: non-blocking audio port calls and presence sync without UI event loop stalls.
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use slint::{ModelRc, VecModel};
 
@@ -21,7 +21,10 @@ use crate::slint_shell::{LyricLineData, MoggytWindow};
 /// Playback start record: when the track started and which track it was.
 #[derive(Debug, Clone)]
 pub struct StartedPlay {
-    pub instant: Instant,
+    /// Accumulated audible listening time before the current resume.
+    pub listened: std::time::Duration,
+    /// Time of the current resume; `None` while paused or after freezing.
+    pub resumed_at: Option<Instant>,
     pub unix_secs: u64,
     pub track: Track,
 }
@@ -29,7 +32,34 @@ pub struct StartedPlay {
 impl StartedPlay {
     /// Captures the start instant and unix epoch timestamp for the given track.
     pub fn now(track: Track) -> Self {
-        Self { instant: Instant::now(), unix_secs: current_unix_secs(), track }
+        Self {
+            listened: Duration::ZERO,
+            resumed_at: Some(Instant::now()),
+            unix_secs: current_unix_secs(),
+            track,
+        }
+    }
+
+    /// Freezes listened-time accumulation; idempotent when already paused.
+    pub fn on_pause(&mut self) {
+        if let Some(resumed) = self.resumed_at.take() {
+            self.listened += resumed.elapsed();
+        }
+    }
+
+    /// Restarts listened-time accumulation; idempotent when already running.
+    pub fn on_resume(&mut self) {
+        if self.resumed_at.is_none() {
+            self.resumed_at = Some(Instant::now());
+        }
+    }
+
+    /// Total audible listening duration accumulated so far.
+    pub fn listened(&self) -> Duration {
+        match self.resumed_at {
+            Some(resumed) => self.listened + resumed.elapsed(),
+            None => self.listened,
+        }
     }
 }
 
@@ -66,12 +96,14 @@ impl SlintAppState {
             if let Ok(mut a) = self.audio.lock() {
                 a.pause();
             }
+            self.pause_play_ledger();
             self.set_playback_phase(PlaybackPhase::Paused);
             self.sync_presence_playing(false);
         } else if has_last {
             if let Ok(mut a) = self.audio.lock() {
                 a.resume_play();
             }
+            self.resume_play_ledger();
             self.set_playback_phase(PlaybackPhase::Resolving);
             self.sync_presence_playing(true);
         } else {
@@ -251,6 +283,7 @@ impl SlintAppState {
             return;
         }
         if !self.autoplay {
+            self.maybe_scrobble_current();
             return;
         }
         let Some(current) = self.queue.current() else {
