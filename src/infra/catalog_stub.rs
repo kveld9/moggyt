@@ -147,31 +147,35 @@ impl Catalog for CatalogStub {
         Ok(results)
     }
 
-    fn radio(&self, seed_track_id: &str) -> Vec<Track> {
+    fn radio(&self, seed_track_id: &str) -> Result<Vec<Track>, CatalogError> {
         let trimmed = seed_track_id.trim();
         if trimmed.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
-        vec![
+        Ok(vec![
             Track::new(&format!("{trimmed}-radio-1"), &format!("{trimmed} Radio 1"), "Stub Artist")
                 .with_duration(180),
             Track::new(&format!("{trimmed}-radio-2"), &format!("{trimmed} Radio 2"), "Stub Artist")
                 .with_duration(210),
-        ]
+        ])
     }
 
     fn home_shelves(&self) -> Vec<Shelf> {
         Self::stub_home_shelves()
     }
 
-    fn explore_shelves(&self) -> Vec<Shelf> {
-        Self::stub_explore_shelves()
+    fn explore_shelves(&self) -> Result<Vec<Shelf>, CatalogError> {
+        Ok(Self::stub_explore_shelves())
     }
 
-    fn category_shelves(&self, browse_id: &str, _params: Option<&str>) -> Vec<Shelf> {
+    fn category_shelves(
+        &self,
+        browse_id: &str,
+        _params: Option<&str>,
+    ) -> Result<Vec<Shelf>, CatalogError> {
         match browse_id {
-            "FEmusic_moods_and_genres_category" => Self::stub_category_shelves(),
-            _ => Vec::new(),
+            "FEmusic_moods_and_genres_category" => Ok(Self::stub_category_shelves()),
+            _ => Ok(Vec::new()),
         }
     }
 
@@ -269,8 +273,8 @@ mod tests {
     #[test]
     fn stub_radio_determinism_and_blank_seed() {
         let catalog = CatalogStub::new();
-        let first = catalog.radio("vid-seed");
-        let second = catalog.radio("vid-seed");
+        let first = catalog.radio("vid-seed").expect("radio tracks");
+        let second = catalog.radio("vid-seed").expect("radio tracks");
         assert_eq!(first, second, "stub radio must be deterministic");
         assert_eq!(first.len(), 2);
         assert_eq!(first[0].id, "vid-seed-radio-1");
@@ -280,8 +284,8 @@ mod tests {
         assert_eq!(first[1].artist, "Stub Artist");
         assert_eq!(first[1].duration_secs, Some(210));
 
-        assert!(catalog.radio("").is_empty());
-        assert!(catalog.radio("   ").is_empty());
+        assert_eq!(catalog.radio(""), Ok(Vec::new()));
+        assert_eq!(catalog.radio("   "), Ok(Vec::new()));
     }
 
     #[test]
@@ -305,8 +309,8 @@ mod tests {
     #[test]
     fn stub_explore_shelves_determinism_and_content() {
         let catalog = CatalogStub::new();
-        let first = catalog.explore_shelves();
-        let second = catalog.explore_shelves();
+        let first = catalog.explore_shelves().expect("explore shelves");
+        let second = catalog.explore_shelves().expect("explore shelves");
         assert_eq!(first, second, "stub explore shelves must be deterministic");
         assert_eq!(first.len(), 2);
         assert_eq!(first[0].title, "Charts");
@@ -382,9 +386,11 @@ mod tests {
     #[test]
     fn stub_category_shelves_seeded_and_empty() {
         let stub = CatalogStub::new();
-        let s = stub.category_shelves("FEmusic_moods_and_genres_category", Some("calma"));
+        let s = stub
+            .category_shelves("FEmusic_moods_and_genres_category", Some("calma"))
+            .expect("category shelves");
         assert_eq!(s.len(), 1);
         assert_eq!(s[0].title, "Chill Playlists");
-        assert!(stub.category_shelves("other_id", None).is_empty());
+        assert_eq!(stub.category_shelves("other_id", None), Ok(Vec::new()));
     }
 }

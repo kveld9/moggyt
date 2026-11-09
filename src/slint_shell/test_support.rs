@@ -59,8 +59,8 @@ impl Catalog for LocaleTrackingCatalog {
         Ok(Vec::new())
     }
 
-    fn radio(&self, _track_id: &str) -> Vec<Track> {
-        Vec::new()
+    fn radio(&self, _track_id: &str) -> Result<Vec<Track>, CatalogError> {
+        Ok(Vec::new())
     }
 
     fn home_shelves(&self) -> Vec<Shelf> {
@@ -99,7 +99,9 @@ pub struct MockLibraryCatalog {
     pub search_res: Result<Vec<Track>, CatalogError>,
     pub search_filtered_res: Result<Vec<SearchResult>, CatalogError>,
     pub detail_res: Result<Option<Detail>, CatalogError>,
-    pub radio_res: Vec<Track>,
+    pub radio_res: Result<Vec<Track>, CatalogError>,
+    pub explore_res: Result<Vec<Shelf>, CatalogError>,
+    pub category_res: Result<Vec<Shelf>, CatalogError>,
 }
 
 impl Default for MockLibraryCatalog {
@@ -110,7 +112,9 @@ impl Default for MockLibraryCatalog {
             search_res: Ok(Vec::new()),
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
-            radio_res: Vec::new(),
+            radio_res: Ok(Vec::new()),
+            explore_res: Ok(Vec::new()),
+            category_res: Ok(Vec::new()),
         }
     }
 }
@@ -126,7 +130,9 @@ impl MockLibraryCatalog {
             search_res: Ok(Vec::new()),
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
-            radio_res: Vec::new(),
+            radio_res: Ok(Vec::new()),
+            explore_res: Ok(Vec::new()),
+            category_res: Ok(Vec::new()),
         }
     }
 
@@ -146,7 +152,22 @@ impl MockLibraryCatalog {
     }
 
     pub fn with_radio(mut self, tracks: Vec<Track>) -> Self {
-        self.radio_res = tracks;
+        self.radio_res = Ok(tracks);
+        self
+    }
+
+    pub fn with_radio_result(mut self, res: Result<Vec<Track>, CatalogError>) -> Self {
+        self.radio_res = res;
+        self
+    }
+
+    pub fn with_explore(mut self, res: Result<Vec<Shelf>, CatalogError>) -> Self {
+        self.explore_res = res;
+        self
+    }
+
+    pub fn with_category(mut self, res: Result<Vec<Shelf>, CatalogError>) -> Self {
+        self.category_res = res;
         self
     }
 }
@@ -158,11 +179,17 @@ impl Catalog for MockLibraryCatalog {
     fn search_filtered(&self, _: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
         self.search_filtered_res.clone()
     }
-    fn radio(&self, _: &str) -> Vec<Track> {
+    fn radio(&self, _: &str) -> Result<Vec<Track>, CatalogError> {
         self.radio_res.clone()
     }
     fn home_shelves(&self) -> Vec<Shelf> {
         Vec::new()
+    }
+    fn explore_shelves(&self) -> Result<Vec<Shelf>, CatalogError> {
+        self.explore_res.clone()
+    }
+    fn category_shelves(&self, _: &str, _: Option<&str>) -> Result<Vec<Shelf>, CatalogError> {
+        self.category_res.clone()
     }
     fn playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
         self.playlists_res.clone()

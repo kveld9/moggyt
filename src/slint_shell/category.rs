@@ -2,8 +2,10 @@
 //!
 //! Hexagonal invariant: pure in-memory page mutations without direct I/O.
 
+use crate::infra::CatalogError;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::state::SlintAppState;
+use crate::slint_shell::view_phase::ViewPhase;
 
 impl SlintAppState {
     /// Opens category container for moods and genres identifier.
@@ -16,10 +18,20 @@ impl SlintAppState {
             self.category_return = self.page;
         }
         self.category_title = title.to_owned();
-        self.category_shelves = self
+        let res = self
             .catalog
             .lock()
-            .map_or_else(|_| Vec::new(), |c| c.category_shelves(trimmed, params));
+            .map_or(Err(CatalogError::Transport), |c| c.category_shelves(trimmed, params));
+        match res {
+            Ok(shelves) => {
+                let is_empty = shelves.is_empty();
+                self.category_shelves = shelves;
+                self.category_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
+            }
+            Err(_) => {
+                self.category_phase = ViewPhase::Error;
+            }
+        }
         self.page = SlintPage::Category;
     }
 
@@ -79,5 +91,21 @@ mod tests {
         assert_eq!(state.category_return, SlintPage::Explore);
         state.go_back();
         assert_eq!(state.page, SlintPage::Explore);
+    }
+
+    #[test]
+    fn category_error_sets_error_phase_and_preserves_shelves() {
+        use crate::slint_shell::test_support::MockLibraryCatalog;
+
+        let mut state = test_wired();
+        let err_cat = MockLibraryCatalog::default().with_category(Err(CatalogError::Transport));
+        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(err_cat)));
+        state.category_shelves =
+            vec![crate::domain::Shelf { title: "Previous".into(), items: Vec::new() }];
+
+        state.open_category("some_id", None, "Title");
+        assert_eq!(state.category_phase, ViewPhase::Error);
+        assert_eq!(state.category_shelves.len(), 1);
+        assert_eq!(state.category_shelves[0].title, "Previous");
     }
 }

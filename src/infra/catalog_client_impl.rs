@@ -85,6 +85,47 @@ fn validate_search_result<T>(items: Vec<T>, payload: &Value) -> Result<Vec<T>, C
     }
 }
 
+fn has_radio_section(value: &Value) -> bool {
+    const CANDIDATES: &[&str] = &[
+        "/contents/singleColumnMusicWatchNextResultsRenderer",
+        "/singleColumnMusicWatchNextResultsRenderer",
+        "/tabbedRenderer/watchNextTabbedResultsRenderer",
+        "/watchNextTabbedResultsRenderer",
+        "/musicQueueRenderer",
+        "/playlistPanelRenderer",
+    ];
+    CANDIDATES.iter().any(|path| value.pointer(path).is_some())
+}
+
+fn validate_radio_result<T>(items: Vec<T>, payload: &Value) -> Result<Vec<T>, CatalogError> {
+    if !items.is_empty() || has_radio_section(payload) {
+        Ok(items)
+    } else {
+        Err(CatalogError::Malformed)
+    }
+}
+
+fn has_explore_section(value: &Value) -> bool {
+    const CANDIDATES: &[&str] = &[
+        "/contents/singleColumnBrowseResultsRenderer",
+        "/singleColumnBrowseResultsRenderer",
+        "/sectionListRenderer",
+        "/musicCarouselShelfRenderer",
+        "/musicShelfRenderer",
+        "/gridRenderer",
+        "/itemSectionRenderer",
+    ];
+    CANDIDATES.iter().any(|path| value.pointer(path).is_some())
+}
+
+fn validate_explore_result<T>(items: Vec<T>, payload: &Value) -> Result<Vec<T>, CatalogError> {
+    if !items.is_empty() || has_explore_section(payload) {
+        Ok(items)
+    } else {
+        Err(CatalogError::Malformed)
+    }
+}
+
 impl CatalogClient {
     /// Creates a new catalog API client with a 10-second request timeout (anonymous).
     pub fn new() -> Self {
@@ -197,13 +238,14 @@ impl CatalogClient {
     }
 
     /// Queries the next endpoint for `video_id` and returns parsed radio tracks.
-    /// Returns an empty vector on any network or parse failure.
-    pub fn radio_tracks(&self, video_id: &str) -> Vec<RawTrack> {
+    pub fn radio(&self, video_id: &str) -> Result<Vec<Track>, CatalogError> {
         let trimmed = video_id.trim();
         if trimmed.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
-        self.next_payload(trimmed).map_or_else(|_| Vec::new(), |p| parse_radio_all(&p))
+        let payload = self.next_payload(trimmed).map_err(|_| CatalogError::Transport)?;
+        let tracks: Vec<Track> = parse_radio_all(&payload).into_iter().map(raw_to_track).collect();
+        validate_radio_result(tracks, &payload)
     }
 
     /// Executes browse endpoint request for `browse_id` with optional `params`, returning unparsed JSON.
@@ -229,14 +271,20 @@ impl CatalogClient {
     }
 
     /// Queries the browse endpoint for category shelves with `browse_id` and optional `params`.
-    /// Returns an empty vector on blank id, network error, or parse failure.
-    pub fn category_shelves(&self, browse_id: &str, params: Option<&str>) -> Vec<Shelf> {
+    pub fn category_shelves(
+        &self,
+        browse_id: &str,
+        params: Option<&str>,
+    ) -> Result<Vec<Shelf>, CatalogError> {
         let trimmed = browse_id.trim();
         if trimmed.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
-        self.browse_payload_with_params(trimmed, params)
-            .map_or_else(|_| Vec::new(), |p| parse_explore_all(&p))
+        let payload = self
+            .browse_payload_with_params(trimmed, params)
+            .map_err(|_| CatalogError::Transport)?;
+        let shelves = parse_explore_all(&payload);
+        validate_explore_result(shelves, &payload)
     }
 
     /// Queries the browse endpoint for home shelves and returns parsed shelves.
@@ -246,10 +294,11 @@ impl CatalogClient {
     }
 
     /// Queries the browse endpoint for explore shelves and returns parsed shelves.
-    /// Returns an empty vector on any network or parse failure.
-    pub fn explore_shelves(&self) -> Vec<Shelf> {
-        self.browse_payload(EXPLORE_BROWSE_ID)
-            .map_or_else(|_| Vec::new(), |p| parse_explore_all(&p))
+    pub fn explore_shelves(&self) -> Result<Vec<Shelf>, CatalogError> {
+        let payload =
+            self.browse_payload(EXPLORE_BROWSE_ID).map_err(|_| CatalogError::Transport)?;
+        let shelves = parse_explore_all(&payload);
+        validate_explore_result(shelves, &payload)
     }
 
     fn detail_payload(&self, id: &str) -> anyhow::Result<Value> {
@@ -430,10 +479,42 @@ mod tests {
     }
 
     #[test]
+    fn empty_explore_section_is_ok_empty() {
+        let empty_payload = serde_json::json!({
+            "sectionListRenderer": { "contents": [] }
+        });
+        let shelves: Vec<Shelf> = Vec::new();
+        assert_eq!(validate_explore_result(shelves, &empty_payload), Ok(Vec::new()));
+
+        let malformed_payload = serde_json::json!({});
+        let malformed_shelves: Vec<Shelf> = Vec::new();
+        assert_eq!(
+            validate_explore_result(malformed_shelves, &malformed_payload),
+            Err(CatalogError::Malformed)
+        );
+    }
+
+    #[test]
+    fn empty_radio_section_is_ok_empty() {
+        let empty_payload = serde_json::json!({
+            "playlistPanelRenderer": { "contents": [] }
+        });
+        let tracks: Vec<Track> = Vec::new();
+        assert_eq!(validate_radio_result(tracks, &empty_payload), Ok(Vec::new()));
+
+        let malformed_payload = serde_json::json!({});
+        let malformed_tracks: Vec<Track> = Vec::new();
+        assert_eq!(
+            validate_radio_result(malformed_tracks, &malformed_payload),
+            Err(CatalogError::Malformed)
+        );
+    }
+
+    #[test]
     fn catalog_client_category_shelves_parses_minimal_payload_and_guards() {
         let client = CatalogClient::new();
-        assert!(client.category_shelves("", None).is_empty());
-        assert!(client.category_shelves("   ", Some("p")).is_empty());
+        assert_eq!(client.category_shelves("", None), Ok(Vec::new()));
+        assert_eq!(client.category_shelves("   ", Some("p")), Ok(Vec::new()));
 
         let payload = serde_json::json!({
             "sectionListRenderer": { "contents": [{

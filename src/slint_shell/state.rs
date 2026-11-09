@@ -229,11 +229,17 @@ impl SlintAppState {
 
     /// Refreshes explore shelves from the injected catalog port.
     pub fn refresh_explore(&mut self) {
-        let shelves = match self.catalog.lock() {
-            Ok(c) => c.explore_shelves(),
-            Err(_) => Vec::new(),
-        };
-        self.explore_shelves = shelves;
+        let res = self.catalog.lock().map_or(Err(CatalogError::Transport), |c| c.explore_shelves());
+        match res {
+            Ok(shelves) => {
+                let is_empty = shelves.is_empty();
+                self.explore_shelves = shelves;
+                self.explore_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
+            }
+            Err(_) => {
+                self.explore_phase = ViewPhase::Error;
+            }
+        }
         self.explore_loaded = true;
     }
 
@@ -484,16 +490,16 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     ) -> Result<Vec<Track>, CatalogError> {
         (**self).search_by_lyrics(s)
     }
-    fn radio(&self, id: &str) -> Vec<Track> {
+    fn radio(&self, id: &str) -> Result<Vec<Track>, CatalogError> {
         (**self).radio(id)
     }
     fn home_shelves(&self) -> Vec<Shelf> {
         (**self).home_shelves()
     }
-    fn explore_shelves(&self) -> Vec<Shelf> {
+    fn explore_shelves(&self) -> Result<Vec<Shelf>, CatalogError> {
         (**self).explore_shelves()
     }
-    fn category_shelves(&self, id: &str, p: Option<&str>) -> Vec<Shelf> {
+    fn category_shelves(&self, id: &str, p: Option<&str>) -> Result<Vec<Shelf>, CatalogError> {
         (**self).category_shelves(id, p)
     }
     fn playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
@@ -693,14 +699,12 @@ mod tests {
         assert_eq!(state.search_phase, ViewPhase::Error);
         state.submit_search_with_filter("rock", SearchFilter::Albums);
         assert_eq!(state.search_phase, ViewPhase::Error);
-
         let empty_cat = MockLibraryCatalog::default().with_search_filtered(Ok(Vec::new()));
         state.catalog = wrap_mock_catalog(empty_cat);
         state.submit_search("rock");
         assert_eq!(state.search_phase, ViewPhase::Empty);
         state.submit_search_with_filter("rock", SearchFilter::Albums);
         assert_eq!(state.search_phase, ViewPhase::Empty);
-
         let hit = SearchResult::Track(Track::new("t1", "Title", "Artist"));
         let ok_cat = MockLibraryCatalog::default().with_search_filtered(Ok(vec![hit]));
         state.catalog = wrap_mock_catalog(ok_cat);
@@ -716,13 +720,11 @@ mod tests {
         state.open_detail("album-1", DetailKind::Album);
         assert_eq!(state.detail_phase, ViewPhase::Error);
         assert!(state.detail.is_none());
-
         let empty_cat = MockLibraryCatalog::default().with_detail(Ok(None));
         state.catalog = wrap_mock_catalog(empty_cat);
         state.open_detail("album-1", DetailKind::Album);
         assert_eq!(state.detail_phase, ViewPhase::Empty);
         assert!(state.detail.is_none());
-
         let d = Detail::new(DetailKind::Album, "T", "A", vec![Track::new("t1", "T", "A")]);
         let ok_cat = MockLibraryCatalog::default().with_detail(Ok(Some(d)));
         state.catalog = wrap_mock_catalog(ok_cat);
@@ -755,29 +757,24 @@ mod tests {
         assert_eq!(state.settings_store.load().theme, ThemeId::BlackOled);
         state.set_theme(ThemeId::Mono);
         assert_eq!(state.settings_store.load().theme, ThemeId::Mono);
-
         assert_eq!(state.player_bar.mode, PlayerBarMode::Classic);
         state.set_player_bar_mode(PlayerBarMode::Floating);
         assert_eq!(state.settings_store.load().player_bar_mode, PlayerBarMode::Floating);
         state.set_player_bar_mode(PlayerBarMode::Classic);
         assert_eq!(state.settings_store.load().player_bar_mode, PlayerBarMode::Classic);
-
         assert!(state.player_bar.show_artwork && !state.player_bar.show_skip_seconds);
         state.toggle_player_bar_option(0);
         assert!(!state.settings_store.load().player_bar_show_artwork);
         state.toggle_player_bar_option(4);
         assert!(state.settings_store.load().player_bar_show_skip_seconds);
-
         state.hi_res_covers = false;
         assert_eq!(state.cover_max_px(), 512);
         state.hi_res_covers = true;
         assert_eq!(state.cover_max_px(), 1024);
-
         state.set_crossfade_seconds(5);
         assert_eq!(state.settings_store.load().crossfade_seconds, 5);
         state.set_crossfade_seconds(20);
         assert_eq!(state.settings_store.load().crossfade_seconds, 15);
-
         state.set_stream_cache_limit_mb(1024);
         assert_eq!(state.settings_store.load().stream_cache_limit_mb, 1024);
         state.set_stream_cache_limit_mb(20000);

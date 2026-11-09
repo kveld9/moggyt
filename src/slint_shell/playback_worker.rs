@@ -473,8 +473,8 @@ mod tests {
                 ),
             ])
         }
-        fn radio(&self, _: &str) -> Vec<crate::domain::Track> {
-            Vec::new()
+        fn radio(&self, _: &str) -> Result<Vec<crate::domain::Track>, CatalogError> {
+            Ok(Vec::new())
         }
         fn home_shelves(&self) -> Vec<Shelf> {
             Vec::new()
@@ -521,8 +521,8 @@ mod tests {
             let hits = crate::infra::catalog_parse_search::parse_search_all(&payload);
             Ok(crate::infra::LiveCatalog::map_hits(hits, crate::domain::SearchFilter::All))
         }
-        fn radio(&self, _: &str) -> Vec<crate::domain::Track> {
-            Vec::new()
+        fn radio(&self, _: &str) -> Result<Vec<crate::domain::Track>, CatalogError> {
+            Ok(Vec::new())
         }
         fn home_shelves(&self) -> Vec<Shelf> {
             Vec::new()
