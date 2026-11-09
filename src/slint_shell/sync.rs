@@ -62,6 +62,9 @@ impl SlintAppState {
 }
 
 fn derive_search_phase(state: &SlintAppState) -> ViewPhase {
+    if state.search_phase == ViewPhase::Error {
+        return ViewPhase::Error;
+    }
     if !state.search_active {
         ViewPhase::Idle
     } else if state.home_shelves.iter().any(|shelf| !shelf.items.is_empty()) {
@@ -617,6 +620,16 @@ mod tests {
         state.library_phase = ViewPhase::Error;
         observe_view_phases(&mut state);
         assert_eq!(state.library_phase, ViewPhase::Error);
+    }
+
+    #[test]
+    fn search_phase_error_not_overwritten_by_derivation() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.search_phase = ViewPhase::Error;
+        observe_view_phases(&mut state);
+        assert_eq!(state.search_phase, ViewPhase::Error);
     }
 
     #[test]

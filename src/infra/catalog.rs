@@ -30,15 +30,15 @@ impl std::error::Error for CatalogError {}
 /// Catalog port: search by free text and user library read/mutation access.
 pub trait Catalog {
     /// Returns catalog hits for `query` (empty when nothing matches).
-    fn search(&self, query: &str) -> Vec<Track>;
+    fn search(&self, query: &str) -> Result<Vec<Track>, CatalogError>;
 
     /// Returns catalog hits matching the query text and filter.
-    fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult>;
+    fn search_filtered(&self, query: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError>;
 
     /// Returns catalog hits matching lyrics in `snippet` (empty when nothing matches).
     ///
     /// Default implementation forwards the snippet text to [`Catalog::search`].
-    fn search_by_lyrics(&self, snippet: &LyricsSnippet) -> Vec<Track> {
+    fn search_by_lyrics(&self, snippet: &LyricsSnippet) -> Result<Vec<Track>, CatalogError> {
         self.search(snippet.as_str())
     }
 
@@ -64,8 +64,8 @@ pub trait Catalog {
     /// Returns albums saved to the user's library.
     fn saved_albums(&self) -> Result<Vec<Album>, CatalogError>;
 
-    /// Returns detail view for `browse_id` and `kind` (None on blank id or failure).
-    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail>;
+    /// Returns detail view for `browse_id` and `kind` (Ok(None) on blank id).
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError>;
 
     /// Updates the session cookies used for authenticated catalog requests.
     ///
@@ -88,12 +88,12 @@ mod tests {
     }
 
     impl Catalog for PassThroughCatalog {
-        fn search(&self, query: &str) -> Vec<Track> {
+        fn search(&self, query: &str) -> Result<Vec<Track>, CatalogError> {
             *self.last_query.lock().unwrap() = Some(query.to_owned());
-            vec![Track::new("pass-1", query, "Pass Artist")]
+            Ok(vec![Track::new("pass-1", query, "Pass Artist")])
         }
-        fn search_filtered(&self, _query: &SearchQuery) -> Vec<SearchResult> {
-            Vec::new()
+        fn search_filtered(&self, _query: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
+            Ok(Vec::new())
         }
         fn radio(&self, _seed_track_id: &str) -> Vec<Track> {
             Vec::new()
@@ -107,8 +107,12 @@ mod tests {
         fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
             Ok(Vec::new())
         }
-        fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
-            None
+        fn detail(
+            &self,
+            _browse_id: &str,
+            _kind: DetailKind,
+        ) -> Result<Option<Detail>, CatalogError> {
+            Ok(None)
         }
     }
 
@@ -116,7 +120,7 @@ mod tests {
     fn default_forwarding_works_through_pass_through_catalog() {
         let pass_through = PassThroughCatalog::default();
         let snippet = LyricsSnippet::parse("running through the night").unwrap();
-        let hits = pass_through.search_by_lyrics(&snippet);
+        let hits = pass_through.search_by_lyrics(&snippet).expect("search by lyrics");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].id, "pass-1");
         assert_eq!(hits[0].title, "running through the night");

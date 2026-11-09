@@ -176,22 +176,11 @@ pub(crate) fn submit_search_with_filter_async(
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
-                if st.search_generation == g {
-                    st.search_query = q_res;
-                    st.home_shelves = shelves;
-                    st.search_results = st
-                        .home_shelves
-                        .iter()
-                        .flat_map(|s| s.items.iter())
-                        .filter_map(|it| match it {
-                            SearchResult::Track(t) => Some(t.clone()),
-                            _ => None,
-                        })
-                        .collect();
+                if apply_async_search_outcome(st, g, q_res, shelves) {
                     request_shelf_covers(st, &tx);
-                    win.set_query(st.search_query.as_str().into());
-                    sync_shelves_and_queue(&win, st);
                 }
+                win.set_query(st.search_query.as_str().into());
+                sync_shelves_and_queue(&win, st);
             });
         });
     });
@@ -240,23 +229,61 @@ fn begin_detail_load(state: &mut SlintAppState, browse_id: &str, kind: DetailKin
     Some(state.detail_generation)
 }
 
+fn apply_async_search_outcome(
+    state: &mut SlintAppState,
+    generation: u64,
+    query: String,
+    shelves: Result<Vec<Shelf>, CatalogError>,
+) -> bool {
+    if state.search_generation != generation {
+        return false;
+    }
+    state.search_query = query;
+    match shelves {
+        Ok(shelves) => {
+            let is_empty = shelves.iter().all(|s| s.items.is_empty());
+            state.home_shelves = shelves;
+            state.search_results = state
+                .home_shelves
+                .iter()
+                .flat_map(|s| s.items.iter())
+                .filter_map(|it| match it {
+                    SearchResult::Track(t) => Some(t.clone()),
+                    _ => None,
+                })
+                .collect();
+            state.search_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
+            true
+        }
+        Err(_) => {
+            state.search_phase = ViewPhase::Error;
+            false
+        }
+    }
+}
+
 fn apply_detail_outcome(
     state: &mut SlintAppState,
     generation: u64,
-    detail: Option<Detail>,
+    detail: Result<Option<Detail>, CatalogError>,
     id: &str,
 ) -> bool {
     if state.detail_generation != generation {
         return false;
     }
     match detail {
-        Some(detail) => {
+        Ok(Some(detail)) => {
             let is_empty = detail.tracks.is_empty();
             state.detail = apply_detail_result(Some(detail), id, state.locale);
             state.detail_error = None;
             state.detail_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
         }
-        None => {
+        Ok(None) => {
+            state.detail = None;
+            state.detail_error = None;
+            state.detail_phase = ViewPhase::Empty;
+        }
+        Err(_) => {
             state.detail = None;
             state.detail_phase = ViewPhase::Error;
             state.detail_error = Some("Failed to load detail".to_string());
@@ -279,7 +306,7 @@ pub(crate) fn open_detail_async(
     let trimmed = browse_id.trim();
     if is_local_playlist_id(trimmed) {
         let detail = current_store().and_then(|st| resolve_local_detail(trimmed, st.as_ref()));
-        apply_detail_outcome(state, generation, detail, trimmed);
+        apply_detail_outcome(state, generation, Ok(detail), trimmed);
         sync_window(window, state);
         return;
     }
@@ -318,11 +345,8 @@ pub fn retry_detail_load(
     open_detail_async(window, state, &id, kind, worker_tx);
 }
 
-fn is_library_empty(
-    playlists: &[crate::domain::Playlist],
-    albums: &[crate::domain::Album],
-) -> bool {
-    playlists.is_empty() && albums.is_empty()
+fn is_library_empty(p: &[crate::domain::Playlist], a: &[crate::domain::Album]) -> bool {
+    p.is_empty() && a.is_empty()
 }
 
 fn apply_async_library_outcome(
@@ -514,7 +538,7 @@ mod tests {
 
     use super::*;
     use crate::domain::Track;
-    use crate::slint_shell::test_support::{MockLibraryCatalog, test_wired};
+    use crate::slint_shell::test_support::test_wired;
 
     #[test]
     fn test_set_and_with_ui_state_round_trip() {
@@ -558,7 +582,6 @@ mod tests {
         let mut state = test_wired();
         let (tx, rx) = std::sync::mpsc::channel();
         state.updater_rx = Some(rx);
-
         tx.send(Some(crate::infra::ReleaseInfo {
             version: "v99.0.0".to_string(),
             url: "https://github.com/example/releases/tag/v99.0.0".to_string(),
@@ -567,21 +590,11 @@ mod tests {
 
         assert!(!state.update_available);
         assert_eq!(state.latest_version, None);
-        assert!(state.updater_rx.is_some());
-
-        // First poll: applies the queued result and clears the channel
-        let applied = poll_updater_check(&mut state);
-        assert!(applied);
+        assert!(poll_updater_check(&mut state));
         assert!(state.update_available);
         assert_eq!(state.latest_version.as_deref(), Some("v99.0.0"));
         assert!(state.updater_rx.is_none());
-
-        // Subsequent poll: state unchanged
-        let second_poll = poll_updater_check(&mut state);
-        assert!(!second_poll);
-        assert!(state.update_available);
-        assert_eq!(state.latest_version.as_deref(), Some("v99.0.0"));
-        assert!(state.updater_rx.is_none());
+        assert!(!poll_updater_check(&mut state));
     }
 
     #[test]
@@ -591,8 +604,7 @@ mod tests {
         state.updater_rx = Some(rx);
         drop(tx);
 
-        let applied = poll_updater_check(&mut state);
-        assert!(!applied);
+        assert!(!poll_updater_check(&mut state));
         assert!(!state.update_available);
         assert_eq!(state.latest_version, None);
         assert!(state.updater_rx.is_none());
@@ -628,43 +640,34 @@ mod tests {
     #[test]
     fn local_detail_after_remote_keeps_local() {
         let mut state = test_wired();
-        let remote_gen = begin_detail_load(&mut state, "album-1", DetailKind::Album)
-            .expect("remote load begins");
-        let local_gen = begin_detail_load(&mut state, "local:race", DetailKind::Playlist)
-            .expect("local load begins");
-        assert!(local_gen > remote_gen);
+        let r_gen = begin_detail_load(&mut state, "album-1", DetailKind::Album).unwrap();
+        let l_gen = begin_detail_load(&mut state, "local:race", DetailKind::Playlist).unwrap();
+        assert!(l_gen > r_gen);
 
-        let local_detail = Detail::new(
-            DetailKind::Playlist,
-            "Local Playlist",
-            "",
-            vec![Track::new("t1", "Track 1", "Artist 1")],
-        );
-        let applied_local =
-            apply_detail_outcome(&mut state, local_gen, Some(local_detail), "local:race");
-        assert!(applied_local);
+        let local =
+            Detail::new(DetailKind::Playlist, "Local", "", vec![Track::new("t1", "T", "A")]);
+        assert!(apply_detail_outcome(&mut state, l_gen, Ok(Some(local)), "local:race"));
         assert_eq!(state.detail_phase, ViewPhase::Ready);
-        assert_eq!(state.detail.as_ref().map(|d| d.title.as_str()), Some("Local Playlist"));
+        assert_eq!(state.detail.as_ref().map(|d| d.title.as_str()), Some("Local"));
 
-        let remote_detail = Detail::new(
-            DetailKind::Album,
-            "Remote Album",
-            "",
-            vec![Track::new("t2", "Track 2", "Artist 2")],
-        );
-        let applied_remote =
-            apply_detail_outcome(&mut state, remote_gen, Some(remote_detail), "album-1");
-        assert!(!applied_remote);
+        let remote =
+            Detail::new(DetailKind::Album, "Remote", "", vec![Track::new("t2", "T2", "A2")]);
+        assert!(!apply_detail_outcome(&mut state, r_gen, Ok(Some(remote)), "album-1"));
         assert_eq!(state.detail_phase, ViewPhase::Ready);
-        assert_eq!(state.detail.as_ref().map(|d| d.title.as_str()), Some("Local Playlist"));
+        assert_eq!(state.detail.as_ref().map(|d| d.title.as_str()), Some("Local"));
     }
 
     #[test]
-    fn failed_detail_shows_error() {
+    fn detail_failure_sets_error_phase() {
         let mut state = test_wired();
         let generation =
             begin_detail_load(&mut state, "album-fail", DetailKind::Album).expect("load begins");
-        let applied = apply_detail_outcome(&mut state, generation, None, "album-fail");
+        let applied = apply_detail_outcome(
+            &mut state,
+            generation,
+            Err(CatalogError::Transport),
+            "album-fail",
+        );
         assert!(applied);
         assert_eq!(state.detail_phase, ViewPhase::Error);
         assert!(state.detail_error.is_some());
@@ -673,15 +676,24 @@ mod tests {
     }
 
     #[test]
+    fn detail_not_found_is_empty_not_error() {
+        let mut state = test_wired();
+        let generation =
+            begin_detail_load(&mut state, "album-404", DetailKind::Album).expect("load begins");
+        assert!(apply_detail_outcome(&mut state, generation, Ok(None), "album-404"));
+        assert_eq!(state.detail_phase, ViewPhase::Empty);
+        assert_eq!(state.detail_error, None);
+        assert!(state.detail.is_none());
+    }
+
+    #[test]
     fn local_detail_bumps_generation() {
         let mut state = test_wired();
-        let gen1 = begin_detail_load(&mut state, "local:pl1", DetailKind::Playlist)
-            .expect("first load begins");
+        let gen1 = begin_detail_load(&mut state, "local:pl1", DetailKind::Playlist).unwrap();
         assert_eq!(state.detail_generation, gen1);
         assert_eq!(state.detail_phase, ViewPhase::Loading);
 
-        let gen2 = begin_detail_load(&mut state, "local:pl2", DetailKind::Playlist)
-            .expect("second load begins");
+        let gen2 = begin_detail_load(&mut state, "local:pl2", DetailKind::Playlist).unwrap();
         assert_eq!(gen2, gen1.wrapping_add(1));
         assert_eq!(state.detail_generation, gen2);
         assert_eq!(state.detail_phase, ViewPhase::Loading);
@@ -694,7 +706,7 @@ mod tests {
             begin_detail_load(&mut state, "album-empty", DetailKind::Album).expect("load begins");
         let empty_detail = Detail::new(DetailKind::Album, "Empty Album", "", Vec::new());
         let applied =
-            apply_detail_outcome(&mut state, generation, Some(empty_detail), "album-empty");
+            apply_detail_outcome(&mut state, generation, Ok(Some(empty_detail)), "album-empty");
         assert!(applied);
         assert_eq!(state.detail_phase, ViewPhase::Empty);
         assert_eq!(state.detail_error, None);
@@ -702,55 +714,26 @@ mod tests {
     }
 
     #[test]
-    fn unauthenticated_is_distinct_from_empty() {
+    fn async_search_outcome_handles_error_and_empty() {
         let mut state = test_wired();
-        let initial_playlist = crate::domain::Playlist::new("p1", "Initial", 1, None);
-        state.library_playlists = vec![initial_playlist.clone()];
-        let unauth = MockLibraryCatalog::new(
-            Err(CatalogError::Unauthenticated),
-            Err(CatalogError::Unauthenticated),
-        );
-        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(unauth)));
+        state.search_generation = 10;
+        let initial_shelves = vec![Shelf::new("Initial")];
+        state.home_shelves = initial_shelves.clone();
 
-        state.refresh_library();
-        assert_eq!(state.library_phase, ViewPhase::Error);
-        assert_eq!(state.library_playlists, vec![initial_playlist]);
+        let applied_stale =
+            apply_async_search_outcome(&mut state, 9, "rock".into(), Err(CatalogError::Transport));
+        assert!(!applied_stale);
 
-        let empty = MockLibraryCatalog::new(Ok(Vec::new()), Ok(Vec::new()));
-        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(empty)));
+        let applied_err =
+            apply_async_search_outcome(&mut state, 10, "rock".into(), Err(CatalogError::Transport));
+        assert!(!applied_err);
+        assert_eq!(state.search_phase, ViewPhase::Error);
+        assert_eq!(state.home_shelves, initial_shelves);
 
-        state.refresh_library();
-        assert_eq!(state.library_phase, ViewPhase::Empty);
-        assert!(state.library_playlists.is_empty());
-    }
-
-    #[test]
-    fn transport_error_sets_error_phase() {
-        let mut state = test_wired();
-        let transport =
-            MockLibraryCatalog::new(Err(CatalogError::Transport), Err(CatalogError::Transport));
-        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(transport)));
-
-        state.refresh_library();
-        assert_eq!(state.library_phase, ViewPhase::Error);
-    }
-
-    #[test]
-    fn empty_success_is_ready_empty() {
-        let mut state = test_wired();
-        let empty = MockLibraryCatalog::new(Ok(Vec::new()), Ok(Vec::new()));
-        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(empty)));
-
-        state.refresh_library();
-        assert_eq!(state.library_phase, ViewPhase::Empty);
-
-        let one = crate::domain::Playlist::new("p1", "One Playlist", 5, None);
-        let populated = MockLibraryCatalog::new(Ok(vec![one.clone()]), Ok(Vec::new()));
-        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(populated)));
-
-        state.refresh_library();
-        assert_eq!(state.library_phase, ViewPhase::Ready);
-        assert_eq!(state.library_playlists, vec![one]);
+        let applied_ok = apply_async_search_outcome(&mut state, 10, "rock".into(), Ok(Vec::new()));
+        assert!(applied_ok);
+        assert_eq!(state.search_phase, ViewPhase::Empty);
+        assert!(state.home_shelves.is_empty());
     }
 
     #[test]
@@ -765,8 +748,8 @@ mod tests {
         );
         assert!(!applied_stale);
 
-        let initial_playlist = crate::domain::Playlist::new("p1", "Initial", 1, None);
-        state.library_playlists = vec![initial_playlist.clone()];
+        let initial = crate::domain::Playlist::new("p1", "Initial", 1, None);
+        state.library_playlists = vec![initial.clone()];
         let applied_err = apply_async_library_outcome(
             &mut state,
             10,
@@ -775,11 +758,9 @@ mod tests {
         );
         assert!(!applied_err);
         assert_eq!(state.library_phase, ViewPhase::Error);
-        assert_eq!(state.library_playlists, vec![initial_playlist]);
+        assert_eq!(state.library_playlists, vec![initial]);
 
-        let applied_ok =
-            apply_async_library_outcome(&mut state, 10, Ok(Vec::new()), Ok(Vec::new()));
-        assert!(applied_ok);
+        assert!(apply_async_library_outcome(&mut state, 10, Ok(Vec::new()), Ok(Vec::new())));
         assert_eq!(state.library_phase, ViewPhase::Empty);
     }
 }

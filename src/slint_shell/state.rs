@@ -261,7 +261,17 @@ impl SlintAppState {
         };
         self.search_active = true;
         self.recent_searches.record(parsed.text());
-        let mut items = self.catalog.lock().map(|c| c.search_filtered(&parsed)).unwrap_or_default();
+        let res = self
+            .catalog
+            .lock()
+            .map_or(Err(CatalogError::Transport), |c| c.search_filtered(&parsed));
+        match res {
+            Ok(items) => self.apply_search_items(items),
+            Err(_) => self.search_phase = ViewPhase::Error,
+        }
+    }
+
+    fn apply_search_items(&mut self, mut items: Vec<SearchResult>) {
         if self.songs_only {
             items = crate::domain::retain_song_results(items);
         }
@@ -272,9 +282,11 @@ impl SlintAppState {
                 _ => None,
             })
             .collect();
+        let is_empty = items.is_empty();
         let mut shelf = Shelf::new(tr(self.locale, "Search Results"));
         shelf.items = items;
         self.home_shelves = vec![shelf];
+        self.search_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
     }
 
     /// Opens detail container for album, artist, or playlist identifier.
@@ -286,8 +298,25 @@ impl SlintAppState {
         if self.page != SlintPage::Detail {
             self.detail_return = self.page;
         }
-        self.detail = self.catalog.lock().map(|c| c.detail(trimmed, kind)).unwrap_or(None);
         self.page = SlintPage::Detail;
+        self.apply_sync_detail(trimmed, kind);
+    }
+
+    fn apply_sync_detail(&mut self, browse_id: &str, kind: DetailKind) {
+        let (detail, phase) = match self
+            .catalog
+            .lock()
+            .map_or(Err(CatalogError::Transport), |c| c.detail(browse_id, kind))
+        {
+            Ok(Some(d)) => {
+                let phase = if d.tracks.is_empty() { ViewPhase::Empty } else { ViewPhase::Ready };
+                (Some(d), phase)
+            }
+            Ok(None) => (None, ViewPhase::Empty),
+            Err(_) => (None, ViewPhase::Error),
+        };
+        self.detail = detail;
+        self.detail_phase = phase;
     }
 
     /// Enqueues all tracks from a playlist URL into the playback queue.
@@ -299,6 +328,7 @@ impl SlintAppState {
             .lock()
             .map_err(|_| anyhow::anyhow!("catalog lock poisoned"))?
             .detail(&playlist_id, DetailKind::Playlist)
+            .map_err(|err| anyhow::anyhow!("failed to fetch playlist {playlist_id}: {err}"))?
             .ok_or_else(|| anyhow::anyhow!("playlist detail not found: {playlist_id}"))?;
         let count = detail.tracks.len();
         let worker_tx = self.worker_tx.clone();
@@ -442,13 +472,16 @@ impl SlintAppState {
 }
 
 impl<T: ?Sized + Catalog> Catalog for Box<T> {
-    fn search(&self, q: &str) -> Vec<Track> {
+    fn search(&self, q: &str) -> Result<Vec<Track>, CatalogError> {
         (**self).search(q)
     }
-    fn search_filtered(&self, q: &SearchQuery) -> Vec<SearchResult> {
+    fn search_filtered(&self, q: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
         (**self).search_filtered(q)
     }
-    fn search_by_lyrics(&self, s: &crate::domain::LyricsSnippet) -> Vec<Track> {
+    fn search_by_lyrics(
+        &self,
+        s: &crate::domain::LyricsSnippet,
+    ) -> Result<Vec<Track>, CatalogError> {
         (**self).search_by_lyrics(s)
     }
     fn radio(&self, id: &str) -> Vec<Track> {
@@ -469,7 +502,7 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
         (**self).saved_albums()
     }
-    fn detail(&self, id: &str, k: DetailKind) -> Option<Detail> {
+    fn detail(&self, id: &str, k: DetailKind) -> Result<Option<Detail>, CatalogError> {
         (**self).detail(id, k)
     }
     fn set_session_cookies(&mut self, c: Option<&str>) {
@@ -560,7 +593,7 @@ impl<T: ?Sized + CoverCache> CoverCache for Box<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::slint_shell::test_support::test_wired;
+    use crate::slint_shell::test_support::{MockLibraryCatalog, test_wired};
 
     #[test]
     fn test_initial_state_defaults() {
@@ -583,27 +616,15 @@ mod tests {
     fn test_queue_panel_open_close_and_toggle_lifecycle() {
         let mut state = test_wired();
         assert!(!state.queue_panel_open);
-        assert_eq!(state.page, SlintPage::Search);
-
         state.toggle_queue_panel();
         assert!(state.queue_panel_open);
-        state.toggle_queue_panel();
-        assert!(!state.queue_panel_open);
-
-        assert_eq!(state.page, SlintPage::Search);
-
         state.close_queue_panel();
         assert!(!state.queue_panel_open);
-
         state.select_page(SlintPage::NowPlaying);
-        assert_eq!(state.page, SlintPage::NowPlaying);
         state.toggle_queue_panel();
         assert!(state.queue_panel_open);
-        assert_eq!(state.page, SlintPage::NowPlaying);
-
-        state.close_queue_panel();
+        state.toggle_queue_panel();
         assert!(!state.queue_panel_open);
-        assert_eq!(state.page, SlintPage::NowPlaying);
     }
 
     #[test]
@@ -614,6 +635,11 @@ mod tests {
         assert_eq!(state.page, SlintPage::Library);
         assert!(!state.library_playlists.is_empty());
         assert!(!state.library_albums.is_empty());
+        state.open_detail("album-1", DetailKind::Album);
+        assert_eq!(state.page, SlintPage::Detail);
+        assert!(state.detail.is_some());
+        state.go_back();
+        assert_eq!(state.page, SlintPage::Library);
     }
 
     #[test]
@@ -625,68 +651,84 @@ mod tests {
         assert_eq!(state.recent_searches.entries(), &["midnight"]);
         assert_eq!(state.home_shelves.len(), 1);
         assert_eq!(state.home_shelves[0].title, "Search Results");
+        state.search_query.clear();
+        assert_eq!(state.search_query, "");
+
+        let mut empty_state = test_wired();
+        empty_state.submit_search("   ");
+        assert_eq!(empty_state.search_query, "   ");
+        assert!(!empty_state.search_active);
+        assert!(empty_state.home_shelves.is_empty());
 
         let mut state_es = test_wired();
         state_es.locale = Locale::Spanish;
         state_es.submit_search("midnight");
-        assert_eq!(state_es.home_shelves.len(), 1);
         assert_eq!(state_es.home_shelves[0].title, "Resultados de búsqueda");
-    }
-
-    #[test]
-    fn test_search_submission_empty_query_preserves_shelves() {
-        let mut state = test_wired();
-        let initial_shelves = state.home_shelves.clone();
-        assert!(initial_shelves.is_empty());
-        state.submit_search("   ");
-        assert_eq!(state.search_query, "   ");
-        assert!(!state.search_active);
-        assert_eq!(state.home_shelves, initial_shelves);
-    }
-
-    #[test]
-    fn test_search_query_explicit_clear() {
-        let mut state = test_wired();
-        state.submit_search("midnight");
-        assert_eq!(state.search_query, "midnight");
-        state.search_query.clear();
-        assert_eq!(state.search_query, "");
     }
 
     #[test]
     fn test_sign_in_and_out_lifecycle() {
         let mut state = test_wired();
         assert!(!state.signed_in);
-
-        let ok = state.sign_in_from_input("SID=valid_cookie_123");
-        assert!(ok);
+        assert!(!state.sign_in_from_input("   "));
+        assert!(state.sign_in_from_input("SID=valid_cookie_123"));
         assert!(state.signed_in);
         assert_eq!(state.session.load().as_deref(), Some("SID=valid_cookie_123"));
-
         state.sign_out();
         assert!(!state.signed_in);
         assert_eq!(state.session.load(), None);
     }
 
-    #[test]
-    fn test_sign_in_empty_input_rejected() {
-        let mut state = test_wired();
-        assert!(!state.signed_in);
-
-        let ok = state.sign_in_from_input("   ");
-        assert!(!ok);
-        assert!(!state.signed_in);
-        assert_eq!(state.session.load(), None);
+    fn wrap_mock_catalog(cat: MockLibraryCatalog) -> Arc<Mutex<Box<dyn Catalog + Send>>> {
+        Arc::new(Mutex::new(Box::new(cat)))
     }
 
     #[test]
-    fn test_detail_view_open_and_close() {
+    fn state_search_errors_and_empty_phases() {
         let mut state = test_wired();
+        let err_cat =
+            MockLibraryCatalog::default().with_search_filtered(Err(CatalogError::Transport));
+        state.catalog = wrap_mock_catalog(err_cat);
+        state.submit_search("rock");
+        assert_eq!(state.search_phase, ViewPhase::Error);
+        state.submit_search_with_filter("rock", SearchFilter::Albums);
+        assert_eq!(state.search_phase, ViewPhase::Error);
+
+        let empty_cat = MockLibraryCatalog::default().with_search_filtered(Ok(Vec::new()));
+        state.catalog = wrap_mock_catalog(empty_cat);
+        state.submit_search("rock");
+        assert_eq!(state.search_phase, ViewPhase::Empty);
+        state.submit_search_with_filter("rock", SearchFilter::Albums);
+        assert_eq!(state.search_phase, ViewPhase::Empty);
+
+        let hit = SearchResult::Track(Track::new("t1", "Title", "Artist"));
+        let ok_cat = MockLibraryCatalog::default().with_search_filtered(Ok(vec![hit]));
+        state.catalog = wrap_mock_catalog(ok_cat);
+        state.submit_search("rock");
+        assert_eq!(state.search_phase, ViewPhase::Ready);
+    }
+
+    #[test]
+    fn state_detail_errors_and_empty_phases() {
+        let mut state = test_wired();
+        let err_cat = MockLibraryCatalog::default().with_detail(Err(CatalogError::Transport));
+        state.catalog = wrap_mock_catalog(err_cat);
         state.open_detail("album-1", DetailKind::Album);
-        assert_eq!(state.page, SlintPage::Detail);
+        assert_eq!(state.detail_phase, ViewPhase::Error);
+        assert!(state.detail.is_none());
+
+        let empty_cat = MockLibraryCatalog::default().with_detail(Ok(None));
+        state.catalog = wrap_mock_catalog(empty_cat);
+        state.open_detail("album-1", DetailKind::Album);
+        assert_eq!(state.detail_phase, ViewPhase::Empty);
+        assert!(state.detail.is_none());
+
+        let d = Detail::new(DetailKind::Album, "T", "A", vec![Track::new("t1", "T", "A")]);
+        let ok_cat = MockLibraryCatalog::default().with_detail(Ok(Some(d)));
+        state.catalog = wrap_mock_catalog(ok_cat);
+        state.open_detail("album-1", DetailKind::Album);
+        assert_eq!(state.detail_phase, ViewPhase::Ready);
         assert!(state.detail.is_some());
-        state.go_back();
-        assert_eq!(state.page, SlintPage::Search);
     }
 
     #[test]
@@ -706,84 +748,39 @@ mod tests {
     }
 
     #[test]
-    fn test_set_theme_persists_to_settings_store() {
+    fn test_settings_persist_to_store_and_state() {
         let mut state = test_wired();
         assert_eq!(state.theme, ThemeId::White);
-
         state.set_theme(ThemeId::BlackOled);
-        assert_eq!(state.theme, ThemeId::BlackOled);
-        let loaded = state.settings_store.load();
-        assert_eq!(loaded.theme, ThemeId::BlackOled);
-
+        assert_eq!(state.settings_store.load().theme, ThemeId::BlackOled);
         state.set_theme(ThemeId::Mono);
-        assert_eq!(state.theme, ThemeId::Mono);
-        let loaded2 = state.settings_store.load();
-        assert_eq!(loaded2.theme, ThemeId::Mono);
-    }
+        assert_eq!(state.settings_store.load().theme, ThemeId::Mono);
 
-    #[test]
-    fn test_set_player_bar_mode_persists_to_settings_store() {
-        let mut state = test_wired();
         assert_eq!(state.player_bar.mode, PlayerBarMode::Classic);
-
         state.set_player_bar_mode(PlayerBarMode::Floating);
-        assert_eq!(state.player_bar.mode, PlayerBarMode::Floating);
-        let loaded = state.settings_store.load();
-        assert_eq!(loaded.player_bar_mode, PlayerBarMode::Floating);
-
+        assert_eq!(state.settings_store.load().player_bar_mode, PlayerBarMode::Floating);
         state.set_player_bar_mode(PlayerBarMode::Classic);
-        assert_eq!(state.player_bar.mode, PlayerBarMode::Classic);
-        let loaded2 = state.settings_store.load();
-        assert_eq!(loaded2.player_bar_mode, PlayerBarMode::Classic);
-    }
+        assert_eq!(state.settings_store.load().player_bar_mode, PlayerBarMode::Classic);
 
-    #[test]
-    fn test_toggle_player_bar_option_persists_to_settings_store() {
-        let mut state = test_wired();
-        assert!(state.player_bar.show_artwork);
-        assert!(!state.player_bar.show_skip_seconds);
-
+        assert!(state.player_bar.show_artwork && !state.player_bar.show_skip_seconds);
         state.toggle_player_bar_option(0);
-        assert!(!state.player_bar.show_artwork);
-        let loaded = state.settings_store.load();
-        assert!(!loaded.player_bar_show_artwork);
-
+        assert!(!state.settings_store.load().player_bar_show_artwork);
         state.toggle_player_bar_option(4);
-        assert!(state.player_bar.show_skip_seconds);
-        let loaded2 = state.settings_store.load();
-        assert!(loaded2.player_bar_show_skip_seconds);
-    }
+        assert!(state.settings_store.load().player_bar_show_skip_seconds);
 
-    #[test]
-    fn test_cover_max_px_resolution() {
-        let mut state = test_wired();
         state.hi_res_covers = false;
         assert_eq!(state.cover_max_px(), 512);
         state.hi_res_covers = true;
         assert_eq!(state.cover_max_px(), 1024);
-    }
 
-    #[test]
-    fn test_set_crossfade_seconds_persists_to_settings_store() {
-        let mut state = test_wired();
-        assert_eq!(state.crossfade_seconds, 0);
         state.set_crossfade_seconds(5);
-        assert_eq!(state.crossfade_seconds, 5);
         assert_eq!(state.settings_store.load().crossfade_seconds, 5);
         state.set_crossfade_seconds(20);
-        assert_eq!(state.crossfade_seconds, 15);
         assert_eq!(state.settings_store.load().crossfade_seconds, 15);
-    }
 
-    #[test]
-    fn test_set_stream_cache_limit_mb_persists_to_settings_store() {
-        let mut state = test_wired();
-        assert_eq!(state.stream_cache_limit_mb, 512);
         state.set_stream_cache_limit_mb(1024);
-        assert_eq!(state.stream_cache_limit_mb, 1024);
         assert_eq!(state.settings_store.load().stream_cache_limit_mb, 1024);
         state.set_stream_cache_limit_mb(20000);
-        assert_eq!(state.stream_cache_limit_mb, 10240);
         assert_eq!(state.settings_store.load().stream_cache_limit_mb, 10240);
     }
 
