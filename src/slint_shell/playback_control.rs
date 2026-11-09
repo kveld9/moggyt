@@ -383,7 +383,7 @@ mod tests {
     use crate::domain::{PlaybackPhase, SkipRanges, SkipSegment, Track};
     use crate::infra::SkipStore;
     use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
-    use crate::slint_shell::test_support::{EndedAudio, test_wired};
+    use crate::slint_shell::test_support::{EndedAudio, MockLibraryCatalog, test_wired};
 
     #[derive(Debug)]
     struct CountingSkipStore {
@@ -538,47 +538,18 @@ mod tests {
         assert!(!state.settings_store.load().songs_only);
     }
 
-    #[derive(Debug, Default)]
-    struct RadioVideoCatalog;
-
-    impl Catalog for RadioVideoCatalog {
-        fn search(&self, _: &str) -> Vec<Track> {
-            Vec::new()
-        }
-        fn search_filtered(
-            &self,
-            _: &crate::domain::SearchQuery,
-        ) -> Vec<crate::domain::SearchResult> {
-            Vec::new()
-        }
-        fn radio(&self, _: &str) -> Vec<Track> {
-            vec![
-                Track::new("vid-omv", "OMV Track", "Artist")
-                    .with_duration(180)
-                    .with_video_type(crate::domain::MusicVideoType::Omv),
-                Track::new("song-atv", "ATV Track", "Artist")
-                    .with_duration(200)
-                    .with_video_type(crate::domain::MusicVideoType::Atv),
-            ]
-        }
-        fn home_shelves(&self) -> Vec<crate::domain::Shelf> {
-            Vec::new()
-        }
-        fn playlists(&self) -> Result<Vec<crate::domain::Playlist>, crate::infra::CatalogError> {
-            Ok(Vec::new())
-        }
-        fn saved_albums(&self) -> Result<Vec<crate::domain::Album>, crate::infra::CatalogError> {
-            Ok(Vec::new())
-        }
-        fn detail(&self, _: &str, _: crate::domain::DetailKind) -> Option<crate::domain::Detail> {
-            None
-        }
-    }
-
     #[test]
     fn test_continue_autoplay_if_ended_filters_video_recommendations_when_songs_only() {
         let mut state = test_wired();
-        state.catalog = Arc::new(Mutex::new(Box::new(RadioVideoCatalog)));
+        let catalog = MockLibraryCatalog::default().with_radio(vec![
+            Track::new("vid-omv", "OMV Track", "Artist")
+                .with_duration(180)
+                .with_video_type(crate::domain::MusicVideoType::Omv),
+            Track::new("song-atv", "ATV Track", "Artist")
+                .with_duration(200)
+                .with_video_type(crate::domain::MusicVideoType::Atv),
+        ]);
+        state.catalog = Arc::new(Mutex::new(Box::new(catalog)));
         state.autoplay = true;
         state.songs_only = true;
 

@@ -51,12 +51,12 @@ impl LocaleTrackingCatalog {
 }
 
 impl Catalog for LocaleTrackingCatalog {
-    fn search(&self, _query: &str) -> Vec<Track> {
-        Vec::new()
+    fn search(&self, _query: &str) -> Result<Vec<Track>, CatalogError> {
+        Ok(Vec::new())
     }
 
-    fn search_filtered(&self, _query: &SearchQuery) -> Vec<SearchResult> {
-        Vec::new()
+    fn search_filtered(&self, _query: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
+        Ok(Vec::new())
     }
 
     fn radio(&self, _track_id: &str) -> Vec<Track> {
@@ -81,8 +81,8 @@ impl Catalog for LocaleTrackingCatalog {
         Ok(Vec::new())
     }
 
-    fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Option<Detail> {
-        None
+    fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
+        Ok(None)
     }
 
     fn set_locale(&mut self, locale: Locale) {
@@ -96,11 +96,22 @@ impl Catalog for LocaleTrackingCatalog {
 pub struct MockLibraryCatalog {
     pub playlists_res: Result<Vec<Playlist>, CatalogError>,
     pub albums_res: Result<Vec<Album>, CatalogError>,
+    pub search_res: Result<Vec<Track>, CatalogError>,
+    pub search_filtered_res: Result<Vec<SearchResult>, CatalogError>,
+    pub detail_res: Result<Option<Detail>, CatalogError>,
+    pub radio_res: Vec<Track>,
 }
 
 impl Default for MockLibraryCatalog {
     fn default() -> Self {
-        Self { playlists_res: Ok(Vec::new()), albums_res: Ok(Vec::new()) }
+        Self {
+            playlists_res: Ok(Vec::new()),
+            albums_res: Ok(Vec::new()),
+            search_res: Ok(Vec::new()),
+            search_filtered_res: Ok(Vec::new()),
+            detail_res: Ok(None),
+            radio_res: Vec::new(),
+        }
     }
 }
 
@@ -109,19 +120,46 @@ impl MockLibraryCatalog {
         playlists: Result<Vec<Playlist>, CatalogError>,
         albums: Result<Vec<Album>, CatalogError>,
     ) -> Self {
-        Self { playlists_res: playlists, albums_res: albums }
+        Self {
+            playlists_res: playlists,
+            albums_res: albums,
+            search_res: Ok(Vec::new()),
+            search_filtered_res: Ok(Vec::new()),
+            detail_res: Ok(None),
+            radio_res: Vec::new(),
+        }
+    }
+
+    pub fn with_search(mut self, res: Result<Vec<Track>, CatalogError>) -> Self {
+        self.search_res = res;
+        self
+    }
+
+    pub fn with_search_filtered(mut self, res: Result<Vec<SearchResult>, CatalogError>) -> Self {
+        self.search_filtered_res = res;
+        self
+    }
+
+    pub fn with_detail(mut self, res: Result<Option<Detail>, CatalogError>) -> Self {
+        self.detail_res = res;
+        self
+    }
+
+    pub fn with_radio(mut self, tracks: Vec<Track>) -> Self {
+        self.radio_res = tracks;
+        self
     }
 }
 
 impl Catalog for MockLibraryCatalog {
-    fn search(&self, _: &str) -> Vec<Track> {
-        Vec::new()
+    fn search(&self, _: &str) -> Result<Vec<Track>, CatalogError> {
+        self.search_res.clone()
     }
-    fn search_filtered(&self, _: &SearchQuery) -> Vec<SearchResult> {
-        Vec::new()
+    fn search_filtered(&self, _: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
+        self.search_filtered_res.clone()
     }
     fn radio(&self, _: &str) -> Vec<Track> {
-        Vec::new()
+        self.radio_res.clone()
     }
     fn home_shelves(&self) -> Vec<Shelf> {
         Vec::new()
@@ -132,8 +170,8 @@ impl Catalog for MockLibraryCatalog {
     fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
         self.albums_res.clone()
     }
-    fn detail(&self, _: &str, _: DetailKind) -> Option<Detail> {
-        None
+    fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
+        self.detail_res.clone()
     }
 }
 

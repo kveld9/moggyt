@@ -118,16 +118,16 @@ impl CatalogStub {
 }
 
 impl Catalog for CatalogStub {
-    fn search(&self, query: &str) -> Vec<Track> {
-        Self::fixed_hits(query)
+    fn search(&self, query: &str) -> Result<Vec<Track>, CatalogError> {
+        Ok(Self::fixed_hits(query))
     }
 
-    fn search_by_lyrics(&self, snippet: &LyricsSnippet) -> Vec<Track> {
-        Self::stub_lyrics_hits(snippet.as_str())
+    fn search_by_lyrics(&self, snippet: &LyricsSnippet) -> Result<Vec<Track>, CatalogError> {
+        Ok(Self::stub_lyrics_hits(snippet.as_str()))
     }
 
-    fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
-        match query.filter() {
+    fn search_filtered(&self, query: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
+        let results = match query.filter() {
             SearchFilter::All => vec![
                 SearchResult::Track(
                     Track::new("stub-1", query.text(), "Stub Artist")
@@ -143,7 +143,8 @@ impl Catalog for CatalogStub {
             SearchFilter::Albums => vec![SearchResult::Album(Self::stub_album())],
             SearchFilter::Artists => vec![SearchResult::Artist(Self::stub_artist())],
             SearchFilter::Playlists => vec![SearchResult::Playlist(Self::stub_playlist())],
-        }
+        };
+        Ok(results)
     }
 
     fn radio(&self, seed_track_id: &str) -> Vec<Track> {
@@ -182,10 +183,10 @@ impl Catalog for CatalogStub {
         Ok(vec![Self::stub_album()])
     }
 
-    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         let trimmed = browse_id.trim();
         if trimmed.is_empty() {
-            return None;
+            return Ok(None);
         }
         let tracks = vec![
             Track::new(&format!("{trimmed}-1"), &format!("{trimmed} Track 1"), "Stub Artist")
@@ -194,7 +195,7 @@ impl Catalog for CatalogStub {
             Track::new(&format!("{trimmed}-2"), &format!("{trimmed} Track 2"), "Stub Artist")
                 .with_duration(210),
         ];
-        Some(Detail::new(kind, &format!("{trimmed} Title"), "Stub Subtitle", tracks))
+        Ok(Some(Detail::new(kind, &format!("{trimmed} Title"), "Stub Subtitle", tracks)))
     }
 
     fn set_session_cookies(&mut self, cookies: Option<&str>) {
@@ -210,7 +211,7 @@ mod tests {
     #[test]
     fn stub_returns_deterministic_hits() {
         let catalog = CatalogStub::new();
-        let hits = catalog.search("midnight");
+        let hits = catalog.search("midnight").expect("search hits");
         assert_eq!(hits.len(), 2);
         assert_eq!(hits[0].title, "midnight");
         assert_eq!(hits[0].artwork.as_deref(), Some(STUB_ARTWORK_URL));
@@ -221,8 +222,8 @@ mod tests {
     fn stub_search_filtered_respects_filter_and_is_deterministic() {
         let catalog = CatalogStub::new();
         let query_all = SearchQuery::parse("echoed").expect("valid query");
-        let first_all = catalog.search_filtered(&query_all);
-        let second_all = catalog.search_filtered(&query_all);
+        let first_all = catalog.search_filtered(&query_all).expect("first search");
+        let second_all = catalog.search_filtered(&query_all).expect("second search");
         assert_eq!(first_all, second_all);
         assert_eq!(first_all.len(), 4);
         assert_eq!(
@@ -241,12 +242,12 @@ mod tests {
 
         for (filter, expected_count) in cases {
             let query = SearchQuery::parse("echoed").expect("valid query").with_filter(filter);
-            let hits = catalog.search_filtered(&query);
+            let hits = catalog.search_filtered(&query).expect("filtered hits");
             assert_eq!(hits.len(), expected_count);
             assert!(hits.iter().all(|item| item.kind() == filter));
         }
 
-        let legacy_hits = catalog.search("echoed");
+        let legacy_hits = catalog.search("echoed").expect("legacy hits");
         assert_eq!(legacy_hits.len(), 2);
         assert_eq!(legacy_hits[0].title, "echoed");
     }
@@ -318,8 +319,8 @@ mod tests {
     fn stub_detail_determinism_per_kind_and_blank_none() {
         let catalog = CatalogStub::new();
         for kind in [DetailKind::Album, DetailKind::Artist, DetailKind::Playlist] {
-            let first = catalog.detail("browse-123", kind);
-            let second = catalog.detail("browse-123", kind);
+            let first = catalog.detail("browse-123", kind).expect("first detail");
+            let second = catalog.detail("browse-123", kind).expect("second detail");
             assert_eq!(first, second, "stub detail must be deterministic");
             let detail = first.expect("expected detail");
             assert_eq!(detail.kind, kind);
@@ -333,8 +334,8 @@ mod tests {
             assert_eq!(detail.tracks[1].duration_secs, Some(210));
         }
 
-        assert_eq!(catalog.detail("", DetailKind::Album), None);
-        assert_eq!(catalog.detail("   ", DetailKind::Album), None);
+        assert_eq!(catalog.detail("", DetailKind::Album), Ok(None));
+        assert_eq!(catalog.detail("   ", DetailKind::Album), Ok(None));
     }
 
     #[test]
@@ -353,22 +354,28 @@ mod tests {
     fn stub_matches_lyric_substring_and_misses_on_unrelated_text() {
         let catalog = CatalogStub::new();
 
-        let hit1 = catalog.search_by_lyrics(&LyricsSnippet::parse("midnight breeze").unwrap());
+        let hit1 = catalog
+            .search_by_lyrics(&LyricsSnippet::parse("midnight breeze").unwrap())
+            .expect("lyric search 1");
         assert_eq!(hit1.len(), 1);
         assert_eq!(hit1[0].id, "stub-1");
         assert_eq!(hit1[0].title, "Midnight City");
         assert_eq!(hit1[0].artwork.as_deref(), Some(STUB_ARTWORK_URL));
 
         // Case-insensitive substring match
-        let hit2 = catalog.search_by_lyrics(&LyricsSnippet::parse("WHISPER SOFTLY").unwrap());
+        let hit2 = catalog
+            .search_by_lyrics(&LyricsSnippet::parse("WHISPER SOFTLY").unwrap())
+            .expect("lyric search 2");
         assert_eq!(hit2.len(), 1);
         assert_eq!(hit2[0].id, "stub-2");
         assert_eq!(hit2[0].title, "Echoes of Silence");
 
         // Unrelated query returns empty vec
-        let misses = catalog.search_by_lyrics(
-            &LyricsSnippet::parse("completely unrelated lyrics not in index").unwrap(),
-        );
+        let misses = catalog
+            .search_by_lyrics(
+                &LyricsSnippet::parse("completely unrelated lyrics not in index").unwrap(),
+            )
+            .expect("unrelated search");
         assert!(misses.is_empty());
     }
 

@@ -2,7 +2,7 @@
 
 use super::catalog::{Catalog, CatalogError};
 use super::catalog_client::{
-    CatalogClient, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
+    CatalogClient, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits,
 };
 use crate::domain::{
     Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf,
@@ -52,12 +52,6 @@ impl LiveCatalog {
         self.client.is_authenticated()
     }
 
-    fn fetch_hits(&self, query: &SearchQuery) -> SearchHits {
-        self.client
-            .search_payload_filtered(query)
-            .map_or_else(|_| SearchHits::empty(), |p| parse_search_all(&p))
-    }
-
     /// Maps search hits into domain search results according to the requested filter.
     pub fn map_hits(hits: SearchHits, filter: SearchFilter) -> Vec<SearchResult> {
         match filter {
@@ -74,7 +68,7 @@ impl LiveCatalog {
     }
 }
 
-fn raw_to_track(raw: RawTrack) -> Track {
+pub(crate) fn raw_to_track(raw: RawTrack) -> Track {
     let mut track = Track::new(&raw.video_id, &raw.title, &raw.artist);
     if let Some(dur) = raw.duration_secs {
         track = track.with_duration(dur);
@@ -111,14 +105,14 @@ fn map_playlists(playlists: Vec<RawPlaylist>) -> impl Iterator<Item = SearchResu
 }
 
 impl Catalog for LiveCatalog {
-    /// Returns catalog hits for `query`. Network failures map to an empty vector.
-    fn search(&self, query: &str) -> Vec<Track> {
-        self.client.search_tracks(query).unwrap_or_default().into_iter().map(raw_to_track).collect()
+    /// Returns catalog hits for `query`.
+    fn search(&self, query: &str) -> Result<Vec<Track>, CatalogError> {
+        self.client.search(query)
     }
 
-    /// Returns catalog hits matching the query text and filter. Network failures map to an empty vector.
-    fn search_filtered(&self, query: &SearchQuery) -> Vec<SearchResult> {
-        Self::map_hits(self.fetch_hits(query), query.filter())
+    /// Returns catalog hits matching the query text and filter.
+    fn search_filtered(&self, query: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
+        self.client.search_filtered(query)
     }
 
     /// Returns radio continuation tracks seeded by `seed_track_id`. Network failures map to an empty vector.
@@ -155,13 +149,9 @@ impl Catalog for LiveCatalog {
         self.client.library_saved_albums()
     }
 
-    /// Returns detail view for `browse_id` and `kind`. Network failures map to None.
-    fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
-        let trimmed = browse_id.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-        self.client.detail(trimmed, kind)
+    /// Returns detail view for `browse_id` and `kind`.
+    fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
+        self.client.detail(browse_id, kind)
     }
 
     fn set_session_cookies(&mut self, cookies: Option<&str>) {
@@ -311,9 +301,9 @@ mod tests {
     #[test]
     fn live_catalog_detail_blank_returns_none() {
         let catalog = LiveCatalog::new();
-        assert_eq!(catalog.detail("", DetailKind::Album), None);
-        assert_eq!(catalog.detail("   ", DetailKind::Artist), None);
-        assert_eq!(catalog.detail("   ", DetailKind::Playlist), None);
+        assert_eq!(catalog.detail("", DetailKind::Album), Ok(None));
+        assert_eq!(catalog.detail("   ", DetailKind::Artist), Ok(None));
+        assert_eq!(catalog.detail("   ", DetailKind::Playlist), Ok(None));
     }
 
     #[test]

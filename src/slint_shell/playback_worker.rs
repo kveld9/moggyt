@@ -302,14 +302,18 @@ pub fn execute_search<C: Catalog>(
     catalog: &Arc<Mutex<C>>,
     locale: Locale,
     songs_only: bool,
-) -> (u64, String, Vec<Shelf>) {
-    let mut items = catalog.lock().map(|c| c.search_filtered(query)).unwrap_or_default();
-    if songs_only {
-        items = crate::domain::retain_song_results(items);
-    }
-    let mut shelf = Shelf::new(tr(locale, "Search Results"));
-    shelf.items = items;
-    (generation, query.text().to_string(), vec![shelf])
+) -> (u64, String, Result<Vec<Shelf>, CatalogError>) {
+    let res =
+        catalog.lock().map_err(|_| CatalogError::Transport).and_then(|c| c.search_filtered(query));
+    let shelves = res.map(|mut items| {
+        if songs_only {
+            items = crate::domain::retain_song_results(items);
+        }
+        let mut shelf = Shelf::new(tr(locale, "Search Results"));
+        shelf.items = items;
+        vec![shelf]
+    });
+    (generation, query.text().to_string(), shelves)
 }
 
 /// Executes blocking detail lookup off the UI thread.
@@ -318,13 +322,14 @@ pub fn execute_detail<C: Catalog>(
     browse_id: &str,
     kind: DetailKind,
     catalog: &Arc<Mutex<C>>,
-) -> (u64, Option<Detail>) {
+) -> (u64, Result<Option<Detail>, CatalogError>) {
     let trimmed = browse_id.trim();
     if trimmed.is_empty() {
-        return (generation, None);
+        return (generation, Ok(None));
     }
-    let detail = catalog.lock().map(|c| c.detail(trimmed, kind)).unwrap_or(None);
-    (generation, detail)
+    let res =
+        catalog.lock().map_err(|_| CatalogError::Transport).and_then(|c| c.detail(trimmed, kind));
+    (generation, res)
 }
 
 type PlaylistResult = Result<Vec<crate::domain::Playlist>, CatalogError>;
@@ -424,6 +429,7 @@ mod tests {
         });
 
         let (generation, query, shelves) = handle.join().expect("thread join succeeds");
+        let shelves = shelves.expect("shelves ok");
         assert_eq!(generation, 42);
         assert_eq!(query, "rock");
         assert_eq!(shelves.len(), 1);
@@ -433,12 +439,14 @@ mod tests {
         let handle_es =
             std::thread::spawn(move || execute_search(43, &q, &cat_es, Locale::Spanish, false));
         let (_, _, shelves_es) = handle_es.join().expect("thread join succeeds");
+        let shelves_es = shelves_es.expect("shelves_es ok");
         assert_eq!(shelves_es[0].title, "Resultados de búsqueda");
 
         let q_albums =
             SearchQuery::parse("rock").expect("valid query").with_filter(SearchFilter::Albums);
         let (_, _, shelves_albums) =
             execute_search(44, &q_albums, &catalog, Locale::English, false);
+        let shelves_albums = shelves_albums.expect("shelves_albums ok");
         assert_eq!(shelves_albums[0].items.len(), 1);
         assert_eq!(shelves_albums[0].items[0].kind(), SearchFilter::Albums);
     }
@@ -447,11 +455,14 @@ mod tests {
     struct VideoTrackSearchCatalog;
 
     impl Catalog for VideoTrackSearchCatalog {
-        fn search(&self, _: &str) -> Vec<crate::domain::Track> {
-            Vec::new()
+        fn search(&self, _: &str) -> Result<Vec<crate::domain::Track>, CatalogError> {
+            Ok(Vec::new())
         }
-        fn search_filtered(&self, _: &SearchQuery) -> Vec<crate::domain::SearchResult> {
-            vec![
+        fn search_filtered(
+            &self,
+            _: &SearchQuery,
+        ) -> Result<Vec<crate::domain::SearchResult>, CatalogError> {
+            Ok(vec![
                 crate::domain::SearchResult::Track(
                     crate::domain::Track::new("t1", "Video", "Artist")
                         .with_video_type(crate::domain::MusicVideoType::Omv),
@@ -460,7 +471,7 @@ mod tests {
                     crate::domain::Track::new("t2", "Song", "Artist")
                         .with_video_type(crate::domain::MusicVideoType::Atv),
                 ),
-            ]
+            ])
         }
         fn radio(&self, _: &str) -> Vec<crate::domain::Track> {
             Vec::new()
@@ -474,8 +485,8 @@ mod tests {
         fn saved_albums(&self) -> Result<Vec<crate::domain::Album>, CatalogError> {
             Ok(Vec::new())
         }
-        fn detail(&self, _: &str, _: DetailKind) -> Option<Detail> {
-            None
+        fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
+            Ok(None)
         }
     }
 
@@ -484,6 +495,7 @@ mod tests {
         let catalog = Arc::new(Mutex::new(VideoTrackSearchCatalog));
         let q = SearchQuery::parse("query").expect("valid query");
         let (_, _, shelves) = execute_search(1, &q, &catalog, Locale::English, true);
+        let shelves = shelves.expect("shelves ok");
         assert_eq!(shelves.len(), 1);
         assert_eq!(shelves[0].items.len(), 1);
         match &shelves[0].items[0] {
@@ -495,16 +507,19 @@ mod tests {
     struct BadgeVideoSearchCatalog;
 
     impl Catalog for BadgeVideoSearchCatalog {
-        fn search(&self, _: &str) -> Vec<crate::domain::Track> {
-            Vec::new()
+        fn search(&self, _: &str) -> Result<Vec<crate::domain::Track>, CatalogError> {
+            Ok(Vec::new())
         }
-        fn search_filtered(&self, _: &SearchQuery) -> Vec<crate::domain::SearchResult> {
+        fn search_filtered(
+            &self,
+            _: &SearchQuery,
+        ) -> Result<Vec<crate::domain::SearchResult>, CatalogError> {
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("tests/fixtures/catalog_search_badges.json");
             let raw = std::fs::read_to_string(path).expect("fixture readable");
             let payload: serde_json::Value = serde_json::from_str(&raw).expect("fixture json");
             let hits = crate::infra::catalog_parse_search::parse_search_all(&payload);
-            crate::infra::LiveCatalog::map_hits(hits, crate::domain::SearchFilter::All)
+            Ok(crate::infra::LiveCatalog::map_hits(hits, crate::domain::SearchFilter::All))
         }
         fn radio(&self, _: &str) -> Vec<crate::domain::Track> {
             Vec::new()
@@ -518,8 +533,8 @@ mod tests {
         fn saved_albums(&self) -> Result<Vec<crate::domain::Album>, CatalogError> {
             Ok(Vec::new())
         }
-        fn detail(&self, _: &str, _: DetailKind) -> Option<Detail> {
-            None
+        fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
+            Ok(None)
         }
     }
 
@@ -529,6 +544,8 @@ mod tests {
         let q = SearchQuery::parse("bachata").expect("valid query");
         let (_, _, unfiltered) = execute_search(1, &q, &catalog, Locale::English, false);
         let (_, _, filtered) = execute_search(1, &q, &catalog, Locale::English, true);
+        let unfiltered = unfiltered.expect("unfiltered ok");
+        let filtered = filtered.expect("filtered ok");
 
         let contains_video = |shelves: &[Shelf]| {
             shelves.iter().flat_map(|s| &s.items).any(|item| match item {
@@ -550,6 +567,7 @@ mod tests {
             std::thread::spawn(move || execute_detail(7, "album-1", DetailKind::Album, &cat_clone));
 
         let (generation, detail) = handle.join().expect("thread join succeeds");
+        let detail = detail.expect("detail ok");
         assert_eq!(generation, 7);
         assert!(detail.is_some());
         assert_eq!(detail.unwrap().title, "album-1 Title");

@@ -1,19 +1,21 @@
 //! HTTP client implementation for YouTube Music catalog endpoints.
 
 use super::catalog::CatalogError;
+use super::catalog_client::parse_search_all;
+use super::catalog_live::{LiveCatalog, raw_to_track};
 use super::catalog_model::{RawTrack, SearchHits};
 use super::catalog_parse_detail::parse_detail_all;
 use super::catalog_parse_explore::parse_explore_all;
 use super::catalog_parse_home::parse_home_all;
 use super::catalog_parse_library::{parse_library_albums, parse_library_playlists};
 use super::catalog_parse_radio::parse_radio_all;
-use super::catalog_parse_search::{parse_search_all, parse_search_tracks};
+use super::catalog_parse_search::parse_search_tracks;
 use super::catalog_requests::{
     CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
     LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_body_with_params,
     browse_url, next_body, next_url, search_body, search_body_with_params, search_filter_params,
 };
-use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, Shelf};
+use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
 use crate::i18n::Locale;
 use serde_json::Value;
 use std::time::Duration;
@@ -57,6 +59,26 @@ fn has_library_section(value: &Value) -> bool {
 
 fn validate_library_result<T>(items: Vec<T>, payload: &Value) -> Result<Vec<T>, CatalogError> {
     if !items.is_empty() || has_library_section(payload) {
+        Ok(items)
+    } else {
+        Err(CatalogError::Malformed)
+    }
+}
+
+fn has_search_section(value: &Value) -> bool {
+    const CANDIDATES: &[&str] = &[
+        "/contents/tabbedSearchResultsRenderer",
+        "/tabbedSearchResultsRenderer",
+        "/contents/sectionListRenderer",
+        "/sectionListRenderer",
+        "/musicShelfRenderer",
+        "/itemSectionRenderer",
+    ];
+    CANDIDATES.iter().any(|path| value.pointer(path).is_some())
+}
+
+fn validate_search_result<T>(items: Vec<T>, payload: &Value) -> Result<Vec<T>, CatalogError> {
+    if !items.is_empty() || has_search_section(payload) {
         Ok(items)
     } else {
         Err(CatalogError::Malformed)
@@ -135,6 +157,22 @@ impl CatalogClient {
     }
 
     /// Performs search for `query` and returns parsed tracks.
+    pub fn search(&self, query: &str) -> Result<Vec<Track>, CatalogError> {
+        let payload = self.search_payload(query).map_err(|_| CatalogError::Transport)?;
+        let tracks: Vec<Track> =
+            parse_search_tracks(&payload).into_iter().map(raw_to_track).collect();
+        validate_search_result(tracks, &payload)
+    }
+
+    /// Performs filtered search and returns domain search results.
+    pub fn search_filtered(&self, query: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
+        let payload = self.search_payload_filtered(query).map_err(|_| CatalogError::Transport)?;
+        let hits = parse_search_all(&payload);
+        let results = LiveCatalog::map_hits(hits, query.filter());
+        validate_search_result(results, &payload)
+    }
+
+    /// Performs search for `query` and returns parsed raw tracks.
     pub fn search_tracks(&self, query: &str) -> anyhow::Result<Vec<RawTrack>> {
         let payload = self.search_payload(query)?;
         Ok(parse_search_tracks(&payload))
@@ -223,14 +261,20 @@ impl CatalogClient {
     }
 
     /// Queries the browse endpoint for `browse_id` and returns parsed detail view of `kind`.
-    /// Returns `None` on blank id, network error, or parse failure.
-    pub fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
+    pub fn detail(
+        &self,
+        browse_id: &str,
+        kind: DetailKind,
+    ) -> Result<Option<Detail>, CatalogError> {
         let trimmed = browse_id.trim();
         if trimmed.is_empty() {
-            return None;
+            return Ok(None);
         }
-        let payload = self.detail_payload(trimmed).ok()?;
-        parse_detail_all(&payload, kind)
+        if trimmed == HISTORY_BROWSE_ID && !self.is_authenticated() {
+            return Err(CatalogError::Unauthenticated);
+        }
+        let payload = self.detail_payload(trimmed).map_err(|_| CatalogError::Transport)?;
+        parse_detail_all(&payload, kind).map(Some).ok_or(CatalogError::Malformed)
     }
 
     /// Executes authenticated browse request for `browse_id`.
@@ -273,7 +317,7 @@ impl CatalogClient {
         validate_library_result(albums, &payload)
     }
 
-    /// Converts this catalog API client into a [`LiveCatalog`](super::catalog_live::LiveCatalog) adapter.
+    /// Converts this catalog API client into a [`LiveCatalog`] adapter.
     pub fn into_catalog(self) -> super::catalog_live::LiveCatalog {
         super::catalog_live::LiveCatalog::with_client(self)
     }
@@ -292,8 +336,8 @@ mod tests {
     #[test]
     fn catalog_client_detail_blank_id_returns_none() {
         let client = CatalogClient::new();
-        assert_eq!(client.detail("", DetailKind::Album), None);
-        assert_eq!(client.detail("   ", DetailKind::Artist), None);
+        assert_eq!(client.detail("", DetailKind::Album), Ok(None));
+        assert_eq!(client.detail("   ", DetailKind::Artist), Ok(None));
     }
 
     #[test]
@@ -357,9 +401,32 @@ mod tests {
     }
 
     #[test]
-    fn catalog_client_history_detail_unauthenticated_returns_none() {
+    fn empty_search_section_is_ok_empty() {
+        let empty_payload = serde_json::json!({
+            "contents": {
+                "tabbedSearchResultsRenderer": {
+                    "tabs": []
+                }
+            }
+        });
+        let tracks: Vec<Track> = Vec::new();
+        assert_eq!(validate_search_result(tracks, &empty_payload), Ok(Vec::new()));
+
+        let malformed_payload = serde_json::json!({});
+        let malformed_tracks: Vec<Track> = Vec::new();
+        assert_eq!(
+            validate_search_result(malformed_tracks, &malformed_payload),
+            Err(CatalogError::Malformed)
+        );
+    }
+
+    #[test]
+    fn catalog_client_history_detail_unauthenticated_returns_unauthenticated() {
         let client = CatalogClient::new();
-        assert_eq!(client.detail(HISTORY_BROWSE_ID, DetailKind::Playlist), None);
+        assert_eq!(
+            client.detail(HISTORY_BROWSE_ID, DetailKind::Playlist),
+            Err(CatalogError::Unauthenticated)
+        );
     }
 
     #[test]
