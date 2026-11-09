@@ -14,14 +14,42 @@ pub fn clamp_speed(speed: f32) -> f32 {
     speed.clamp(0.5, 2.0)
 }
 
+/// Failure of a playback request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AudioError {
+    /// The backend cannot produce audio (muted, unavailable device, unconfigured).
+    Unavailable,
+    /// The stream could not be resolved or decoded.
+    Playback(String),
+}
+
+impl std::fmt::Display for AudioError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unavailable => write!(f, "audio backend unavailable"),
+            Self::Playback(msg) => write!(f, "playback failed: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for AudioError {}
+
 /// Playback port: stream control and observable playback state.
 pub trait AudioBackend {
-    fn play(&mut self, track_id: &str);
+    /// Begins audible playback of a track.
+    ///
+    /// Success means the backend actually started audible playback of that track.
+    fn play(&mut self, track_id: &str) -> Result<(), AudioError>;
     /// Begins playback of a track with crossfade transition from current audio.
     ///
+    /// Success means the backend actually started audible playback of that track.
     /// Implementations that do not support crossfading fall back to immediate playback via [`play`](Self::play).
-    fn play_crossfade(&mut self, track_id: &str, _duration: std::time::Duration) {
-        self.play(track_id);
+    fn play_crossfade(
+        &mut self,
+        track_id: &str,
+        _duration: std::time::Duration,
+    ) -> Result<(), AudioError> {
+        self.play(track_id)
     }
     fn pause(&mut self);
     fn resume_play(&mut self);
@@ -71,6 +99,7 @@ pub type NullAudio = AudioStub;
 /// Recording stub: captures intent without touching audio hardware.
 #[derive(Debug)]
 pub struct AudioStub {
+    fail_plays: bool,
     last_requested: Option<String>,
     playing: bool,
     volume: u8,
@@ -84,6 +113,7 @@ pub struct AudioStub {
 impl Default for AudioStub {
     fn default() -> Self {
         Self {
+            fail_plays: false,
             last_requested: None,
             playing: false,
             volume: 100,
@@ -101,6 +131,16 @@ impl AudioStub {
         Self::default()
     }
 
+    /// Constructs an audio stub configured to fail playback attempts.
+    pub fn failing() -> Self {
+        Self { fail_plays: true, ..Self::default() }
+    }
+
+    /// Configures whether playback attempts should fail.
+    pub fn set_fail_plays(&mut self, fail: bool) {
+        self.fail_plays = fail;
+    }
+
     pub fn skip_silence(&self) -> bool {
         self.skip_silence
     }
@@ -116,14 +156,22 @@ impl AudioStub {
 }
 
 impl AudioBackend for AudioStub {
-    fn play(&mut self, track_id: &str) {
+    fn play(&mut self, track_id: &str) -> Result<(), AudioError> {
+        if self.fail_plays {
+            return Err(AudioError::Unavailable);
+        }
         self.last_requested = Some(track_id.to_owned());
         self.playing = true;
         self.position_secs = 0;
+        Ok(())
     }
 
-    fn play_crossfade(&mut self, track_id: &str, _duration: std::time::Duration) {
-        self.play(track_id);
+    fn play_crossfade(
+        &mut self,
+        track_id: &str,
+        _duration: std::time::Duration,
+    ) -> Result<(), AudioError> {
+        self.play(track_id)
     }
 
     fn pause(&mut self) {
@@ -250,13 +298,13 @@ mod tests {
         assert!(
             !audio.is_playing() && audio.last_requested().is_none() && audio.position_secs() == 0
         );
-        audio.play("s-1");
+        assert_eq!(audio.play("s-1"), Ok(()));
         audio.seek(42);
         audio.pause();
         assert!(!audio.is_playing() && audio.position_secs() == 42);
         audio.resume_play();
         assert!(audio.is_playing() && audio.last_requested() == Some("s-1"));
-        audio.play("s-2");
+        assert_eq!(audio.play("s-2"), Ok(()));
         assert!(audio.is_playing() && audio.position_secs() == 0);
         audio.set_quality(AudioQuality::High);
         audio.set_skip_silence(true);
@@ -286,10 +334,32 @@ mod tests {
         assert_eq!(audio.last_requested(), None);
         assert_eq!(audio.last_requested_id(), None);
 
-        audio.play_crossfade("t-cross-1", std::time::Duration::from_secs(5));
+        assert_eq!(audio.play_crossfade("t-cross-1", std::time::Duration::from_secs(5)), Ok(()));
         assert!(audio.is_playing());
         assert_eq!(audio.last_requested(), Some("t-cross-1"));
         assert_eq!(audio.last_requested_id(), Some("t-cross-1"));
+        assert_eq!(audio.position_secs(), 0);
+    }
+
+    #[test]
+    fn audio_stub_failing_play_reports_error_without_state_change() {
+        let mut audio = AudioStub::failing();
+        assert!(!audio.is_playing());
+        assert_eq!(audio.last_requested(), None);
+
+        let res = audio.play("track-fail");
+        assert_eq!(res, Err(AudioError::Unavailable));
+        assert!(!audio.is_playing());
+        assert_eq!(audio.last_requested(), None);
+        assert_eq!(audio.position_secs(), 0);
+    }
+
+    #[test]
+    fn audio_stub_play_reports_ok_and_marks_playing() {
+        let mut audio = AudioStub::new();
+        assert_eq!(audio.play("track-ok"), Ok(()));
+        assert!(audio.is_playing());
+        assert_eq!(audio.last_requested(), Some("track-ok"));
         assert_eq!(audio.position_secs(), 0);
     }
 }

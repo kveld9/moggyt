@@ -15,10 +15,10 @@ use crate::domain::{
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, CustomThemeFile, DesktopPresence, DiscordPresence,
-    LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, PlayLogStore, QueueStore,
-    ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipStore, TrayAction, TrayHandle,
-    decode_cover, decode_handoff, fetch_artwork, sanitize_cookie_input,
+    AudioBackend, AudioError, Catalog, CoverCache, CustomThemeFile, DesktopPresence,
+    DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, PlayLogStore,
+    QueueStore, ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipStore, TrayAction,
+    TrayHandle, decode_cover, decode_handoff, fetch_artwork, sanitize_cookie_input,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
@@ -479,8 +479,8 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
 }
 
 impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
-    fn play(&mut self, id: &str) {
-        (**self).play(id);
+    fn play(&mut self, id: &str) -> Result<(), AudioError> {
+        (**self).play(id)
     }
     fn pause(&mut self) {
         (**self).pause();

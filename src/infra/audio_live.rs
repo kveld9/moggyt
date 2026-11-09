@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::audio::{AudioBackend, AudioStub};
+use super::audio::{AudioBackend, AudioError, AudioStub};
 use super::audio_rodio::RodioBackend;
 use super::stream::AudioQuality;
 use super::stream_disk_cache::StreamDiskCache;
@@ -46,12 +46,18 @@ macro_rules! delegate_audio {
 }
 
 impl AudioBackend for LiveAudio {
-    fn play(&mut self, track_id: &str) {
-        delegate_audio!(self, play, track_id);
+    fn play(&mut self, track_id: &str) -> Result<(), AudioError> {
+        match self {
+            Self::Live(backend) => backend.play(track_id),
+            Self::Muted(_) => Err(AudioError::Unavailable),
+        }
     }
 
-    fn play_crossfade(&mut self, track_id: &str, duration: Duration) {
-        delegate_audio!(self, play_crossfade, track_id, duration);
+    fn play_crossfade(&mut self, track_id: &str, duration: Duration) -> Result<(), AudioError> {
+        match self {
+            Self::Live(backend) => backend.play_crossfade(track_id, duration),
+            Self::Muted(_) => Err(AudioError::Unavailable),
+        }
     }
 
     fn pause(&mut self) {
@@ -120,7 +126,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn live_audio_muted_delegation_table() {
+    fn live_audio_muted_play_reports_unavailable() {
         let mut audio = LiveAudio::muted();
         assert!(!audio.is_live());
         assert_eq!(audio.last_requested(), None);
@@ -128,15 +134,10 @@ mod tests {
         assert_eq!(audio.position_secs(), 0);
         assert_eq!(audio.volume(), 100);
 
-        audio.play("track-stub-1");
-        assert_eq!(audio.last_requested(), Some("track-stub-1"));
-        assert!(audio.is_playing());
-
-        audio.pause();
+        let res = audio.play("track-stub-1");
+        assert_eq!(res, Err(AudioError::Unavailable));
         assert!(!audio.is_playing());
-
-        audio.resume_play();
-        assert!(audio.is_playing());
+        assert_eq!(audio.last_requested(), None);
 
         audio.seek(42);
         assert_eq!(audio.position_secs(), 42);
@@ -168,13 +169,14 @@ mod tests {
     }
 
     #[test]
-    fn live_audio_muted_play_crossfade_delegates() {
+    fn live_audio_muted_play_crossfade_reports_unavailable() {
         let mut audio = LiveAudio::muted();
         assert!(!audio.is_playing());
         assert_eq!(audio.last_requested(), None);
 
-        audio.play_crossfade("track-cf-muted", Duration::from_secs(4));
-        assert!(audio.is_playing());
-        assert_eq!(audio.last_requested(), Some("track-cf-muted"));
+        let res = audio.play_crossfade("track-cf-muted", Duration::from_secs(4));
+        assert_eq!(res, Err(AudioError::Unavailable));
+        assert!(!audio.is_playing());
+        assert_eq!(audio.last_requested(), None);
     }
 }
