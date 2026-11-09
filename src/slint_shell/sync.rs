@@ -47,13 +47,6 @@ fn derive_search_phase(state: &SlintAppState) -> ViewPhase {
     }
 }
 
-fn derive_detail_phase(state: &SlintAppState) -> ViewPhase {
-    let Some(detail) = &state.detail else {
-        return ViewPhase::Idle;
-    };
-    if detail.tracks.is_empty() { ViewPhase::Empty } else { ViewPhase::Ready }
-}
-
 fn derive_explore_phase(state: &SlintAppState) -> ViewPhase {
     if state.explore_loading {
         ViewPhase::Loading
@@ -78,7 +71,6 @@ fn derive_category_phase(state: &SlintAppState) -> ViewPhase {
 pub(crate) fn observe_view_phases(state: &mut SlintAppState) {
     state.library_phase = derive_library_phase(state);
     state.search_phase = derive_search_phase(state);
-    state.detail_phase = derive_detail_phase(state);
     state.explore_phase = derive_explore_phase(state);
     state.category_phase = derive_category_phase(state);
 }
@@ -610,17 +602,6 @@ mod tests {
         state.search_active = true;
         observe_view_phases(&mut state);
         assert_eq!(state.search_phase, ViewPhase::Empty);
-    }
-
-    #[test]
-    fn detail_phase_empty_when_detail_has_no_tracks() {
-        use crate::domain::{Detail, DetailKind};
-        use crate::slint_shell::test_support::test_wired;
-
-        let mut state = test_wired();
-        state.detail = Some(Detail::new(DetailKind::Album, "T", "A", Vec::new()));
-        observe_view_phases(&mut state);
-        assert_eq!(state.detail_phase, ViewPhase::Empty);
     }
 
     #[test]

@@ -123,6 +123,8 @@ pub struct SlintAppState {
     pub play_generation: u64,
     pub search_generation: u64,
     pub detail_generation: u64,
+    pub detail_error: Option<String>,
+    pub detail_request: Option<(String, crate::domain::DetailKind)>,
     pub library_generation: u64,
     pub explore_generation: u64,
     pub explore_shelves: Vec<Shelf>,

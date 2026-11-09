@@ -113,6 +113,8 @@ impl SlintAppState {
             play_generation: crate::slint_shell::cover_pool::CoverDomain::Play.base(),
             search_generation: crate::slint_shell::cover_pool::CoverDomain::Search.base(),
             detail_generation: crate::slint_shell::cover_pool::CoverDomain::Detail.base(),
+            detail_error: None,
+            detail_request: None,
             library_generation: crate::slint_shell::cover_pool::CoverDomain::Library.base(),
             explore_generation: crate::slint_shell::cover_pool::CoverDomain::Explore.base(),
             explore_shelves: Vec::new(),
