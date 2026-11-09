@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use slint::{ModelRc, VecModel};
 
-use crate::domain::Track;
+use crate::domain::{PlaybackPhase, Track};
 use crate::i18n::tr;
 use crate::infra::{AudioBackend, AudioQuality, Catalog};
 use crate::slint_shell::covers::request_queue_track_cover;
@@ -15,6 +15,7 @@ use crate::slint_shell::format::current_unix_secs;
 use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_worker::PlayTrackResult;
 use crate::slint_shell::state::SlintAppState;
+use crate::slint_shell::sync::observe_playback_phase;
 use crate::slint_shell::{LyricLineData, MoggytWindow};
 
 /// Playback start record: when the track started and which track it was.
@@ -80,6 +81,7 @@ impl SlintAppState {
         if self.on_track_changing_sleep_timer(&id) {
             return;
         }
+        self.set_playback_phase(PlaybackPhase::Resolving);
         if let Ok(mut a) = self.audio.lock() {
             dispatch_audio_play(&mut **a, &id, self.crossfade_seconds);
         }
@@ -99,11 +101,13 @@ impl SlintAppState {
             if let Ok(mut a) = self.audio.lock() {
                 a.pause();
             }
+            self.set_playback_phase(PlaybackPhase::Paused);
             self.sync_presence_playing(false);
         } else if has_last {
             if let Ok(mut a) = self.audio.lock() {
                 a.resume_play();
             }
+            self.set_playback_phase(PlaybackPhase::Resolving);
             self.sync_presence_playing(true);
         } else {
             self.play_current_quiet();
@@ -276,6 +280,9 @@ impl SlintAppState {
     }
 
     fn advance_ended_playback(&mut self) {
+        if self.playback_phase != PlaybackPhase::Ended {
+            return;
+        }
         if self.queue.peek_next().is_some() {
             self.next_track();
             return;
@@ -293,23 +300,27 @@ impl SlintAppState {
     }
 
     /// Advances queue or appends radio recommendations when active track ends or reaches crossfade boundary.
+    ///
+    /// Pausing never advances playback; only the `Ended` phase advances to the next track.
     pub fn continue_autoplay_if_ended(&mut self) {
-        let Ok(audio) = self.audio.try_lock() else {
-            return;
-        };
+        observe_playback_phase(self);
         if self.queue.is_empty() {
             return;
         }
-        if audio.is_playing() {
-            let candidate = self.handle_playing_crossfade(&**audio);
-            drop(audio);
+        if self.playback_phase == PlaybackPhase::Ended {
+            self.advance_ended_playback();
+            return;
+        }
+        if self.playback_phase == PlaybackPhase::Playing {
+            let candidate = if let Ok(audio) = self.audio.try_lock() {
+                self.handle_playing_crossfade(&**audio)
+            } else {
+                None
+            };
             if let Some((id, has_next)) = candidate {
                 self.execute_crossfade(id, has_next);
             }
-            return;
         }
-        drop(audio);
-        self.advance_ended_playback();
     }
 }
 
@@ -373,9 +384,9 @@ mod tests {
 
     use super::*;
 
-    use crate::domain::{SkipRanges, SkipSegment, Track};
+    use crate::domain::{PlaybackPhase, SkipRanges, SkipSegment, Track};
     use crate::infra::SkipStore;
-    use crate::slint_shell::test_support::test_wired;
+    use crate::slint_shell::test_support::{EndedAudio, test_wired};
 
     #[derive(Debug)]
     struct CountingSkipStore {
@@ -581,7 +592,7 @@ mod tests {
         let seed = Track::new("seed", "Seed", "Artist").with_duration(100);
         state.queue.push(seed);
         state.play_track_at_index_in_memory(0);
-        state.audio.lock().unwrap().seek(100);
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("seed", 100))));
 
         state.continue_autoplay_if_ended();
 
@@ -686,12 +697,9 @@ mod tests {
         state.queue.push(t1);
         state.queue.push(t2);
 
-        state.play_track_at_index(0);
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("t1", 180))));
         assert_eq!(state.queue.cursor(), 0);
         assert_eq!(state.audio.lock().unwrap().last_requested(), Some("t1"));
-
-        state.audio.lock().unwrap().pause();
-        assert!(!state.audio.lock().unwrap().is_playing());
 
         state.continue_autoplay_if_ended();
         assert_eq!(state.queue.cursor(), 1);
@@ -718,5 +726,50 @@ mod tests {
         assert_eq!(state.queue.cursor(), 0);
         assert_eq!(state.queue.len(), 1);
         assert!(!state.audio.lock().unwrap().is_playing());
+    }
+
+    #[test]
+    fn pause_mid_queue_does_not_advance() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("a", "Track A", "Artist").with_duration(180));
+        state.queue.push(Track::new("b", "Track B", "Artist").with_duration(200));
+        state.play_track_at_index(0);
+        state.toggle_play();
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("a"));
+        assert_eq!(state.playback_phase, PlaybackPhase::Paused);
+    }
+
+    #[test]
+    fn ended_advances_to_next() {
+        let mut state = test_wired();
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("a", 180))));
+        state.queue.push(Track::new("a", "Track A", "Artist").with_duration(180));
+        state.queue.push(Track::new("b", "Track B", "Artist").with_duration(200));
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.cursor(), 1);
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("b"));
+    }
+
+    #[test]
+    fn ended_last_track_autoplay_off_stays() {
+        let mut state = test_wired();
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("a", 180))));
+        state.queue.push(Track::new("a", "Track A", "Artist").with_duration(180));
+        state.autoplay = false;
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.playback_phase, PlaybackPhase::Ended);
+    }
+
+    #[test]
+    fn restored_queue_startup_does_not_advance() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("a", "Track A", "Artist").with_duration(180));
+        state.queue.push(Track::new("b", "Track B", "Artist").with_duration(200));
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.playback_phase, PlaybackPhase::Empty);
     }
 }

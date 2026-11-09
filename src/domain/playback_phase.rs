@@ -29,24 +29,23 @@ pub enum PlaybackEvent {
 pub const END_TOLERANCE_SECS: u64 = 1;
 
 const TRANSITIONS: [[PlaybackPhase; 7]; 6] = [
-    // Empty: Resolve->Resolving, Reset->Empty, (all others -> Empty)
-    [
-        PlaybackPhase::Resolving, // Resolve
-        PlaybackPhase::Empty,     // Started
-        PlaybackPhase::Empty,     // Pause
-        PlaybackPhase::Empty,     // Resume
-        PlaybackPhase::Empty,     // Ended
-        PlaybackPhase::Empty,     // Failed
-        PlaybackPhase::Empty,     // Reset
-    ],
-    // Resolving: Started->Playing, Failed->Failed, Reset->Empty, Resolve->Resolving,
-    //            Pause->Resolving, Resume->Resolving, Ended->Resolving
+    // Empty: Resolve->Resolving, Started->Playing, Pause->Paused, Resume->Empty, Ended->Ended, Failed->Empty, Reset->Empty
     [
         PlaybackPhase::Resolving, // Resolve
         PlaybackPhase::Playing,   // Started
-        PlaybackPhase::Resolving, // Pause
+        PlaybackPhase::Paused,    // Pause
+        PlaybackPhase::Empty,     // Resume
+        PlaybackPhase::Ended,     // Ended
+        PlaybackPhase::Empty,     // Failed
+        PlaybackPhase::Empty,     // Reset
+    ],
+    // Resolving: Resolve->Resolving, Started->Playing, Pause->Paused, Resume->Resolving, Ended->Ended, Failed->Failed, Reset->Empty
+    [
+        PlaybackPhase::Resolving, // Resolve
+        PlaybackPhase::Playing,   // Started
+        PlaybackPhase::Paused,    // Pause
         PlaybackPhase::Resolving, // Resume
-        PlaybackPhase::Resolving, // Ended
+        PlaybackPhase::Ended,     // Ended
         PlaybackPhase::Failed,    // Failed
         PlaybackPhase::Empty,     // Reset
     ],
@@ -103,8 +102,12 @@ impl PlaybackPhase {
 }
 
 /// Raw observable playback facts sampled from the audio backend and queue.
+///
+/// `has_track` indicates whether a track was requested. `is_empty` indicates
+/// whether the backend has no buffered audio left for it (a drained sink).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PlaybackFacts {
+    pub has_track: bool,
     pub is_empty: bool,
     pub is_paused: bool,
     pub is_playing: bool,
@@ -116,15 +119,17 @@ impl PlaybackFacts {
     /// Maps raw observable playback facts to a domain playback event.
     ///
     /// Evaluated in priority order:
-    /// 1. `is_empty` -> `Some(PlaybackEvent::Reset)`
+    /// 1. `!has_track` -> `Some(PlaybackEvent::Reset)`
     /// 2. `is_playing` -> `Some(PlaybackEvent::Started)`
     /// 3. `is_paused` -> `Some(PlaybackEvent::Pause)`
-    /// 4. `duration_secs > 0 && position_secs + END_TOLERANCE_SECS >= duration_secs` -> `Some(PlaybackEvent::Ended)`
-    /// 5. otherwise `None` (unknown/stalled state must not change the phase).
+    /// 4. `is_empty` -> `Some(PlaybackEvent::Ended)` (sink drained)
+    /// 5. `duration_secs > 0 && position_secs + END_TOLERANCE_SECS >= duration_secs` -> `Some(PlaybackEvent::Ended)`
+    /// 6. otherwise `None` (unknown/stalled state must not change the phase).
     ///
-    /// An unknown duration (`0`) never reports `Ended`.
+    /// A paused track must never report Ended, and an unknown duration without a drained
+    /// sink must not report Ended.
     pub fn event(self) -> Option<PlaybackEvent> {
-        if self.is_empty {
+        if !self.has_track {
             return Some(PlaybackEvent::Reset);
         }
         if self.is_playing {
@@ -132,6 +137,9 @@ impl PlaybackFacts {
         }
         if self.is_paused {
             return Some(PlaybackEvent::Pause);
+        }
+        if self.is_empty {
+            return Some(PlaybackEvent::Ended);
         }
         if self.is_ended() {
             return Some(PlaybackEvent::Ended);
@@ -173,10 +181,10 @@ mod tests {
             // Empty
             [
                 PlaybackPhase::Resolving,
+                PlaybackPhase::Playing,
+                PlaybackPhase::Paused,
                 PlaybackPhase::Empty,
-                PlaybackPhase::Empty,
-                PlaybackPhase::Empty,
-                PlaybackPhase::Empty,
+                PlaybackPhase::Ended,
                 PlaybackPhase::Empty,
                 PlaybackPhase::Empty,
             ],
@@ -184,9 +192,9 @@ mod tests {
             [
                 PlaybackPhase::Resolving,
                 PlaybackPhase::Playing,
+                PlaybackPhase::Paused,
                 PlaybackPhase::Resolving,
-                PlaybackPhase::Resolving,
-                PlaybackPhase::Resolving,
+                PlaybackPhase::Ended,
                 PlaybackPhase::Failed,
                 PlaybackPhase::Empty,
             ],
@@ -259,6 +267,7 @@ mod tests {
     #[test]
     fn facts_empty_is_reset() {
         let facts = PlaybackFacts {
+            has_track: false,
             is_empty: true,
             is_paused: false,
             is_playing: false,
@@ -271,6 +280,7 @@ mod tests {
     #[test]
     fn facts_playing_is_started() {
         let facts = PlaybackFacts {
+            has_track: true,
             is_empty: false,
             is_paused: false,
             is_playing: true,
@@ -283,6 +293,7 @@ mod tests {
     #[test]
     fn facts_pause_at_end_stays_paused() {
         let facts = PlaybackFacts {
+            has_track: true,
             is_empty: false,
             is_paused: true,
             is_playing: false,
@@ -295,6 +306,7 @@ mod tests {
     #[test]
     fn facts_ended_at_tolerance() {
         let facts = PlaybackFacts {
+            has_track: true,
             is_empty: false,
             is_paused: false,
             is_playing: false,
@@ -307,6 +319,7 @@ mod tests {
     #[test]
     fn facts_unknown_duration_is_not_ended() {
         let facts = PlaybackFacts {
+            has_track: true,
             is_empty: false,
             is_paused: false,
             is_playing: false,
@@ -314,5 +327,31 @@ mod tests {
             duration_secs: 0,
         };
         assert_eq!(facts.event(), None);
+    }
+
+    #[test]
+    fn facts_drained_sink_is_ended() {
+        let facts = PlaybackFacts {
+            has_track: true,
+            is_empty: true,
+            is_paused: false,
+            is_playing: false,
+            position_secs: 0,
+            duration_secs: 0,
+        };
+        assert_eq!(facts.event(), Some(PlaybackEvent::Ended));
+    }
+
+    #[test]
+    fn facts_no_track_is_reset() {
+        let facts = PlaybackFacts {
+            has_track: false,
+            is_empty: false,
+            is_paused: false,
+            is_playing: false,
+            position_secs: 0,
+            duration_secs: 0,
+        };
+        assert_eq!(facts.event(), Some(PlaybackEvent::Reset));
     }
 }

@@ -34,7 +34,7 @@ pub trait AudioBackend {
     fn is_paused(&self) -> bool {
         self.last_requested().is_some() && !self.is_playing()
     }
-    /// Returns whether the backend is empty. Exposes raw facts only; adapters must never derive the phase.
+    /// Returns whether the backend has no buffered audio left for the loaded track (a drained sink); it is not the phase.
     fn is_empty(&self) -> bool {
         self.last_requested().is_none()
     }

@@ -391,7 +391,6 @@ pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppStat
     window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
     window.set_is_playing(is_playing);
     sync_sleep_timer(window, state);
-    observe_playback_phase(state);
 }
 
 /// Samples raw backend facts and advances the stored playback phase.
@@ -401,6 +400,7 @@ pub(crate) fn observe_playback_phase(state: &mut SlintAppState) {
         return;
     };
     let facts = PlaybackFacts {
+        has_track: audio.last_requested().is_some(),
         is_empty: audio.is_empty(),
         is_paused: audio.is_paused(),
         is_playing: audio.is_playing(),
