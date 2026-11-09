@@ -63,6 +63,7 @@ export component ContentArea inherits Rectangle {
     in property <bool> category-loading: false;
     in property <[string]> recent-searches: [];
     in property <bool> search-active: false;
+    in property <int> search-phase: 0;
     in property <int> player-bar-mode: 0;
     in property <bool> player-bar-show-artwork: true;
     in property <bool> player-bar-show-like: true;
@@ -73,6 +74,7 @@ export component ContentArea inherits Rectangle {
     in property <bool> player-bar-show-volume: true;
 
     callback query-submitted(string);
+    callback query-cleared();
     callback track-selected(int);
     callback filter-selected(int);
     callback recent-search-selected(string);
@@ -200,7 +202,9 @@ export component ContentArea inherits Rectangle {
                 active-filter: root.search-filter;
                 recent-searches: root.recent-searches;
                 search-active: root.search-active;
+                search-phase: root.search-phase;
                 query-submitted(q) => { root.query-submitted(q); }
+                query-cleared => { root.query-cleared(); }
                 track-selected(idx) => { root.track-selected(idx); }
                 filter-selected(idx) => { root.filter-selected(idx); }
                 recent-search-selected(q) => { root.recent-search-selected(q); }

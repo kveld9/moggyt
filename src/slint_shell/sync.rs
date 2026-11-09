@@ -62,15 +62,11 @@ impl SlintAppState {
 }
 
 fn derive_search_phase(state: &SlintAppState) -> ViewPhase {
-    if state.search_phase == ViewPhase::Error {
-        return ViewPhase::Error;
-    }
-    if !state.search_active {
-        ViewPhase::Idle
-    } else if state.home_shelves.iter().any(|shelf| !shelf.items.is_empty()) {
-        ViewPhase::Ready
-    } else {
-        ViewPhase::Empty
+    match state.search_phase {
+        ViewPhase::Error | ViewPhase::Loading => state.search_phase,
+        _ if !state.search_active => ViewPhase::Idle,
+        _ if state.home_shelves.iter().any(|shelf| !shelf.items.is_empty()) => ViewPhase::Ready,
+        _ => ViewPhase::Empty,
     }
 }
 
@@ -113,9 +109,10 @@ pub(crate) fn sync_view_phase(window: &MoggytWindow, view: ViewId, phase: ViewPh
     match view {
         ViewId::Explore => window.set_explore_loading(phase == ViewPhase::Loading),
         ViewId::Category => window.set_category_loading(phase == ViewPhase::Loading),
-        // Library, Search, and Detail already own their booleans in their sync
-        // functions and receive phase-driven properties in later plan tasks.
-        ViewId::Library | ViewId::Search | ViewId::Detail => {}
+        ViewId::Search => window.set_search_phase(phase.to_index()),
+        // Library and Detail already own their booleans in their sync functions
+        // and receive phase-driven properties in later plan tasks.
+        ViewId::Library | ViewId::Detail => {}
     }
 }
 
@@ -224,6 +221,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     sync_category_shelves(window, state);
     sync_view_phase(window, ViewId::Explore, state.explore_phase);
     sync_view_phase(window, ViewId::Category, state.category_phase);
+    sync_view_phase(window, ViewId::Search, state.search_phase);
     sync_sleep_timer(window, state);
 }
 
@@ -739,5 +737,25 @@ mod tests {
         );
 
         assert_eq!(persistence_error_text(Locale::English, None), "");
+    }
+
+    #[test]
+    fn search_phase_loading_not_overwritten_by_derivation() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.search_active = true;
+        state.search_phase = ViewPhase::Loading;
+        observe_view_phases(&mut state);
+        assert_eq!(state.search_phase, ViewPhase::Loading);
+    }
+
+    #[test]
+    fn search_phase_indices_match_slint_contract() {
+        assert_eq!(ViewPhase::Idle.to_index(), 0);
+        assert_eq!(ViewPhase::Loading.to_index(), 1);
+        assert_eq!(ViewPhase::Ready.to_index(), 2);
+        assert_eq!(ViewPhase::Empty.to_index(), 3);
+        assert_eq!(ViewPhase::Error.to_index(), 4);
     }
 }

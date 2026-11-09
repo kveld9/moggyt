@@ -22,6 +22,17 @@ pub enum ViewId {
 }
 
 impl ViewPhase {
+    /// Returns the stable index exposed to Slint properties.
+    pub fn to_index(self) -> i32 {
+        match self {
+            ViewPhase::Idle => 0,
+            ViewPhase::Loading => 1,
+            ViewPhase::Ready => 2,
+            ViewPhase::Empty => 3,
+            ViewPhase::Error => 4,
+        }
+    }
+
     /// Returns the next legal phase. Idle can only be left through Loading; any
     /// settled phase may return to Idle or reload; repeating a phase is a no-op.
     pub fn transition(self, next: ViewPhase) -> Self {
@@ -44,6 +55,15 @@ impl ViewPhase {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn phase_indices_are_stable() {
+        assert_eq!(ViewPhase::Idle.to_index(), 0);
+        assert_eq!(ViewPhase::Loading.to_index(), 1);
+        assert_eq!(ViewPhase::Ready.to_index(), 2);
+        assert_eq!(ViewPhase::Empty.to_index(), 3);
+        assert_eq!(ViewPhase::Error.to_index(), 4);
+    }
 
     #[test]
     fn transition_table() {

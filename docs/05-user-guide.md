@@ -27,6 +27,10 @@ The search view accepts queries for tracks, artists, and albums, and maintains a
     indicates no recent searches.
 - **Search Execution**: type your query into the input field and press `Enter` or click `Search` to view filtered
   search results.
+- **Clearing**: clearing the input (the `X` button or backspacing to empty) returns the page to the
+  Idle state with the recent-search list.
+- **Zero hits**: a query with no matches shows an empty-results message. A failed catalog request
+  shows an error message instead of an empty list.
 
 ### Detail Page
 
