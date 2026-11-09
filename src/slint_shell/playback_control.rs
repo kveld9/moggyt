@@ -212,11 +212,7 @@ impl SlintAppState {
         }
     }
 
-    fn append_autoplay_radio(&mut self, current_id: &str) {
-        let mut recs = self.catalog.lock().map(|c| c.radio(current_id)).unwrap_or_default();
-        if self.songs_only {
-            recs = crate::domain::retain_songs(recs);
-        }
+    fn enqueue_radio_recommendations(&mut self, recs: Vec<Track>) {
         let worker_tx = self.worker_tx.clone();
         let generation = self.play_generation;
         for track in recs {
@@ -232,6 +228,28 @@ impl SlintAppState {
                 self.queue.push(track);
             }
         }
+    }
+
+    fn fetch_autoplay_radio(&self, current_id: &str) -> Option<Vec<Track>> {
+        let Ok(catalog) = self.catalog.lock() else {
+            tracing::warn!("failed to fetch autoplay radio: catalog lock poisoned");
+            return None;
+        };
+        match catalog.radio(current_id) {
+            Ok(tracks) => Some(tracks),
+            Err(err) => {
+                tracing::warn!("failed to fetch autoplay radio: {err}");
+                None
+            }
+        }
+    }
+
+    fn append_autoplay_radio(&mut self, current_id: &str) {
+        let Some(recs) = self.fetch_autoplay_radio(current_id) else {
+            return;
+        };
+        let filtered = if self.songs_only { crate::domain::retain_songs(recs) } else { recs };
+        self.enqueue_radio_recommendations(filtered);
     }
 
     fn track_remaining_secs(&self, audio: &dyn AudioBackend) -> Option<u64> {
@@ -381,7 +399,7 @@ mod tests {
     use super::*;
 
     use crate::domain::{PlaybackPhase, SkipRanges, SkipSegment, Track};
-    use crate::infra::SkipStore;
+    use crate::infra::{CatalogError, SkipStore};
     use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
     use crate::slint_shell::test_support::{EndedAudio, MockLibraryCatalog, test_wired};
 
@@ -430,10 +448,8 @@ mod tests {
         let mut state = test_wired();
         state.set_volume(75);
         assert_eq!(state.audio.lock().unwrap().volume(), 75);
-
         state.seek_by(15);
         assert_eq!(state.audio.lock().unwrap().position_secs(), 15);
-
         state.seek_by(-50);
         assert_eq!(state.audio.lock().unwrap().position_secs(), 0);
     }
@@ -552,16 +568,26 @@ mod tests {
         state.catalog = Arc::new(Mutex::new(Box::new(catalog)));
         state.autoplay = true;
         state.songs_only = true;
-
         let seed = Track::new("seed", "Seed", "Artist").with_duration(100);
         state.queue.push(seed);
         state.play_track_at_index_in_memory(0);
         state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("seed", 100))));
-
         state.continue_autoplay_if_ended();
-
         assert_eq!(state.queue.len(), 2);
         assert_eq!(state.queue.tracks()[1].id, "song-atv");
+    }
+
+    #[test]
+    fn radio_failure_does_not_append_tracks() {
+        let mut state = test_wired();
+        let catalog = MockLibraryCatalog::default().with_radio_result(Err(CatalogError::Transport));
+        state.catalog = Arc::new(Mutex::new(Box::new(catalog)));
+        state.autoplay = true;
+        let seed = Track::new("seed", "Seed", "Artist").with_duration(100);
+        state.queue.push(seed);
+        assert_eq!(state.queue.len(), 1);
+        state.append_autoplay_radio("seed");
+        assert_eq!(state.queue.len(), 1);
     }
 
     #[test]

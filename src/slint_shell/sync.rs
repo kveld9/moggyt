@@ -75,6 +75,9 @@ fn derive_search_phase(state: &SlintAppState) -> ViewPhase {
 }
 
 fn derive_explore_phase(state: &SlintAppState) -> ViewPhase {
+    if state.explore_phase == ViewPhase::Error {
+        return ViewPhase::Error;
+    }
     if state.explore_loading {
         ViewPhase::Loading
     } else if !state.explore_shelves.is_empty() {
@@ -85,6 +88,9 @@ fn derive_explore_phase(state: &SlintAppState) -> ViewPhase {
 }
 
 fn derive_category_phase(state: &SlintAppState) -> ViewPhase {
+    if state.category_phase == ViewPhase::Error {
+        return ViewPhase::Error;
+    }
     if state.category_loading {
         ViewPhase::Loading
     } else if !state.category_shelves.is_empty() {
@@ -662,12 +668,32 @@ mod tests {
     }
 
     #[test]
+    fn explore_phase_preserves_error() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.explore_phase = ViewPhase::Error;
+        observe_view_phases(&mut state);
+        assert_eq!(state.explore_phase, ViewPhase::Error);
+    }
+
+    #[test]
     fn category_phase_empty_without_shelves() {
         use crate::slint_shell::test_support::test_wired;
 
         let mut state = test_wired();
         observe_view_phases(&mut state);
         assert_eq!(state.category_phase, ViewPhase::Empty);
+    }
+
+    #[test]
+    fn category_phase_preserves_error() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.category_phase = ViewPhase::Error;
+        observe_view_phases(&mut state);
+        assert_eq!(state.category_phase, ViewPhase::Error);
     }
 
     #[test]

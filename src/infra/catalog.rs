@@ -43,19 +43,23 @@ pub trait Catalog {
     }
 
     /// Returns radio continuation tracks seeded by `seed_track_id` (empty when seed is blank).
-    fn radio(&self, seed_track_id: &str) -> Vec<Track>;
+    fn radio(&self, seed_track_id: &str) -> Result<Vec<Track>, CatalogError>;
 
     /// Returns home shelves (empty on failure).
     fn home_shelves(&self) -> Vec<Shelf>;
 
-    /// Returns explore shelves (empty on failure).
-    fn explore_shelves(&self) -> Vec<Shelf> {
-        Vec::new()
+    /// Returns explore shelves.
+    fn explore_shelves(&self) -> Result<Vec<Shelf>, CatalogError> {
+        Ok(Vec::new())
     }
 
-    /// Returns category shelves for `browse_id` and optional `params` (empty on failure).
-    fn category_shelves(&self, _browse_id: &str, _params: Option<&str>) -> Vec<Shelf> {
-        Vec::new()
+    /// Returns category shelves for `browse_id` and optional `params`.
+    fn category_shelves(
+        &self,
+        _browse_id: &str,
+        _params: Option<&str>,
+    ) -> Result<Vec<Shelf>, CatalogError> {
+        Ok(Vec::new())
     }
 
     /// Returns saved or owned playlists.
@@ -95,8 +99,8 @@ mod tests {
         fn search_filtered(&self, _query: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
             Ok(Vec::new())
         }
-        fn radio(&self, _seed_track_id: &str) -> Vec<Track> {
-            Vec::new()
+        fn radio(&self, _seed_track_id: &str) -> Result<Vec<Track>, CatalogError> {
+            Ok(Vec::new())
         }
         fn home_shelves(&self) -> Vec<Shelf> {
             Vec::new()
@@ -131,13 +135,13 @@ mod tests {
     #[test]
     fn default_explore_shelves_returns_empty_vec() {
         let pass_through = PassThroughCatalog::default();
-        assert!(pass_through.explore_shelves().is_empty());
+        assert_eq!(pass_through.explore_shelves(), Ok(Vec::new()));
     }
 
     #[test]
     fn default_category_shelves_returns_empty_vec() {
         let pass_through = PassThroughCatalog::default();
-        assert!(pass_through.category_shelves("FEmusic_moods", None).is_empty());
+        assert_eq!(pass_through.category_shelves("FEmusic_moods", None), Ok(Vec::new()));
     }
 
     #[test]

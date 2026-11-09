@@ -115,13 +115,13 @@ impl Catalog for LiveCatalog {
         self.client.search_filtered(query)
     }
 
-    /// Returns radio continuation tracks seeded by `seed_track_id`. Network failures map to an empty vector.
-    fn radio(&self, seed_track_id: &str) -> Vec<Track> {
+    /// Returns radio continuation tracks seeded by `seed_track_id`.
+    fn radio(&self, seed_track_id: &str) -> Result<Vec<Track>, CatalogError> {
         let trimmed = seed_track_id.trim();
         if trimmed.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
-        self.client.radio_tracks(trimmed).into_iter().map(raw_to_track).collect()
+        self.client.radio(trimmed)
     }
 
     /// Returns home shelves. Network failures map to an empty vector.
@@ -129,13 +129,17 @@ impl Catalog for LiveCatalog {
         self.client.home_shelves()
     }
 
-    /// Returns explore shelves. Network failures map to an empty vector.
-    fn explore_shelves(&self) -> Vec<Shelf> {
+    /// Returns explore shelves.
+    fn explore_shelves(&self) -> Result<Vec<Shelf>, CatalogError> {
         self.client.explore_shelves()
     }
 
-    /// Returns category shelves for `browse_id` and optional `params`. Network failures map to empty.
-    fn category_shelves(&self, browse_id: &str, params: Option<&str>) -> Vec<Shelf> {
+    /// Returns category shelves for `browse_id` and optional `params`.
+    fn category_shelves(
+        &self,
+        browse_id: &str,
+        params: Option<&str>,
+    ) -> Result<Vec<Shelf>, CatalogError> {
         self.client.category_shelves(browse_id, params)
     }
 
@@ -294,8 +298,8 @@ mod tests {
         assert_eq!(track.video_type, Some(crate::domain::MusicVideoType::Atv));
 
         let catalog = LiveCatalog::new();
-        assert!(catalog.radio("").is_empty());
-        assert!(catalog.radio("   ").is_empty());
+        assert_eq!(catalog.radio(""), Ok(Vec::new()));
+        assert_eq!(catalog.radio("   "), Ok(Vec::new()));
     }
 
     #[test]

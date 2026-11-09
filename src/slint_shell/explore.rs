@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::domain::{SearchResult, Shelf};
-use crate::infra::Catalog;
+use crate::infra::{Catalog, CatalogError};
 use crate::slint_shell::covers::{
     dispatch_cover_with_generation_if_needed, iter_shelf_artwork_urls, request_explore_covers,
     resolve_row_cover_image,
@@ -20,6 +20,7 @@ use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::SearchRow;
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::sync::{sync_category_shelves, sync_explore_shelves, sync_window};
+use crate::slint_shell::view_phase::ViewPhase;
 use crate::slint_shell::window::with_ui_state;
 use crate::slint_shell::{ExploreCardData, ExploreCardRow, ExploreShelfData, MoggytWindow};
 
@@ -27,12 +28,10 @@ use crate::slint_shell::{ExploreCardData, ExploreCardRow, ExploreShelfData, Mogg
 pub fn execute_explore<T: ?Sized + Catalog>(
     generation: u64,
     catalog: &Arc<Mutex<T>>,
-) -> (u64, Vec<Shelf>) {
-    let shelves = match catalog.lock() {
-        Ok(guard) => guard.explore_shelves(),
-        Err(_) => Vec::new(),
-    };
-    (generation, shelves)
+) -> (u64, Result<Vec<Shelf>, CatalogError>) {
+    let result =
+        catalog.lock().map_or(Err(CatalogError::Transport), |guard| guard.explore_shelves());
+    (generation, result)
 }
 
 /// Queries catalog for category shelves asynchronously off the UI thread.
@@ -41,10 +40,11 @@ pub fn execute_category<T: ?Sized + Catalog>(
     catalog: &Arc<Mutex<T>>,
     browse_id: &str,
     params: Option<&str>,
-) -> (u64, Vec<Shelf>) {
-    let shelves =
-        catalog.lock().map_or_else(|_| Vec::new(), |c| c.category_shelves(browse_id, params));
-    (generation, shelves)
+) -> (u64, Result<Vec<Shelf>, CatalogError>) {
+    let result = catalog
+        .lock()
+        .map_or(Err(CatalogError::Transport), |guard| guard.category_shelves(browse_id, params));
+    (generation, result)
 }
 
 /// Helper resolving an item in explore shelves by linear index.
@@ -69,22 +69,62 @@ pub(crate) fn request_category_covers(
     }
 }
 
+/// Applies explore outcome (success or failure) directly to state.
+pub(crate) fn apply_explore_outcome(
+    st: &mut SlintAppState,
+    result: Result<Vec<Shelf>, CatalogError>,
+) {
+    match result {
+        Ok(shelves) => {
+            let is_empty = shelves.is_empty();
+            st.explore_shelves = shelves;
+            st.explore_loaded = true;
+            st.explore_loading = false;
+            st.explore_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
+        }
+        Err(_) => {
+            st.explore_loading = false;
+            st.explore_phase = ViewPhase::Error;
+        }
+    }
+}
+
+/// Applies category outcome (success or failure) directly to state.
+pub(crate) fn apply_category_outcome(
+    st: &mut SlintAppState,
+    result: Result<Vec<Shelf>, CatalogError>,
+) {
+    match result {
+        Ok(shelves) => {
+            let is_empty = shelves.is_empty();
+            st.category_shelves = shelves;
+            st.category_loading = false;
+            st.category_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
+        }
+        Err(_) => {
+            st.category_loading = false;
+            st.category_phase = ViewPhase::Error;
+        }
+    }
+}
+
 /// Applies completed explore shelves fetch to state and UI on main thread.
 pub(crate) fn apply_explore_completion(
     win: &MoggytWindow,
     st: &mut SlintAppState,
     generation: u64,
-    shelves: Vec<Shelf>,
+    result: Result<Vec<Shelf>, CatalogError>,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     if st.explore_generation != generation {
         return;
     }
-    st.explore_shelves = shelves;
-    st.explore_loaded = true;
-    st.explore_loading = false;
+    let is_ok = result.is_ok();
+    apply_explore_outcome(st, result);
     win.set_explore_loading(false);
-    request_explore_covers(st, tx);
+    if is_ok {
+        request_explore_covers(st, tx);
+    }
     sync_explore_shelves(win, st);
 }
 
@@ -94,18 +134,20 @@ pub(crate) fn apply_category_completion(
     win: &MoggytWindow,
     st: &mut SlintAppState,
     generation: u64,
-    shelves: Vec<Shelf>,
+    result: Result<Vec<Shelf>, CatalogError>,
     title: String,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     if st.category_generation != generation {
         return;
     }
-    st.category_shelves = shelves;
     st.category_title = title;
-    st.category_loading = false;
+    let is_ok = result.is_ok();
+    apply_category_outcome(st, result);
     win.set_category_loading(false);
-    request_category_covers(st, tx);
+    if is_ok {
+        request_category_covers(st, tx);
+    }
     sync_category_shelves(win, st);
 }
 
@@ -125,11 +167,11 @@ pub(crate) fn load_explore_async(
     let tx = worker_tx.clone();
 
     std::thread::spawn(move || {
-        let (g, shelves) = execute_explore(generation, &cat);
+        let (g, result) = execute_explore(generation, &cat);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
-                apply_explore_completion(&win, st, g, shelves, &tx);
+                apply_explore_completion(&win, st, g, result, &tx);
             });
         });
     });
@@ -161,10 +203,10 @@ pub(crate) fn load_category_async(
     let (id, p, t) = (browse_id.to_string(), params.map(str::to_string), title.to_string());
 
     std::thread::spawn(move || {
-        let (g, shelves) = execute_category(generation, &cat, &id, p.as_deref());
+        let (g, result) = execute_category(generation, &cat, &id, p.as_deref());
         let _ = dispatch_to_ui(move || {
             if let Some(win) = weak.upgrade() {
-                with_ui_state(|st| apply_category_completion(&win, st, g, shelves, t, &tx));
+                with_ui_state(|st| apply_category_completion(&win, st, g, result, t, &tx));
             }
         });
     });
@@ -349,6 +391,7 @@ mod tests {
         let cat = Arc::new(Mutex::new(CatalogStub::new()));
         let (generation, shelves) = execute_explore(42, &cat);
         assert_eq!(generation, 42);
+        let shelves = shelves.expect("explore ok");
         assert_eq!(shelves.len(), 2);
         assert_eq!(shelves[0].title, "Charts");
         assert_eq!(shelves[1].title, "Moods & genres");
@@ -359,8 +402,39 @@ mod tests {
         let cat = Arc::new(Mutex::new(CatalogStub::new()));
         let (g, s) = execute_category(99, &cat, "FEmusic_moods_and_genres_category", Some("calma"));
         assert_eq!(g, 99);
+        let s = s.expect("category ok");
         assert_eq!(s.len(), 1);
         assert_eq!(s[0].title, "Chill Playlists");
+    }
+
+    #[test]
+    fn explore_transport_error_sets_error_phase() {
+        let mut state = test_wired();
+        state.explore_loading = true;
+        state.explore_shelves =
+            vec![Shelf { title: "Previous Shelf".to_string(), items: Vec::new() }];
+
+        apply_explore_outcome(&mut state, Err(CatalogError::Transport));
+
+        assert!(!state.explore_loading);
+        assert_eq!(state.explore_phase, ViewPhase::Error);
+        assert_eq!(state.explore_shelves.len(), 1);
+        assert_eq!(state.explore_shelves[0].title, "Previous Shelf");
+    }
+
+    #[test]
+    fn category_transport_error_sets_error_phase() {
+        let mut state = test_wired();
+        state.category_loading = true;
+        state.category_shelves =
+            vec![Shelf { title: "Previous Category".to_string(), items: Vec::new() }];
+
+        apply_category_outcome(&mut state, Err(CatalogError::Transport));
+
+        assert!(!state.category_loading);
+        assert_eq!(state.category_phase, ViewPhase::Error);
+        assert_eq!(state.category_shelves.len(), 1);
+        assert_eq!(state.category_shelves[0].title, "Previous Category");
     }
 
     #[test]
