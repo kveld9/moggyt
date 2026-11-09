@@ -54,6 +54,7 @@ mod skip_store;
 mod spotify_csv;
 mod spotify_embed;
 mod spotify_search;
+mod store_health;
 mod stream;
 pub mod stream_disk_cache;
 mod stream_reader;
@@ -144,6 +145,7 @@ pub use spotify_search::{
     SpotifySongSearch, classify_failure, classify_status, parse_song_candidates, songs_search_body,
     video_type_from,
 };
+pub use store_health::{HealthFlag, StoreHealth, quarantine};
 pub use stream::{AudioQuality, StreamResolver, StreamStub};
 pub use stream_disk_cache::StreamDiskCache;
 pub use stream_url_cache::{STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache};
