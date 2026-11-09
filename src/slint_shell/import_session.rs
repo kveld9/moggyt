@@ -18,6 +18,7 @@ pub enum ImportStage {
     Idle,
     LoadingSource,
     Matching,
+    Cancelling,
     Review,
     Failed,
 }
@@ -87,9 +88,12 @@ impl ImportSession {
         self.load_generation
     }
 
-    /// Returns `true` if loading source or matching is actively running.
+    /// Returns `true` if loading source, matching, or cancelling is actively running.
     pub fn is_busy(&self) -> bool {
-        matches!(self.stage, ImportStage::LoadingSource | ImportStage::Matching)
+        matches!(
+            self.stage,
+            ImportStage::LoadingSource | ImportStage::Matching | ImportStage::Cancelling
+        )
     }
 
     /// Returns `true` only when stage is `LoadingSource` and generation matches.
@@ -149,6 +153,10 @@ impl ImportSession {
     /// Requests cancellation for the running worker.
     pub fn request_cancel(&mut self) {
         self.cancel.store(true, Ordering::Relaxed);
+        if self.stage == ImportStage::Matching {
+            self.stage = ImportStage::Cancelling;
+            self.status = "Import cancelled".to_string();
+        }
     }
 
     /// Returns `true` if matching is actively running.
@@ -201,6 +209,12 @@ impl ImportSession {
         if !rev.has_matches() {
             anyhow::bail!("no matched tracks to save");
         }
+        let Some(ref source) = self.source else {
+            anyhow::bail!("no import source available");
+        };
+        if rev.rows.len() != source.tracks.len() {
+            anyhow::bail!("import review is incomplete");
+        }
         let playlist = rev.to_local_playlist();
         store.save(&playlist)?;
         Ok(playlist)
@@ -248,10 +262,12 @@ impl ImportSession {
                 self.status = progress_status(done, total);
             }
             ImportProgressEvent::Finished { .. } => {
-                self.finish_review(outcome, false);
+                self.finish_review(outcome);
             }
             ImportProgressEvent::Cancelled { .. } => {
-                self.finish_review(outcome, true);
+                self.reset_to_idle();
+                outcome.finished = true;
+                outcome.cancelled = true;
             }
             ImportProgressEvent::Failed { message } => {
                 self.fail(message);
@@ -277,16 +293,12 @@ impl ImportSession {
         }
     }
 
-    fn finish_review(&mut self, outcome: &mut DrainOutcome, cancelled: bool) {
+    fn finish_review(&mut self, outcome: &mut DrainOutcome) {
         self.stage = ImportStage::Review;
         if let Some(ref src) = self.source {
             self.review = Some(ImportReview::from_resolutions(src, &self.resolutions));
         }
         outcome.finished = true;
-        if cancelled {
-            outcome.cancelled = true;
-            self.status = "Import cancelled".to_string();
-        }
     }
 }
 
@@ -391,6 +403,9 @@ mod tests {
         assert_eq!(session.stage, ImportStage::Matching);
         assert!(session.is_busy());
 
+        session.stage = ImportStage::Cancelling;
+        assert!(session.is_busy());
+
         session.fail("prior error");
         assert_eq!(session.stage, ImportStage::Failed);
         assert!(!session.is_busy());
@@ -433,6 +448,8 @@ mod tests {
 
         session.request_cancel();
         assert!(cancel.load(Ordering::Relaxed));
+        assert_eq!(session.stage, ImportStage::Cancelling);
+        assert_eq!(session.status, "Import cancelled");
     }
 
     #[test]
@@ -493,34 +510,88 @@ mod tests {
     }
 
     #[test]
-    fn test_drain_cancelled_keeps_partial_rows_and_sets_status() {
+    fn test_cancel_returns_to_idle_without_review() {
+        let mut session = ImportSession::new();
+        let (tx, rx) = mpsc::channel();
+        session.begin_matching(sample_spotify_playlist(), rx);
+
+        session.request_cancel();
+        assert_eq!(session.stage, ImportStage::Cancelling);
+        assert_eq!(session.status, "Import cancelled");
+        assert!(session.is_busy());
+
+        tx.send(ImportProgressEvent::Cancelled {
+            playlist: LocalPlaylist::new("local:cancelled", "Cancelled"),
+        })
+        .unwrap();
+
+        let outcome = session.drain();
+        assert_eq!(session.stage, ImportStage::Idle);
+        assert!(session.review.is_none());
+        assert_eq!(session.counts().total, 0);
+        assert!(outcome.cancelled);
+    }
+
+    #[test]
+    fn test_save_impossible_after_cancel() {
+        let mut session = ImportSession::new();
+        let (tx, rx) = mpsc::channel();
+        session.begin_matching(sample_spotify_playlist(), rx);
+
+        session.request_cancel();
+        tx.send(ImportProgressEvent::Cancelled {
+            playlist: LocalPlaylist::new("local:cancelled", "Cancelled"),
+        })
+        .unwrap();
+        session.drain();
+
+        let store = MemoryPlaylistStore::new();
+        let err = session.save(&store).unwrap_err();
+        assert!(err.to_string().contains("no import review"));
+    }
+
+    #[test]
+    fn test_save_requires_complete_review() {
         let mut session = ImportSession::new();
         let (tx, rx) = mpsc::channel();
         session.begin_matching(sample_spotify_playlist(), rx);
 
         let local = LocalTrack::new("v1", "Song 1", "Artist 1", MatchConfidence::High);
+        tx.send(ImportProgressEvent::Started { total: 2 }).unwrap();
         tx.send(ImportProgressEvent::Track {
             index: 0,
             resolution: TrackResolution::Matched {
                 track: local.clone(),
-                alternatives: vec![local.clone()],
+                alternatives: vec![local],
             },
         })
         .unwrap();
-        tx.send(ImportProgressEvent::Cancelled {
+        tx.send(ImportProgressEvent::Finished {
             playlist: LocalPlaylist::new("local:sp_test_id", "Road Trip"),
         })
         .unwrap();
 
         let outcome = session.drain();
-        assert_eq!(outcome.applied, 2);
-        assert!(outcome.finished);
-        assert!(outcome.cancelled);
         assert_eq!(session.stage, ImportStage::Review);
-        assert_eq!(session.status, "Import cancelled");
+        assert_eq!(session.review.as_ref().unwrap().rows.len(), 1);
+        assert!(outcome.finished);
 
-        let rev = session.review.as_ref().expect("review created");
-        assert_eq!(rev.rows.len(), 1);
+        let store = MemoryPlaylistStore::new();
+        let err = session.save(&store).unwrap_err();
+        assert!(err.to_string().contains("incomplete"));
+    }
+
+    #[test]
+    fn test_progress_modal_reports_cancelling() {
+        let mut session = ImportSession::new();
+        let (_tx, rx) = mpsc::channel();
+        session.begin_matching(sample_spotify_playlist(), rx);
+
+        session.request_cancel();
+        assert_eq!(session.stage, ImportStage::Cancelling);
+        assert_eq!(session.status, "Import cancelled");
+        assert!(session.is_busy());
+        assert!(!session.is_running());
     }
 
     #[test]
@@ -595,6 +666,15 @@ mod tests {
             resolution: TrackResolution::Unresolved {
                 title: "Song 1".into(),
                 artist: "Artist 1".into(),
+                reason: "not found".into(),
+            },
+        })
+        .unwrap();
+        tx.send(ImportProgressEvent::Track {
+            index: 1,
+            resolution: TrackResolution::Unresolved {
+                title: "Song 2".into(),
+                artist: "Artist 2".into(),
                 reason: "not found".into(),
             },
         })

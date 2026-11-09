@@ -105,6 +105,7 @@ export component MoggytWindow inherits Window {
     in-out property <bool> import-busy: false;
     in-out property <bool> import-failed: false;
     in-out property <bool> import-running: false;
+    in-out property <bool> import-cancelling: false;
     in-out property <string> import-status-text: "";
     in-out property <int> import-done: 0;
     in-out property <int> import-total: 0;
@@ -359,19 +360,21 @@ export component MoggytWindow inherits Window {
 
     ImportProgress {
         visible: root.import-running;
+        cancelling: root.import-cancelling;
         status-text: root.import-status-text;
         done: root.import-done;
         total: root.import-total;
         high: root.import-high;
         review: root.import-review;
         unresolved: root.import-unresolved;
-        cancel-requested => { root.import-running = false; root.import-cancel-requested(); }
+        cancel-requested => { root.import-cancel-requested(); }
     }
 
     ImportReviewView {
         visible: root.import-review-open;
         playlist-title: root.import-review-title;
         counts-text: root.import-review-counts;
+        status-text: root.import-status-text;
         rows: root.import-rows;
         selected: root.import-selected-row;
         can-save: root.import-can-save;
