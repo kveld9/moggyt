@@ -59,6 +59,7 @@ pub mod platform;
 pub mod play_log;
 pub mod playback;
 pub mod playback_control;
+pub mod playback_request;
 pub mod playback_worker;
 pub mod player_bar;
 mod scrobble_control;

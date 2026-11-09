@@ -51,7 +51,7 @@ pub(crate) fn handle_filtered_item_click(
             let last_idx = state.queue.len().saturating_sub(1);
             state.play_track_at_index_in_memory(last_idx);
             state.page = SlintPage::NowPlaying;
-            trigger_playback(window, state, worker_tx);
+            trigger_playback(window, state);
             sync_window(window, state);
         }
         SearchResult::Album(album) => {
@@ -83,11 +83,7 @@ pub(crate) fn handle_explore_item_click(
 }
 
 /// Non-blocking handler for playback toggle (pause, resume, or start head track).
-pub(crate) fn handle_toggle_play(
-    window: &MoggytWindow,
-    state: &mut SlintAppState,
-    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
-) {
+pub(crate) fn handle_toggle_play(window: &MoggytWindow, state: &mut SlintAppState) {
     let audio_arc = std::sync::Arc::clone(&state.audio);
     let Ok(mut audio) = audio_arc.try_lock() else {
         return;
@@ -109,7 +105,7 @@ pub(crate) fn handle_toggle_play(
         return;
     }
     drop(audio);
-    trigger_playback(window, state, worker_tx);
+    trigger_playback(window, state);
 }
 
 /// Wires user event callbacks between MoggytWindow and the application state without blocking.
@@ -312,12 +308,11 @@ fn wire_library_callbacks(
 ) {
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    let tx = worker_tx.clone();
     window.on_queue_track_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         st.play_track_at_index_in_memory(idx as usize);
-        trigger_playback(&win, &mut st, &tx);
+        trigger_playback(&win, &mut st);
         sync_window(&win, &mut st);
     });
 
@@ -362,23 +357,20 @@ fn wire_playback_callbacks(
 ) {
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    let tx = worker_tx.clone();
     window.on_toggle_play(move || {
-        with_window_state(&w, &s, |win, st| handle_toggle_play(win, st, &tx));
+        with_window_state(&w, &s, handle_toggle_play);
     });
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    let tx = worker_tx.clone();
     window.on_prev_track(move || {
-        with_window_state(&w, &s, |win, st| handle_prev_track(win, st, &tx));
+        with_window_state(&w, &s, handle_prev_track);
     });
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    let tx = worker_tx.clone();
     window.on_next_track(move || {
-        with_window_state(&w, &s, |win, st| handle_next_track(win, st, &tx));
+        with_window_state(&w, &s, handle_next_track);
     });
 
     let s = Rc::clone(state_rc);
@@ -449,23 +441,15 @@ fn wire_playback_callbacks(
     });
 }
 
-fn handle_prev_track(
-    win: &MoggytWindow,
-    st: &mut SlintAppState,
-    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
-) {
+fn handle_prev_track(win: &MoggytWindow, st: &mut SlintAppState) {
     st.queue.retreat();
-    trigger_playback(win, st, tx);
+    trigger_playback(win, st);
     sync_window(win, st);
 }
 
-fn handle_next_track(
-    win: &MoggytWindow,
-    st: &mut SlintAppState,
-    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
-) {
+fn handle_next_track(win: &MoggytWindow, st: &mut SlintAppState) {
     st.queue.advance();
-    trigger_playback(win, st, tx);
+    trigger_playback(win, st);
     sync_window(win, st);
 }
 

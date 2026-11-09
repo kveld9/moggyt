@@ -34,9 +34,9 @@ use crate::slint_shell::platform::dispatch_to_ui;
 use crate::slint_shell::playback::{format_track_duration, is_track_liked};
 use crate::slint_shell::playback_control::apply_play_track_completion;
 use crate::slint_shell::playback_worker::{
-    LyricsPrefetch, PlayTrackRequest, PlaybackWorkerAdapters, PlaybackWorkerCommand,
-    execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
-    execute_seek, spawn_lyrics_prefetch, thumbnail_variant_for_row,
+    PlaybackWorkerAdapters, PlaybackWorkerCommand, execute_detail, execute_play_track,
+    execute_refresh_library, execute_scrobble, execute_search, execute_seek, spawn_lyrics_prefetch,
+    thumbnail_variant_for_row,
 };
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::stream_prefetch::spawn_stream_prefetch;
@@ -72,17 +72,14 @@ pub(crate) fn with_ui_state<R>(f: impl FnOnce(&mut SlintAppState) -> R) -> Optio
 }
 
 /// Triggers asynchronous track playback on the background worker thread.
-pub(crate) fn trigger_playback(
-    window: &MoggytWindow,
-    state: &mut SlintAppState,
-    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
-) {
+pub(crate) fn trigger_playback(window: &MoggytWindow, state: &mut SlintAppState) {
+    let Some(req) = state.begin_play_request() else {
+        return;
+    };
     let Some(track) = state.queue.current().cloned() else {
         return;
     };
-    state.play_generation = state.play_generation.wrapping_add(1);
-    let generation = state.play_generation;
-    state.maybe_scrobble_current();
+    let generation = req.generation;
 
     state.current_cover_image = None;
     let initial_cover = resolve_row_cover_image(track.artwork.as_deref(), &state.search_covers);
@@ -98,8 +95,9 @@ pub(crate) fn trigger_playback(
         let target_url =
             if state.hi_res_covers { art_url.clone() } else { thumbnail_variant_for_row(art_url) };
         if !state.search_covers.contains_key(&target_url) {
-            let _ =
-                worker_tx.send(PlaybackWorkerCommand::FetchCover { url: target_url, generation });
+            if let Some(ref tx) = state.worker_tx {
+                let _ = tx.send(PlaybackWorkerCommand::FetchCover { url: target_url, generation });
+            }
         }
     }
     state.lyrics_lines.clear();
@@ -121,27 +119,7 @@ pub(crate) fn trigger_playback(
     window.set_lyrics_lines(ModelRc::new(VecModel::default()));
     window.set_active_lyric_index(-1);
 
-    let next_track = state.queue.peek_next().filter(|next| next.id != track.id);
-    let prefetch_lyrics = next_track.as_ref().map(|next| LyricsPrefetch {
-        artist: next.artist.clone(),
-        title: next.title.clone(),
-        duration_secs: next.duration_secs,
-    });
-    let prefetch_stream_id = next_track.map(|next| next.id.clone());
-
-    let req = PlayTrackRequest {
-        generation,
-        track_id: track.id.clone(),
-        title: track.title.clone(),
-        artist: track.artist.clone(),
-        artwork_url: track.artwork.clone(),
-        duration_secs: track.duration_secs,
-        hi_res_covers: state.hi_res_covers,
-        lyric_overrides: state.lyric_overrides.clone(),
-        prefetch_lyrics,
-        prefetch_stream_id,
-    };
-    let _ = worker_tx.send(PlaybackWorkerCommand::Play(req));
+    state.send_play_request(req);
 }
 
 fn search_filter_index(filter: SearchFilter) -> i32 {
@@ -350,7 +328,7 @@ pub(crate) fn spawn_playback_worker(
                         let _ = dispatch_to_ui(move || {
                             let Some(win) = w.upgrade() else { return };
                             with_ui_state(|st| {
-                                if st.play_generation == res.generation {
+                                if st.should_apply_play_result(res.generation) {
                                     apply_play_track_completion(&win, st, res);
                                 }
                             });
