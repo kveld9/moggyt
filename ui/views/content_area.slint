@@ -14,6 +14,7 @@ import { LibraryView } from "./library_view.slint";
 import { DetailView } from "./detail_view.slint";
 import { SettingsView } from "./settings_view.slint";
 import { StatsView } from "./stats_view.slint";
+import { PersistenceBanner } from "../components/persistence_banner.slint";
 
 export component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
@@ -99,6 +100,9 @@ export component ContentArea inherits Rectangle {
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
     callback library-import-requested();
+    in property <string> persistence-error-text: "";
+    in property <string> persistence-dismiss-text: "Dismiss";
+    callback persistence-error-dismissed();
 
     background: Theme.window;
     clip: true;
@@ -112,6 +116,12 @@ export component ContentArea inherits Rectangle {
             padding: 24px;
             spacing: 16px;
             alignment: start;
+
+            PersistenceBanner {
+                text: root.persistence-error-text;
+                dismiss-text: root.persistence-dismiss-text;
+                dismissed => { root.persistence-error-dismissed(); }
+            }
 
             HorizontalLayout {
                 alignment: space-between;

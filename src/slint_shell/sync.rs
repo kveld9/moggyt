@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use slint::{ModelRc, VecModel};
 
 use crate::domain::{PlaybackFacts, SearchFilter, Track};
-use crate::i18n::tr;
-use crate::infra::GithubUpdater;
+use crate::i18n::{Locale, tr};
+use crate::infra::{GithubUpdater, StoreHealth};
 use crate::slint_shell::covers::resolve_row_cover_image;
 use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::explore::explore_card_shelves;
@@ -24,7 +24,7 @@ use crate::slint_shell::playback::{
 };
 use crate::slint_shell::player_bar::mode_to_index;
 use crate::slint_shell::search::{SearchRow, format_duration};
-use crate::slint_shell::state::SlintAppState;
+use crate::slint_shell::state::{PersistenceError, PersistenceStore, SlintAppState};
 use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData};
@@ -94,10 +94,36 @@ pub(crate) fn sync_view_phase(window: &MoggytWindow, view: ViewId, phase: ViewPh
     }
 }
 
+fn persistence_error_key(error: PersistenceError) -> Option<&'static str> {
+    match (error.store, error.health) {
+        (PersistenceStore::Settings, StoreHealth::Quarantined) => {
+            Some("Settings file was corrupt and was quarantined")
+        }
+        (PersistenceStore::Settings, StoreHealth::Incompatible) => {
+            Some("Settings file uses a newer schema")
+        }
+        (PersistenceStore::Queue, StoreHealth::Quarantined) => {
+            Some("Queue file was corrupt and was quarantined")
+        }
+        (PersistenceStore::Queue, StoreHealth::Incompatible) => {
+            Some("Queue file uses a newer schema")
+        }
+        _ => None,
+    }
+}
+
+fn persistence_error_text(locale: Locale, error: Option<PersistenceError>) -> String {
+    error.and_then(persistence_error_key).map(|key| tr(locale, key).to_string()).unwrap_or_default()
+}
+
 /// Synchronizes state with Slint window properties without performing blocking I/O.
 pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     apply_palette(window, &state.active_palette());
     observe_view_phases(state);
+    window.set_persistence_error_text(
+        persistence_error_text(state.locale, state.persistence_error).into(),
+    );
+    window.set_persistence_dismiss_text(tr(state.locale, "Dismiss").into());
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_custom_theme_status_text(state.custom_theme_status.clone().into());
     let custom_names: Vec<slint::SharedString> = state
@@ -614,5 +640,50 @@ mod tests {
         let mut state = test_wired();
         observe_view_phases(&mut state);
         assert_eq!(state.category_phase, ViewPhase::Empty);
+    }
+
+    #[test]
+    fn test_persistence_error_text_mapping() {
+        let err_settings_q = Some(PersistenceError {
+            store: PersistenceStore::Settings,
+            health: StoreHealth::Quarantined,
+        });
+        assert_eq!(
+            persistence_error_text(Locale::English, err_settings_q),
+            "Settings file was corrupt and was quarantined"
+        );
+        assert_eq!(
+            persistence_error_text(Locale::Spanish, err_settings_q),
+            "El archivo de ajustes estaba corrupto y se puso en cuarentena"
+        );
+
+        let err_settings_i = Some(PersistenceError {
+            store: PersistenceStore::Settings,
+            health: StoreHealth::Incompatible,
+        });
+        assert_eq!(
+            persistence_error_text(Locale::English, err_settings_i),
+            "Settings file uses a newer schema"
+        );
+
+        let err_queue_q = Some(PersistenceError {
+            store: PersistenceStore::Queue,
+            health: StoreHealth::Quarantined,
+        });
+        assert_eq!(
+            persistence_error_text(Locale::English, err_queue_q),
+            "Queue file was corrupt and was quarantined"
+        );
+
+        let err_queue_i = Some(PersistenceError {
+            store: PersistenceStore::Queue,
+            health: StoreHealth::Incompatible,
+        });
+        assert_eq!(
+            persistence_error_text(Locale::English, err_queue_i),
+            "Queue file uses a newer schema"
+        );
+
+        assert_eq!(persistence_error_text(Locale::English, None), "");
     }
 }

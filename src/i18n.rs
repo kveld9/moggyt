@@ -127,6 +127,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Disconnect", "Desconectar"),
     ("Disk space quota for offline stream cache", "Espacio en disco para la caché de audio"),
     ("Discord Rich Presence", "Discord Rich Presence"),
+    ("Dismiss", "Descartar"),
     (
         "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
         "Las importaciones por enlace se limitan a 100 canciones. Exporta un CSV para playlists mas largas.",
@@ -200,6 +201,11 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Prefer songs over music videos", "Preferir canciones a videoclips"),
     ("Queue", "Cola"),
     ("Queue ({count})", "Cola ({count})"),
+    ("Queue file uses a newer schema", "El archivo de cola usa un esquema mas nuevo"),
+    (
+        "Queue file was corrupt and was quarantined",
+        "El archivo de cola estaba corrupto y se puso en cuarentena",
+    ),
     ("Recent searches", "Búsquedas recientes"),
     ("Review matches", "Revisar coincidencias"),
     ("Save playlist", "Guardar playlist"),
@@ -211,6 +217,11 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Select a playlist file", "Selecciona un archivo de playlist"),
     ("Session", "Sesión"),
     ("Settings", "Ajustes"),
+    ("Settings file uses a newer schema", "El archivo de ajustes usa un esquema mas nuevo"),
+    (
+        "Settings file was corrupt and was quarantined",
+        "El archivo de ajustes estaba corrupto y se puso en cuarentena",
+    ),
     ("Show artwork", "Mostrar portada"),
     ("Show like button", "Mostrar botón Me gusta"),
     ("Show queue button", "Mostrar botón de cola"),

@@ -30,7 +30,8 @@ pub use crate::slint_shell::page::SlintPage;
 pub use crate::slint_shell::playback_control::apply_play_track_completion;
 pub use crate::slint_shell::player_bar::PlayerBarPrefs;
 pub use crate::slint_shell::state::{
-    SharedAudio, SharedCatalog, SharedCovers, SharedLyrics, SharedState, SlintAppState,
+    PersistenceError, PersistenceStore, SharedAudio, SharedCatalog, SharedCovers, SharedLyrics,
+    SharedState, SlintAppState,
 };
 pub use crate::slint_shell::window::build_window;
 use crate::slint_shell::window::with_ui_state;
@@ -134,6 +135,7 @@ pub fn run(
         state.queue = saved_queue;
     }
     state.queue_store = queue_store;
+    state.persistence_error = detect_persistence_error(&*state.settings_store, &*state.queue_store);
 
     state.skip_store = skip_store;
     state.play_log_store = play_log_store;
@@ -157,6 +159,24 @@ pub fn run(
 /// Persists the active playback queue to storage on application exit.
 pub fn persist_state_on_exit(state: &SlintAppState) -> anyhow::Result<()> {
     state.queue_store.save(&state.queue)
+}
+
+fn detect_persistence_error(
+    settings: &dyn SettingsStore,
+    queue: &dyn QueueStore,
+) -> Option<PersistenceError> {
+    let settings_health = settings.health();
+    if settings_health != crate::infra::StoreHealth::Ok {
+        return Some(PersistenceError {
+            store: PersistenceStore::Settings,
+            health: settings_health,
+        });
+    }
+    let queue_health = queue.health();
+    if queue_health != crate::infra::StoreHealth::Ok {
+        return Some(PersistenceError { store: PersistenceStore::Queue, health: queue_health });
+    }
+    None
 }
 
 #[cfg(test)]
@@ -186,5 +206,51 @@ mod tests {
         let loaded = state.queue_store.load();
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded.tracks(), &[track1, track2]);
+    }
+
+    #[test]
+    fn test_detect_persistence_error_reports_quarantined_settings() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-detect-err-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let settings = crate::infra::DiskSettingsStore::new(temp_dir.clone());
+        let queue = crate::infra::DiskQueueStore::new(temp_dir.clone());
+
+        std::fs::write(settings.file_path(), b"broken payload").unwrap();
+        let _ = settings.load();
+
+        let err = detect_persistence_error(&settings, &queue);
+        assert_eq!(
+            err,
+            Some(PersistenceError {
+                store: PersistenceStore::Settings,
+                health: crate::infra::StoreHealth::Quarantined,
+            })
+        );
+
+        let clean_temp =
+            std::env::temp_dir().join(format!("moggyt-detect-clean-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&clean_temp);
+        let _ = std::fs::create_dir_all(&clean_temp);
+        let clean_settings = crate::infra::DiskSettingsStore::new(clean_temp.clone());
+        let clean_queue = crate::infra::DiskQueueStore::new(clean_temp.clone());
+        assert_eq!(detect_persistence_error(&clean_settings, &clean_queue), None);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let _ = std::fs::remove_dir_all(&clean_temp);
+    }
+
+    #[test]
+    fn test_dismiss_persistence_error_clears_error_and_unblocks_stores() {
+        let mut state = test_wired();
+        state.persistence_error = Some(PersistenceError {
+            store: PersistenceStore::Settings,
+            health: crate::infra::StoreHealth::Quarantined,
+        });
+
+        state.dismiss_persistence_error();
+        assert_eq!(state.persistence_error, None);
     }
 }

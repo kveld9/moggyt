@@ -34,6 +34,8 @@ pub trait QueueStore: Send + Sync {
     fn is_quarantined(&self) -> bool {
         self.health() == StoreHealth::Quarantined
     }
+    /// Clears any reported health errors on the store.
+    fn clear_health(&self) {}
 }
 
 /// In-memory queue store for tests and headless execution.
@@ -139,6 +141,10 @@ impl QueueStore for DiskQueueStore {
         self.health.is_quarantined()
     }
 
+    fn clear_health(&self) {
+        self.health.clear();
+    }
+
     fn load(&self) -> PlaybackQueue {
         let path = self.file_path();
         let Ok(bytes) = std::fs::read(&path) else {
@@ -163,6 +169,9 @@ impl QueueStore for DiskQueueStore {
     }
 
     fn save(&self, queue: &PlaybackQueue) -> anyhow::Result<()> {
+        if self.health.get() != StoreHealth::Ok {
+            anyhow::bail!("queue store is blocked until the persistence error is acknowledged");
+        }
         let envelope = QueueFile { version: QUEUE_SCHEMA_VERSION, queue: queue.clone() };
         let json = serde_json::to_vec_pretty(&envelope)?;
         self.write_atomic(&json)
@@ -238,6 +247,26 @@ mod tests {
         std::fs::write(store.file_path(), b"{\"tracks\": 99999}").unwrap();
         assert_eq!(store.load(), PlaybackQueue::new());
         assert!(store.is_quarantined());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_quarantined_queue_blocks_save_until_ack() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("moggyt-queue-block-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let store = DiskQueueStore::new(temp_dir.clone());
+
+        std::fs::write(store.file_path(), b"{\"tracks\": [{\"id\": ").unwrap();
+        let _ = store.load();
+        assert!(store.is_quarantined());
+
+        // Quarantined store blocks writes, ensuring corrupted queues are not overwritten on exit
+        assert!(store.save(&PlaybackQueue::new()).is_err());
+        store.clear_health();
+        assert!(store.save(&PlaybackQueue::new()).is_ok());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

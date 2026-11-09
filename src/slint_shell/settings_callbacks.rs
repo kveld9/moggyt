@@ -6,6 +6,7 @@ use slint::ComponentHandle;
 
 use crate::domain::{ThemeId, TimerPreset};
 use crate::slint_shell::MoggytWindow;
+use crate::slint_shell::callbacks::with_window_state;
 use crate::slint_shell::explore::explore_columns_for_width;
 use crate::slint_shell::format::timer_preset_from_index;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
@@ -134,6 +135,15 @@ pub(crate) fn wire_settings_callbacks(
         if st.explore_loaded {
             sync_explore_shelves(&win, &st);
         }
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_persistence_error_dismissed(move || {
+        with_window_state(&w, &s, |win, st| {
+            st.dismiss_persistence_error();
+            sync_window(win, st);
+        });
     });
 }
 

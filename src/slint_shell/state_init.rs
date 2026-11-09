@@ -125,6 +125,7 @@ impl SlintAppState {
             category_return: SlintPage::Explore,
             explore_columns: crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS,
             worker_tx: None,
+            persistence_error: None,
         }
     }
 }

@@ -202,6 +202,8 @@ pub trait SettingsStore: Send + Sync {
     fn is_quarantined(&self) -> bool {
         self.health() == StoreHealth::Quarantined
     }
+    /// Clears any reported health errors on the store.
+    fn clear_health(&self) {}
 }
 
 /// In-memory settings store for tests and headless execution.
@@ -268,9 +270,11 @@ impl SettingsStore for DiskSettingsStore {
     fn health(&self) -> StoreHealth {
         self.health.get()
     }
-
     fn is_quarantined(&self) -> bool {
         self.health.is_quarantined()
+    }
+    fn clear_health(&self) {
+        self.health.clear();
     }
 
     fn load(&self) -> Settings {
@@ -300,6 +304,9 @@ impl SettingsStore for DiskSettingsStore {
     }
 
     fn save(&self, settings: &Settings) -> anyhow::Result<()> {
+        if self.health.get() != StoreHealth::Ok {
+            anyhow::bail!("settings store is blocked until the persistence error is acknowledged");
+        }
         let json = serde_json::to_vec_pretty(settings)?;
         self.write_atomic(&json)
     }
@@ -351,6 +358,14 @@ mod tests {
         }
     }
 
+    fn corrupt_files(dir: &Path) -> Vec<PathBuf> {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.to_string_lossy().contains(".corrupt."))
+            .collect()
+    }
+
     #[test]
     fn test_1_given_no_settings_file_when_loaded_then_returns_default() {
         let temp = TempDir::new("test-1");
@@ -369,11 +384,7 @@ mod tests {
         assert!(store.is_quarantined());
         assert!(!store.file_path().exists());
 
-        let corrupt: Vec<_> = std::fs::read_dir(temp.path())
-            .unwrap()
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.to_string_lossy().contains(".corrupt."))
-            .collect();
+        let corrupt = corrupt_files(&temp.path());
         assert_eq!(corrupt.len(), 1);
         assert_eq!(std::fs::read(&corrupt[0]).unwrap(), payload);
         assert!(!store.file_path().exists());
@@ -391,11 +402,7 @@ mod tests {
         std::fs::write(store.file_path(), payload2).unwrap();
         assert_eq!(store.load(), Settings::default());
 
-        let files: Vec<_> = std::fs::read_dir(temp.path())
-            .unwrap()
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.to_string_lossy().contains(".corrupt."))
-            .collect();
+        let files = corrupt_files(&temp.path());
         assert_eq!(files.len(), 2);
         let contents: Vec<_> = files.iter().map(|p| std::fs::read(p).unwrap()).collect();
         assert!(contents.contains(&payload1.to_vec()) && contents.contains(&payload2.to_vec()));
@@ -446,6 +453,19 @@ mod tests {
 
         store.clear_health();
         assert_eq!(store.health(), StoreHealth::Ok);
+    }
+
+    #[test]
+    fn test_quarantined_settings_block_writes_until_ack() {
+        let temp = TempDir::new("test-block-ack");
+        let store = DiskSettingsStore::new(temp.path());
+        std::fs::write(store.file_path(), b"broken payload").unwrap();
+        let _ = store.load();
+        assert!(store.is_quarantined());
+
+        assert!(store.save(&Settings::default()).is_err());
+        store.clear_health();
+        assert!(store.save(&Settings::default()).is_ok());
     }
 
     #[test]
@@ -511,12 +531,10 @@ mod tests {
     fn test_lastfm_credentials_serde_defaults_and_roundtrip() {
         let empty: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(empty.lastfm_api_key.is_empty() && empty.lastfm_api_secret.is_empty());
-
         let json = r#"{"lastfm_api_key": "my-key", "lastfm_api_secret": "my-secret"}"#;
         let loaded: Settings = serde_json::from_str(json).expect("deserialize explicit");
         assert_eq!(loaded.lastfm_api_key, "my-key");
         assert_eq!(loaded.lastfm_api_secret, "my-secret");
-
         let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
         let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
         assert_eq!(decoded.lastfm_api_key, "my-key");
@@ -527,14 +545,11 @@ mod tests {
     fn test_songs_only_setting_defaults_false_and_roundtrips() {
         let default_settings = Settings::default();
         assert!(!default_settings.songs_only);
-
         let missing_key: Settings = serde_json::from_str("{}").expect("deserialize empty json");
         assert!(!missing_key.songs_only);
-
         let json_true = r#"{"songs_only": true}"#;
         let loaded: Settings = serde_json::from_str(json_true).expect("deserialize true");
         assert!(loaded.songs_only);
-
         let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
         let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
         assert!(decoded.songs_only);
@@ -600,14 +615,11 @@ mod tests {
     fn test_discord_presence_setting_defaults_false_and_roundtrips() {
         let default_settings = Settings::default();
         assert!(!default_settings.discord_presence_enabled);
-
         let missing_key: Settings = serde_json::from_str("{}").expect("deserialize empty json");
         assert!(!missing_key.discord_presence_enabled);
-
         let json_true = r#"{"discord_presence_enabled": true}"#;
         let loaded: Settings = serde_json::from_str(json_true).expect("deserialize true");
         assert!(loaded.discord_presence_enabled);
-
         let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
         let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
         assert!(decoded.discord_presence_enabled);
@@ -620,14 +632,12 @@ mod tests {
                 .expect("deserialize false");
         assert!(!with_both_false.lastfm_enabled && with_both_false.lastfm_username.is_empty());
         assert!(!with_both_false.hi_res_covers);
-
         let with_both_true: Settings = serde_json::from_str(
             r#"{"lastfm_enabled": true, "lastfm_username": "moggy", "hi_res_covers": true}"#,
         )
         .expect("deserialize true");
         assert!(with_both_true.lastfm_enabled && with_both_true.hi_res_covers);
         assert_eq!(with_both_true.lastfm_username, "moggy");
-
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(!omitted.lastfm_enabled && omitted.lastfm_username.is_empty());
         assert!(!omitted.hi_res_covers);
@@ -681,16 +691,10 @@ mod tests {
     fn test_playback_speed_clamped_on_load_from_disk() {
         let temp = TempDir::new("test-speed-clamp");
         let store = DiskSettingsStore::new(temp.path());
-
-        // Above max -> clamped to 2.0
         std::fs::write(store.file_path(), r#"{"playback_speed": 99.0}"#).unwrap();
         assert_eq!(store.load().playback_speed, 2.0);
-
-        // Below min -> clamped to 0.5
         std::fs::write(store.file_path(), r#"{"playback_speed": 0.1}"#).unwrap();
         assert_eq!(store.load().playback_speed, 0.5);
-
-        // Non-positive -> clamped to 1.0
         std::fs::write(store.file_path(), r#"{"playback_speed": -1.0}"#).unwrap();
         assert_eq!(store.load().playback_speed, 1.0);
     }
@@ -722,10 +726,8 @@ mod tests {
         let explicit: Settings =
             serde_json::from_str(r#"{"crossfade_seconds": 8}"#).expect("deserialize explicit");
         assert_eq!(explicit.crossfade_seconds, 8);
-
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert_eq!(omitted.crossfade_seconds, 0);
-
         let roundtrip = serde_json::to_string(&explicit).expect("serialize settings");
         let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
         assert_eq!(decoded.crossfade_seconds, 8);
@@ -735,13 +737,10 @@ mod tests {
     fn test_crossfade_seconds_clamped_on_load_from_disk() {
         let temp = TempDir::new("test-crossfade-clamp");
         let store = DiskSettingsStore::new(temp.path());
-
         std::fs::write(store.file_path(), r#"{"crossfade_seconds": 99}"#).unwrap();
         assert_eq!(store.load().crossfade_seconds, MAX_CROSSFADE_SECONDS);
-
         std::fs::write(store.file_path(), r#"{"crossfade_seconds": 0}"#).unwrap();
         assert_eq!(store.load().crossfade_seconds, 0);
-
         std::fs::write(store.file_path(), r#"{"crossfade_seconds": 7}"#).unwrap();
         assert_eq!(store.load().crossfade_seconds, 7);
     }
@@ -760,10 +759,8 @@ mod tests {
         let explicit: Settings = serde_json::from_str(r#"{"stream_cache_limit_mb": 1024}"#)
             .expect("deserialize explicit");
         assert_eq!(explicit.stream_cache_limit_mb, 1024);
-
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert_eq!(omitted.stream_cache_limit_mb, 512);
-
         let roundtrip = serde_json::to_string(&explicit).expect("serialize settings");
         let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
         assert_eq!(decoded.stream_cache_limit_mb, 1024);
@@ -777,7 +774,6 @@ mod tests {
 
         let temp = TempDir::new("test-stream-cache-clamp");
         let store = DiskSettingsStore::new(temp.path());
-
         std::fs::write(store.file_path(), r#"{"stream_cache_limit_mb": 50000}"#).unwrap();
         assert_eq!(store.load().stream_cache_limit_mb, 10240);
     }
@@ -787,10 +783,8 @@ mod tests {
         let explicit: Settings = serde_json::from_str(r#"{"custom_theme_name": "rose-pine"}"#)
             .expect("deserialize explicit");
         assert_eq!(explicit.custom_theme_name.as_deref(), Some("rose-pine"));
-
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert_eq!(omitted.custom_theme_name, None);
-
         let roundtrip = serde_json::to_string(&explicit).expect("serialize settings");
         let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
         assert_eq!(decoded.custom_theme_name.as_deref(), Some("rose-pine"));

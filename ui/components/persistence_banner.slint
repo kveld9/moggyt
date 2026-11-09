@@ -1,0 +1,43 @@
+import { Theme } from "../theme.slint";
+
+export component PersistenceBanner inherits Rectangle {
+    in property <string> text: "";
+    in property <string> dismiss-text: "Dismiss";
+    callback dismissed();
+
+    visible: root.text != "";
+    height: 36px;
+    background: Theme.surface;
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 8px;
+        alignment: space-between;
+
+        Text {
+            text: root.text;
+            color: Theme.text;
+            font-size: 12px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        Rectangle {
+            width: 84px;
+            height: 24px;
+            border-radius: 6px;
+            background: dismiss-btn.has-hover ? Theme.hover : Theme.overlay;
+            dismiss-btn := TouchArea {
+                clicked => { root.dismissed(); }
+            }
+            Text {
+                text: root.dismiss-text;
+                color: Theme.text;
+                font-size: 12px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

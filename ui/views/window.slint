@@ -121,7 +121,10 @@ export component MoggytWindow inherits Window {
     in-out property <[ImportAlternativeData]> import-alternatives: [];
     in-out property <int> import-alternative-selected: 0;
     in-out property <bool> import-picker-open: false;
+    in-out property <string> persistence-error-text: "";
+    in-out property <string> persistence-dismiss-text: "Dismiss";
 
+    callback persistence-error-dismissed();
     callback page-selected(int);
     callback back-pressed();
     callback theme-selected(int);
@@ -281,6 +284,9 @@ export component MoggytWindow inherits Window {
                     back-pressed => { root.back-pressed(); }
                     player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
                     player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
+                    persistence-error-text: root.persistence-error-text;
+                    persistence-dismiss-text: root.persistence-dismiss-text;
+                    persistence-error-dismissed => { root.persistence-error-dismissed(); }
                 }
                 Rectangle {
                     width: root.queue-panel-open ? 340px : 0px;

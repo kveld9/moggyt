@@ -34,6 +34,20 @@ pub type SharedAudio = Arc<Mutex<Box<dyn AudioBackend + Send>>>;
 pub type SharedLyrics = Arc<Box<dyn LyricsSource + Send + Sync>>;
 pub type SharedCovers = Arc<Mutex<Box<dyn CoverCache + Send>>>;
 
+/// Store whose persisted payload failed to load cleanly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PersistenceStore {
+    Settings,
+    Queue,
+}
+
+/// Unresolved persistence problem that blocks writes until acknowledged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PersistenceError {
+    pub store: PersistenceStore,
+    pub health: crate::infra::StoreHealth,
+}
+
 /// In-memory state and collaborator wiring for the Slint UI shell.
 pub struct SlintAppState {
     pub catalog: SharedCatalog,
@@ -123,12 +137,19 @@ pub struct SlintAppState {
     pub(crate) explore_columns: usize,
 
     pub worker_tx: Option<std::sync::mpsc::Sender<PlaybackWorkerCommand>>,
+    pub persistence_error: Option<PersistenceError>,
 }
 
 /// Shared reference-counted wrapper for [`SlintAppState`].
 pub type SharedState = Rc<RefCell<SlintAppState>>;
 
 impl SlintAppState {
+    /// Clears the reported persistence error and unblocks the affected stores.
+    pub fn dismiss_persistence_error(&mut self) {
+        self.persistence_error = None;
+        self.settings_store.clear_health();
+        self.queue_store.clear_health();
+    }
     /// Updates active UI theme and persists preference to disk settings store.
     pub fn set_theme(&mut self, theme: ThemeId) {
         self.theme = theme;
