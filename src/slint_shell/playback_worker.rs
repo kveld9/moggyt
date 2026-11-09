@@ -38,7 +38,7 @@ use tracing::{debug, warn};
 use crate::domain::{Detail, DetailKind, SearchQuery, Shelf};
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache, LyricLine,
+    AudioBackend, AudioError, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache, LyricLine,
     LyricOverrideDir, LyricsSource, Scrobbler, decode_cover, fetch_artwork,
 };
 use crate::slint_shell::platform::{CoverArtData, PresenceSnapshot};
@@ -233,12 +233,15 @@ impl<A, L, K> PlaybackWorkerAdapters<A, L, K> {
     }
 }
 
-fn dispatch_backend_play<A: AudioBackend>(audio: &mut A, track_id: &str, crossfade_seconds: u32) {
+fn dispatch_backend_play<A: AudioBackend>(
+    audio: &mut A,
+    track_id: &str,
+    crossfade_seconds: u32,
+) -> Result<(), AudioError> {
     if audio.is_playing() && crossfade_seconds > 0 {
-        audio
-            .play_crossfade(track_id, std::time::Duration::from_secs(u64::from(crossfade_seconds)));
+        audio.play_crossfade(track_id, std::time::Duration::from_secs(u64::from(crossfade_seconds)))
     } else {
-        audio.play(track_id);
+        audio.play(track_id)
     }
 }
 
@@ -254,8 +257,9 @@ where
 {
     let success = match adapters.audio.lock() {
         Ok(mut a) => {
-            dispatch_backend_play(&mut *a, &req.track_id, req.crossfade_seconds);
-            a.is_playing() || a.last_requested() == Some(req.track_id.as_str())
+            let started =
+                dispatch_backend_play(&mut *a, &req.track_id, req.crossfade_seconds).is_ok();
+            started && a.last_requested() == Some(req.track_id.as_str()) && a.is_playing()
         }
         Err(_) => false,
     };
@@ -358,17 +362,12 @@ mod tests {
     use super::*;
     use crate::domain::SearchFilter;
     use crate::infra::{AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, StubScrobbler};
+    use crate::slint_shell::test_support::NoLastRequestedAudio;
 
-    #[test]
-    fn test_execute_play_track_in_worker_thread() {
-        let audio = Arc::new(Mutex::new(AudioStub::new()));
-        let scrobbler = Arc::new(Mutex::new(Box::new(StubScrobbler::new()) as Box<dyn Scrobbler>));
-        let lyrics = Arc::new(LrclibStub::new());
-        let covers = Arc::new(Mutex::new(MemoryCoverCache::new()));
-
-        let req = PlayTrackRequest {
+    fn dummy_play_req(track_id: &str) -> PlayTrackRequest {
+        PlayTrackRequest {
             generation: 1,
-            track_id: "t1".into(),
+            track_id: track_id.into(),
             title: "Song".into(),
             artist: "Artist".into(),
             artwork_url: None,
@@ -378,15 +377,23 @@ mod tests {
             lyric_overrides: None,
             prefetch_lyrics: None,
             prefetch_stream_id: None,
-        };
+        }
+    }
 
-        let adapters = PlaybackWorkerAdapters::new(
-            Arc::clone(&audio),
-            Arc::clone(&scrobbler),
-            None,
-            Arc::clone(&lyrics),
-            Arc::clone(&covers),
-        );
+    fn test_worker_adapters<A: AudioBackend>(
+        audio: Arc<Mutex<A>>,
+    ) -> PlaybackWorkerAdapters<A, LrclibStub, MemoryCoverCache> {
+        let scrobbler = Arc::new(Mutex::new(Box::new(StubScrobbler::new()) as Box<dyn Scrobbler>));
+        let lyrics = Arc::new(LrclibStub::new());
+        let covers = Arc::new(Mutex::new(MemoryCoverCache::new()));
+        PlaybackWorkerAdapters::new(audio, scrobbler, None, lyrics, covers)
+    }
+
+    #[test]
+    fn test_execute_play_track_in_worker_thread() {
+        let audio = Arc::new(Mutex::new(AudioStub::new()));
+        let adapters = test_worker_adapters(Arc::clone(&audio));
+        let req = dummy_play_req("t1");
 
         let handle = std::thread::spawn(move || execute_play_track(req, &adapters));
 
@@ -398,6 +405,28 @@ mod tests {
         assert!(res.presence.is_playing);
 
         assert_eq!(audio.lock().unwrap().last_requested(), Some("t1"));
+    }
+
+    #[test]
+    fn failed_play_while_other_track_plays_reports_failure() {
+        let mut stub = AudioStub::new();
+        assert_eq!(stub.play("track-A"), Ok(()));
+        stub.set_fail_plays(true);
+        let audio = Arc::new(Mutex::new(stub));
+        let adapters = test_worker_adapters(Arc::clone(&audio));
+        let res = execute_play_track(dummy_play_req("track-B"), &adapters);
+        assert!(!res.success);
+        let guard = audio.lock().unwrap();
+        assert_eq!(guard.last_requested(), Some("track-A"));
+        assert!(guard.is_playing());
+    }
+
+    #[test]
+    fn success_requires_requested_id_match() {
+        let audio = Arc::new(Mutex::new(NoLastRequestedAudio));
+        let adapters = test_worker_adapters(audio);
+        let res = execute_play_track(dummy_play_req("track-C"), &adapters);
+        assert!(!res.success);
     }
 
     #[test]
@@ -572,35 +601,20 @@ mod tests {
             }
         });
 
-        tx.send(PlaybackWorkerCommand::Play(PlayTrackRequest {
-            generation: 99,
-            track_id: "test".into(),
-            title: "T".into(),
-            artist: "A".into(),
-            artwork_url: None,
-            duration_secs: None,
-            hi_res_covers: false,
-            crossfade_seconds: 0,
-            lyric_overrides: None,
-            prefetch_lyrics: None,
-            prefetch_stream_id: None,
-        }))
-        .unwrap();
-
-        let received = done_rx.recv().unwrap();
-        assert_eq!(received, 99);
+        let mut play_req = dummy_play_req("test");
+        play_req.generation = 99;
+        tx.send(PlaybackWorkerCommand::Play(play_req)).unwrap();
+        assert_eq!(done_rx.recv().unwrap(), 99);
 
         tx.send(PlaybackWorkerCommand::FetchCover {
             url: "https://artwork.local/art".into(),
             generation: 100,
         })
         .unwrap();
-        let cover_gen = done_rx.recv().unwrap();
-        assert_eq!(cover_gen, 100);
+        assert_eq!(done_rx.recv().unwrap(), 100);
 
         tx.send(PlaybackWorkerCommand::Seek { position_secs: 42 }).unwrap();
-        let seek_pos = done_rx.recv().unwrap();
-        assert_eq!(seek_pos, 42);
+        assert_eq!(done_rx.recv().unwrap(), 42);
 
         drop(tx);
         handle.join().expect("worker terminates on channel disconnect");
@@ -609,7 +623,7 @@ mod tests {
     #[test]
     fn test_execute_seek_in_worker_thread() {
         let audio = Arc::new(Mutex::new(AudioStub::new()));
-        audio.lock().unwrap().play("track-1");
+        let _ = audio.lock().unwrap().play("track-1");
         execute_seek(35, &audio);
         assert_eq!(audio.lock().unwrap().position_secs(), 35);
     }
@@ -628,26 +642,30 @@ mod tests {
 
     #[test]
     fn test_thumbnail_variant_for_row_replaces_hqdefault_with_mqdefault() {
-        let input = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg";
-        let expected = "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg";
-        assert_eq!(thumbnail_variant_for_row(input), expected);
+        assert_eq!(
+            thumbnail_variant_for_row("https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"),
+            "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"
+        );
     }
 
     #[test]
     fn test_thumbnail_variant_for_row_replaces_large_suffix() {
-        let input = "https://lh3.googleusercontent.com/test-thumb-large";
-        let expected = "https://lh3.googleusercontent.com/test-thumb-small";
-        assert_eq!(thumbnail_variant_for_row(input), expected);
-
-        let input_alt = "https://img.local/cover-large";
-        let expected_alt = "https://img.local/cover-small";
-        assert_eq!(thumbnail_variant_for_row(input_alt), expected_alt);
+        assert_eq!(
+            thumbnail_variant_for_row("https://lh3.googleusercontent.com/test-thumb-large"),
+            "https://lh3.googleusercontent.com/test-thumb-small"
+        );
+        assert_eq!(
+            thumbnail_variant_for_row("https://img.local/cover-large"),
+            "https://img.local/cover-small"
+        );
     }
 
     #[test]
     fn test_thumbnail_variant_for_row_leaves_other_urls_untouched() {
-        let input = "https://lh3.googleusercontent.com/artist-thumb";
-        assert_eq!(thumbnail_variant_for_row(input), input);
+        assert_eq!(
+            thumbnail_variant_for_row("https://lh3.googleusercontent.com/artist-thumb"),
+            "https://lh3.googleusercontent.com/artist-thumb"
+        );
     }
 
     #[test]
@@ -694,45 +712,19 @@ mod tests {
             section_art.insert(badge.trim().to_ascii_lowercase(), url.trim().to_string());
         }
 
-        // 1. Songs section
-        let song_art = section_art.get("song").expect("song section art");
-        assert_eq!(song_art, "https://lh3.googleusercontent.com/test-thumb-large");
-        assert_eq!(
-            thumbnail_variant_for_row(song_art),
-            "https://lh3.googleusercontent.com/test-thumb-small"
-        );
-
-        // 2. Videos section
-        let video_art = section_art.get("video").expect("video section art");
-        assert_eq!(video_art, "https://lh3.googleusercontent.com/video-thumb-large");
-        assert_eq!(
-            thumbnail_variant_for_row(video_art),
-            "https://lh3.googleusercontent.com/video-thumb-small"
-        );
-
-        // 3. Artists section
-        let artist_art = section_art.get("artist").expect("artist section art");
-        assert_eq!(artist_art, "https://lh3.googleusercontent.com/artist-thumb");
-        assert_eq!(
-            thumbnail_variant_for_row(artist_art),
-            "https://lh3.googleusercontent.com/artist-thumb"
-        );
-
-        // 4. Albums section (represented as Single in badge fixture)
-        let album_art = section_art.get("single").expect("album section art");
-        assert_eq!(album_art, "https://lh3.googleusercontent.com/single-thumb");
-        assert_eq!(
-            thumbnail_variant_for_row(album_art),
-            "https://lh3.googleusercontent.com/single-thumb"
-        );
-
-        // 5. Playlists section
-        let playlist_art = section_art.get("playlist").expect("playlist section art");
-        assert_eq!(playlist_art, "https://lh3.googleusercontent.com/playlist-thumb");
-        assert_eq!(
-            thumbnail_variant_for_row(playlist_art),
-            "https://lh3.googleusercontent.com/playlist-thumb"
-        );
+        const B: &str = "https://lh3.googleusercontent.com";
+        let cases = [
+            ("song", format!("{B}/test-thumb-large"), format!("{B}/test-thumb-small")),
+            ("video", format!("{B}/video-thumb-large"), format!("{B}/video-thumb-small")),
+            ("artist", format!("{B}/artist-thumb"), format!("{B}/artist-thumb")),
+            ("single", format!("{B}/single-thumb"), format!("{B}/single-thumb")),
+            ("playlist", format!("{B}/playlist-thumb"), format!("{B}/playlist-thumb")),
+        ];
+        for (section, raw, small) in cases {
+            let art = section_art.get(section).expect("section art");
+            assert_eq!(art, &raw);
+            assert_eq!(thumbnail_variant_for_row(art), small);
+        }
     }
 
     #[test]
@@ -740,14 +732,15 @@ mod tests {
         let lyrics = Arc::new(LrclibStub::new());
         assert!(spawn_lyrics_prefetch(None, Arc::clone(&lyrics)).is_none());
 
-        for (artist, title) in [
+        let blanks = [
             ("", "Title"),
             ("   ", "Title"),
             ("Artist", ""),
             ("Artist", "   "),
             ("", ""),
             ("  ", "  "),
-        ] {
+        ];
+        for (artist, title) in blanks {
             let prefetch = LyricsPrefetch {
                 artist: artist.into(),
                 title: title.into(),

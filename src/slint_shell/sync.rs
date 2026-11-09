@@ -548,7 +548,7 @@ mod tests {
         state.set_playback_phase(PlaybackPhase::Playing);
         {
             let mut audio = state.audio.lock().unwrap();
-            audio.play("t");
+            let _ = audio.play("t");
             audio.seek(10);
             audio.pause();
         }
@@ -566,7 +566,7 @@ mod tests {
         state.set_playback_phase(PlaybackPhase::Resolving);
         {
             let mut audio = state.audio.lock().unwrap();
-            audio.play("t");
+            let _ = audio.play("t");
             audio.seek(10);
         }
         observe_playback_phase(&mut state);

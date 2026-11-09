@@ -8,7 +8,8 @@ use std::sync::{Arc, Mutex};
 use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
 use crate::i18n::Locale;
 use crate::infra::{
-    AudioBackend, AudioStub, Catalog, CatalogStub, LrclibStub, MemoryCoverCache, MemorySessionStore,
+    AudioBackend, AudioError, AudioStub, Catalog, CatalogStub, LrclibStub, MemoryCoverCache,
+    MemorySessionStore,
 };
 use crate::slint_shell::state::SlintAppState;
 
@@ -117,12 +118,13 @@ impl EndedAudio {
 }
 
 impl AudioBackend for EndedAudio {
-    fn play(&mut self, track_id: &str) {
+    fn play(&mut self, track_id: &str) -> Result<(), AudioError> {
         self.track_id = Some(track_id.to_owned());
         self.playing = true;
         self.paused = false;
         self.empty = false;
         self.position_secs = 0;
+        Ok(())
     }
 
     fn pause(&mut self) {
@@ -175,6 +177,40 @@ impl AudioBackend for EndedAudio {
     }
 }
 
+/// Fake audio backend returning Ok on play but leaving last_requested empty.
+#[derive(Debug, Default)]
+pub struct NoLastRequestedAudio;
+
+impl AudioBackend for NoLastRequestedAudio {
+    fn play(&mut self, _track_id: &str) -> Result<(), AudioError> {
+        Ok(())
+    }
+
+    fn pause(&mut self) {}
+
+    fn resume_play(&mut self) {}
+
+    fn seek(&mut self, _position_secs: u64) {}
+
+    fn set_volume(&mut self, _volume: u8) {}
+
+    fn volume(&self) -> u8 {
+        100
+    }
+
+    fn position_secs(&self) -> u64 {
+        0
+    }
+
+    fn is_playing(&self) -> bool {
+        true
+    }
+
+    fn last_requested(&self) -> Option<&str> {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,7 +238,7 @@ mod tests {
         audio.seek(42);
         assert_eq!(audio.position_secs(), 42);
 
-        audio.play("trk-2");
+        let _ = audio.play("trk-2");
         assert_eq!(audio.last_requested(), Some("trk-2"));
         assert!(audio.is_playing());
         assert!(!audio.is_empty());

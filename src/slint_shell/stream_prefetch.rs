@@ -47,7 +47,7 @@ pub fn spawn_stream_prefetch<A: AudioBackend>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infra::{AudioQuality, AudioStub};
+    use crate::infra::{AudioError, AudioQuality, AudioStub};
 
     #[test]
     fn spawn_stream_prefetch_none_id_returns_none() {
@@ -87,7 +87,9 @@ mod tests {
     }
 
     impl AudioBackend for MockPrefetchBackend {
-        fn play(&mut self, _track_id: &str) {}
+        fn play(&mut self, _track_id: &str) -> Result<(), AudioError> {
+            Ok(())
+        }
         fn pause(&mut self) {}
         fn resume_play(&mut self) {}
         fn seek(&mut self, _pos: u64) {}

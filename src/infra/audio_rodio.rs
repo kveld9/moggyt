@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink, Source};
 
-use super::audio::{AudioBackend, clamp_speed};
+use super::audio::{AudioBackend, AudioError, clamp_speed};
 use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
 use super::stream::{AudioQuality, open_audio_stream};
 use super::stream_disk_cache::StreamDiskCache;
@@ -301,15 +301,16 @@ impl RodioBackend {
 
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
-    fn retry_play_with_fresh_url(&mut self, track_id: &str) {
+    fn retry_play_with_fresh_url(&mut self, track_id: &str) -> Result<(), AudioError> {
         self.resolver.invalidate(track_id);
         let Some(url) = self.resolver.resolve(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to re-resolve audio stream URL on retry");
-            return;
+            return Err(AudioError::Unavailable);
         };
-        if let Err(err) = self.play_url(track_id, &url) {
+        self.play_url(track_id, &url).map_err(|err| {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream on retry");
-        }
+            AudioError::Playback(err.to_string())
+        })
     }
 }
 
@@ -396,38 +397,39 @@ impl AudioBackend for RodioBackend {
     /// Records `last_requested` strictly upon successful playback start.
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
-    fn play(&mut self, track_id: &str) {
+    fn play(&mut self, track_id: &str) -> Result<(), AudioError> {
         if self.try_play_cached(track_id) {
-            return;
+            return Ok(());
         }
         let Some(url) = self.resolver.resolve(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL");
-            return;
+            return Err(AudioError::Unavailable);
         };
         if let Err(err) = self.play_url(track_id, &url) {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream");
-            self.retry_play_with_fresh_url(track_id);
+            return self.retry_play_with_fresh_url(track_id);
         }
+        Ok(())
     }
 
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
-    fn play_crossfade(&mut self, track_id: &str, duration: Duration) {
+    fn play_crossfade(&mut self, track_id: &str, duration: Duration) -> Result<(), AudioError> {
         if duration.is_zero() {
-            self.play(track_id);
-            return;
+            return self.play(track_id);
         }
         if self.try_play_crossfade_cached(track_id, duration) {
-            return;
+            return Ok(());
         }
         let Some(url) = self.resolver.resolve(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL for crossfade");
-            return;
+            return Err(AudioError::Unavailable);
         };
         if let Err(err) = self.play_url_crossfade(track_id, &url, duration) {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to crossfade audio stream; retrying immediate play");
-            self.retry_play_with_fresh_url(track_id);
+            return self.retry_play_with_fresh_url(track_id);
         }
+        Ok(())
     }
 
     fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
@@ -567,7 +569,7 @@ mod tests {
             return;
         };
 
-        backend.play("dQw4w9WgXcQ");
+        let _ = backend.play("dQw4w9WgXcQ");
         assert_eq!(backend.last_requested(), None);
         assert!(!backend.is_playing());
         assert_eq!(backend.position_secs(), 0);
@@ -630,7 +632,7 @@ mod tests {
         );
 
         // play should fail on "not-a-valid-url", invalidate the cache entry, and fail second resolve
-        backend.play(track_id);
+        let _ = backend.play(track_id);
         assert_eq!(
             backend.resolver.cache().get(track_id, AudioQuality::Standard, Instant::now()),
             None
@@ -664,7 +666,7 @@ mod tests {
             Instant::now(),
         );
 
-        backend.play_crossfade(track_id, Duration::from_secs(2));
+        let _ = backend.play_crossfade(track_id, Duration::from_secs(2));
         assert_eq!(
             backend.resolver.cache().get(track_id, AudioQuality::Standard, Instant::now()),
             None
@@ -677,7 +679,7 @@ mod tests {
             return;
         };
 
-        backend.play_crossfade("zero-dur-track", Duration::ZERO);
+        let _ = backend.play_crossfade("zero-dur-track", Duration::ZERO);
         assert_eq!(backend.last_requested(), None);
     }
 
@@ -728,7 +730,7 @@ mod tests {
                 }
             };
 
-        backend.play("cached-track-1");
+        assert_eq!(backend.play("cached-track-1"), Ok(()));
         assert_eq!(backend.last_requested(), Some("cached-track-1"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
