@@ -27,6 +27,7 @@ use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_control::StartedPlay;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
+use crate::slint_shell::view_phase::ViewPhase;
 
 pub type SharedCatalog = Arc<Mutex<Box<dyn Catalog + Send>>>;
 pub type SharedAudio = Arc<Mutex<Box<dyn AudioBackend + Send>>>;
@@ -65,6 +66,11 @@ pub struct SlintAppState {
     pub detail: Option<Detail>,
     pub detail_return: SlintPage,
     pub playback_phase: PlaybackPhase,
+    pub library_phase: ViewPhase,
+    pub search_phase: ViewPhase,
+    pub detail_phase: ViewPhase,
+    pub explore_phase: ViewPhase,
+    pub category_phase: ViewPhase,
     pub lyrics_lines: Vec<LyricLine>,
     pub lyrics_key: Option<(String, String)>,
     pub cover_key: Option<String>,

@@ -74,6 +74,7 @@ pub mod sync;
 #[cfg(test)]
 pub mod test_support;
 pub mod theme;
+pub mod view_phase;
 pub mod window;
 
 pub use app::{

@@ -18,6 +18,7 @@ use crate::slint_shell::player_bar::PlayerBarPrefs;
 use crate::slint_shell::state::{
     SharedAudio, SharedCatalog, SharedCovers, SharedLyrics, SlintAppState,
 };
+use crate::slint_shell::view_phase::ViewPhase;
 
 impl SlintAppState {
     /// Creates the Slint application state with injected collaborators.
@@ -71,6 +72,11 @@ impl SlintAppState {
             detail: None,
             detail_return: SlintPage::Search,
             playback_phase: PlaybackPhase::Empty,
+            library_phase: ViewPhase::Idle,
+            search_phase: ViewPhase::Idle,
+            detail_phase: ViewPhase::Idle,
+            explore_phase: ViewPhase::Idle,
+            category_phase: ViewPhase::Idle,
             lyrics_lines: Vec::new(),
             lyrics_key: None,
             cover_key: None,

@@ -26,11 +26,78 @@ use crate::slint_shell::player_bar::mode_to_index;
 use crate::slint_shell::search::{SearchRow, format_duration};
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::theme::{apply_palette, theme_to_index};
+use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData};
+
+fn derive_library_phase(state: &SlintAppState) -> ViewPhase {
+    if !state.library_playlists.is_empty() || !state.library_albums.is_empty() {
+        ViewPhase::Ready
+    } else {
+        ViewPhase::Empty
+    }
+}
+
+fn derive_search_phase(state: &SlintAppState) -> ViewPhase {
+    if !state.search_active {
+        ViewPhase::Idle
+    } else if state.home_shelves.iter().any(|shelf| !shelf.items.is_empty()) {
+        ViewPhase::Ready
+    } else {
+        ViewPhase::Empty
+    }
+}
+
+fn derive_detail_phase(state: &SlintAppState) -> ViewPhase {
+    let Some(detail) = &state.detail else {
+        return ViewPhase::Idle;
+    };
+    if detail.tracks.is_empty() { ViewPhase::Empty } else { ViewPhase::Ready }
+}
+
+fn derive_explore_phase(state: &SlintAppState) -> ViewPhase {
+    if state.explore_loading {
+        ViewPhase::Loading
+    } else if !state.explore_shelves.is_empty() {
+        ViewPhase::Ready
+    } else {
+        ViewPhase::Empty
+    }
+}
+
+fn derive_category_phase(state: &SlintAppState) -> ViewPhase {
+    if state.category_loading {
+        ViewPhase::Loading
+    } else if !state.category_shelves.is_empty() {
+        ViewPhase::Ready
+    } else {
+        ViewPhase::Empty
+    }
+}
+
+/// Derives and stores each view phase from existing state data.
+pub(crate) fn observe_view_phases(state: &mut SlintAppState) {
+    state.library_phase = derive_library_phase(state);
+    state.search_phase = derive_search_phase(state);
+    state.detail_phase = derive_detail_phase(state);
+    state.explore_phase = derive_explore_phase(state);
+    state.category_phase = derive_category_phase(state);
+}
+
+/// Synchronizes a view phase with the corresponding window properties.
+pub(crate) fn sync_view_phase(window: &MoggytWindow, view: ViewId, phase: ViewPhase) {
+    match view {
+        ViewId::Explore => window.set_explore_loading(phase == ViewPhase::Loading),
+        ViewId::Category => window.set_category_loading(phase == ViewPhase::Loading),
+        // Library, Search, and Detail already own their booleans in their sync
+        // functions and receive phase-driven properties in later plan tasks.
+        ViewId::Library | ViewId::Search | ViewId::Detail => {}
+    }
+}
 
 /// Synchronizes state with Slint window properties without performing blocking I/O.
 pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     apply_palette(window, &state.active_palette());
+    observe_view_phases(state);
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_custom_theme_status_text(state.custom_theme_status.clone().into());
     let custom_names: Vec<slint::SharedString> = state
@@ -104,6 +171,8 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     sync_library_and_detail(window, state);
     sync_explore_shelves(window, state);
     sync_category_shelves(window, state);
+    sync_view_phase(window, ViewId::Explore, state.explore_phase);
+    sync_view_phase(window, ViewId::Category, state.category_phase);
     sync_sleep_timer(window, state);
 }
 
@@ -476,5 +545,74 @@ mod tests {
         }
         observe_playback_phase(&mut state);
         assert_eq!(state.playback_phase, PlaybackPhase::Playing);
+    }
+
+    #[test]
+    fn library_phase_ready_when_playlists_present() {
+        use crate::domain::Playlist;
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.library_playlists.push(Playlist::new("p1", "Mix", 3, None));
+        observe_view_phases(&mut state);
+        assert_eq!(state.library_phase, ViewPhase::Ready);
+    }
+
+    #[test]
+    fn library_phase_empty_without_data() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        observe_view_phases(&mut state);
+        assert_eq!(state.library_phase, ViewPhase::Empty);
+    }
+
+    #[test]
+    fn search_phase_idle_when_inactive() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        observe_view_phases(&mut state);
+        assert_eq!(state.search_phase, ViewPhase::Idle);
+    }
+
+    #[test]
+    fn search_phase_empty_when_active_without_hits() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.search_active = true;
+        observe_view_phases(&mut state);
+        assert_eq!(state.search_phase, ViewPhase::Empty);
+    }
+
+    #[test]
+    fn detail_phase_empty_when_detail_has_no_tracks() {
+        use crate::domain::{Detail, DetailKind};
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.detail = Some(Detail::new(DetailKind::Album, "T", "A", Vec::new()));
+        observe_view_phases(&mut state);
+        assert_eq!(state.detail_phase, ViewPhase::Empty);
+    }
+
+    #[test]
+    fn explore_phase_loading_while_loading() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.explore_loading = true;
+        observe_view_phases(&mut state);
+        assert_eq!(state.explore_phase, ViewPhase::Loading);
+    }
+
+    #[test]
+    fn category_phase_empty_without_shelves() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        observe_view_phases(&mut state);
+        assert_eq!(state.category_phase, ViewPhase::Empty);
     }
 }
