@@ -51,6 +51,8 @@ mod session;
 mod session_keyring;
 mod settings;
 mod skip_store;
+mod spotify_api;
+mod spotify_credentials;
 mod spotify_csv;
 mod spotify_embed;
 mod spotify_search;
@@ -132,6 +134,11 @@ pub use settings::{
     clamp_crossfade_seconds, default_config_dir,
 };
 pub use skip_store::{DiskSkipStore, MemorySkipStore, SkipStore};
+pub use spotify_api::SpotifyApiClient;
+pub use spotify_credentials::{
+    KeyringSpotifyCredentialStore, MemorySpotifyCredentialStore, SpotifyCredentialStore,
+    SpotifyCredentials,
+};
 pub use spotify_csv::{
     REQUIRED_CSV_COLUMNS, load_playlist_file, parse_backup_json, parse_csv_records,
     parse_exportify_csv,
