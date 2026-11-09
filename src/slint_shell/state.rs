@@ -390,6 +390,7 @@ impl SlintAppState {
                             a.pause();
                         }
                     }
+                    self.set_playback_phase(PlaybackPhase::Paused);
                 }
             }
         }
@@ -507,6 +508,9 @@ impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
     }
     fn is_paused(&self) -> bool {
         (**self).is_paused()
+    }
+    fn is_empty(&self) -> bool {
+        (**self).is_empty()
     }
     fn duration_secs(&self) -> u64 {
         (**self).duration_secs()

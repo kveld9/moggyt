@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::domain::{DetailKind, SearchFilter, SearchResult};
+use crate::domain::{DetailKind, PlaybackPhase, SearchFilter, SearchResult};
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::explore::{
@@ -95,6 +95,7 @@ pub(crate) fn handle_toggle_play(
     if audio.is_playing() {
         audio.pause();
         drop(audio);
+        state.set_playback_phase(PlaybackPhase::Paused);
         state.sync_presence_playing(false);
         window.set_is_playing(false);
         return;
@@ -102,6 +103,7 @@ pub(crate) fn handle_toggle_play(
     if audio.last_requested().is_some() {
         audio.resume_play();
         drop(audio);
+        state.set_playback_phase(PlaybackPhase::Resolving);
         state.sync_presence_playing(true);
         window.set_is_playing(true);
         return;

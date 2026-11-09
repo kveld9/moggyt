@@ -488,6 +488,10 @@ impl AudioBackend for RodioBackend {
         self.sink.is_paused() && !self.sink.empty()
     }
 
+    fn is_empty(&self) -> bool {
+        self.sink.empty()
+    }
+
     fn last_requested(&self) -> Option<&str> {
         self.last_requested.as_deref()
     }
