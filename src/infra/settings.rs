@@ -3,12 +3,13 @@
 //! Handles loading and saving application preferences (`settings.json`).
 //! Tranche 1 default: ThemeId::White + Locale::English.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 
 use super::audio::clamp_speed;
+use super::store_health::{HealthFlag, StoreHealth, quarantine};
 use super::stream::AudioQuality;
 use crate::domain::{PlayerBarMode, RecentSearches, ThemeId};
 use crate::i18n::Locale;
@@ -16,21 +17,25 @@ use crate::i18n::Locale;
 const fn default_true() -> bool {
     true
 }
-
 const fn default_false() -> bool {
     false
 }
-
 const fn default_volume() -> u8 {
     100
 }
-
 const fn default_playback_speed() -> f32 {
     1.0
 }
 
 /// Maximum allowed crossfade duration in seconds.
 pub const MAX_CROSSFADE_SECONDS: u32 = 15;
+
+/// Schema version of persisted settings.
+pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
+
+const fn default_schema_version() -> u32 {
+    SETTINGS_SCHEMA_VERSION
+}
 
 /// Clamps crossfade duration in seconds to the valid `0..=15` range.
 pub const fn clamp_crossfade_seconds(seconds: u32) -> u32 {
@@ -40,7 +45,6 @@ pub const fn clamp_crossfade_seconds(seconds: u32) -> u32 {
 const fn default_crossfade_seconds() -> u32 {
     0
 }
-
 const fn default_stream_cache_limit_mb() -> u32 {
     512
 }
@@ -49,6 +53,9 @@ const fn default_stream_cache_limit_mb() -> u32 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    /// Schema version for persistence migrations and compatibility.
+    #[serde(default = "default_schema_version")]
+    pub version: u32,
     /// Active UI theme.
     pub theme: ThemeId,
     /// Active custom theme name when Custom theme is selected.
@@ -134,6 +141,7 @@ impl Default for Settings {
     /// Tranche 1 default settings: White theme + English locale + volume 100 + speed 1.0 + Standard quality.
     fn default() -> Self {
         Self {
+            version: SETTINGS_SCHEMA_VERSION,
             theme: ThemeId::White,
             custom_theme_name: None,
             locale: Locale::English,
@@ -186,6 +194,14 @@ pub trait SettingsStore: Send + Sync {
     fn load(&self) -> Settings;
     /// Persists settings to storage.
     fn save(&self, settings: &Settings) -> anyhow::Result<()>;
+    /// Reports the health of the store after the last load.
+    fn health(&self) -> StoreHealth {
+        StoreHealth::Ok
+    }
+    /// Returns true if the store payload was corrupt and quarantined.
+    fn is_quarantined(&self) -> bool {
+        self.health() == StoreHealth::Quarantined
+    }
 }
 
 /// In-memory settings store for tests and headless execution.
@@ -218,30 +234,67 @@ impl SettingsStore for MemorySettingsStore {
 #[derive(Debug, Clone)]
 pub struct DiskSettingsStore {
     config_dir: PathBuf,
+    health: HealthFlag,
 }
 
 impl DiskSettingsStore {
     pub fn new(config_dir: PathBuf) -> Self {
-        Self { config_dir }
+        Self { config_dir, health: HealthFlag::new() }
     }
 
     pub fn file_path(&self) -> PathBuf {
         self.config_dir.join("settings.json")
     }
 
+    pub fn clear_health(&self) {
+        self.health.clear();
+    }
+
     fn write_atomic(&self, data: &[u8]) -> anyhow::Result<()> {
         super::atomic_file::write_atomic(&self.file_path(), data)
+    }
+
+    fn quarantine_corrupt(&self, path: &Path, err: &serde_json::Error) {
+        self.health.set(StoreHealth::Quarantined);
+        tracing::warn!("corrupt settings file at {}: {err}", path.display());
+        match quarantine(path) {
+            Ok(b) => tracing::warn!("settings file quarantined to {}", b.display()),
+            Err(e) => tracing::warn!("failed to quarantine settings file: {e}"),
+        }
     }
 }
 
 impl SettingsStore for DiskSettingsStore {
+    fn health(&self) -> StoreHealth {
+        self.health.get()
+    }
+
+    fn is_quarantined(&self) -> bool {
+        self.health.is_quarantined()
+    }
+
     fn load(&self) -> Settings {
         let path = self.file_path();
         let Ok(bytes) = std::fs::read(&path) else {
             return Settings::fallback();
         };
-        let mut settings: Settings =
-            serde_json::from_slice(&bytes).unwrap_or_else(|_| Settings::fallback());
+        let mut settings: Settings = match serde_json::from_slice(&bytes) {
+            Ok(s) => s,
+            Err(err) => {
+                self.quarantine_corrupt(&path, &err);
+                return Settings::fallback();
+            }
+        };
+        if settings.version > SETTINGS_SCHEMA_VERSION {
+            self.health.set(StoreHealth::Incompatible);
+            tracing::warn!(
+                "unsupported settings schema version {} in {}",
+                settings.version,
+                path.display()
+            );
+            return Settings::fallback();
+        }
+        self.health.set(StoreHealth::Ok);
         settings.sanitize();
         settings
     }
@@ -277,47 +330,131 @@ pub fn default_config_dir() -> PathBuf {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_1_given_no_settings_file_when_loaded_then_returns_default() {
-        let temp_dir = std::env::temp_dir().join(format!("moggyt-test-1-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-        let store = DiskSettingsStore::new(temp_dir.clone());
+    struct TempDir(PathBuf);
 
-        let loaded = store.load();
-        assert_eq!(loaded, Settings::default());
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!("moggyt-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&path);
+            let _ = std::fs::create_dir_all(&path);
+            Self(path)
+        }
 
-        let _ = std::fs::remove_dir_all(&temp_dir);
+        fn path(&self) -> PathBuf {
+            self.0.clone()
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
     }
 
     #[test]
-    fn test_4_given_damaged_settings_json_when_loading_then_returns_default_without_panic() {
-        let temp_dir = std::env::temp_dir().join(format!("moggyt-test-4-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-        std::fs::create_dir_all(&temp_dir).unwrap();
-        let store = DiskSettingsStore::new(temp_dir.clone());
+    fn test_1_given_no_settings_file_when_loaded_then_returns_default() {
+        let temp = TempDir::new("test-1");
+        let store = DiskSettingsStore::new(temp.path());
+        assert_eq!(store.load(), Settings::default());
+    }
 
-        // 1. Partial/truncated JSON
-        std::fs::write(store.file_path(), b"{\"theme\": \"white\", \"locale\": ").unwrap();
+    #[test]
+    fn test_damaged_settings_json_is_quarantined_not_overwritten() {
+        let temp = TempDir::new("test-dmg");
+        let store = DiskSettingsStore::new(temp.path());
+        let payload = b"{\"theme\": \"white\", \"locale\": ";
+        std::fs::write(store.file_path(), payload).unwrap();
+
+        assert_eq!(store.load(), Settings::default());
+        assert!(store.is_quarantined());
+        assert!(!store.file_path().exists());
+
+        let corrupt: Vec<_> = std::fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.to_string_lossy().contains(".corrupt."))
+            .collect();
+        assert_eq!(corrupt.len(), 1);
+        assert_eq!(std::fs::read(&corrupt[0]).unwrap(), payload);
+        assert!(!store.file_path().exists());
+    }
+
+    #[test]
+    fn second_corruption_preserves_first_backup() {
+        let temp = TempDir::new("test-dmg2");
+        let store = DiskSettingsStore::new(temp.path());
+        let payload1 = b"corrupt payload 1";
+        std::fs::write(store.file_path(), payload1).unwrap();
         assert_eq!(store.load(), Settings::default());
 
-        // 2. Corrupt binary garbage
-        std::fs::write(store.file_path(), [0xFF, 0xFE, 0x00, 0x01]).unwrap();
+        let payload2 = b"corrupt payload 2";
+        std::fs::write(store.file_path(), payload2).unwrap();
         assert_eq!(store.load(), Settings::default());
 
-        // 3. Schema mismatch
-        std::fs::write(store.file_path(), b"{\"theme\": 99999}").unwrap();
-        assert_eq!(store.load(), Settings::default());
+        let files: Vec<_> = std::fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.to_string_lossy().contains(".corrupt."))
+            .collect();
+        assert_eq!(files.len(), 2);
+        let contents: Vec<_> = files.iter().map(|p| std::fs::read(p).unwrap()).collect();
+        assert!(contents.contains(&payload1.to_vec()) && contents.contains(&payload2.to_vec()));
+    }
 
-        let _ = std::fs::remove_dir_all(&temp_dir);
+    #[test]
+    fn newer_settings_schema_is_incompatible_not_empty() {
+        let temp = TempDir::new("test-newer");
+        let store = DiskSettingsStore::new(temp.path());
+        let payload = br#"{"version": 2, "theme": "white", "locale": "en"}"#;
+        std::fs::write(store.file_path(), payload).unwrap();
+
+        assert_eq!(store.load(), Settings::default());
+        assert_eq!(store.health(), StoreHealth::Incompatible);
+        assert!(!store.is_quarantined());
+        assert_eq!(std::fs::read(store.file_path()).unwrap(), payload);
+    }
+
+    #[test]
+    fn settings_without_version_still_loads() {
+        let temp = TempDir::new("test-nover");
+        let store = DiskSettingsStore::new(temp.path());
+        std::fs::write(store.file_path(), br#"{"theme": "black-oled", "locale": "en"}"#).unwrap();
+
+        let loaded = store.load();
+        assert_eq!(loaded.theme, ThemeId::BlackOled);
+        assert_eq!(store.health(), StoreHealth::Ok);
+    }
+
+    #[test]
+    fn save_writes_current_schema_version() {
+        let temp = TempDir::new("test-save-ver");
+        let store = DiskSettingsStore::new(temp.path());
+        store.save(&Settings::default()).expect("save succeeds");
+
+        let bytes = std::fs::read(store.file_path()).expect("read file");
+        let val: serde_json::Value = serde_json::from_slice(&bytes).expect("parse json");
+        assert_eq!(val["version"], SETTINGS_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn clear_health_allows_future_loads() {
+        let temp = TempDir::new("test-clr-health");
+        let store = DiskSettingsStore::new(temp.path());
+        std::fs::write(store.file_path(), b"broken payload").unwrap();
+        let _ = store.load();
+        assert!(store.is_quarantined());
+
+        store.clear_health();
+        assert_eq!(store.health(), StoreHealth::Ok);
     }
 
     #[test]
     fn test_5_given_settings_change_when_saved_then_round_trips_through_load_with_atomic_write() {
-        let temp_dir = std::env::temp_dir().join(format!("moggyt-test-5-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-        let store = DiskSettingsStore::new(temp_dir.clone());
+        let temp = TempDir::new("test-5");
+        let store = DiskSettingsStore::new(temp.path());
 
         let modified = Settings {
+            version: SETTINGS_SCHEMA_VERSION,
             theme: ThemeId::BlackOled,
             custom_theme_name: Some("rose-pine".to_string()),
             locale: Locale::Spanish,
@@ -337,25 +474,19 @@ mod tests {
             skip_silence: true,
             loudness_normalization: true,
             player_bar_mode: PlayerBarMode::Floating,
+            player_bar_show_skip_seconds: true,
             player_bar_show_artwork: false,
             player_bar_show_like: false,
             player_bar_show_shuffle: false,
             player_bar_show_repeat: false,
-            player_bar_show_skip_seconds: true,
             player_bar_show_queue: false,
             player_bar_show_volume: false,
-            recent_searches: RecentSearches::default(),
+            ..Settings::default()
         };
 
         store.save(&modified).expect("save should succeed");
-
-        let loaded = store.load();
-        assert_eq!(loaded, modified);
-
-        // Verify file was written to disk and can be re-loaded
+        assert_eq!(store.load(), modified);
         assert!(store.file_path().exists());
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
@@ -379,13 +510,9 @@ mod tests {
     #[test]
     fn test_lastfm_credentials_serde_defaults_and_roundtrip() {
         let empty: Settings = serde_json::from_str("{}").expect("deserialize empty");
-        assert!(empty.lastfm_api_key.is_empty());
-        assert!(empty.lastfm_api_secret.is_empty());
+        assert!(empty.lastfm_api_key.is_empty() && empty.lastfm_api_secret.is_empty());
 
-        let json = r#"{
-            "lastfm_api_key": "my-key",
-            "lastfm_api_secret": "my-secret"
-        }"#;
+        let json = r#"{"lastfm_api_key": "my-key", "lastfm_api_secret": "my-secret"}"#;
         let loaded: Settings = serde_json::from_str(json).expect("deserialize explicit");
         assert_eq!(loaded.lastfm_api_key, "my-key");
         assert_eq!(loaded.lastfm_api_secret, "my-secret");
@@ -417,42 +544,29 @@ mod tests {
     fn test_player_bar_settings_serde_defaults_and_explicit_deserialization() {
         let empty: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert_eq!(empty.player_bar_mode, PlayerBarMode::Classic);
-        assert!(empty.player_bar_show_artwork);
-        assert!(empty.player_bar_show_like);
-        assert!(empty.player_bar_show_shuffle);
-        assert!(empty.player_bar_show_repeat);
-        assert!(!empty.player_bar_show_skip_seconds);
-        assert!(empty.player_bar_show_queue);
+        assert!(empty.player_bar_show_artwork && empty.player_bar_show_like);
+        assert!(empty.player_bar_show_shuffle && empty.player_bar_show_repeat);
+        assert!(!empty.player_bar_show_skip_seconds && empty.player_bar_show_queue);
         assert!(empty.player_bar_show_volume);
 
         let explicit_json = r#"{
-            "player_bar_mode": "floating",
-            "player_bar_show_artwork": false,
-            "player_bar_show_like": false,
-            "player_bar_show_shuffle": false,
-            "player_bar_show_repeat": false,
-            "player_bar_show_skip_seconds": true,
-            "player_bar_show_queue": false,
-            "player_bar_show_volume": false
+            "player_bar_mode": "floating", "player_bar_show_artwork": false,
+            "player_bar_show_like": false, "player_bar_show_shuffle": false,
+            "player_bar_show_repeat": false, "player_bar_show_skip_seconds": true,
+            "player_bar_show_queue": false, "player_bar_show_volume": false
         }"#;
         let explicit: Settings = serde_json::from_str(explicit_json).expect("deserialize explicit");
         assert_eq!(explicit.player_bar_mode, PlayerBarMode::Floating);
-        assert!(!explicit.player_bar_show_artwork);
-        assert!(!explicit.player_bar_show_like);
-        assert!(!explicit.player_bar_show_shuffle);
-        assert!(!explicit.player_bar_show_repeat);
-        assert!(explicit.player_bar_show_skip_seconds);
-        assert!(!explicit.player_bar_show_queue);
+        assert!(!explicit.player_bar_show_artwork && !explicit.player_bar_show_like);
+        assert!(!explicit.player_bar_show_shuffle && !explicit.player_bar_show_repeat);
+        assert!(explicit.player_bar_show_skip_seconds && !explicit.player_bar_show_queue);
         assert!(!explicit.player_bar_show_volume);
     }
 
     #[test]
     fn test_volume_clamped_on_load_from_disk() {
-        let temp_dir =
-            std::env::temp_dir().join(format!("moggyt-test-clamp-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-        std::fs::create_dir_all(&temp_dir).unwrap();
-        let store = DiskSettingsStore::new(temp_dir.clone());
+        let temp = TempDir::new("test-clamp");
+        let store = DiskSettingsStore::new(temp.path());
 
         let json = r#"{"theme": "mono", "locale": "es", "volume": 150, "quality": "compact"}"#;
         std::fs::write(store.file_path(), json).unwrap();
@@ -463,24 +577,15 @@ mod tests {
         assert_eq!(loaded.volume, 100);
         assert_eq!(loaded.playback_speed, 1.0);
         assert_eq!(loaded.quality, AudioQuality::Compact);
-        assert!(!loaded.discord_presence_enabled);
-        assert!(!loaded.lastfm_enabled);
-        assert!(loaded.lastfm_username.is_empty());
-        assert!(!loaded.secondary_lastfm_enabled);
-        assert!(!loaded.hi_res_covers);
-        assert!(!loaded.skip_silence);
-        assert!(!loaded.loudness_normalization);
+        assert!(!loaded.discord_presence_enabled && !loaded.lastfm_enabled);
+        assert!(loaded.lastfm_username.is_empty() && !loaded.secondary_lastfm_enabled);
+        assert!(!loaded.hi_res_covers && !loaded.skip_silence && !loaded.loudness_normalization);
         assert_eq!(loaded.player_bar_mode, PlayerBarMode::Classic);
-        assert!(loaded.player_bar_show_artwork);
-        assert!(loaded.player_bar_show_like);
-        assert!(loaded.player_bar_show_shuffle);
-        assert!(loaded.player_bar_show_repeat);
-        assert!(!loaded.player_bar_show_skip_seconds);
-        assert!(loaded.player_bar_show_queue);
+        assert!(loaded.player_bar_show_artwork && loaded.player_bar_show_like);
+        assert!(loaded.player_bar_show_shuffle && loaded.player_bar_show_repeat);
+        assert!(!loaded.player_bar_show_skip_seconds && loaded.player_bar_show_queue);
         assert!(loaded.player_bar_show_volume);
         assert_eq!(loaded.crossfade_seconds, 0);
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
@@ -513,21 +618,18 @@ mod tests {
         let with_both_false: Settings =
             serde_json::from_str(r#"{"lastfm_enabled": false, "hi_res_covers": false}"#)
                 .expect("deserialize false");
-        assert!(!with_both_false.lastfm_enabled);
-        assert!(with_both_false.lastfm_username.is_empty());
+        assert!(!with_both_false.lastfm_enabled && with_both_false.lastfm_username.is_empty());
         assert!(!with_both_false.hi_res_covers);
 
         let with_both_true: Settings = serde_json::from_str(
             r#"{"lastfm_enabled": true, "lastfm_username": "moggy", "hi_res_covers": true}"#,
         )
         .expect("deserialize true");
-        assert!(with_both_true.lastfm_enabled);
+        assert!(with_both_true.lastfm_enabled && with_both_true.hi_res_covers);
         assert_eq!(with_both_true.lastfm_username, "moggy");
-        assert!(with_both_true.hi_res_covers);
 
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
-        assert!(!omitted.lastfm_enabled);
-        assert!(omitted.lastfm_username.is_empty());
+        assert!(!omitted.lastfm_enabled && omitted.lastfm_username.is_empty());
         assert!(!omitted.hi_res_covers);
     }
 
@@ -536,18 +638,15 @@ mod tests {
         let with_both_false: Settings =
             serde_json::from_str(r#"{"skip_silence": false, "loudness_normalization": false}"#)
                 .expect("deserialize false");
-        assert!(!with_both_false.skip_silence);
-        assert!(!with_both_false.loudness_normalization);
+        assert!(!with_both_false.skip_silence && !with_both_false.loudness_normalization);
 
         let with_both_true: Settings =
             serde_json::from_str(r#"{"skip_silence": true, "loudness_normalization": true}"#)
                 .expect("deserialize true");
-        assert!(with_both_true.skip_silence);
-        assert!(with_both_true.loudness_normalization);
+        assert!(with_both_true.skip_silence && with_both_true.loudness_normalization);
 
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
-        assert!(!omitted.skip_silence);
-        assert!(!omitted.loudness_normalization);
+        assert!(!omitted.skip_silence && !omitted.loudness_normalization);
     }
 
     #[test]
@@ -559,9 +658,8 @@ mod tests {
         assert!(!loaded.secondary_lastfm_enabled);
 
         // Explicit true deserializes as true
-        let json_true = r#"{"secondary_lastfm_enabled": true}"#;
         let loaded_true: Settings =
-            serde_json::from_str(json_true).expect("deserialization succeeds");
+            serde_json::from_str(r#"{"secondary_lastfm_enabled": true}"#).unwrap();
         assert!(loaded_true.secondary_lastfm_enabled);
 
         // Empty object defaults to false
@@ -581,11 +679,8 @@ mod tests {
 
     #[test]
     fn test_playback_speed_clamped_on_load_from_disk() {
-        let temp_dir =
-            std::env::temp_dir().join(format!("moggyt-test-speed-clamp-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-        std::fs::create_dir_all(&temp_dir).unwrap();
-        let store = DiskSettingsStore::new(temp_dir.clone());
+        let temp = TempDir::new("test-speed-clamp");
+        let store = DiskSettingsStore::new(temp.path());
 
         // Above max -> clamped to 2.0
         std::fs::write(store.file_path(), r#"{"playback_speed": 99.0}"#).unwrap();
@@ -598,8 +693,6 @@ mod tests {
         // Non-positive -> clamped to 1.0
         std::fs::write(store.file_path(), r#"{"playback_speed": -1.0}"#).unwrap();
         assert_eq!(store.load().playback_speed, 1.0);
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
@@ -640,11 +733,8 @@ mod tests {
 
     #[test]
     fn test_crossfade_seconds_clamped_on_load_from_disk() {
-        let temp_dir = std::env::temp_dir()
-            .join(format!("moggyt-test-crossfade-clamp-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-        std::fs::create_dir_all(&temp_dir).unwrap();
-        let store = DiskSettingsStore::new(temp_dir.clone());
+        let temp = TempDir::new("test-crossfade-clamp");
+        let store = DiskSettingsStore::new(temp.path());
 
         std::fs::write(store.file_path(), r#"{"crossfade_seconds": 99}"#).unwrap();
         assert_eq!(store.load().crossfade_seconds, MAX_CROSSFADE_SECONDS);
@@ -654,8 +744,6 @@ mod tests {
 
         std::fs::write(store.file_path(), r#"{"crossfade_seconds": 7}"#).unwrap();
         assert_eq!(store.load().crossfade_seconds, 7);
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
@@ -687,16 +775,11 @@ mod tests {
         settings.sanitize();
         assert_eq!(settings.stream_cache_limit_mb, 10240);
 
-        let temp_dir = std::env::temp_dir()
-            .join(format!("moggyt-test-stream-cache-clamp-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-        std::fs::create_dir_all(&temp_dir).unwrap();
-        let store = DiskSettingsStore::new(temp_dir.clone());
+        let temp = TempDir::new("test-stream-cache-clamp");
+        let store = DiskSettingsStore::new(temp.path());
 
         std::fs::write(store.file_path(), r#"{"stream_cache_limit_mb": 50000}"#).unwrap();
         assert_eq!(store.load().stream_cache_limit_mb, 10240);
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
