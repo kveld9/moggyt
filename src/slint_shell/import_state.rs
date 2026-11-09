@@ -177,16 +177,30 @@ impl ImportReview {
         self.rows.iter().any(|r| r.chosen.is_some())
     }
 
-    /// Produces a persisted `LocalPlaylist` containing all chosen matches in source order.
-    pub fn to_local_playlist(&self) -> LocalPlaylist {
-        let mut playlist =
-            LocalPlaylist::new(&local_playlist_id(&self.playlist_id), &self.playlist_title)
-                .with_author(&self.author);
+    /// Returns the chosen track of every review row in source order, skipping rows with no match.
+    pub fn selected_tracks(&self) -> Vec<LocalTrack> {
+        self.rows.iter().filter_map(|r| r.chosen.clone()).collect()
+    }
+
+    /// Produces a persisted `LocalPlaylist` containing all chosen matches in source order,
+    /// using the provided title override (when non-empty after trimming) or falling back to the source title.
+    pub fn to_local_playlist_with_title(&self, title_override: Option<&str>) -> LocalPlaylist {
+        let title = match title_override.map(str::trim) {
+            Some(t) if !t.is_empty() => t,
+            _ => &self.playlist_title,
+        };
+        let mut playlist = LocalPlaylist::new(&local_playlist_id(&self.playlist_id), title)
+            .with_author(&self.author);
         if let Some(ref art) = self.artwork {
             playlist = playlist.with_artwork(art);
         }
-        playlist.tracks = self.rows.iter().filter_map(|r| r.chosen.clone()).collect();
+        playlist.tracks = self.selected_tracks();
         playlist
+    }
+
+    /// Produces a persisted `LocalPlaylist` containing all chosen matches in source order.
+    pub fn to_local_playlist(&self) -> LocalPlaylist {
+        self.to_local_playlist_with_title(None)
     }
 }
 
@@ -671,5 +685,48 @@ mod tests {
         assert_eq!(merged[1].title, "Zeta");
         assert_eq!(merged[2].id, "cat_1");
         assert_eq!(merged[3].id, "cat_2");
+    }
+
+    #[test]
+    fn test_to_local_playlist_with_title_override_and_fallbacks() {
+        let playlist = sample_spotify_playlist();
+        let track1 = LocalTrack::new("id_1", "Song 1", "Artist 1", MatchConfidence::High);
+        let resolutions =
+            vec![TrackResolution::Matched { track: track1, alternatives: Vec::new() }];
+        let review = ImportReview::from_resolutions(&playlist, &resolutions);
+
+        let pl_custom = review.to_local_playlist_with_title(Some("My Road Trip"));
+        assert_eq!(pl_custom.title, "My Road Trip");
+
+        let pl_blank = review.to_local_playlist_with_title(Some("   "));
+        assert_eq!(pl_blank.title, "Road Trip");
+
+        let pl_none = review.to_local_playlist_with_title(None);
+        assert_eq!(pl_none.title, "Road Trip");
+
+        let pl_default = review.to_local_playlist();
+        assert_eq!(pl_default.title, "Road Trip");
+    }
+
+    #[test]
+    fn test_selected_tracks_skips_unresolved_and_preserves_order() {
+        let playlist = sample_spotify_playlist();
+        let track1 = LocalTrack::new("id_1", "Song 1", "Artist 1", MatchConfidence::High);
+        let track3 = LocalTrack::new("id_3", "Song 3", "Artist 3", MatchConfidence::Low);
+        let resolutions = vec![
+            TrackResolution::Matched { track: track1.clone(), alternatives: Vec::new() },
+            TrackResolution::Unresolved {
+                title: "Song 2".to_string(),
+                artist: "Artist 2".to_string(),
+                reason: "not found".to_string(),
+            },
+            TrackResolution::Matched { track: track3.clone(), alternatives: Vec::new() },
+        ];
+        let review = ImportReview::from_resolutions(&playlist, &resolutions);
+        let selected = review.selected_tracks();
+
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected[0].video_id, "id_1");
+        assert_eq!(selected[1].video_id, "id_3");
     }
 }

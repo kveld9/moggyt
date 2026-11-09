@@ -1,0 +1,101 @@
+import { Theme, ImportRowData, ImportAlternativeData } from "../theme.slint";
+import { AlternativePicker } from "../components/alternative_picker.slint";
+import { ImportModal } from "./import_modal.slint";
+import { ImportProgress } from "./import_progress.slint";
+import { ImportReviewView } from "./import_review.slint";
+
+export component ImportOverlay inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    in-out property <bool> show-modal: false;
+    in-out property <int> active-tab: 0;
+    in-out property <string> link-text: "";
+    in-out property <string> file-path: "";
+    in-out property <string> name-text: "";
+    in-out property <bool> to-queue: false;
+    in-out property <bool> link-valid: false;
+    in-out property <string> link-status: "";
+
+    in property <bool> busy: false;
+    in property <bool> failed: false;
+    in property <string> status-text: "";
+    in property <bool> running: false;
+    in property <bool> cancelling: false;
+    in property <int> done: 0;
+    in property <int> total: 0;
+    in property <int> high: 0;
+    in property <int> review-count: 0;
+    in property <int> unresolved: 0;
+    in property <bool> review-open: false;
+    in property <string> review-title: "";
+    in property <string> review-counts: "";
+    in property <[ImportRowData]> rows: [];
+    in property <int> selected-row: -1;
+    in property <bool> can-save: false;
+    in property <[ImportAlternativeData]> alternatives: [];
+    in property <int> alternative-selected: -1;
+    in property <bool> picker-open: false;
+
+    callback browse-requested();
+    callback link-changed(string);
+    callback start-requested();
+    callback cancel-requested();
+    callback close-requested();
+    callback row-selected(int);
+    callback swap-requested(int);
+    callback save-requested();
+    callback discard-requested();
+    callback alternative-chosen(int);
+    callback picker-dismissed();
+
+    ImportModal {
+        visible: root.show-modal;
+        active-tab <=> root.active-tab;
+        link-text <=> root.link-text;
+        file-path <=> root.file-path;
+        name-text <=> root.name-text;
+        to-queue <=> root.to-queue;
+        link-valid <=> root.link-valid;
+        link-status <=> root.link-status;
+        busy: root.busy;
+        failed: root.failed;
+        status-text: root.status-text;
+        link-changed(text) => { root.link-changed(text); }
+        browse-requested => { root.browse-requested(); }
+        start-requested => { root.start-requested(); }
+        close-requested => { root.close-requested(); }
+    }
+    ImportProgress {
+        visible: root.running;
+        cancelling: root.cancelling;
+        status-text: root.status-text;
+        done: root.done;
+        total: root.total;
+        high: root.high;
+        review: root.review-count;
+        unresolved: root.unresolved;
+        cancel-requested => { root.cancel-requested(); }
+    }
+    ImportReviewView {
+        visible: root.review-open;
+        playlist-title: root.review-title;
+        counts-text: root.review-counts;
+        status-text: root.status-text;
+        rows: root.rows;
+        selected: root.selected-row;
+        can-save: root.can-save;
+        row-selected(idx) => { root.row-selected(idx); }
+        swap-requested(idx) => { root.swap-requested(idx); }
+        save-requested => { root.save-requested(); }
+        discard-requested => { root.discard-requested(); }
+    }
+    AlternativePicker {
+        visible: root.picker-open;
+        alternatives: root.alternatives;
+        selected: root.alternative-selected;
+        alternative-chosen(idx) => { root.alternative-chosen(idx); }
+        dismissed => { root.picker-dismissed(); }
+    }
+}
