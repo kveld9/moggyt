@@ -26,6 +26,7 @@ impl SlintAppState {
     /// Returns from detail or category view to the previous page.
     pub fn go_back(&mut self) {
         if self.page == SlintPage::Detail {
+            self.detail_error = None;
             self.page = self.detail_return;
         } else if self.page == SlintPage::Category {
             self.page = self.category_return;
@@ -45,10 +46,12 @@ mod tests {
         assert_eq!(state.detail_return, SlintPage::Search);
 
         state.open_detail("album-1", DetailKind::Album);
+        state.detail_error = Some("error".to_string());
         assert_eq!(state.page, SlintPage::Detail);
         assert_eq!(state.detail_return, SlintPage::Search);
         state.go_back();
         assert_eq!(state.page, SlintPage::Search);
+        assert_eq!(state.detail_error, None);
 
         state.select_page(SlintPage::Library);
         state.open_detail("artist-1", DetailKind::Artist);

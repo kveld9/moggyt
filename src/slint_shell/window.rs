@@ -45,6 +45,7 @@ use crate::slint_shell::sync::{
     sync_recent_searches, sync_shelves_and_queue, sync_update_status, sync_window,
 };
 use crate::slint_shell::theme::apply_custom_theme_if_changed;
+use crate::slint_shell::view_phase::ViewPhase;
 
 thread_local! {
     static ACTIVE_STATE: RefCell<Option<SharedState>> = const { RefCell::new(None) };
@@ -222,6 +223,47 @@ fn apply_detail_result(
     if is_history_id(id) { detail.map(|d| label_history_detail(d, locale)) } else { detail }
 }
 
+fn begin_detail_load(state: &mut SlintAppState, browse_id: &str, kind: DetailKind) -> Option<u64> {
+    let trimmed = browse_id.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if state.page != crate::slint_shell::page::SlintPage::Detail {
+        state.detail_return = state.page;
+    }
+    state.page = crate::slint_shell::page::SlintPage::Detail;
+    state.detail_generation = state.detail_generation.wrapping_add(1);
+    state.detail_phase = ViewPhase::Loading;
+    state.detail_error = None;
+    state.detail_request = Some((trimmed.to_string(), kind));
+    Some(state.detail_generation)
+}
+
+fn apply_detail_outcome(
+    state: &mut SlintAppState,
+    generation: u64,
+    detail: Option<Detail>,
+    id: &str,
+) -> bool {
+    if state.detail_generation != generation {
+        return false;
+    }
+    match detail {
+        Some(detail) => {
+            let is_empty = detail.tracks.is_empty();
+            state.detail = apply_detail_result(Some(detail), id, state.locale);
+            state.detail_error = None;
+            state.detail_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
+        }
+        None => {
+            state.detail = None;
+            state.detail_phase = ViewPhase::Error;
+            state.detail_error = Some("Failed to load detail".to_string());
+        }
+    }
+    true
+}
+
 /// Dispatches asynchronous container detail lookup off the UI thread.
 pub(crate) fn open_detail_async(
     window: &MoggytWindow,
@@ -230,24 +272,19 @@ pub(crate) fn open_detail_async(
     kind: DetailKind,
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
-    let trimmed = browse_id.trim();
-    if trimmed.is_empty() {
+    let Some(generation) = begin_detail_load(state, browse_id, kind) else {
         return;
-    }
-    if state.page != crate::slint_shell::page::SlintPage::Detail {
-        state.detail_return = state.page;
-    }
-    state.page = crate::slint_shell::page::SlintPage::Detail;
+    };
+    let trimmed = browse_id.trim();
     if is_local_playlist_id(trimmed) {
-        state.detail = current_store().and_then(|st| resolve_local_detail(trimmed, st.as_ref()));
+        let detail = current_store().and_then(|st| resolve_local_detail(trimmed, st.as_ref()));
+        apply_detail_outcome(state, generation, detail, trimmed);
         sync_window(window, state);
         return;
     }
     state.detail = Some(Detail::new(kind, tr(state.locale, "Loading..."), "", Vec::new()));
     sync_window(window, state);
 
-    state.detail_generation = state.detail_generation.wrapping_add(1);
-    let generation = state.detail_generation;
     let id = trimmed.to_string();
     let cat = Arc::clone(&state.catalog);
     let weak = window.as_weak();
@@ -258,8 +295,7 @@ pub(crate) fn open_detail_async(
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
-                if st.detail_generation == g {
-                    st.detail = apply_detail_result(detail, &id, st.locale);
+                if apply_detail_outcome(st, g, detail, &id) {
                     request_detail_covers(st, &tx);
                     sync_library_and_detail(&win, st);
                     sync_header_title(&win, st);
@@ -267,6 +303,18 @@ pub(crate) fn open_detail_async(
             });
         });
     });
+}
+
+/// Re-dispatches pending or failed detail request using captured parameters.
+pub fn retry_detail_load(
+    window: &MoggytWindow,
+    state: &mut SlintAppState,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let Some((id, kind)) = state.detail_request.clone() else {
+        return;
+    };
+    open_detail_async(window, state, &id, kind, worker_tx);
 }
 
 /// Dispatches asynchronous library refresh off the UI thread.
@@ -545,5 +593,81 @@ mod tests {
         let store = crate::infra::MemoryPlaylistStore::new();
         assert!(resolve_local_detail("local:missing_id", &store).is_none());
         assert!(resolve_local_detail("spotify:non_local", &store).is_none());
+    }
+
+    #[test]
+    fn local_detail_after_remote_keeps_local() {
+        let mut state = test_wired();
+        let remote_gen = begin_detail_load(&mut state, "album-1", DetailKind::Album)
+            .expect("remote load begins");
+        let local_gen = begin_detail_load(&mut state, "local:race", DetailKind::Playlist)
+            .expect("local load begins");
+        assert!(local_gen > remote_gen);
+
+        let local_detail = Detail::new(
+            DetailKind::Playlist,
+            "Local Playlist",
+            "",
+            vec![Track::new("t1", "Track 1", "Artist 1")],
+        );
+        let applied_local =
+            apply_detail_outcome(&mut state, local_gen, Some(local_detail), "local:race");
+        assert!(applied_local);
+        assert_eq!(state.detail_phase, ViewPhase::Ready);
+        assert_eq!(state.detail.as_ref().map(|d| d.title.as_str()), Some("Local Playlist"));
+
+        let remote_detail = Detail::new(
+            DetailKind::Album,
+            "Remote Album",
+            "",
+            vec![Track::new("t2", "Track 2", "Artist 2")],
+        );
+        let applied_remote =
+            apply_detail_outcome(&mut state, remote_gen, Some(remote_detail), "album-1");
+        assert!(!applied_remote);
+        assert_eq!(state.detail_phase, ViewPhase::Ready);
+        assert_eq!(state.detail.as_ref().map(|d| d.title.as_str()), Some("Local Playlist"));
+    }
+
+    #[test]
+    fn failed_detail_shows_error() {
+        let mut state = test_wired();
+        let generation =
+            begin_detail_load(&mut state, "album-fail", DetailKind::Album).expect("load begins");
+        let applied = apply_detail_outcome(&mut state, generation, None, "album-fail");
+        assert!(applied);
+        assert_eq!(state.detail_phase, ViewPhase::Error);
+        assert!(state.detail_error.is_some());
+        assert!(state.detail.is_none());
+        assert_eq!(state.detail_request, Some(("album-fail".to_string(), DetailKind::Album)));
+    }
+
+    #[test]
+    fn local_detail_bumps_generation() {
+        let mut state = test_wired();
+        let gen1 = begin_detail_load(&mut state, "local:pl1", DetailKind::Playlist)
+            .expect("first load begins");
+        assert_eq!(state.detail_generation, gen1);
+        assert_eq!(state.detail_phase, ViewPhase::Loading);
+
+        let gen2 = begin_detail_load(&mut state, "local:pl2", DetailKind::Playlist)
+            .expect("second load begins");
+        assert_eq!(gen2, gen1.wrapping_add(1));
+        assert_eq!(state.detail_generation, gen2);
+        assert_eq!(state.detail_phase, ViewPhase::Loading);
+    }
+
+    #[test]
+    fn empty_detail_is_empty_not_error() {
+        let mut state = test_wired();
+        let generation =
+            begin_detail_load(&mut state, "album-empty", DetailKind::Album).expect("load begins");
+        let empty_detail = Detail::new(DetailKind::Album, "Empty Album", "", Vec::new());
+        let applied =
+            apply_detail_outcome(&mut state, generation, Some(empty_detail), "album-empty");
+        assert!(applied);
+        assert_eq!(state.detail_phase, ViewPhase::Empty);
+        assert_eq!(state.detail_error, None);
+        assert!(state.detail.is_some());
     }
 }
