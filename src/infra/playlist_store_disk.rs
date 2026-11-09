@@ -102,22 +102,8 @@ impl DiskPlaylistStore {
         Ok(())
     }
 
-    fn temp_file_path(&self) -> PathBuf {
-        let id = std::process::id();
-        self.config_dir.join(format!("{PLAYLISTS_FILE}.tmp.{id}"))
-    }
-
     fn write_atomic(&self, data: &[u8]) -> anyhow::Result<()> {
-        std::fs::create_dir_all(&self.config_dir).with_context(|| {
-            format!("failed to create config dir {}", self.config_dir.display())
-        })?;
-        let tmp = self.temp_file_path();
-        std::fs::write(&tmp, data)
-            .with_context(|| format!("failed to write temporary file {}", tmp.display()))?;
-        std::fs::rename(&tmp, self.file_path()).with_context(|| {
-            format!("failed to rename {} to {}", tmp.display(), self.file_path().display())
-        })?;
-        Ok(())
+        super::atomic_file::write_atomic(&self.file_path(), data)
     }
 
     fn persist_playlists(&self, playlists: &[LocalPlaylist]) -> anyhow::Result<()> {

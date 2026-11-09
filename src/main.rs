@@ -60,6 +60,8 @@ fn main() -> anyhow::Result<()> {
 
     let data_dir = app_data_dir();
     let config_dir = default_config_dir();
+    // Stale temp files from interrupted writes are removed at startup.
+    let _ = moggyt::infra::sweep_stale_temp_files(&config_dir, moggyt::infra::TEMP_FILE_MAX_AGE);
     let cache_dir = app_cache_dir();
 
     let settings_store = DiskSettingsStore::new(config_dir.clone());

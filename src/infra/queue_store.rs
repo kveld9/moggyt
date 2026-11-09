@@ -64,17 +64,8 @@ impl DiskQueueStore {
         self.config_dir.join("queue.json")
     }
 
-    fn temp_file_path(&self) -> PathBuf {
-        let id = std::process::id();
-        self.config_dir.join(format!("queue.json.tmp.{id}"))
-    }
-
     fn write_atomic(&self, data: &[u8]) -> anyhow::Result<()> {
-        std::fs::create_dir_all(&self.config_dir)?;
-        let tmp = self.temp_file_path();
-        std::fs::write(&tmp, data)?;
-        std::fs::rename(&tmp, self.file_path())?;
-        Ok(())
+        super::atomic_file::write_atomic(&self.file_path(), data)
     }
 }
 

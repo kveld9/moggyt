@@ -4,6 +4,7 @@
 //! (catalog API, rodio/gstreamer) implement these traits later
 //! without touching `domain` or `app`.
 
+mod atomic_file;
 mod audio;
 mod audio_dsp;
 mod audio_live;
@@ -64,6 +65,7 @@ mod updater;
 mod updater_github;
 mod ytdlp;
 
+pub use atomic_file::{TEMP_FILE_MAX_AGE, sweep_stale_temp_files, write_atomic};
 pub use audio::{AudioBackend, AudioStub, NullAudio, clamp_speed};
 pub use audio_dsp::{
     DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, LoudnessNormalizer,
