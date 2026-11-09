@@ -295,30 +295,6 @@ impl SlintAppState {
         Ok(count)
     }
 
-    /// Refreshes lyrics for the active track from local overrides or LRCLIB.
-    pub fn refresh_lyrics(&mut self) {
-        let Some(track) = self.queue.current() else {
-            self.lyrics_lines.clear();
-            self.lyrics_key = None;
-            return;
-        };
-        let key = (track.artist.clone(), track.title.clone());
-        if self.lyrics_key.as_ref() == Some(&key) {
-            return;
-        }
-        if let Some(ref overrides) = self.lyric_overrides {
-            if let Some(hit) = overrides.load(&track.id) {
-                self.lyrics_lines = hit.lines;
-                self.lyrics_key = Some(key);
-                return;
-            }
-        }
-        let duration = track.duration_secs.map(u64::from);
-        self.lyrics_lines =
-            self.lyrics.lookup(&key.0, &key.1, duration).map(|s| s.lines).unwrap_or_default();
-        self.lyrics_key = Some(key);
-    }
-
     /// Resolves 0-based active lyric line index for current playback timestamp.
     pub fn active_lyric_index(&self) -> i32 {
         let pos_secs = self.audio.try_lock().map(|a| a.position_secs()).unwrap_or(0);

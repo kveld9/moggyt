@@ -39,17 +39,6 @@ impl SlintAppState {
         self.play_generation == generation
     }
 
-    fn notify_now_playing(&self, artist: &str, title: &str) {
-        if let Ok(mut s) = self.scrobbler.lock() {
-            s.now_playing(artist, title);
-        }
-        if let Some(sec) = &self.secondary_scrobbler {
-            if let Ok(mut s) = sec.lock() {
-                s.now_playing(artist, title);
-            }
-        }
-    }
-
     /// Advances or retreats queue cursor in-memory to target index without triggering playback.
     pub fn play_track_at_index_in_memory(&mut self, index: usize) {
         if index >= self.queue.len() {
@@ -63,32 +52,10 @@ impl SlintAppState {
         }
     }
 
-    /// Advances or retreats queue cursor to target index and starts playback quietly.
+    /// Advances or retreats queue cursor to target index and requests playback.
     pub fn play_track_at_index(&mut self, index: usize) {
         self.play_track_at_index_in_memory(index);
-        self.play_current_quiet();
-    }
-
-    /// Plays the track currently under the cursor without changing navigation page.
-    pub fn play_current_quiet(&mut self) {
-        let Some(track) = self.queue.current().cloned() else {
-            return;
-        };
-        let (id, artist, title) = (track.id.clone(), track.artist.clone(), track.title.clone());
-        if self.on_track_changing_sleep_timer(&id) {
-            return;
-        }
-        let Some(req) = self.begin_play_request() else {
-            return;
-        };
-        self.send_play_request(req);
-        self.set_playback_phase(PlaybackPhase::Resolving);
-        self.started_at = Some(StartedPlay::now(track));
-        self.notify_now_playing(&artist, &title);
-        self.last_skip_target = None;
-        self.cached_skip_ranges = None;
-        self.sync_presence_track(&artist, &title, true);
-        self.refresh_lyrics();
+        self.request_current_play();
     }
 
     /// Toggles playback: pauses if playing, resumes if requested, or starts head.
@@ -108,20 +75,20 @@ impl SlintAppState {
             self.set_playback_phase(PlaybackPhase::Resolving);
             self.sync_presence_playing(true);
         } else {
-            self.play_current_quiet();
+            self.request_current_play();
         }
     }
 
     /// Advances cursor to next track, scrobbling the completed track if eligible.
     pub fn next_track(&mut self) {
         self.queue.advance();
-        self.play_current_quiet();
+        self.request_current_play();
     }
 
     /// Retreats cursor to previous track, scrobbling the completed track if eligible.
     pub fn prev_track(&mut self) {
         self.queue.retreat();
-        self.play_current_quiet();
+        self.request_current_play();
     }
 
     /// Adjusts position relative to current playback point, clamped at zero.
@@ -292,7 +259,7 @@ impl SlintAppState {
         let current_id = current.id.clone();
         self.append_autoplay_radio(&current_id);
         self.queue.advance();
-        self.play_current_quiet();
+        self.request_current_play();
     }
 
     /// Advances queue or appends radio recommendations when active track ends or reaches crossfade boundary.
@@ -408,7 +375,7 @@ mod tests {
         state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
         state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
 
-        state.play_current_quiet();
+        state.request_current_play();
         assert!(state.audio.lock().unwrap().is_playing());
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
 
@@ -640,7 +607,7 @@ mod tests {
     }
 
     #[test]
-    fn test_play_current_quiet_uses_crossfade_when_playing_and_configured() {
+    fn request_current_play_uses_crossfade_when_playing_and_configured() {
         let mut state = test_wired();
         state.crossfade_seconds = 8;
 
@@ -653,7 +620,7 @@ mod tests {
 
         // Advance cursor in memory and play while audio is playing
         state.queue.advance();
-        state.play_current_quiet();
+        state.request_current_play();
         assert_eq!(state.audio.lock().unwrap().last_requested(), Some("pq-2"));
     }
 
