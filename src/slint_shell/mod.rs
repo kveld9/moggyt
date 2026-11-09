@@ -67,6 +67,7 @@ pub mod search;
 mod settings_callbacks;
 pub mod shortcuts;
 mod sleep_fade;
+pub mod spotify_connect;
 pub mod state;
 pub mod state_init;
 pub mod stats;

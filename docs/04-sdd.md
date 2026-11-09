@@ -236,6 +236,9 @@ developer API credentials or user accounts.
 - **Embed Ingestion (`SpotifyEmbedClient`)**: Fetches public playlist or album embed HTML
   (`https://open.spotify.com/embed/playlist/<id>` or `/album/<id>`) and extracts the embedded `__NEXT_DATA__` JSON
   payload, parsing track title, artist (subtitle), duration, and metadata without requiring Spotify Web API keys.
+- **Official Web API Ingestion (`SpotifyApiClient`)**: Optional Tier 3 ingestion adapter using OAuth 2.0 Client
+  Credentials. When configured with user-supplied Client ID and Client Secret, requests bearer tokens from Spotify
+  accounts and fetches paginated tracklists (100 items per page) alongside catalog ISRC identifiers.
 - **File Ingestion (`parse_exportify_csv`, `parse_spotify_backup_json`)**: Pure, allocation-light parsers. The CSV
   adapter parses RFC 4180 files exported by Exportify, requiring `Track Name`, `Artist Name(s)`, `Album Name`,
   `Track Duration (ms)`, and `Track URI` columns; `ISRC` is optional and, when present, is used as the first search
@@ -341,15 +344,35 @@ The importer supports headless execution from the terminal:
 - Streams progress diagnostics to `stderr`.
 - Outputs a machine-readable JSON summary report to `stdout` when `--json` is supplied, or human-readable summary
   text otherwise.
+- Configured Spotify Web API credentials stored in the OS credential manager are honored for link imports,
+  bypassing the 100-track embed cap and extracting ISRC identifiers when present.
 
 #### 6.1.8 Known limits
 
 - **Embed 100-Track Cap**: Spotify embed HTML documents only contain the first 100 tracks of a playlist or album.
   Playlists exceeding 100 tracks require Exportify CSV or JSON file exports to import completely.
-- **Public Playlists Only**: Link-based import requires public playlist accessibility; private, unlisted, or
-  region-locked Spotify playlists cannot be scraped via embed and require CSV or JSON export files.
+- **Public Playlists Only**: Link-based import requires public or unlisted playlist accessibility; private user
+  playlists cannot be accessed via Client Credentials or embed scraping and still require CSV or JSON export files.
 - **Region-Unavailable Tracks**: Tracks absent from the YouTube Music catalog or restricted by licensing remain
   unresolved, preserving their source title and artist in the review view.
+
+#### 6.1.9 Optional Spotify Web API (Tier 3)
+
+The optional Tier 3 ingestion client (`SpotifyApiClient`) enhances link-based imports using official Spotify Web API
+endpoints:
+
+- **Token Endpoint**: Requests OAuth 2.0 bearer tokens from `https://accounts.spotify.com/api/token` using the Client
+  Credentials flow (`grant_type=client_credentials`) with HTTP Basic authentication.
+- **Paginated Track Endpoints**: Traverses `https://api.spotify.com/v1/playlists/<id>/tracks` and
+  `https://api.spotify.com/v1/albums/<id>/tracks` with `limit=100` and incremental offsets, retrieving complete
+  tracklists beyond the 100-track embed cap.
+- **Keyring Storage**: Credentials are held in the OS credential manager under service name `moggyt` with accounts
+  `spotify-client-id` and `spotify-client-secret`. Keyring operations fail softly if no credential provider is available.
+- **Selection Rule**: Link imports (`load_spotify_link`) evaluate stored credentials. If complete credentials exist
+  (`client_id` and `client_secret` non-empty after trimming), `SpotifyApiClient` executes the request; otherwise,
+  ingestion falls back to `SpotifyEmbedClient`.
+- **File Ingestion Independence**: CSV and JSON file imports remain completely unaffected by API credentials,
+  relying exclusively on pure file parsers.
 
 ## 7 Data model
 

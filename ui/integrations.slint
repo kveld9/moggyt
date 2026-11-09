@@ -9,4 +9,11 @@ export global Integrations {
     in-out property <string> lastfm-status: "";
     callback lastfm-connect();
     callback lastfm-disconnect();
+
+    in-out property <string> spotify-client-id: "";
+    in-out property <string> spotify-client-secret: "";
+    in-out property <bool> spotify-configured: false;
+    in-out property <string> spotify-status: "";
+    callback spotify-save();
+    callback spotify-clear();
 }

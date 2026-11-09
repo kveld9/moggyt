@@ -108,11 +108,13 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Artists", "Artistas"),
     ("Audio quality", "Calidad de audio"),
     ("Black OLED", "Negro OLED"),
+    ("Both Spotify credentials are required", "Se requieren ambas credenciales de Spotify"),
     ("CSV file path", "Ruta del archivo CSV"),
     ("Cancel", "Cancelar"),
     ("Category", "Categoria"),
     ("Choose a track", "Elegir una cancion"),
     ("Classic", "Clásica"),
+    ("Clear credentials", "Borrar credenciales"),
     ("Clear history", "Borrar todo el historial"),
     ("Close", "Cerrar"),
     ("Connect with Last.fm", "Conectar con Last.fm"),
@@ -135,9 +137,11 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("English", "Inglés"),
     ("End of track", "Fin de la canción"),
     ("Explore", "Explorar"),
+    ("Failed to clear Spotify credentials", "No se pudieron borrar las credenciales de Spotify"),
     ("Failed to load search results", "No se pudieron cargar los resultados de busqueda"),
     ("Failed to play track", "Error al reproducir la canción"),
     ("Failed to save playlist", "No se pudo guardar la playlist"),
+    ("Failed to save Spotify credentials", "No se pudieron guardar las credenciales de Spotify"),
     ("Floating", "Flotante"),
     ("From file", "Desde archivo"),
     ("From link", "Desde enlace"),
@@ -209,6 +213,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ),
     ("Recent searches", "Búsquedas recientes"),
     ("Review matches", "Revisar coincidencias"),
+    ("Save credentials", "Guardar credenciales"),
     ("Save playlist", "Guardar playlist"),
     ("Saved playlist", "Playlist guardada"),
     ("Search", "Buscar"),
@@ -247,7 +252,12 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Songs", "Canciones"),
     ("Source", "Origen"),
     ("Spanish", "Español"),
+    ("Spotify Client ID", "ID de cliente de Spotify"),
+    ("Spotify Client Secret", "Secreto de cliente de Spotify"),
     ("Spotify playlist or album link", "Enlace de playlist o album de Spotify"),
+    ("Spotify Web API", "API web de Spotify"),
+    ("Spotify Web API: configured", "API web de Spotify: configurada"),
+    ("Spotify Web API: not configured", "API web de Spotify: no configurada"),
     ("Start import", "Iniciar importacion"),
     ("Standard (~128 kbps)", "Estándar (~128 kbps)"),
     ("Stats", "Estadísticas"),
@@ -572,6 +582,36 @@ mod tests {
                 "Waiting for authorization in your browser",
                 "Esperando la autorización en tu navegador",
             ),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_spotify_web_api_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Both Spotify credentials are required", "Se requieren ambas credenciales de Spotify"),
+            ("Clear credentials", "Borrar credenciales"),
+            (
+                "Failed to clear Spotify credentials",
+                "No se pudieron borrar las credenciales de Spotify",
+            ),
+            (
+                "Failed to save Spotify credentials",
+                "No se pudieron guardar las credenciales de Spotify",
+            ),
+            ("Save credentials", "Guardar credenciales"),
+            ("Spotify Client ID", "ID de cliente de Spotify"),
+            ("Spotify Client Secret", "Secreto de cliente de Spotify"),
+            ("Spotify Web API", "API web de Spotify"),
+            ("Spotify Web API: configured", "API web de Spotify: configurada"),
+            ("Spotify Web API: not configured", "API web de Spotify: no configurada"),
         ];
 
         for (key, expected_es) in keys_and_expected {

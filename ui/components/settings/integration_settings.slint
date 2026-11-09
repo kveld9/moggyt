@@ -1,6 +1,7 @@
 import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
 import { Integrations } from "../../integrations.slint";
+import { StyledInputField } from "../controls.slint";
 import { SettingsToggleRow } from "../settings_rows.slint";
 
 export component IntegrationSettings inherits VerticalLayout {
@@ -74,6 +75,96 @@ export component IntegrationSettings inherits VerticalLayout {
 
                             Text {
                                 text: Integrations.lastfm-connected ? Labels.lastfm-disconnect-label : Labels.lastfm-connect-label;
+                                color: Theme.text;
+                                font-size: 12px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+
+            VerticalLayout {
+                spacing: 10px;
+
+                Text {
+                    text: Labels.spotify-label;
+                    color: Theme.text;
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: Integrations.spotify-status;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+
+                StyledInputField {
+                    height: 32px;
+                    text <=> Integrations.spotify-client-id;
+                    placeholder-text: Labels.spotify-client-id-placeholder;
+                }
+
+                StyledInputField {
+                    height: 32px;
+                    text <=> Integrations.spotify-client-secret;
+                    placeholder-text: Labels.spotify-client-secret-placeholder;
+                    input-type: InputType.password;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 8px;
+                        background: spotify-save-touch.pressed ? Theme.overlay : (spotify-save-touch.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        spotify-save-touch := TouchArea {
+                            clicked => {
+                                Integrations.spotify-save();
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+
+                            Text {
+                                text: Labels.spotify-save-label;
+                                color: Theme.text;
+                                font-size: 12px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 8px;
+                        background: spotify-clear-touch.pressed ? Theme.overlay : (spotify-clear-touch.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        spotify-clear-touch := TouchArea {
+                            clicked => {
+                                Integrations.spotify-clear();
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+
+                            Text {
+                                text: Labels.spotify-clear-label;
                                 color: Theme.text;
                                 font-size: 12px;
                                 font-weight: 700;

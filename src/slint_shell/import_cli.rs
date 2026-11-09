@@ -12,8 +12,11 @@ use std::time::Duration;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{MatchConfidence, SpotifyPlaylist, SpotifyTrack, parse_spotify_ref};
-use crate::infra::{PlaylistStore, SpotifyEmbedClient, load_playlist_file};
+use crate::domain::{MatchConfidence, SpotifyPlaylist, SpotifyTrack};
+use crate::infra::{
+    KeyringSpotifyCredentialStore, PlaylistStore, SpotifyCredentialStore, load_playlist_file,
+    load_spotify_link,
+};
 use crate::slint_shell::import_worker::{
     ImportProgressEvent, TrackResolution, TrackSearcher, WorkerConfig, assemble_playlist,
     resolve_tracks,
@@ -241,10 +244,8 @@ pub fn render_progress(event: &ImportProgressEvent) -> Option<String> {
 }
 
 fn load_link_source(url: &str) -> anyhow::Result<SpotifyPlaylist> {
-    let spotify_ref = parse_spotify_ref(url)
-        .ok_or_else(|| anyhow::anyhow!("invalid or unsupported Spotify URL or URI: '{url}'"))?;
-    let client = SpotifyEmbedClient::new();
-    client.fetch(&spotify_ref)
+    let store = KeyringSpotifyCredentialStore::moggyt();
+    load_spotify_link(url, store.load().as_ref())
 }
 
 fn load_csv_source(path: &Path) -> anyhow::Result<SpotifyPlaylist> {

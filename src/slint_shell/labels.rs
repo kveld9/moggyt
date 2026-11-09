@@ -78,6 +78,11 @@ pub struct StaticLabels {
     pub lastfm_label: &'static str,
     pub lastfm_connect_label: &'static str,
     pub lastfm_disconnect_label: &'static str,
+    pub spotify_label: &'static str,
+    pub spotify_client_id_placeholder: &'static str,
+    pub spotify_client_secret_placeholder: &'static str,
+    pub spotify_save_label: &'static str,
+    pub spotify_clear_label: &'static str,
     pub section_session: &'static str,
     pub status_signed_in: &'static str,
     pub status_anonymous: &'static str,
@@ -216,6 +221,11 @@ impl StaticLabels {
             lastfm_label: tr(locale, "Last.fm"),
             lastfm_connect_label: tr(locale, "Connect with Last.fm"),
             lastfm_disconnect_label: tr(locale, "Disconnect"),
+            spotify_label: tr(locale, "Spotify Web API"),
+            spotify_client_id_placeholder: tr(locale, "Spotify Client ID"),
+            spotify_client_secret_placeholder: tr(locale, "Spotify Client Secret"),
+            spotify_save_label: tr(locale, "Save credentials"),
+            spotify_clear_label: tr(locale, "Clear credentials"),
             section_session: tr(locale, "Session"),
             status_signed_in: tr(locale, "Status: Signed in"),
             status_anonymous: tr(locale, "Status: Anonymous"),
@@ -357,6 +367,11 @@ impl StaticLabels {
         labels.set_lastfm_label(self.lastfm_label.into());
         labels.set_lastfm_connect_label(self.lastfm_connect_label.into());
         labels.set_lastfm_disconnect_label(self.lastfm_disconnect_label.into());
+        labels.set_spotify_label(self.spotify_label.into());
+        labels.set_spotify_client_id_placeholder(self.spotify_client_id_placeholder.into());
+        labels.set_spotify_client_secret_placeholder(self.spotify_client_secret_placeholder.into());
+        labels.set_spotify_save_label(self.spotify_save_label.into());
+        labels.set_spotify_clear_label(self.spotify_clear_label.into());
         labels.set_section_session_label(self.section_session.into());
         labels.set_status_signed_in_label(self.status_signed_in.into());
         labels.set_status_anonymous_label(self.status_anonymous.into());
@@ -444,6 +459,11 @@ mod tests {
         assert_eq!(en_labels.lastfm_label, "Last.fm");
         assert_eq!(en_labels.lastfm_connect_label, "Connect with Last.fm");
         assert_eq!(en_labels.lastfm_disconnect_label, "Disconnect");
+        assert_eq!(en_labels.spotify_label, "Spotify Web API");
+        assert_eq!(en_labels.spotify_client_id_placeholder, "Spotify Client ID");
+        assert_eq!(en_labels.spotify_client_secret_placeholder, "Spotify Client Secret");
+        assert_eq!(en_labels.spotify_save_label, "Save credentials");
+        assert_eq!(en_labels.spotify_clear_label, "Clear credentials");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -458,6 +478,11 @@ mod tests {
         assert_eq!(es_labels.lastfm_label, "Last.fm");
         assert_eq!(es_labels.lastfm_connect_label, "Conectar con Last.fm");
         assert_eq!(es_labels.lastfm_disconnect_label, "Desconectar");
+        assert_eq!(es_labels.spotify_label, "API web de Spotify");
+        assert_eq!(es_labels.spotify_client_id_placeholder, "ID de cliente de Spotify");
+        assert_eq!(es_labels.spotify_client_secret_placeholder, "Secreto de cliente de Spotify");
+        assert_eq!(es_labels.spotify_save_label, "Guardar credenciales");
+        assert_eq!(es_labels.spotify_clear_label, "Borrar credenciales");
     }
 
     #[test]
@@ -538,6 +563,11 @@ mod tests {
             es.discord_presence_hint_label,
             "Muestra el tema actual en tu estado de Discord mientras Discord está abierto."
         );
+        assert_eq!(es.spotify_label, "API web de Spotify");
+        assert_eq!(es.spotify_client_id_placeholder, "ID de cliente de Spotify");
+        assert_eq!(es.spotify_client_secret_placeholder, "Secreto de cliente de Spotify");
+        assert_eq!(es.spotify_save_label, "Guardar credenciales");
+        assert_eq!(es.spotify_clear_label, "Borrar credenciales");
         assert_eq!(es.section_session, "Sesión");
         assert_eq!(es.status_signed_in, "Estado: Sesión iniciada");
         assert_eq!(es.status_anonymous, "Estado: Anónimo");
@@ -670,6 +700,11 @@ mod tests {
             en.discord_presence_hint_label,
             "Shows the current track in your Discord status while Discord is running."
         );
+        assert_eq!(en.spotify_label, "Spotify Web API");
+        assert_eq!(en.spotify_client_id_placeholder, "Spotify Client ID");
+        assert_eq!(en.spotify_client_secret_placeholder, "Spotify Client Secret");
+        assert_eq!(en.spotify_save_label, "Save credentials");
+        assert_eq!(en.spotify_clear_label, "Clear credentials");
         assert_eq!(en.section_session, "Session");
         assert_eq!(en.status_signed_in, "Status: Signed in");
         assert_eq!(en.status_anonymous, "Status: Anonymous");
