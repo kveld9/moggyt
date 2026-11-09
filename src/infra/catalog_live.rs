@@ -1,6 +1,6 @@
 //! Production catalog adapter implementing the [`Catalog`] port via [`CatalogClient`].
 
-use super::catalog::Catalog;
+use super::catalog::{Catalog, CatalogError};
 use super::catalog_client::{
     CatalogClient, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits, parse_search_all,
 };
@@ -145,13 +145,13 @@ impl Catalog for LiveCatalog {
         self.client.category_shelves(browse_id, params)
     }
 
-    /// Returns saved or owned playlists. Returns empty when unauthenticated or on failure.
-    fn playlists(&self) -> Vec<Playlist> {
+    /// Returns saved or owned playlists.
+    fn playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
         self.client.library_playlists()
     }
 
-    /// Returns saved albums. Returns empty when unauthenticated or on failure.
-    fn saved_albums(&self) -> Vec<Album> {
+    /// Returns saved albums.
+    fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
         self.client.library_saved_albums()
     }
 
@@ -272,11 +272,11 @@ mod tests {
     }
 
     #[test]
-    fn live_catalog_unauthenticated_returns_empty_without_network() {
+    fn live_catalog_unauthenticated_returns_unauthenticated_error() {
         let catalog = LiveCatalog::new();
 
-        assert!(catalog.playlists().is_empty());
-        assert!(catalog.saved_albums().is_empty());
+        assert_eq!(catalog.playlists(), Err(CatalogError::Unauthenticated));
+        assert_eq!(catalog.saved_albums(), Err(CatalogError::Unauthenticated));
     }
 
     #[test]

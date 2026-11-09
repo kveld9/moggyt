@@ -1,6 +1,6 @@
 //! Deterministic catalog stub (no network).
 
-use super::catalog::Catalog;
+use super::catalog::{Catalog, CatalogError};
 use crate::domain::{
     Album, Artist, Detail, DetailKind, LyricsSnippet, Playlist, SearchFilter, SearchQuery,
     SearchResult, Shelf, Track,
@@ -174,12 +174,12 @@ impl Catalog for CatalogStub {
         }
     }
 
-    fn playlists(&self) -> Vec<Playlist> {
-        Self::stub_playlists()
+    fn playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
+        Ok(Self::stub_playlists())
     }
 
-    fn saved_albums(&self) -> Vec<Album> {
-        vec![Self::stub_album()]
+    fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
+        Ok(vec![Self::stub_album()])
     }
 
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Option<Detail> {
@@ -255,12 +255,12 @@ mod tests {
     fn stub_library_lifecycle_defaults_and_readers() {
         let catalog = CatalogStub::new();
 
-        let playlists = catalog.playlists();
+        let playlists = catalog.playlists().expect("stub playlists");
         assert_eq!(playlists.len(), 2);
         assert!(!playlists[0].title.is_empty());
         assert!(!playlists[1].title.is_empty());
 
-        let albums = catalog.saved_albums();
+        let albums = catalog.saved_albums().expect("stub albums");
         assert_eq!(albums.len(), 1);
         assert_eq!(albums[0].id, "stub-album-1");
     }

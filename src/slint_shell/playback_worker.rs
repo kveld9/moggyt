@@ -38,8 +38,8 @@ use tracing::{debug, warn};
 use crate::domain::{Detail, DetailKind, SearchQuery, Shelf};
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, AudioError, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CoverCache, LyricLine,
-    LyricOverrideDir, LyricsSource, Scrobbler, decode_cover, fetch_artwork,
+    AudioBackend, AudioError, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CatalogError, CoverCache,
+    LyricLine, LyricOverrideDir, LyricsSource, Scrobbler, decode_cover, fetch_artwork,
 };
 use crate::slint_shell::platform::{CoverArtData, PresenceSnapshot};
 
@@ -327,14 +327,17 @@ pub fn execute_detail<C: Catalog>(
     (generation, detail)
 }
 
+type PlaylistResult = Result<Vec<crate::domain::Playlist>, CatalogError>;
+type AlbumResult = Result<Vec<crate::domain::Album>, CatalogError>;
+
 /// Refreshes playlists and saved albums from catalog off the UI thread.
 pub fn execute_refresh_library<C: Catalog>(
     generation: u64,
     catalog: &Arc<Mutex<C>>,
-) -> (u64, Vec<crate::domain::Playlist>, Vec<crate::domain::Album>) {
+) -> (u64, PlaylistResult, AlbumResult) {
     let guard = catalog.lock();
-    let playlists = guard.as_ref().map(|c| c.playlists()).unwrap_or_default();
-    let albums = guard.as_ref().map(|c| c.saved_albums()).unwrap_or_default();
+    let playlists = guard.as_ref().map(|c| c.playlists()).unwrap_or(Err(CatalogError::Transport));
+    let albums = guard.as_ref().map(|c| c.saved_albums()).unwrap_or(Err(CatalogError::Transport));
     (generation, playlists, albums)
 }
 
@@ -465,11 +468,11 @@ mod tests {
         fn home_shelves(&self) -> Vec<Shelf> {
             Vec::new()
         }
-        fn playlists(&self) -> Vec<crate::domain::Playlist> {
-            Vec::new()
+        fn playlists(&self) -> Result<Vec<crate::domain::Playlist>, CatalogError> {
+            Ok(Vec::new())
         }
-        fn saved_albums(&self) -> Vec<crate::domain::Album> {
-            Vec::new()
+        fn saved_albums(&self) -> Result<Vec<crate::domain::Album>, CatalogError> {
+            Ok(Vec::new())
         }
         fn detail(&self, _: &str, _: DetailKind) -> Option<Detail> {
             None
@@ -509,11 +512,11 @@ mod tests {
         fn home_shelves(&self) -> Vec<Shelf> {
             Vec::new()
         }
-        fn playlists(&self) -> Vec<crate::domain::Playlist> {
-            Vec::new()
+        fn playlists(&self) -> Result<Vec<crate::domain::Playlist>, CatalogError> {
+            Ok(Vec::new())
         }
-        fn saved_albums(&self) -> Vec<crate::domain::Album> {
-            Vec::new()
+        fn saved_albums(&self) -> Result<Vec<crate::domain::Album>, CatalogError> {
+            Ok(Vec::new())
         }
         fn detail(&self, _: &str, _: DetailKind) -> Option<Detail> {
             None

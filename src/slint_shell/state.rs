@@ -15,7 +15,7 @@ use crate::domain::{
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, AudioError, Catalog, CoverCache, CustomThemeFile, DesktopPresence,
+    AudioBackend, AudioError, Catalog, CatalogError, CoverCache, CustomThemeFile, DesktopPresence,
     DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, PlayLogStore,
     QueueStore, ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipStore, TrayAction,
     TrayHandle, decode_cover, decode_handoff, fetch_artwork, sanitize_cookie_input,
@@ -241,10 +241,9 @@ impl SlintAppState {
     pub fn refresh_library(&mut self) {
         let (playlists, albums) = match self.catalog.lock() {
             Ok(c) => (c.playlists(), c.saved_albums()),
-            Err(_) => (Vec::new(), Vec::new()),
+            Err(_) => (Err(CatalogError::Transport), Err(CatalogError::Transport)),
         };
-        self.library_playlists = playlists;
-        self.library_albums = albums;
+        self.apply_library_outcome(playlists, albums);
     }
 
     /// Submits search query to catalog and wraps hits in a shelf.
@@ -464,10 +463,10 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     fn category_shelves(&self, id: &str, p: Option<&str>) -> Vec<Shelf> {
         (**self).category_shelves(id, p)
     }
-    fn playlists(&self) -> Vec<Playlist> {
+    fn playlists(&self) -> Result<Vec<Playlist>, CatalogError> {
         (**self).playlists()
     }
-    fn saved_albums(&self) -> Vec<Album> {
+    fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
         (**self).saved_albums()
     }
     fn detail(&self, id: &str, k: DetailKind) -> Option<Detail> {

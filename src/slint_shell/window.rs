@@ -15,7 +15,8 @@ use crate::domain::{
 };
 use crate::i18n::tr;
 use crate::infra::{
-    AudioBackend, CoverCache, DiskPlaylistStore, LyricsSource, PlaylistStore, default_config_dir,
+    AudioBackend, CatalogError, CoverCache, DiskPlaylistStore, LyricsSource, PlaylistStore,
+    default_config_dir,
 };
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::callbacks::wire_window_callbacks;
@@ -317,6 +318,42 @@ pub fn retry_detail_load(
     open_detail_async(window, state, &id, kind, worker_tx);
 }
 
+fn is_library_empty(
+    playlists: &[crate::domain::Playlist],
+    albums: &[crate::domain::Album],
+) -> bool {
+    playlists.is_empty() && albums.is_empty()
+}
+
+fn apply_async_library_outcome(
+    state: &mut SlintAppState,
+    generation: u64,
+    playlists: Result<Vec<crate::domain::Playlist>, CatalogError>,
+    albums: Result<Vec<crate::domain::Album>, CatalogError>,
+) -> bool {
+    if state.library_generation != generation {
+        return false;
+    }
+    match (playlists, albums) {
+        (Ok(playlists), Ok(albums)) => {
+            let local = current_store().map(|s| s.list()).unwrap_or_default();
+            let is_empty = is_library_empty(&playlists, &albums);
+            state.library_playlists = with_history_entry(
+                merge_local_library(&playlists, &local),
+                state.signed_in,
+                state.locale,
+            );
+            state.library_albums = albums;
+            state.library_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
+            true
+        }
+        _ => {
+            state.library_phase = ViewPhase::Error;
+            false
+        }
+    }
+}
+
 /// Dispatches asynchronous library refresh off the UI thread.
 pub(crate) fn refresh_library_async(
     window: &MoggytWindow,
@@ -334,17 +371,10 @@ pub(crate) fn refresh_library_async(
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
-                if st.library_generation == g {
-                    let local = current_store().map(|s| s.list()).unwrap_or_default();
-                    st.library_playlists = with_history_entry(
-                        merge_local_library(&playlists, &local),
-                        st.signed_in,
-                        st.locale,
-                    );
-                    st.library_albums = albums;
+                if apply_async_library_outcome(st, g, playlists, albums) {
                     request_library_covers(st, &tx);
-                    sync_library_and_detail(&win, st);
                 }
+                sync_library_and_detail(&win, st);
             });
         });
     });
@@ -484,7 +514,7 @@ mod tests {
 
     use super::*;
     use crate::domain::Track;
-    use crate::slint_shell::test_support::test_wired;
+    use crate::slint_shell::test_support::{MockLibraryCatalog, test_wired};
 
     #[test]
     fn test_set_and_with_ui_state_round_trip() {
@@ -669,5 +699,87 @@ mod tests {
         assert_eq!(state.detail_phase, ViewPhase::Empty);
         assert_eq!(state.detail_error, None);
         assert!(state.detail.is_some());
+    }
+
+    #[test]
+    fn unauthenticated_is_distinct_from_empty() {
+        let mut state = test_wired();
+        let initial_playlist = crate::domain::Playlist::new("p1", "Initial", 1, None);
+        state.library_playlists = vec![initial_playlist.clone()];
+        let unauth = MockLibraryCatalog::new(
+            Err(CatalogError::Unauthenticated),
+            Err(CatalogError::Unauthenticated),
+        );
+        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(unauth)));
+
+        state.refresh_library();
+        assert_eq!(state.library_phase, ViewPhase::Error);
+        assert_eq!(state.library_playlists, vec![initial_playlist]);
+
+        let empty = MockLibraryCatalog::new(Ok(Vec::new()), Ok(Vec::new()));
+        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(empty)));
+
+        state.refresh_library();
+        assert_eq!(state.library_phase, ViewPhase::Empty);
+        assert!(state.library_playlists.is_empty());
+    }
+
+    #[test]
+    fn transport_error_sets_error_phase() {
+        let mut state = test_wired();
+        let transport =
+            MockLibraryCatalog::new(Err(CatalogError::Transport), Err(CatalogError::Transport));
+        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(transport)));
+
+        state.refresh_library();
+        assert_eq!(state.library_phase, ViewPhase::Error);
+    }
+
+    #[test]
+    fn empty_success_is_ready_empty() {
+        let mut state = test_wired();
+        let empty = MockLibraryCatalog::new(Ok(Vec::new()), Ok(Vec::new()));
+        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(empty)));
+
+        state.refresh_library();
+        assert_eq!(state.library_phase, ViewPhase::Empty);
+
+        let one = crate::domain::Playlist::new("p1", "One Playlist", 5, None);
+        let populated = MockLibraryCatalog::new(Ok(vec![one.clone()]), Ok(Vec::new()));
+        state.catalog = std::sync::Arc::new(std::sync::Mutex::new(Box::new(populated)));
+
+        state.refresh_library();
+        assert_eq!(state.library_phase, ViewPhase::Ready);
+        assert_eq!(state.library_playlists, vec![one]);
+    }
+
+    #[test]
+    fn async_library_outcome_handles_error_and_empty() {
+        let mut state = test_wired();
+        state.library_generation = 10;
+        let applied_stale = apply_async_library_outcome(
+            &mut state,
+            9,
+            Err(CatalogError::Transport),
+            Err(CatalogError::Transport),
+        );
+        assert!(!applied_stale);
+
+        let initial_playlist = crate::domain::Playlist::new("p1", "Initial", 1, None);
+        state.library_playlists = vec![initial_playlist.clone()];
+        let applied_err = apply_async_library_outcome(
+            &mut state,
+            10,
+            Err(CatalogError::Transport),
+            Err(CatalogError::Transport),
+        );
+        assert!(!applied_err);
+        assert_eq!(state.library_phase, ViewPhase::Error);
+        assert_eq!(state.library_playlists, vec![initial_playlist]);
+
+        let applied_ok =
+            apply_async_library_outcome(&mut state, 10, Ok(Vec::new()), Ok(Vec::new()));
+        assert!(applied_ok);
+        assert_eq!(state.library_phase, ViewPhase::Empty);
     }
 }
