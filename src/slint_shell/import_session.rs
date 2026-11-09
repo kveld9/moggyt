@@ -6,10 +6,18 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 
-use crate::domain::{LocalPlaylist, SpotifyPlaylist};
+use crate::domain::{LocalPlaylist, LocalTrack, SpotifyPlaylist};
 use crate::infra::PlaylistStore;
 use crate::slint_shell::import_state::{ImportCounts, ImportReview};
 use crate::slint_shell::import_worker::{ImportProgressEvent, TrackResolution};
+
+/// Destination for imported tracks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ImportDestination {
+    #[default]
+    Library,
+    Queue,
+}
 
 /// Stage of the import flow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -37,12 +45,15 @@ pub fn progress_status(done: usize, total: usize) -> String {
 }
 
 /// One import run owned by the UI.
+#[derive(Default)]
 pub struct ImportSession {
     pub stage: ImportStage,
     pub source: Option<SpotifyPlaylist>,
     pub review: Option<ImportReview>,
     pub status: String,
     pub picker_row: Option<usize>,
+    pub destination: ImportDestination,
+    pub name_override: Option<String>,
     load_generation: u64,
     cancel: Arc<AtomicBool>,
     receiver: Option<mpsc::Receiver<ImportProgressEvent>>,
@@ -52,46 +63,22 @@ pub struct ImportSession {
     progress_total: usize,
 }
 
-impl Default for ImportSession {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ImportSession {
     /// Creates a fresh idle import session.
     pub fn new() -> Self {
-        Self {
-            stage: ImportStage::Idle,
-            source: None,
-            review: None,
-            status: String::new(),
-            picker_row: None,
-            load_generation: 0,
-            cancel: Arc::new(AtomicBool::new(false)),
-            receiver: None,
-            played_events: 0,
-            resolutions: Vec::new(),
-            progress_done: 0,
-            progress_total: 0,
-        }
+        Self::default()
     }
 
     /// Transitions to `LoadingSource`, increments generation, and clears any previous review or cancel flag.
     pub fn start_loading(&mut self) -> u64 {
-        self.load_generation = self.load_generation.wrapping_add(1);
+        let (dest, name, generation) =
+            (self.destination, self.name_override.take(), self.load_generation.wrapping_add(1));
+        *self = Self::default();
         self.stage = ImportStage::LoadingSource;
-        self.source = None;
-        self.review = None;
-        self.status.clear();
-        self.picker_row = None;
-        self.cancel = Arc::new(AtomicBool::new(false));
-        self.receiver = None;
-        self.played_events = 0;
-        self.resolutions.clear();
-        self.progress_done = 0;
-        self.progress_total = 0;
-        self.load_generation
+        self.destination = dest;
+        self.name_override = name;
+        self.load_generation = generation;
+        generation
     }
 
     /// Returns `true` if loading source, matching, or cancelling is actively running.
@@ -109,15 +96,10 @@ impl ImportSession {
 
     /// Resets the session to `Idle`, requests cancellation, and invalidates in-flight loaders.
     pub fn reset_to_idle(&mut self) {
+        let generation = self.load_generation.wrapping_add(1);
+        *self = Self::default();
         self.request_cancel();
-        self.stage = ImportStage::Idle;
-        self.review = None;
-        self.picker_row = None;
-        self.receiver = None;
-        self.status.clear();
-        self.progress_done = 0;
-        self.progress_total = 0;
-        self.load_generation = self.load_generation.wrapping_add(1);
+        self.load_generation = generation;
     }
 
     /// Sets the session to `Failed` stage with the given message.
@@ -216,6 +198,27 @@ impl ImportSession {
         self.review.as_mut().map(|r| r.select(row)).unwrap_or(false)
     }
 
+    /// Sets the import destination and optional playlist name override.
+    pub fn set_options(&mut self, destination: ImportDestination, name_override: Option<String>) {
+        self.destination = destination;
+        self.name_override = name_override;
+    }
+
+    /// Returns the configured destination.
+    pub fn destination(&self) -> ImportDestination {
+        self.destination
+    }
+
+    /// Returns the chosen track of every review row in source order.
+    pub fn resolved_tracks(&self) -> Vec<LocalTrack> {
+        self.review.as_ref().map(|r| r.selected_tracks()).unwrap_or_default()
+    }
+
+    /// Returns the review artwork if a review exists.
+    pub fn artwork(&self) -> Option<String> {
+        self.review.as_ref().and_then(|r| r.artwork.clone())
+    }
+
     /// Saves the reviewed playlist through the store and returns it.
     pub fn save(&mut self, store: &dyn PlaylistStore) -> anyhow::Result<LocalPlaylist> {
         let Some(ref rev) = self.review else {
@@ -230,7 +233,7 @@ impl ImportSession {
         if rev.rows.len() != source.tracks.len() {
             anyhow::bail!("import review is incomplete");
         }
-        let playlist = rev.to_local_playlist();
+        let playlist = rev.to_local_playlist_with_title(self.name_override.as_deref());
         store.save(&playlist)?;
         Ok(playlist)
     }
@@ -284,12 +287,10 @@ impl ImportSession {
         match event {
             ImportProgressEvent::Started { total } => self.on_started(total),
             ImportProgressEvent::Track { index, resolution } => {
-                self.record_resolution(index, resolution);
+                self.record_resolution(index, resolution)
             }
             ImportProgressEvent::Progress { done, .. } => self.on_progress(done),
-            ImportProgressEvent::Finished { .. } => {
-                self.finish_review(outcome);
-            }
+            ImportProgressEvent::Finished { .. } => self.finish_review(outcome),
             ImportProgressEvent::Cancelled { .. } => {
                 self.reset_to_idle();
                 outcome.finished = true;
@@ -299,6 +300,12 @@ impl ImportSession {
                 self.fail(message);
                 outcome.finished = true;
             }
+        }
+    }
+
+    fn sync_review(&mut self) {
+        if let Some(ref src) = self.source {
+            self.review = Some(ImportReview::from_resolutions(src, &self.resolutions));
         }
     }
 
@@ -314,16 +321,12 @@ impl ImportSession {
             );
         }
         self.resolutions[index] = resolution;
-        if let Some(ref src) = self.source {
-            self.review = Some(ImportReview::from_resolutions(src, &self.resolutions));
-        }
+        self.sync_review();
     }
 
     fn finish_review(&mut self, outcome: &mut DrainOutcome) {
         self.stage = ImportStage::Review;
-        if let Some(ref src) = self.source {
-            self.review = Some(ImportReview::from_resolutions(src, &self.resolutions));
-        }
+        self.sync_review();
         outcome.finished = true;
     }
 }
@@ -335,20 +338,21 @@ mod tests {
     use crate::infra::MemoryPlaylistStore;
 
     fn sample_playlist_with_tracks(count: usize) -> SpotifyPlaylist {
+        let tracks = (0..count)
+            .map(|i| SpotifyTrack {
+                title: format!("Song {}", i + 1),
+                artist: format!("Artist {}", i + 1),
+                album: None,
+                duration_ms: 180000,
+                isrc: None,
+            })
+            .collect();
         SpotifyPlaylist {
-            id: "sp_test_id".to_string(),
-            title: "Road Trip".to_string(),
-            author: "Tester".to_string(),
-            artwork: Some("https://example.com/cover.jpg".to_string()),
-            tracks: (0..count)
-                .map(|i| SpotifyTrack {
-                    title: format!("Song {}", i + 1),
-                    artist: format!("Artist {}", i + 1),
-                    album: None,
-                    duration_ms: 180000,
-                    isrc: None,
-                })
-                .collect(),
+            id: "sp_test_id".into(),
+            title: "Road Trip".into(),
+            author: "Tester".into(),
+            artwork: Some("https://example.com/cover.jpg".into()),
+            tracks,
         }
     }
 
@@ -379,6 +383,27 @@ mod tests {
         }
     }
 
+    fn test_finished_event() -> ImportProgressEvent {
+        ImportProgressEvent::Finished {
+            playlist: LocalPlaylist::new("local:sp_test_id", "Road Trip"),
+        }
+    }
+
+    fn test_cancelled_event() -> ImportProgressEvent {
+        ImportProgressEvent::Cancelled {
+            playlist: LocalPlaylist::new("local:cancelled", "Cancelled"),
+        }
+    }
+
+    fn test_track_with_alt(id: &str, alt_id: &str) -> ImportProgressEvent {
+        let t = LocalTrack::new(id, "Song", "Artist", MatchConfidence::High);
+        let alt = LocalTrack::new(alt_id, "Alt", "Artist", MatchConfidence::Medium);
+        ImportProgressEvent::Track {
+            index: 0,
+            resolution: TrackResolution::Matched { track: t.clone(), alternatives: vec![t, alt] },
+        }
+    }
+
     #[test]
     fn test_progress_status_formats_done_over_total() {
         assert_eq!(progress_status(3, 10), "3 / 10");
@@ -406,11 +431,9 @@ mod tests {
         session.request_cancel();
         assert!(session.cancel_flag().load(Ordering::Relaxed));
 
-        let generation = session.start_loading();
-        assert_eq!(generation, 1);
+        assert_eq!(session.start_loading(), 1);
         assert_eq!(session.stage, ImportStage::LoadingSource);
-        assert!(session.status.is_empty());
-        assert!(!session.cancel_flag().load(Ordering::Relaxed));
+        assert!(session.status.is_empty() && !session.cancel_flag().load(Ordering::Relaxed));
     }
 
     #[test]
@@ -424,12 +447,10 @@ mod tests {
     fn test_accepts_load_result_generation_and_stage_checks() {
         let mut session = ImportSession::new();
         let gen1 = session.start_loading();
-        assert!(session.accepts_load_result(gen1));
-        assert!(!session.accepts_load_result(gen1 + 1));
+        assert!(session.accepts_load_result(gen1) && !session.accepts_load_result(gen1 + 1));
 
         let gen2 = session.start_loading();
-        assert!(!session.accepts_load_result(gen1));
-        assert!(session.accepts_load_result(gen2));
+        assert!(!session.accepts_load_result(gen1) && session.accepts_load_result(gen2));
 
         session.reset_to_idle();
         assert!(!session.accepts_load_result(gen2));
@@ -505,16 +526,12 @@ mod tests {
     #[test]
     fn test_drain_empty_and_disconnected() {
         let mut session = ImportSession::new();
-        let outcome = session.drain();
-        assert_eq!(outcome.applied, 0);
-        assert!(!outcome.finished);
+        assert_eq!(session.drain().applied, 0);
 
         let (tx, rx) = mpsc::channel::<ImportProgressEvent>();
         session.begin_matching(sample_spotify_playlist(), rx);
         drop(tx);
-        let outcome2 = session.drain();
-        assert_eq!(outcome2.applied, 0);
-        assert!(!outcome2.finished);
+        assert_eq!(session.drain().applied, 0);
     }
 
     #[test]
@@ -523,28 +540,10 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         session.begin_matching(sample_spotify_playlist(), rx);
 
-        let local = LocalTrack::new("v1", "Song 1", "Artist 1", MatchConfidence::High);
         tx.send(ImportProgressEvent::Started { total: 2 }).unwrap();
-        tx.send(ImportProgressEvent::Track {
-            index: 0,
-            resolution: TrackResolution::Matched {
-                track: local.clone(),
-                alternatives: vec![local.clone()],
-            },
-        })
-        .unwrap();
-        tx.send(ImportProgressEvent::Progress {
-            done: 1,
-            total: 2,
-            high: 1,
-            review: 0,
-            unresolved: 0,
-        })
-        .unwrap();
-        tx.send(ImportProgressEvent::Finished {
-            playlist: LocalPlaylist::new("local:sp_test_id", "Road Trip"),
-        })
-        .unwrap();
+        tx.send(test_track_event(0, "v1")).unwrap();
+        tx.send(test_progress_event(1, 2)).unwrap();
+        tx.send(test_finished_event()).unwrap();
 
         let outcome = session.drain();
         assert_eq!(outcome.applied, 4);
@@ -571,10 +570,7 @@ mod tests {
         assert_eq!(session.status, "Import cancelled");
         assert!(session.is_busy());
 
-        tx.send(ImportProgressEvent::Cancelled {
-            playlist: LocalPlaylist::new("local:cancelled", "Cancelled"),
-        })
-        .unwrap();
+        tx.send(test_cancelled_event()).unwrap();
 
         let outcome = session.drain();
         assert_eq!(session.stage, ImportStage::Idle);
@@ -588,12 +584,8 @@ mod tests {
         let mut session = ImportSession::new();
         let (tx, rx) = mpsc::channel();
         session.begin_matching(sample_spotify_playlist(), rx);
-
         session.request_cancel();
-        tx.send(ImportProgressEvent::Cancelled {
-            playlist: LocalPlaylist::new("local:cancelled", "Cancelled"),
-        })
-        .unwrap();
+        tx.send(test_cancelled_event()).unwrap();
         session.drain();
 
         let store = MemoryPlaylistStore::new();
@@ -606,18 +598,13 @@ mod tests {
         let mut session = ImportSession::new();
         let (tx, rx) = mpsc::channel();
         session.begin_matching(sample_spotify_playlist(), rx);
-
         tx.send(ImportProgressEvent::Started { total: 2 }).unwrap();
         tx.send(test_track_event(0, "v1")).unwrap();
-        tx.send(ImportProgressEvent::Finished {
-            playlist: LocalPlaylist::new("local:sp_test_id", "Road Trip"),
-        })
-        .unwrap();
-
+        tx.send(test_finished_event()).unwrap();
         let outcome = session.drain();
+        assert!(outcome.finished);
         assert_eq!(session.stage, ImportStage::Review);
         assert_eq!(session.review.as_ref().unwrap().rows.len(), 1);
-        assert!(outcome.finished);
 
         let store = MemoryPlaylistStore::new();
         let err = session.save(&store).unwrap_err();
@@ -642,9 +629,7 @@ mod tests {
         let mut session = ImportSession::new();
         let (tx, rx) = mpsc::channel();
         session.begin_matching(sample_spotify_playlist(), rx);
-
         tx.send(ImportProgressEvent::Failed { message: "rate limit exhausted".into() }).unwrap();
-
         let outcome = session.drain();
         assert_eq!(outcome.applied, 1);
         assert!(outcome.finished);
@@ -658,28 +643,14 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         session.begin_matching(sample_spotify_playlist(), rx);
 
-        let t1 = LocalTrack::new("v1", "Song 1", "Artist 1", MatchConfidence::High);
-        let alt1 = LocalTrack::new("v2", "Song 1 Alt", "Artist 1", MatchConfidence::Medium);
-        tx.send(ImportProgressEvent::Track {
-            index: 0,
-            resolution: TrackResolution::Matched {
-                track: t1.clone(),
-                alternatives: vec![t1, alt1],
-            },
-        })
-        .unwrap();
-        tx.send(ImportProgressEvent::Finished {
-            playlist: LocalPlaylist::new("local:sp_test_id", "Road Trip"),
-        })
-        .unwrap();
+        tx.send(test_track_with_alt("v1", "v2")).unwrap();
+        tx.send(test_finished_event()).unwrap();
         session.drain();
 
-        assert!(!session.open_picker(10));
-        assert!(session.open_picker(0));
+        assert!(session.open_picker(0) && !session.open_picker(10));
         assert_eq!(session.picker_row, Some(0));
 
-        assert!(session.select_row(0));
-        assert!(!session.select_row(99));
+        assert!(session.select_row(0) && !session.select_row(99));
 
         assert!(session.choose_alternative(1));
         assert_eq!(session.picker_row, None);
@@ -706,10 +677,7 @@ mod tests {
         session.begin_matching(sample_spotify_playlist(), rx);
         tx.send(test_unresolved_event(0)).unwrap();
         tx.send(test_unresolved_event(1)).unwrap();
-        tx.send(ImportProgressEvent::Finished {
-            playlist: LocalPlaylist::new("local:sp_test_id", "Road Trip"),
-        })
-        .unwrap();
+        tx.send(test_finished_event()).unwrap();
         session.drain();
 
         let err = session.save(&store).unwrap_err();
@@ -787,5 +755,44 @@ mod tests {
 
         assert_eq!(session.status, "Import cancelled");
         assert_eq!(session.progress().0, 2);
+    }
+
+    #[test]
+    fn test_session_options_defaults_loading_and_reset_lifecycle() {
+        let mut session = ImportSession::new();
+        assert_eq!(session.destination(), ImportDestination::Library);
+        assert_eq!(session.name_override, None);
+        assert!(session.resolved_tracks().is_empty() && session.artwork().is_none());
+
+        session.set_options(ImportDestination::Queue, Some("Custom Title".into()));
+        assert_eq!(session.destination(), ImportDestination::Queue);
+        assert_eq!(session.name_override.as_deref(), Some("Custom Title"));
+
+        session.start_loading();
+        assert_eq!(session.destination(), ImportDestination::Queue);
+        assert_eq!(session.name_override.as_deref(), Some("Custom Title"));
+
+        session.reset_to_idle();
+        assert_eq!(session.destination(), ImportDestination::Library);
+        assert_eq!(session.name_override, None);
+    }
+
+    #[test]
+    fn test_save_writes_overridden_title_through_memory_store() {
+        let store = MemoryPlaylistStore::new();
+        let mut session = ImportSession::new();
+        session.set_options(ImportDestination::Library, Some("Renamed Road Trip".into()));
+        let (tx, rx) = mpsc::channel();
+        session.begin_matching(sample_spotify_playlist(), rx);
+        tx.send(test_track_event(0, "v1")).unwrap();
+        tx.send(test_track_event(1, "v2")).unwrap();
+        tx.send(test_finished_event()).unwrap();
+        session.drain();
+
+        let saved = session.save(&store).expect("save succeeds");
+        assert_eq!(saved.title, "Renamed Road Trip");
+        assert_eq!(store.get("local:sp_test_id").unwrap().title, "Renamed Road Trip");
+        assert_eq!(session.resolved_tracks().len(), 2);
+        assert_eq!(session.artwork().as_deref(), Some("https://example.com/cover.jpg"));
     }
 }

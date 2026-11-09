@@ -374,6 +374,22 @@ endpoints:
 - **File Ingestion Independence**: CSV and JSON file imports remain completely unaffected by API credentials,
   relying exclusively on pure file parsers.
 
+#### 6.1.10 Import options
+
+The import modal configures execution options via `ImportDestination` and session parameters:
+
+- **Destination Selection (`ImportDestination`)**: Users choose between `Library` (default) and `Queue`.
+  - `Library`: Persists resolved tracks into a local playlist stored in `playlists.json` through `PlaylistStore`.
+  - `Queue`: Appends resolved tracks directly to the playback queue, advances the cursor to the first added track
+    via `play_track_at_index_in_memory`, triggers playback with `trigger_playback`, and synchronizes the window
+    without persisting to disk.
+- **Playlist Name Override**: Users can specify an optional custom title for the imported playlist. When non-empty,
+  `to_local_playlist_with_title` overrides the source title at save time; empty or whitespace input falls back to the
+  source title. The override is ignored when loading directly to the queue.
+- **Live Link Validation (`validate_import_link`)**: Text changes in the link input trigger real-time validation via
+  `parse_spotify_ref`. Valid links display a success indicator with accent coloring; malformed inputs show an invalid
+  link status in secondary coloring, while empty input clears validation status.
+
 ## 7 Data model
 
 Immutable domain types, all serializable: `Track { id, title, artist, album, duration }`,

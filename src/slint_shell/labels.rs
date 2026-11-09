@@ -107,6 +107,10 @@ pub struct StaticLabels {
     pub import_tab_file_label: &'static str,
     pub import_link_placeholder: &'static str,
     pub import_file_placeholder: &'static str,
+    pub import_name_placeholder: &'static str,
+    pub import_to_queue_label: &'static str,
+    pub import_valid_link_label: &'static str,
+    pub import_invalid_link_label: &'static str,
     pub import_start_label: &'static str,
     pub import_cancel_label: &'static str,
     pub import_progress_title: &'static str,
@@ -250,6 +254,10 @@ impl StaticLabels {
             import_tab_file_label: tr(locale, "From file"),
             import_link_placeholder: tr(locale, "Spotify playlist or album link"),
             import_file_placeholder: tr(locale, "CSV file path"),
+            import_name_placeholder: tr(locale, "Playlist name (optional)"),
+            import_to_queue_label: tr(locale, "Load directly to queue"),
+            import_valid_link_label: tr(locale, "Valid Spotify link"),
+            import_invalid_link_label: tr(locale, "Invalid Spotify link"),
             import_start_label: tr(locale, "Start import"),
             import_cancel_label: tr(locale, "Cancel"),
             import_progress_title: tr(locale, "Import progress"),
@@ -396,6 +404,10 @@ impl StaticLabels {
         labels.set_import_tab_file_label(self.import_tab_file_label.into());
         labels.set_import_link_placeholder(self.import_link_placeholder.into());
         labels.set_import_file_placeholder(self.import_file_placeholder.into());
+        labels.set_import_name_placeholder(self.import_name_placeholder.into());
+        labels.set_import_to_queue_label(self.import_to_queue_label.into());
+        labels.set_import_valid_link_label(self.import_valid_link_label.into());
+        labels.set_import_invalid_link_label(self.import_invalid_link_label.into());
         labels.set_import_start_label(self.import_start_label.into());
         labels.set_import_cancel_label(self.import_cancel_label.into());
         labels.set_import_progress_title(self.import_progress_title.into());
@@ -464,6 +476,10 @@ mod tests {
         assert_eq!(en_labels.spotify_client_secret_placeholder, "Spotify Client Secret");
         assert_eq!(en_labels.spotify_save_label, "Save credentials");
         assert_eq!(en_labels.spotify_clear_label, "Clear credentials");
+        assert_eq!(en_labels.import_name_placeholder, "Playlist name (optional)");
+        assert_eq!(en_labels.import_to_queue_label, "Load directly to queue");
+        assert_eq!(en_labels.import_valid_link_label, "Valid Spotify link");
+        assert_eq!(en_labels.import_invalid_link_label, "Invalid Spotify link");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -483,6 +499,10 @@ mod tests {
         assert_eq!(es_labels.spotify_client_secret_placeholder, "Secreto de cliente de Spotify");
         assert_eq!(es_labels.spotify_save_label, "Guardar credenciales");
         assert_eq!(es_labels.spotify_clear_label, "Borrar credenciales");
+        assert_eq!(es_labels.import_name_placeholder, "Nombre de la playlist (opcional)");
+        assert_eq!(es_labels.import_to_queue_label, "Cargar directamente en la cola");
+        assert_eq!(es_labels.import_valid_link_label, "Enlace de Spotify valido");
+        assert_eq!(es_labels.import_invalid_link_label, "Enlace de Spotify no valido");
     }
 
     #[test]
@@ -592,6 +612,10 @@ mod tests {
         assert_eq!(es.import_tab_file_label, "Desde archivo");
         assert_eq!(es.import_link_placeholder, "Enlace de playlist o album de Spotify");
         assert_eq!(es.import_file_placeholder, "Ruta del archivo CSV");
+        assert_eq!(es.import_name_placeholder, "Nombre de la playlist (opcional)");
+        assert_eq!(es.import_to_queue_label, "Cargar directamente en la cola");
+        assert_eq!(es.import_valid_link_label, "Enlace de Spotify valido");
+        assert_eq!(es.import_invalid_link_label, "Enlace de Spotify no valido");
         assert_eq!(es.import_start_label, "Iniciar importacion");
         assert_eq!(es.import_cancel_label, "Cancelar");
         assert_eq!(es.import_progress_title, "Progreso de importacion");
@@ -729,6 +753,10 @@ mod tests {
         assert_eq!(en.import_tab_file_label, "From file");
         assert_eq!(en.import_link_placeholder, "Spotify playlist or album link");
         assert_eq!(en.import_file_placeholder, "CSV file path");
+        assert_eq!(en.import_name_placeholder, "Playlist name (optional)");
+        assert_eq!(en.import_to_queue_label, "Load directly to queue");
+        assert_eq!(en.import_valid_link_label, "Valid Spotify link");
+        assert_eq!(en.import_invalid_link_label, "Invalid Spotify link");
         assert_eq!(en.import_start_label, "Start import");
         assert_eq!(en.import_cancel_label, "Cancel");
         assert_eq!(en.import_progress_title, "Import progress");

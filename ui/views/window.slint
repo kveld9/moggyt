@@ -103,6 +103,10 @@ export component MoggytWindow inherits Window {
     in-out property <int> import-tab: 0;
     in-out property <string> import-link-text: "";
     in-out property <string> import-file-path: "";
+    in-out property <string> import-name-text: "";
+    in-out property <bool> import-to-queue: false;
+    in-out property <bool> import-link-valid: false;
+    in-out property <string> import-link-status: "";
     in-out property <bool> import-busy: false;
     in-out property <bool> import-failed: false;
     in-out property <bool> import-running: false;
@@ -169,6 +173,7 @@ export component MoggytWindow inherits Window {
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
     callback import-browse-requested();
+    callback import-link-changed(string);
     callback import-start-requested();
     callback import-cancel-requested();
     callback import-close-requested();
@@ -358,9 +363,14 @@ export component MoggytWindow inherits Window {
         active-tab <=> root.import-tab;
         link-text <=> root.import-link-text;
         file-path <=> root.import-file-path;
+        name-text <=> root.import-name-text;
+        to-queue <=> root.import-to-queue;
+        link-valid <=> root.import-link-valid;
+        link-status <=> root.import-link-status;
         busy: root.import-busy;
         failed: root.import-failed;
         status-text: root.import-status-text;
+        link-changed(text) => { root.import-link-changed(text); }
         browse-requested => { root.import-browse-requested(); }
         start-requested => { root.import-start-requested(); }
         close-requested => { root.show-import-modal = false; root.import-close-requested(); }

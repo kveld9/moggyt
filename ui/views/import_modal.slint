@@ -1,11 +1,16 @@
 import { Labels } from "../labels.slint";
 import { Theme } from "../theme.slint";
 import { StyledInputField } from "../components/controls.slint";
+import { SettingsToggleRow } from "../components/settings_rows.slint";
 
 export component ImportModal inherits Rectangle {
     in-out property <int> active-tab: 0;
     in-out property <string> link-text: "";
     in-out property <string> file-path: "";
+    in-out property <string> name-text: "";
+    in-out property <bool> to-queue: false;
+    in-out property <bool> link-valid: false;
+    in-out property <string> link-status: "";
     in property <bool> busy: false;
     in property <bool> failed: false;
     in property <string> status-text: "";
@@ -14,6 +19,7 @@ export component ImportModal inherits Rectangle {
     callback browse-requested();
     callback start-requested();
     callback close-requested();
+    callback link-changed(string);
 
     background: Theme.overlay;
 
@@ -126,6 +132,13 @@ export component ImportModal inherits Rectangle {
                     text <=> root.link-text;
                     placeholder-text: Labels.import-link-placeholder;
                     accepted => { root.start-requested(); }
+                    edited(t) => { root.link-changed(t); }
+                }
+                if root.link-status != "" : Text {
+                    text: root.link-status;
+                    color: root.link-valid ? Theme.accent : Theme.secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
                 }
                 Text {
                     text: Labels.import-cap-hint;
@@ -164,6 +177,17 @@ export component ImportModal inherits Rectangle {
                         }
                     }
                 }
+            }
+
+            if !root.to-queue : StyledInputField {
+                text <=> root.name-text;
+                placeholder-text: Labels.import-name-placeholder;
+            }
+
+            SettingsToggleRow {
+                label: Labels.import-to-queue-label;
+                checked: root.to-queue;
+                toggled => { root.to-queue = !root.to-queue; }
             }
 
             if root.status-text != "" : Text {

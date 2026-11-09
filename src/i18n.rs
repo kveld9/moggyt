@@ -154,6 +154,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Import progress", "Progreso de importacion"),
     ("Importing matches...", "Importando coincidencias..."),
     ("Integrations", "Integraciones"),
+    ("Invalid Spotify link", "Enlace de Spotify no valido"),
     ("Language", "Idioma"),
     ("Last 4 weeks", "Últimas 4 semanas"),
     ("Last 6 months", "Últimos 6 meses"),
@@ -161,6 +162,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Last.fm is not available in this build", "Last.fm no está disponible en esta compilación"),
     ("Library", "Biblioteca"),
     ("Listening time", "Tiempo escuchado"),
+    ("Load directly to queue", "Cargar directamente en la cola"),
     ("Loading...", "Cargando..."),
     ("Loading explore...", "Cargando exploracion..."),
     ("Low (<=64 kbps)", "Baja (<=64 kbps)"),
@@ -175,6 +177,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No cover", "Sin portada"),
     ("No details available.", "No hay detalles disponibles."),
     ("No match", "Sin coincidencia"),
+    ("No matched tracks to import", "No hay canciones coincidentes para importar"),
     (
         "No plays recorded yet. Songs you listen to for at least 30 seconds show up here.",
         "Todavía no hay reproducciones. Los temas que escuches al menos 30 segundos aparecen acá.",
@@ -201,6 +204,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Playback", "Reproducción"),
     ("Playback speed", "Velocidad de reproducción"),
     ("Playlist", "LISTA"),
+    ("Playlist name (optional)", "Nombre de la playlist (opcional)"),
     ("Playlists", "Listas de reproducción"),
     ("Plays", "Reproducciones"),
     ("Prefer songs over music videos", "Preferir canciones a videoclips"),
@@ -283,6 +287,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Update available", "Actualización disponible"),
     ("Update available: {ver}", "Actualización disponible: {ver}"),
     ("Update status", "Estado de actualización"),
+    ("Valid Spotify link", "Enlace de Spotify valido"),
     ("Waiting for authorization in your browser", "Esperando la autorización en tu navegador"),
     ("White", "Blanco"),
     ("plays", "reproducciones"),
@@ -513,6 +518,25 @@ mod tests {
             let en = tr(Locale::English, key);
             let es = tr(Locale::Spanish, key);
             assert_eq!(en, key, "English must return source key");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_import_options_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Playlist name (optional)", "Nombre de la playlist (opcional)"),
+            ("Load directly to queue", "Cargar directamente en la cola"),
+            ("Valid Spotify link", "Enlace de Spotify valido"),
+            ("Invalid Spotify link", "Enlace de Spotify no valido"),
+            ("No matched tracks to import", "No hay canciones coincidentes para importar"),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
             assert_ne!(en, es, "Spanish must differ from English for '{key}'");
         }
     }

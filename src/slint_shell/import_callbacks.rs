@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::SpotifyPlaylist;
+use crate::domain::{SpotifyPlaylist, Track, parse_spotify_ref};
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     FilePicker, KeyringSpotifyCredentialStore, PlaylistStore, RfdFilePicker,
@@ -16,14 +16,37 @@ use crate::infra::{
 };
 use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
-use crate::slint_shell::import_session::{ImportSession, ImportStage};
+use crate::slint_shell::import_session::{ImportDestination, ImportSession, ImportStage};
 use crate::slint_shell::import_state::{
     ImportCounts, ImportReview, alternatives_to_slint, counts_text, rows_to_slint,
 };
 use crate::slint_shell::import_worker::{WorkerConfig, spawn_import};
+use crate::slint_shell::state::SlintAppState;
 
 static SESSION: Mutex<Option<ImportSession>> = Mutex::new(None);
 static STORE: Mutex<Option<Arc<dyn PlaylistStore>>> = Mutex::new(None);
+
+/// Pure helper evaluating Spotify input link text against supported link patterns.
+pub(crate) fn validate_import_link(text: &str, locale: Locale) -> (bool, String) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return (false, String::new());
+    }
+    if parse_spotify_ref(trimmed).is_some() {
+        (true, tr(locale, "Valid Spotify link").to_string())
+    } else {
+        (false, tr(locale, "Invalid Spotify link").to_string())
+    }
+}
+
+/// Appends imported tracks to the playback queue and returns the index of the first added track.
+pub(crate) fn enqueue_imported_tracks(st: &mut SlintAppState, tracks: Vec<Track>) -> usize {
+    let start_idx = st.queue.len();
+    for track in tracks {
+        st.queue.push(track);
+    }
+    start_idx
+}
 
 /// Installs the shared playlist persistence store.
 pub fn install_playlist_store(store: Arc<dyn PlaylistStore>) {
@@ -220,7 +243,7 @@ fn reload_local_library(window: &MoggytWindow, store: &dyn PlaylistStore) {
     });
 }
 
-fn handle_save_requested(window: &MoggytWindow) {
+fn handle_save_to_library(window: &MoggytWindow) {
     let Some(store) = current_store() else {
         with_session(|s| s.status = "No playlist store installed".into());
         sync_import(window);
@@ -249,6 +272,35 @@ fn handle_save_requested(window: &MoggytWindow) {
     }
 }
 
+fn handle_save_to_queue(window: &MoggytWindow) {
+    let (resolved, artwork) = with_session(|s| (s.resolved_tracks(), s.artwork()));
+    if resolved.is_empty() {
+        let locale =
+            crate::slint_shell::window::with_ui_state(|st| st.locale).unwrap_or(Locale::English);
+        with_session(|s| s.status = tr(locale, "No matched tracks to import").to_string());
+        sync_import(window);
+        return;
+    }
+    let tracks: Vec<Track> = resolved.into_iter().map(|t| t.to_track(artwork.clone())).collect();
+    crate::slint_shell::window::with_ui_state(|st| {
+        let start_idx = enqueue_imported_tracks(st, tracks);
+        st.play_track_at_index_in_memory(start_idx);
+        crate::slint_shell::window::trigger_playback(window, st);
+        crate::slint_shell::sync::sync_window(window, st);
+    });
+    with_session(|s| s.reset_to_idle());
+    window.set_show_import_modal(false);
+    sync_import(window);
+}
+
+fn handle_save_requested(window: &MoggytWindow) {
+    let destination = with_session(|s| s.destination());
+    match destination {
+        ImportDestination::Library => handle_save_to_library(window),
+        ImportDestination::Queue => handle_save_to_queue(window),
+    }
+}
+
 fn reset_session_to_idle(window: &MoggytWindow) {
     with_session(|s| s.reset_to_idle());
     window.set_show_import_modal(false);
@@ -267,6 +319,16 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
     });
 
     let w = window.as_weak();
+    window.on_import_link_changed(move |text| {
+        let Some(win) = w.upgrade() else { return };
+        let locale =
+            crate::slint_shell::window::with_ui_state(|st| st.locale).unwrap_or(Locale::English);
+        let (valid, status) = validate_import_link(&text, locale);
+        win.set_import_link_valid(valid);
+        win.set_import_link_status(status.into());
+    });
+
+    let w = window.as_weak();
     window.on_import_start_requested(move || {
         let Some(win) = w.upgrade() else { return };
         if with_session(|s| s.is_busy()) {
@@ -275,7 +337,18 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
         let tab = win.get_import_tab();
         let link_text = win.get_import_link_text().to_string();
         let file_path = win.get_import_file_path().to_string();
-        let generation = with_session(|s| s.start_loading());
+        let name_raw = win.get_import_name_text().to_string();
+        let trimmed = name_raw.trim();
+        let name_override = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
+        let destination = if win.get_import_to_queue() {
+            ImportDestination::Queue
+        } else {
+            ImportDestination::Library
+        };
+        let generation = with_session(|s| {
+            s.set_options(destination, name_override);
+            s.start_loading()
+        });
         sync_import(&win);
         spawn_source_loader(win.as_weak(), tab, link_text, file_path, generation);
     });
@@ -454,5 +527,54 @@ mod tests {
         with_session(|s| {
             assert_eq!(s.status, "5 / 10");
         });
+    }
+
+    #[test]
+    fn test_validate_import_link_table() {
+        let (valid, status) = validate_import_link("", Locale::English);
+        assert!(!valid);
+        assert!(status.is_empty());
+        let (valid, status) = validate_import_link("   \t\n  ", Locale::English);
+        assert!(!valid);
+        assert!(status.is_empty());
+
+        let (valid, status) = validate_import_link("not-a-spotify-link", Locale::English);
+        assert!(!valid);
+        assert_eq!(status, "Invalid Spotify link");
+        let (valid, status) = validate_import_link("not-a-spotify-link", Locale::Spanish);
+        assert!(!valid);
+        assert_eq!(status, "Enlace de Spotify no valido");
+
+        let (valid, status) = validate_import_link(
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+            Locale::English,
+        );
+        assert!(valid);
+        assert_eq!(status, "Valid Spotify link");
+
+        let (valid, status) =
+            validate_import_link("spotify:album:4aawyAB9vmqN3uQ7FjRGTy", Locale::English);
+        assert!(valid);
+        assert_eq!(status, "Valid Spotify link");
+    }
+
+    #[test]
+    fn test_enqueue_imported_tracks() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        assert_eq!(state.queue.len(), 0);
+
+        let t1 = Track::new("t1", "Track 1", "Artist 1");
+        let t2 = Track::new("t2", "Track 2", "Artist 2");
+        let start = enqueue_imported_tracks(&mut state, vec![t1, t2]);
+        assert_eq!(start, 0);
+        assert_eq!(state.queue.len(), 2);
+        assert_eq!(state.queue.tracks()[0].id, "t1");
+        assert_eq!(state.queue.tracks()[1].id, "t2");
+
+        let t3 = Track::new("t3", "Track 3", "Artist 3");
+        let start2 = enqueue_imported_tracks(&mut state, vec![t3]);
+        assert_eq!(start2, 2);
+        assert_eq!(state.queue.len(), 3);
+        assert_eq!(state.queue.tracks()[2].id, "t3");
     }
 }
