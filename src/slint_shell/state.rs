@@ -9,9 +9,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::domain::{
-    Album, Detail, DetailKind, Palette, PlaybackQueue, PlayerBarMode, Playlist, RecentSearches,
-    SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer, ThemeId, Track,
-    extract_playlist_id,
+    Album, Detail, DetailKind, Palette, PlaybackPhase, PlaybackQueue, PlayerBarMode, Playlist,
+    RecentSearches, SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer,
+    ThemeId, Track, extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
@@ -64,6 +64,7 @@ pub struct SlintAppState {
     pub library_albums: Vec<Album>,
     pub detail: Option<Detail>,
     pub detail_return: SlintPage,
+    pub playback_phase: PlaybackPhase,
     pub lyrics_lines: Vec<LyricLine>,
     pub lyrics_key: Option<(String, String)>,
     pub cover_key: Option<String>,
@@ -128,6 +129,11 @@ impl SlintAppState {
         let mut settings = self.settings_store.load();
         settings.theme = theme;
         let _ = self.settings_store.save(&settings);
+    }
+
+    /// Stores the current playback phase; this is the only assignment site.
+    pub(crate) fn set_playback_phase(&mut self, phase: PlaybackPhase) {
+        self.playback_phase = phase;
     }
 
     /// Updates the crossfade duration setting and persists preference to disk settings store.
@@ -492,6 +498,12 @@ impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
     }
     fn is_playing(&self) -> bool {
         (**self).is_playing()
+    }
+    fn is_paused(&self) -> bool {
+        (**self).is_paused()
+    }
+    fn duration_secs(&self) -> u64 {
+        (**self).duration_secs()
     }
     fn last_requested(&self) -> Option<&str> {
         (**self).last_requested()
