@@ -6,6 +6,7 @@ export component ImportReviewView inherits VerticalLayout {
     in-out property <[ImportRowData]> rows: [];
     in-out property <int> selected: 0;
     in-out property <string> counts-text: "";
+    in-out property <string> status-text: "";
     in-out property <bool> can-save: false;
 
     callback row-selected(int);
@@ -52,6 +53,12 @@ export component ImportReviewView inherits VerticalLayout {
 
                     if root.counts-text != "" : Text {
                         text: root.counts-text;
+                        color: Theme.secondary;
+                        font-size: 13px;
+                    }
+
+                    if root.status-text != "" : Text {
+                        text: root.status-text;
                         color: Theme.secondary;
                         font-size: 13px;
                     }

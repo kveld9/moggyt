@@ -51,7 +51,7 @@ fn sync_import_progress(
     counts: &ImportCounts,
     locale: Locale,
 ) {
-    window.set_import_running(matches!(stage, ImportStage::Matching));
+    window.set_import_running(matches!(stage, ImportStage::Matching | ImportStage::Cancelling));
     window.set_import_status_text(tr(locale, status).into());
     window.set_import_total(counts.total as i32);
     window.set_import_high(counts.high as i32);
@@ -117,7 +117,11 @@ pub fn sync_import(window: &MoggytWindow) {
         with_session(|s| (s.stage, s.status.clone(), s.counts(), s.picker_row, s.review.clone()));
     let locale =
         crate::slint_shell::window::with_ui_state(|st| st.locale).unwrap_or(Locale::English);
-    window.set_import_busy(matches!(stage, ImportStage::LoadingSource | ImportStage::Matching));
+    window.set_import_busy(matches!(
+        stage,
+        ImportStage::LoadingSource | ImportStage::Matching | ImportStage::Cancelling
+    ));
+    window.set_import_cancelling(matches!(stage, ImportStage::Cancelling));
     window.set_import_failed(matches!(stage, ImportStage::Failed));
     sync_import_progress(window, stage, &status, &counts, locale);
     sync_import_modal_visibility(window, stage);
@@ -281,7 +285,16 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
     let w = window.as_weak();
     window.on_import_cancel_requested(move || {
         let Some(win) = w.upgrade() else { return };
-        with_session(|s| s.request_cancel());
+        let already_cancelling = with_session(|s| {
+            if s.stage == ImportStage::Cancelling {
+                return true;
+            }
+            s.request_cancel();
+            false
+        });
+        if already_cancelling {
+            return;
+        }
         sync_import(&win);
     });
 

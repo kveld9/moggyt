@@ -2,6 +2,7 @@ import { Labels } from "../labels.slint";
 import { Theme } from "../theme.slint";
 
 export component ImportProgress inherits Rectangle {
+    in property <bool> cancelling: false;
     in-out property <string> status-text: "";
     in-out property <int> done: 0;
     in-out property <int> total: 0;
@@ -147,14 +148,15 @@ export component ImportProgress inherits Rectangle {
                 Rectangle {
                     width: 100px;
                     border-radius: 8px;
-                    background: cancel-btn.pressed ? Theme.overlay : (cancel-btn.has-hover ? Theme.hover : Theme.surface);
+                    background: root.cancelling ? Theme.overlay : (cancel-btn.pressed ? Theme.overlay : (cancel-btn.has-hover ? Theme.hover : Theme.surface));
                     animate background { duration: 150ms; easing: ease-in-out; }
                     cancel-btn := TouchArea {
+                        enabled: !root.cancelling;
                         clicked => { root.cancel-requested(); }
                     }
                     Text {
                         text: Labels.import-cancel-label;
-                        color: Theme.text;
+                        color: root.cancelling ? Theme.secondary : Theme.text;
                         font-size: 13px;
                         font-weight: 700;
                         horizontal-alignment: center;
