@@ -9,11 +9,25 @@ impl SlintAppState {
         let Some(started) = self.started_at.take() else {
             return;
         };
-        let elapsed = started.instant.elapsed().as_secs();
+        let elapsed = started.listened().as_secs();
         self.record_play(&started, elapsed);
         let duration = started.track.duration_secs.map(u64::from);
         if should_scrobble(elapsed, duration) {
             self.submit_scrobble(&started.track.artist, &started.track.title, started.unix_secs);
+        }
+    }
+
+    /// Freezes listened-time accumulation for the active track.
+    pub fn pause_play_ledger(&mut self) {
+        if let Some(started) = self.started_at.as_mut() {
+            started.on_pause();
+        }
+    }
+
+    /// Restarts listened-time accumulation for the active track.
+    pub fn resume_play_ledger(&mut self) {
+        if let Some(started) = self.started_at.as_mut() {
+            started.on_resume();
         }
     }
 
@@ -51,9 +65,9 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use crate::domain::Track;
-    use crate::infra::Scrobbler;
+    use crate::infra::{MemoryPlayLogStore, PlayLogStore, Scrobbler};
     use crate::slint_shell::playback_control::StartedPlay;
-    use crate::slint_shell::test_support::test_wired;
+    use crate::slint_shell::test_support::{EndedAudio, test_wired};
 
     #[derive(Debug)]
     struct RecordingScrobbler {
@@ -84,9 +98,10 @@ mod tests {
         let rec = RecordingScrobbler { scrobbles: Arc::clone(&scrobbles) };
         state.scrobbler = Arc::new(Mutex::new(Box::new(rec)));
         state.started_at = Some(StartedPlay {
-            instant: Instant::now().checked_sub(Duration::from_secs(150)).unwrap(),
             unix_secs: 1_000,
             track: track_a,
+            listened: Duration::from_secs(150),
+            resumed_at: None,
         });
 
         state.queue.advance();
@@ -113,15 +128,79 @@ mod tests {
         let rec = RecordingScrobbler { scrobbles: Arc::clone(&scrobbles) };
         state.scrobbler = Arc::new(Mutex::new(Box::new(rec)));
         state.started_at = Some(StartedPlay {
-            instant: Instant::now().checked_sub(Duration::from_secs(10)).unwrap(),
             unix_secs: 1_000,
             track: track_a,
+            listened: Duration::from_secs(10),
+            resumed_at: None,
         });
 
         state.queue.advance();
         state.maybe_scrobble_current();
 
         assert!(scrobbles.lock().unwrap().is_empty());
+        assert!(state.started_at.is_none());
+    }
+
+    #[test]
+    fn pause_time_not_counted() {
+        let track = Track::new("t1", "Title", "Artist").with_duration(200);
+        let mut started = StartedPlay::now(track);
+        started.resumed_at =
+            Some(Instant::now().checked_sub(Duration::from_secs(20)).expect("valid instant"));
+        started.on_pause();
+        assert_eq!(started.listened().as_secs(), 20);
+
+        assert!(started.resumed_at.is_none());
+
+        started.resumed_at =
+            Some(Instant::now().checked_sub(Duration::from_secs(5)).expect("valid instant"));
+        assert_eq!(started.listened().as_secs(), 25);
+    }
+
+    #[test]
+    fn last_track_credited_on_end() {
+        let mut state = test_wired();
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("t1", 200))));
+        let track = Track::new("t1", "Title 1", "Artist 1").with_duration(200);
+        state.queue.push(track.clone());
+        state.started_at = Some(StartedPlay {
+            unix_secs: 1,
+            track,
+            listened: Duration::from_secs(120),
+            resumed_at: None,
+        });
+        state.autoplay = false;
+        let memory_store = MemoryPlayLogStore::new();
+        state.play_log_store = Box::new(memory_store.clone());
+
+        state.continue_autoplay_if_ended();
+
+        let records = memory_store.load().expect("load succeeds");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].listened_secs, 120);
+        assert!(state.started_at.is_none());
+    }
+
+    #[test]
+    fn below_threshold_not_scrobbled() {
+        let mut state = test_wired();
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("t1", 200))));
+        let track = Track::new("t1", "Title 1", "Artist 1").with_duration(200);
+        state.queue.push(track.clone());
+        state.started_at = Some(StartedPlay {
+            unix_secs: 1,
+            track,
+            listened: Duration::from_secs(10),
+            resumed_at: None,
+        });
+        state.autoplay = false;
+        let memory_store = MemoryPlayLogStore::new();
+        state.play_log_store = Box::new(memory_store.clone());
+
+        state.continue_autoplay_if_ended();
+
+        let records = memory_store.load().expect("load succeeds");
+        assert!(records.is_empty());
         assert!(state.started_at.is_none());
     }
 }

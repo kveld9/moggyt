@@ -107,7 +107,7 @@ pub use platform::{CoverArtData, PresenceSnapshot, dispatch_to_ui, rgba_to_image
 pub use playback::{format_position, format_track_duration};
 pub use playback_worker::{
     PlayTrackRequest, PlayTrackResult, PlaybackWorkerAdapters, PlaybackWorkerCommand,
-    execute_detail, execute_play_track, execute_refresh_library, execute_scrobble, execute_search,
+    execute_detail, execute_play_track, execute_refresh_library, execute_search,
 };
 pub use player_bar::{PLAYER_BAR_OPTION_COUNT, PlayerBarPrefs, mode_from_index, mode_to_index};
 pub use search::format_duration;
