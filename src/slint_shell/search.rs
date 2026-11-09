@@ -113,6 +113,10 @@ pub fn iter_shelf_items(
 mod tests {
     use super::*;
     use crate::domain::{Album, Artist, Playlist, Track};
+    use crate::i18n::Locale;
+    use crate::infra::CatalogError;
+    use crate::slint_shell::test_support::{MockLibraryCatalog, test_wired, wrap_mock_catalog};
+    use crate::slint_shell::view_phase::ViewPhase;
 
     #[test]
     fn test_format_duration_variants() {
@@ -190,5 +194,95 @@ mod tests {
         let playlist = Playlist::new("p0", "Empty Playlist", 0, None);
         let pl_row = SearchRow::from(&SearchResult::Playlist(playlist));
         assert_eq!(pl_row.subtitle, "");
+    }
+
+    #[test]
+    fn test_search_submission() {
+        let mut state = test_wired();
+        state.submit_search("midnight");
+        assert_eq!(state.search_query, "midnight");
+        assert!(state.search_active);
+        assert_eq!(state.recent_searches.entries(), &["midnight"]);
+        assert_eq!(state.home_shelves.len(), 1);
+        assert_eq!(state.home_shelves[0].title, "Search Results");
+        state.search_query.clear();
+        assert_eq!(state.search_query, "");
+
+        let mut empty_state = test_wired();
+        empty_state.submit_search("   ");
+        assert_eq!(empty_state.search_query, "   ");
+        assert!(!empty_state.search_active);
+        assert!(empty_state.home_shelves.is_empty());
+
+        let mut state_es = test_wired();
+        state_es.locale = Locale::Spanish;
+        state_es.submit_search("midnight");
+        assert_eq!(state_es.home_shelves[0].title, "Resultados de búsqueda");
+    }
+
+    #[test]
+    fn test_search_filter_lifecycle_and_reset() {
+        let mut state = test_wired();
+        assert_eq!(state.search_filter, SearchFilter::All);
+
+        state.search_filter = SearchFilter::Albums;
+        assert_eq!(state.search_filter, SearchFilter::Albums);
+
+        state.submit_search("rock");
+        assert_eq!(state.search_filter, SearchFilter::All);
+
+        state.submit_search_with_filter("rock", SearchFilter::Albums);
+        assert_eq!(state.search_filter, SearchFilter::Albums);
+    }
+
+    #[test]
+    fn clearing_query_exits_search_mode() {
+        let mut state = test_wired();
+        state.submit_search("midnight");
+        assert!(state.search_active);
+        assert_eq!(state.search_phase, ViewPhase::Ready);
+
+        state.clear_search();
+        assert!(!state.search_active);
+        assert_eq!(state.search_query, "");
+        assert_eq!(state.search_phase, ViewPhase::Idle);
+        assert!(state.home_shelves.is_empty());
+        assert!(state.search_results.is_empty());
+    }
+
+    #[test]
+    fn search_failure_shows_error() {
+        let mut state = test_wired();
+        let err_cat =
+            MockLibraryCatalog::default().with_search_filtered(Err(CatalogError::Transport));
+        state.catalog = wrap_mock_catalog(err_cat);
+        state.submit_search("rock");
+        assert!(state.search_active);
+        assert_eq!(state.search_phase, ViewPhase::Error);
+
+        let hit = SearchResult::Track(Track::new("t1", "Title", "Artist"));
+        let ok_cat = MockLibraryCatalog::default().with_search_filtered(Ok(vec![hit]));
+        state.catalog = wrap_mock_catalog(ok_cat);
+        state.submit_search("rock");
+        assert_eq!(state.search_phase, ViewPhase::Ready);
+    }
+
+    #[test]
+    fn empty_results_render_empty_state() {
+        let mut state = test_wired();
+        let empty_cat = MockLibraryCatalog::default().with_search_filtered(Ok(Vec::new()));
+        state.catalog = wrap_mock_catalog(empty_cat);
+        state.submit_search("rock");
+        assert_eq!(state.search_phase, ViewPhase::Empty);
+        assert!(state.home_shelves.iter().all(|shelf| shelf.items.is_empty()));
+    }
+
+    #[test]
+    fn search_does_not_clear_other_covers() {
+        let mut state = test_wired();
+        state.search_covers.insert("https://cover/1.jpg".into(), slint::Image::default());
+        state.submit_search("rock");
+        state.submit_search_with_filter("rock", SearchFilter::Albums);
+        assert!(state.search_covers.contains_key("https://cover/1.jpg"));
     }
 }
