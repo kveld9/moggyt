@@ -135,6 +135,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("English", "Inglés"),
     ("End of track", "Fin de la canción"),
     ("Explore", "Explorar"),
+    ("Failed to load search results", "No se pudieron cargar los resultados de busqueda"),
     ("Failed to play track", "Error al reproducir la canción"),
     ("Failed to save playlist", "No se pudo guardar la playlist"),
     ("Floating", "Flotante"),
@@ -376,6 +377,14 @@ mod tests {
         assert_eq!(tr(Locale::English, "Queue ({count})").replace("{count}", "3"), "Queue (3)");
         assert_eq!(tr(Locale::Spanish, "Searching..."), "Buscando...");
         assert_eq!(tr(Locale::English, "Searching..."), "Searching...");
+        assert_eq!(
+            tr(Locale::English, "Failed to load search results"),
+            "Failed to load search results"
+        );
+        assert_eq!(
+            tr(Locale::Spanish, "Failed to load search results"),
+            "No se pudieron cargar los resultados de busqueda"
+        );
         assert_eq!(tr(Locale::Spanish, "Loading..."), "Cargando...");
         assert_eq!(tr(Locale::English, "Loading..."), "Loading...");
         assert_eq!(tr(Locale::Spanish, "Loading explore..."), "Cargando exploracion...");

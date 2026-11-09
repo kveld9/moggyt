@@ -23,6 +23,10 @@ pub fn test_wired() -> SlintAppState {
     SlintAppState::new(catalog, audio, session, lyrics, covers)
 }
 
+pub(crate) fn wrap_mock_catalog(cat: MockLibraryCatalog) -> Arc<Mutex<Box<dyn Catalog + Send>>> {
+    Arc::new(Mutex::new(Box::new(cat)))
+}
+
 pub type LocaleLog = Arc<Mutex<Vec<Locale>>>;
 
 /// Mock catalog recording locale setting and home shelf requests for verification.

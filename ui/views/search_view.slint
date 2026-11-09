@@ -10,7 +10,10 @@ export component SearchView inherits VerticalLayout {
     in property <int> active-filter: 0;
     in property <[string]> recent-searches: [];
     in property <bool> search-active: false;
+    // Phase index contract: 0 Idle, 1 Loading, 2 Ready, 3 Empty, 4 Error (ViewPhase::to_index).
+    in property <int> search-phase: 0;
     callback query-submitted(string);
+    callback query-cleared();
     callback track-selected(int);
     callback filter-selected(int);
     callback recent-search-selected(string);
@@ -63,6 +66,11 @@ export component SearchView inherits VerticalLayout {
                         accepted => {
                             root.query-submitted(self.text);
                         }
+                        edited => {
+                            if self.text == "" {
+                                root.query-cleared();
+                            }
+                        }
                     }
 
                     if root.query == "" && !input.has-focus : Text {
@@ -89,6 +97,7 @@ export component SearchView inherits VerticalLayout {
                         clear-touch := TouchArea {
                             clicked => {
                                 root.query = "";
+                                root.query-cleared();
                                 input.focus();
                             }
                         }
@@ -166,7 +175,31 @@ export component SearchView inherits VerticalLayout {
         }
     }
 
-    if root.search-active && root.query != "" && root.shelves.length == 0 : VerticalLayout {
+    if root.search-phase == 1 : VerticalLayout {
+        padding-top: 24px;
+        alignment: center;
+
+        Text {
+            text: Labels.search-loading-text;
+            color: Theme.secondary;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    if root.search-phase == 4 : VerticalLayout {
+        padding-top: 24px;
+        alignment: center;
+
+        Text {
+            text: Labels.search-error-text;
+            color: Theme.secondary;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    if root.search-phase == 3 : VerticalLayout {
         padding-top: 24px;
         alignment: center;
 
@@ -178,7 +211,7 @@ export component SearchView inherits VerticalLayout {
         }
     }
 
-    if root.search-active && root.query != "" : VerticalLayout {
+    if root.search-phase == 2 : VerticalLayout {
         spacing: 16px;
         alignment: start;
 
@@ -207,7 +240,7 @@ export component SearchView inherits VerticalLayout {
         }
     }
 
-    if !root.search-active || root.query == "" : VerticalLayout {
+    if root.search-phase == 0 : VerticalLayout {
         spacing: 12px;
         alignment: start;
 

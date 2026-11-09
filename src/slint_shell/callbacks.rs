@@ -28,8 +28,8 @@ use crate::slint_shell::sync::{
     persist_recent_searches, sync_recent_searches, sync_shelves_and_queue, sync_window,
 };
 use crate::slint_shell::window::{
-    open_detail_async, refresh_library_async, submit_search_async, submit_search_with_filter_async,
-    trigger_playback,
+    clear_search_and_sync, open_detail_async, refresh_library_async, submit_search_async,
+    submit_search_with_filter_async, trigger_playback,
 };
 
 /// Maps a clicked search result item to playback or container detail view.
@@ -235,6 +235,14 @@ fn wire_search_callbacks(
         st.recent_searches.clear();
         persist_recent_searches(&st);
         sync_recent_searches(&win, &st);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_query_cleared(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        clear_search_and_sync(&win, &mut st);
     });
 
     let s = Rc::clone(state_rc);

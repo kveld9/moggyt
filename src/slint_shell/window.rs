@@ -42,11 +42,12 @@ use crate::slint_shell::playback_worker::{
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::stream_prefetch::spawn_stream_prefetch;
 use crate::slint_shell::sync::{
-    persist_recent_searches, sync_header_title, sync_library_and_detail, sync_playback_tick,
-    sync_recent_searches, sync_shelves_and_queue, sync_update_status, sync_window,
+    observe_view_phases, persist_recent_searches, sync_header_title, sync_library_and_detail,
+    sync_playback_tick, sync_recent_searches, sync_shelves_and_queue, sync_update_status,
+    sync_view_phase, sync_window,
 };
 use crate::slint_shell::theme::apply_custom_theme_if_changed;
-use crate::slint_shell::view_phase::ViewPhase;
+use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 
 thread_local! {
     static ACTIVE_STATE: RefCell<Option<SharedState>> = const { RefCell::new(None) };
@@ -153,16 +154,18 @@ pub(crate) fn submit_search_with_filter_async(
 
     state.search_query = query.to_string();
     state.search_filter = filter;
-    state.search_covers.clear();
+    state.search_phase = ViewPhase::Loading;
     state.search_generation = state.search_generation.wrapping_add(1);
     let generation = state.search_generation;
 
     window.set_query(query.into());
     window.set_search_filter(search_filter_index(filter));
-    state.home_shelves = vec![Shelf::new(tr(state.locale, "Searching..."))];
     sync_shelves_and_queue(window, state);
+    sync_view_phase(window, ViewId::Search, state.search_phase);
 
     let Some(parsed_query) = SearchQuery::parse(trimmed).map(|q| q.with_filter(filter)) else {
+        state.search_phase = ViewPhase::Empty;
+        sync_view_phase(window, ViewId::Search, state.search_phase);
         return;
     };
     let cat = Arc::clone(&state.catalog);
@@ -180,7 +183,9 @@ pub(crate) fn submit_search_with_filter_async(
                     request_shelf_covers(st, &tx);
                 }
                 win.set_query(st.search_query.as_str().into());
+                observe_view_phases(st);
                 sync_shelves_and_queue(&win, st);
+                sync_view_phase(&win, ViewId::Search, st.search_phase);
             });
         });
     });
@@ -194,6 +199,16 @@ pub(crate) fn submit_search_async(
     worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     submit_search_with_filter_async(window, state, query, SearchFilter::All, worker_tx);
+}
+
+/// Exits search mode from the UI and resyncs the search view.
+pub(crate) fn clear_search_and_sync(window: &MoggytWindow, state: &mut SlintAppState) {
+    state.clear_search();
+    window.set_query("".into());
+    sync_recent_searches(window, state);
+    sync_shelves_and_queue(window, state);
+    observe_view_phases(state);
+    sync_view_phase(window, ViewId::Search, state.search_phase);
 }
 
 /// Resolves a local playlist detail model synchronously from the store if the id is local.
@@ -762,5 +777,22 @@ mod tests {
 
         assert!(apply_async_library_outcome(&mut state, 10, Ok(Vec::new()), Ok(Vec::new())));
         assert_eq!(state.library_phase, ViewPhase::Empty);
+    }
+
+    #[test]
+    fn clearing_query_ignores_in_flight_results() {
+        let mut state = test_wired();
+        state.search_generation = 7;
+        state.search_active = true;
+        state.search_query = "rock".into();
+        state.search_phase = ViewPhase::Loading;
+
+        state.clear_search();
+        let applied = apply_async_search_outcome(&mut state, 7, "rock".into(), Ok(Vec::new()));
+
+        assert!(!applied);
+        assert!(!state.search_active);
+        assert_eq!(state.search_query, "");
+        assert_eq!(state.search_phase, ViewPhase::Idle);
     }
 }

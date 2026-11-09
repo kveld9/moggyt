@@ -22,6 +22,8 @@ pub struct StaticLabels {
     pub filter_artists: &'static str,
     pub filter_playlists: &'static str,
     pub search_empty: &'static str,
+    pub search_loading: &'static str,
+    pub search_error: &'static str,
     pub recent_searches_title: &'static str,
     pub recent_searches_empty: &'static str,
     pub clear_history: &'static str,
@@ -149,6 +151,8 @@ impl StaticLabels {
             filter_artists: tr(locale, "Artists"),
             filter_playlists: tr(locale, "Playlists"),
             search_empty: tr(locale, "No results found."),
+            search_loading: tr(locale, "Searching..."),
+            search_error: tr(locale, "Failed to load search results"),
             recent_searches_title: tr(locale, "Recent searches"),
             recent_searches_empty: tr(locale, "No recent searches."),
             clear_history: tr(locale, "Clear history"),
@@ -292,6 +296,8 @@ impl StaticLabels {
         labels.set_filter_artists_label(self.filter_artists.into());
         labels.set_filter_playlists_label(self.filter_playlists.into());
         labels.set_search_empty_text(self.search_empty.into());
+        labels.set_search_loading_text(self.search_loading.into());
+        labels.set_search_error_text(self.search_error.into());
         labels.set_recent_title_label(self.recent_searches_title.into());
         labels.set_recent_empty_label(self.recent_searches_empty.into());
         labels.set_clear_history_label(self.clear_history.into());
@@ -421,6 +427,11 @@ mod tests {
     #[test]
     fn test_static_labels_resolution_and_sync() {
         let en_labels = StaticLabels::resolve(crate::i18n::Locale::English);
+        assert_eq!(en_labels.search_loading, "Searching...");
+        assert_eq!(en_labels.search_error, "Failed to load search results");
+        let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
+        assert_eq!(es_labels.search_loading, "Buscando...");
+        assert_eq!(es_labels.search_error, "No se pudieron cargar los resultados de busqueda");
         assert_eq!(en_labels.nav_explore, "Explore");
         assert_eq!(en_labels.explore_loading, "Loading explore...");
         assert_eq!(en_labels.explore_empty, "No sections found in Explore.");

@@ -89,6 +89,7 @@ export component MoggytWindow inherits Window {
     in-out property <bool> category-loading: false;
     in-out property <[string]> recent-searches: [];
     in-out property <bool> search-active: false;
+    in-out property <int> search-phase: 0;
     in-out property <string> queue-button-text: "Queue";
     in-out property <int> player-bar-mode: 0;
     in-out property <bool> player-bar-show-artwork: true;
@@ -137,6 +138,7 @@ export component MoggytWindow inherits Window {
     callback songs-only-toggled();
     callback shortcut-pressed(string, bool) -> bool;
     callback query-submitted(string);
+    callback query-cleared();
     callback track-selected(int);
     callback filter-selected(int);
     callback recent-search-selected(string);
@@ -178,9 +180,7 @@ export component MoggytWindow inherits Window {
     callback import-picker-dismissed();
     callback library-import-requested();
     library-import-requested => { root.show-import-modal = true; }
-
     changed width => { root.width-changed(self.width / 1px); }
-
     shortcuts := ShortcutScope {
         shortcut-pressed(text, modified) => { return root.shortcut-pressed(text, modified); }
         VerticalLayout {
@@ -242,6 +242,7 @@ export component MoggytWindow inherits Window {
                     update-status-text: root.update-status-text;
                     recent-searches: root.recent-searches;
                     search-active: root.search-active;
+                    search-phase: root.search-phase;
                     sleep-timer-status-text: root.sleep-timer-status-text;
                     active-sleep-timer-index: root.active-sleep-timer-index;
                     active-audio-quality-index: root.active-audio-quality-index;
@@ -259,6 +260,7 @@ export component MoggytWindow inherits Window {
                     open-settings => { root.page-selected(4); }
                     library-import-requested => { root.library-import-requested(); }
                     query-submitted(q) => { root.query-submitted(q); }
+                    query-cleared => { root.query-cleared(); }
                     track-selected(idx) => { root.track-selected(idx); }
                     filter-selected(idx) => { root.filter-selected(idx); }
                     recent-search-selected(q) => { root.recent-search-selected(q); }
@@ -363,7 +365,6 @@ export component MoggytWindow inherits Window {
         start-requested => { root.import-start-requested(); }
         close-requested => { root.show-import-modal = false; root.import-close-requested(); }
     }
-
     ImportProgress {
         visible: root.import-running;
         cancelling: root.import-cancelling;
@@ -375,7 +376,6 @@ export component MoggytWindow inherits Window {
         unresolved: root.import-unresolved;
         cancel-requested => { root.import-cancel-requested(); }
     }
-
     ImportReviewView {
         visible: root.import-review-open;
         playlist-title: root.import-review-title;
@@ -389,7 +389,6 @@ export component MoggytWindow inherits Window {
         save-requested => { root.import-save-requested(); }
         discard-requested => { root.import-discard-requested(); }
     }
-
     AlternativePicker {
         visible: root.import-picker-open;
         alternatives: root.import-alternatives;

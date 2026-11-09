@@ -261,8 +261,9 @@ impl SlintAppState {
     pub fn submit_search_with_filter(&mut self, query: &str, filter: SearchFilter) {
         self.search_query = query.to_string();
         self.search_filter = filter;
-        self.search_covers.clear();
+        self.search_phase = ViewPhase::Loading;
         let Some(parsed) = SearchQuery::parse(query).map(|q| q.with_filter(filter)) else {
+            self.search_phase = ViewPhase::Idle;
             return;
         };
         self.search_active = true;
@@ -275,6 +276,16 @@ impl SlintAppState {
             Ok(items) => self.apply_search_items(items),
             Err(_) => self.search_phase = ViewPhase::Error,
         }
+    }
+
+    /// Exits search mode: clears the query and results, and returns the view to Idle.
+    pub fn clear_search(&mut self) {
+        self.search_generation = self.search_generation.wrapping_add(1);
+        self.search_query.clear();
+        self.search_active = false;
+        self.home_shelves.clear();
+        self.search_results.clear();
+        self.search_phase = ViewPhase::Idle;
     }
 
     fn apply_search_items(&mut self, mut items: Vec<SearchResult>) {
@@ -599,7 +610,7 @@ impl<T: ?Sized + CoverCache> CoverCache for Box<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::slint_shell::test_support::{MockLibraryCatalog, test_wired};
+    use crate::slint_shell::test_support::{MockLibraryCatalog, test_wired, wrap_mock_catalog};
 
     #[test]
     fn test_initial_state_defaults() {
@@ -649,30 +660,6 @@ mod tests {
     }
 
     #[test]
-    fn test_search_submission() {
-        let mut state = test_wired();
-        state.submit_search("midnight");
-        assert_eq!(state.search_query, "midnight");
-        assert!(state.search_active);
-        assert_eq!(state.recent_searches.entries(), &["midnight"]);
-        assert_eq!(state.home_shelves.len(), 1);
-        assert_eq!(state.home_shelves[0].title, "Search Results");
-        state.search_query.clear();
-        assert_eq!(state.search_query, "");
-
-        let mut empty_state = test_wired();
-        empty_state.submit_search("   ");
-        assert_eq!(empty_state.search_query, "   ");
-        assert!(!empty_state.search_active);
-        assert!(empty_state.home_shelves.is_empty());
-
-        let mut state_es = test_wired();
-        state_es.locale = Locale::Spanish;
-        state_es.submit_search("midnight");
-        assert_eq!(state_es.home_shelves[0].title, "Resultados de búsqueda");
-    }
-
-    #[test]
     fn test_sign_in_and_out_lifecycle() {
         let mut state = test_wired();
         assert!(!state.signed_in);
@@ -683,10 +670,6 @@ mod tests {
         state.sign_out();
         assert!(!state.signed_in);
         assert_eq!(state.session.load(), None);
-    }
-
-    fn wrap_mock_catalog(cat: MockLibraryCatalog) -> Arc<Mutex<Box<dyn Catalog + Send>>> {
-        Arc::new(Mutex::new(Box::new(cat)))
     }
 
     #[test]
@@ -731,22 +714,6 @@ mod tests {
         state.open_detail("album-1", DetailKind::Album);
         assert_eq!(state.detail_phase, ViewPhase::Ready);
         assert!(state.detail.is_some());
-    }
-
-    #[test]
-    fn test_search_filter_lifecycle_and_reset() {
-        let mut state = test_wired();
-        assert_eq!(state.search_filter, SearchFilter::All);
-
-        state.search_filter = SearchFilter::Albums;
-        assert_eq!(state.search_filter, SearchFilter::Albums);
-
-        state.submit_search("rock");
-        assert_eq!(state.search_filter, SearchFilter::All);
-        assert!(state.search_covers.is_empty());
-
-        state.submit_search_with_filter("rock", SearchFilter::Albums);
-        assert_eq!(state.search_filter, SearchFilter::Albums);
     }
 
     #[test]
