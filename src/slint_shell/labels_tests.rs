@@ -194,6 +194,11 @@ mod tests {
         assert_eq!(es.import_all_matched_label, "Todo coincidio");
         assert_eq!(es.import_custom_id_placeholder, "ID de video de YouTube");
         assert_eq!(es.import_use_id_label, "Usar ID");
+        assert_eq!(
+            es.import_connection_lost_label,
+            "Se perdió la conexión. Reintenta o guarda las canciones coincidentes."
+        );
+        assert_eq!(es.import_retry_label, "Reintentar");
         assert_eq!(es.nav_stats, "Estadísticas");
         assert_eq!(es.stats_last_4_weeks, "Últimas 4 semanas");
         assert_eq!(es.stats_last_6_months, "Últimos 6 meses");
@@ -337,6 +342,11 @@ mod tests {
         assert_eq!(en.import_all_matched_label, "All matched");
         assert_eq!(en.import_custom_id_placeholder, "YouTube video ID");
         assert_eq!(en.import_use_id_label, "Use ID");
+        assert_eq!(
+            en.import_connection_lost_label,
+            "Connection lost. Retry or save the matched tracks."
+        );
+        assert_eq!(en.import_retry_label, "Retry");
         assert_eq!(en.nav_stats, "Stats");
         assert_eq!(en.stats_last_4_weeks, "Last 4 weeks");
         assert_eq!(en.stats_last_6_months, "Last 6 months");

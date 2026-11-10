@@ -119,6 +119,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Close", "Cerrar"),
     ("Connect with Last.fm", "Conectar con Last.fm"),
     ("Connected as", "Conectado como"),
+    (
+        "Connection lost. Retry or save the matched tracks.",
+        "Se perdió la conexión. Reintenta o guarda las canciones coincidentes.",
+    ),
     ("Crossfade", "Fundido cruzado"),
     ("Custom", "Personalizado"),
     ("Custom Discord Application ID", "ID de aplicación personalizada de Discord"),
@@ -216,6 +220,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
         "El archivo de cola estaba corrupto y se puso en cuarentena",
     ),
     ("Recent searches", "Búsquedas recientes"),
+    ("Retry", "Reintentar"),
     ("Review matches", "Revisar coincidencias"),
     ("Save credentials", "Guardar credenciales"),
     ("Save playlist", "Guardar playlist"),
@@ -709,5 +714,23 @@ mod tests {
         let expected = "Coloca archivos JSON de tema en ~/.config/moggyt/themes/ o ~/.config/moggyt/custom-theme.json";
         assert_eq!(tr(Locale::English, key), key);
         assert_eq!(tr(Locale::Spanish, key), expected);
+    }
+
+    #[test]
+    fn test_import_connection_loss_retry_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            (
+                "Connection lost. Retry or save the matched tracks.",
+                "Se perdió la conexión. Reintenta o guarda las canciones coincidentes.",
+            ),
+            ("Retry", "Reintentar"),
+        ];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key);
+            assert_eq!(es, expected_es);
+            assert_ne!(en, es);
+        }
     }
 }

@@ -8,12 +8,14 @@ export component ImportReviewView inherits VerticalLayout {
     in-out property <string> counts-text: "";
     in-out property <string> status-text: "";
     in-out property <bool> can-save: false;
+    in property <bool> retry-visible: false;
 
     callback row-selected(int);
     callback swap-requested(int);
     callback row-exclusion-toggled(int);
     callback save-requested();
     callback discard-requested();
+    callback retry-requested();
 
     Rectangle {
         vertical-stretch: 1;
@@ -62,6 +64,51 @@ export component ImportReviewView inherits VerticalLayout {
                         text: root.status-text;
                         color: Theme.secondary;
                         font-size: 13px;
+                    }
+                }
+            }
+
+            if root.retry-visible : Rectangle {
+                height: 48px;
+                border-radius: 8px;
+                background: Theme.surface;
+                border-width: 1px;
+                border-color: Theme.border;
+
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    spacing: 12px;
+                    alignment: space-between;
+
+                    Text {
+                        text: Labels.import-connection-lost-label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    Rectangle {
+                        width: 100px;
+                        height: 32px;
+                        border-radius: 6px;
+                        background: retry-touch.pressed ? Theme.overlay : (retry-touch.has-hover ? Theme.hover : Theme.accent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        retry-touch := TouchArea {
+                            clicked => { root.retry-requested(); }
+                        }
+
+                        Text {
+                            text: Labels.import-retry-label;
+                            color: retry-touch.has-hover ? Theme.text : Theme.window;
+                            font-size: 13px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
                     }
                 }
             }

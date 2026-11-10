@@ -37,6 +37,7 @@ pub struct DrainOutcome {
     pub applied: usize,
     pub finished: bool,
     pub cancelled: bool,
+    pub connection_lost: bool,
 }
 
 /// Formats the progress status text for matching progress.
@@ -300,6 +301,7 @@ impl ImportSession {
                 self.fail(message);
                 outcome.finished = true;
             }
+            ImportProgressEvent::ConnectionLost { .. } => outcome.connection_lost = true,
         }
     }
 
