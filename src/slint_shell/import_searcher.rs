@@ -18,7 +18,7 @@ use super::import_worker::{TrackResolution, TrackSearcher};
 pub const MIN_ACCEPT_SCORE: f32 = 0.50;
 
 /// Maximum number of alternative candidates retained per resolved track.
-pub const MAX_ALTERNATIVES: usize = 3;
+pub const MAX_ALTERNATIVES: usize = 5;
 
 /// One YouTube Music candidate surfaced to the worker, already reduced to domain types.
 #[derive(Debug, Clone, PartialEq)]
@@ -262,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ranked_alternatives_ordering_and_cap_of_three() {
+    fn test_ranked_alternatives_ordering_and_cap_of_five() {
         let t = test_track("Heroes", "David Bowie");
         let pool = [
             test_hit("v1", "Heroes", "David Bowie", Some(180), MusicVideoType::Atv),
@@ -272,11 +272,13 @@ mod tests {
             test_hit("v5", "Heroes", "David Bowie", Some(188), MusicVideoType::Other),
         ];
         let alts = ranked_alternatives(&t, &pool);
+        assert_eq!(alts.len(), 5);
         assert_eq!(alts.len(), MAX_ALTERNATIVES);
-        assert_eq!(alts.len(), 3);
         assert_eq!(alts[0].video_id, "v1");
         assert_eq!(alts[1].video_id, "v2");
         assert_eq!(alts[2].video_id, "v3");
+        assert_eq!(alts[3].video_id, "v4");
+        assert_eq!(alts[4].video_id, "v5");
         assert_eq!(alts[0].confidence, MatchConfidence::High);
     }
 

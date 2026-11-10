@@ -193,7 +193,7 @@ Music candidate:
 If a matched track is incorrect or a better alternative exists:
 
 1. Click the `Swap` button on the track row to open the alternative picker.
-2. The picker presents up to three ranked alternative candidates found during search, ordered by match score.
+2. The picker presents up to five ranked alternative candidates found during search, ordered by match score.
 3. Select an alternative to replace the candidate for that row.
 4. Alternatively, paste an explicit 11-character YouTube video ID into the custom ID field and click `Use ID` to
    force that track for the row. This applies to both matched and unresolved tracks.

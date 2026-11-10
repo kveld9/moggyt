@@ -309,7 +309,7 @@ The matching worker (`import_worker.rs`, `import_searcher.rs`) executes in backg
   jitter (base 500 ms, up to 3 retries).
 - **Atomic Cancellation**: Supports cancellation via `AtomicBool`, cleanly stopping worker execution and returning
   partial resolutions.
-- **Ranked Alternatives**: Retains up to 3 alternative candidate hits (`MAX_ALTERNATIVES = 3`) scoring at or above
+- **Ranked Alternatives**: Retains up to 5 alternative candidate hits (`MAX_ALTERNATIVES = 5`) scoring at or above
   `0.50` for user review.
 - **Event Streaming**: Dispatches progress events (`Started`, `Track`, `Progress`, `Finished`, `Cancelled`, `Failed`)
   to update UI overlays.
