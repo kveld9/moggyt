@@ -55,6 +55,7 @@ pub mod import_worker;
 pub mod init;
 pub mod labels;
 pub mod lastfm_connect;
+pub mod local_edit;
 pub mod page;
 pub mod platform;
 pub mod play_log;
