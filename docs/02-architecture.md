@@ -132,6 +132,11 @@ A seek re-targets the pool at the new block and discards results outside the
 window; `Read + Seek` semantics, the EOF boundary at the reported total length,
 and the sequential fallback for servers that ignore `Range` are unchanged.
 
+The next queued track prefetches its first two blocks (512 KiB) into a bounded
+in-memory cache (`stream_prefetch_cache.rs`). Starting that track seeds the block
+pool with those bytes, so the first read does not issue a cold range request; a
+skipped track keeps at most two prefetched prefixes resident.
+
 ## Evolution rules
 
 1. One concept, one owner: each domain type lives in a single module (single source of truth).

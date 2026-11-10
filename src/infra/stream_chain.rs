@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
 use super::innertube_stream::{FallbackReason, InnertubeResolver};
-use super::stream::{AudioQuality, ResolvedStream, StreamResolver};
+use super::stream::{AudioQuality, RangeResponse, RangeTransport, ResolvedStream, StreamResolver};
+use super::stream_prefetch_cache::{PREFETCH_BYTES, StreamPrefetchCache};
+use super::stream_reqwest::ReqwestRangeTransport;
 use super::stream_url_cache::{ResolverSource, StreamUrlCache};
 use super::ytdlp::YtDlpResolver;
 
@@ -30,6 +32,61 @@ impl PrimaryStreamResolver for InnertubeResolver {
     }
 }
 
+/// Fetches the leading bytes of a resolved stream URL for next-track prefetch.
+pub trait PrefixFetcher: Send + Sync {
+    fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<Vec<u8>>;
+}
+
+/// Real HTTP prefix fetcher used by the production chain.
+#[derive(Debug, Clone, Default)]
+pub struct HttpPrefixFetcher;
+
+fn open_prefix_transport(url: &str) -> Option<ReqwestRangeTransport> {
+    match ReqwestRangeTransport::new(url) {
+        Ok(transport) => Some(transport),
+        Err(err) => {
+            tracing::debug!(error = ?err, "failed to create transport for prefix fetch");
+            None
+        }
+    }
+}
+
+fn prefix_from_response(
+    response: std::io::Result<RangeResponse>,
+    max_bytes: usize,
+) -> Option<Vec<u8>> {
+    match response {
+        Ok(RangeResponse::Partial { mut data, .. }) => {
+            data.truncate(max_bytes);
+            Some(data)
+        }
+        Ok(RangeResponse::Full(_)) => {
+            tracing::debug!("prefix fetch received full response instead of range");
+            None
+        }
+        Err(err) => {
+            tracing::debug!(error = ?err, "prefix fetch range request failed");
+            None
+        }
+    }
+}
+
+impl PrefixFetcher for HttpPrefixFetcher {
+    fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<Vec<u8>> {
+        let mut transport = open_prefix_transport(url)?;
+        prefix_from_response(transport.fetch_range(0, max_bytes), max_bytes)
+    }
+}
+
+#[derive(Debug, Default)]
+struct NoopPrefixFetcher;
+
+impl PrefixFetcher for NoopPrefixFetcher {
+    fn fetch_prefix(&self, _url: &str, _max_bytes: usize) -> Option<Vec<u8>> {
+        None
+    }
+}
+
 /// Deduplicates fallback reason logging so each cause logs at most once per session.
 fn record_once(logged: &mut HashSet<FallbackReason>, reason: FallbackReason) -> bool {
     logged.insert(reason)
@@ -43,6 +100,8 @@ pub struct StreamChain {
     primary_cache: StreamUrlCache,
     quality: AudioQuality,
     logged: Arc<Mutex<HashSet<FallbackReason>>>,
+    prefetch_cache: Arc<StreamPrefetchCache>,
+    prefix_fetcher: Arc<dyn PrefixFetcher>,
 }
 
 impl std::fmt::Debug for StreamChain {
@@ -63,6 +122,8 @@ impl StreamChain {
             primary_cache: StreamUrlCache::new(),
             quality: AudioQuality::default(),
             logged: Arc::new(Mutex::new(HashSet::new())),
+            prefetch_cache: Arc::new(StreamPrefetchCache::new()),
+            prefix_fetcher: Arc::new(HttpPrefixFetcher),
         }
     }
 
@@ -75,6 +136,8 @@ impl StreamChain {
             primary_cache: StreamUrlCache::new(),
             quality,
             logged: Arc::new(Mutex::new(HashSet::new())),
+            prefetch_cache: Arc::new(StreamPrefetchCache::new()),
+            prefix_fetcher: Arc::new(NoopPrefixFetcher),
         }
     }
 
@@ -87,6 +150,8 @@ impl StreamChain {
             primary_cache: StreamUrlCache::new(),
             quality,
             logged: Arc::new(Mutex::new(HashSet::new())),
+            prefetch_cache: Arc::new(StreamPrefetchCache::new()),
+            prefix_fetcher: Arc::new(NoopPrefixFetcher),
         }
     }
 
@@ -166,13 +231,18 @@ impl StreamChain {
         }
     }
 
-    /// Resolves `video_id` to a stream with optional metadata, trying primary tier then fallback.
-    pub fn resolve_stream(&self, video_id: &str) -> Option<ResolvedStream> {
-        let id = video_id.trim();
-        if id.is_empty() {
-            return None;
-        }
+    /// Injects a custom prefix fetcher for testing or custom transport wiring.
+    pub fn with_prefix_fetcher(mut self, fetcher: Arc<dyn PrefixFetcher>) -> Self {
+        self.prefix_fetcher = fetcher;
+        self
+    }
 
+    /// Removes and returns prefetched audio bytes for `url` from the cache.
+    pub fn take_prefetched(&self, url: &str) -> Option<Vec<u8>> {
+        self.prefetch_cache.take(url)
+    }
+
+    fn find_or_resolve_stream(&self, id: &str) -> Option<ResolvedStream> {
         let now = Instant::now();
         if let Some(cached) = self.check_cached(id, now) {
             return Some(cached);
@@ -185,9 +255,45 @@ impl StreamChain {
         self.resolve_primary(primary.as_ref(), id, now)
     }
 
+    /// Resolves `video_id` to a stream with optional metadata, trying primary tier then fallback.
+    pub fn resolve_stream(&self, video_id: &str) -> Option<ResolvedStream> {
+        let id = video_id.trim();
+        if id.is_empty() {
+            return None;
+        }
+        self.find_or_resolve_stream(id)
+    }
+
     /// Resolves `video_id` to a direct stream URL through the layered tiers.
     pub fn resolve(&self, video_id: &str) -> Option<String> {
         self.resolve_stream(video_id).map(|stream| stream.url)
+    }
+
+    /// Prefetches the leading audio blocks of `video_id` into the prefetch cache.
+    ///
+    /// Resolves the stream URL using the same tier order as `resolve_stream`,
+    /// skips downloading if the prefix is already cached, and fetches `PREFETCH_BYTES`.
+    /// Returns true if the prefix is or becomes cached.
+    pub fn prefetch_prefix(&self, video_id: &str) -> bool {
+        let id = video_id.trim();
+        if id.is_empty() {
+            return false;
+        }
+        let Some(stream) = self.find_or_resolve_stream(id) else {
+            return false;
+        };
+        if self.prefetch_cache.contains(&stream.url) {
+            return true;
+        }
+        self.fetch_and_cache_prefix(&stream.url)
+    }
+
+    fn fetch_and_cache_prefix(&self, url: &str) -> bool {
+        let Some(bytes) = self.prefix_fetcher.fetch_prefix(url, PREFETCH_BYTES) else {
+            return false;
+        };
+        self.prefetch_cache.insert(url, bytes);
+        true
     }
 
     fn is_cached(&self, id: &str, now: Instant) -> bool {
@@ -219,15 +325,7 @@ impl StreamChain {
         }
     }
 
-    /// Prefetches and caches stream resolution for `video_id`.
-    ///
-    /// Returns `true` if resolution succeeds or if the entry is already cached.
-    pub fn prefetch(&self, video_id: &str) -> bool {
-        let id = video_id.trim();
-        if id.is_empty() {
-            return false;
-        }
-
+    fn prefetch_url(&self, id: &str) -> bool {
         let now = Instant::now();
         if self.is_cached(id, now) {
             return true;
@@ -238,6 +336,22 @@ impl StreamChain {
         };
 
         self.prefetch_primary(primary.as_ref(), id, now)
+    }
+
+    /// Prefetches and caches stream resolution and leading audio blocks for `video_id`.
+    ///
+    /// Returns `true` if resolution succeeds or if the entry is already cached.
+    pub fn prefetch(&self, video_id: &str) -> bool {
+        let id = video_id.trim();
+        if id.is_empty() {
+            return false;
+        }
+
+        let resolved = self.prefetch_url(id);
+        if resolved {
+            self.prefetch_prefix(id);
+        }
+        resolved
     }
 }
 
@@ -431,5 +545,79 @@ mod tests {
         );
         let chain = StreamChain::from_ytdlp(fallback);
         assert!(chain.prefetch("v-pre"));
+    }
+
+    struct FakePrefixFetcher {
+        bytes: Mutex<Option<Vec<u8>>>,
+        calls: Mutex<Vec<(String, usize)>>,
+    }
+
+    impl FakePrefixFetcher {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self { bytes: Mutex::new(Some(bytes)), calls: Mutex::new(Vec::new()) }
+        }
+    }
+
+    impl PrefixFetcher for FakePrefixFetcher {
+        fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<Vec<u8>> {
+            self.calls.lock().unwrap().push((url.to_string(), max_bytes));
+            self.bytes.lock().unwrap().clone()
+        }
+    }
+
+    #[test]
+    fn prefetch_prefix_inserts_bytes_with_fake_fetcher() {
+        let stream = ResolvedStream::from_url("https://primary.test/v-prefix");
+        let primary = Arc::new(FakePrimary::new(Ok(stream)));
+        let fallback = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let fetcher = Arc::new(FakePrefixFetcher::new(vec![0xAA; PREFETCH_BYTES]));
+        let chain = StreamChain::with_primary(primary, fallback)
+            .with_prefix_fetcher(Arc::clone(&fetcher) as Arc<dyn PrefixFetcher>);
+
+        assert!(chain.prefetch_prefix("v-prefix"));
+        let calls = fetcher.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], ("https://primary.test/v-prefix".to_string(), PREFETCH_BYTES));
+
+        let prefetched = chain.take_prefetched("https://primary.test/v-prefix");
+        assert_eq!(prefetched, Some(vec![0xAA; PREFETCH_BYTES]));
+    }
+
+    #[test]
+    fn prefetch_prefix_skips_blank_and_unresolved() {
+        let fallback = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let fetcher = Arc::new(FakePrefixFetcher::new(vec![0xAA; 100]));
+        let chain = StreamChain::from_ytdlp(fallback)
+            .with_prefix_fetcher(Arc::clone(&fetcher) as Arc<dyn PrefixFetcher>);
+
+        assert!(!chain.prefetch_prefix(""));
+        assert!(!chain.prefetch_prefix("   "));
+        assert!(!chain.prefetch_prefix("unresolved-id"));
+        assert!(fetcher.calls.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn prefetch_prefix_returns_false_when_fetcher_has_no_bytes() {
+        let stream = ResolvedStream::from_url("https://primary.test/v-none");
+        let primary = Arc::new(FakePrimary::new(Ok(stream)));
+        let fallback = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let chain = StreamChain::with_primary(primary, fallback);
+
+        assert!(!chain.prefetch_prefix("v-none"));
+        assert_eq!(chain.take_prefetched("https://primary.test/v-none"), None);
+    }
+
+    #[test]
+    fn take_prefetched_is_single_use() {
+        let stream = ResolvedStream::from_url("https://primary.test/v-single");
+        let primary = Arc::new(FakePrimary::new(Ok(stream)));
+        let fallback = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let fetcher = Arc::new(FakePrefixFetcher::new(vec![1, 2, 3]));
+        let chain = StreamChain::with_primary(primary, fallback)
+            .with_prefix_fetcher(Arc::clone(&fetcher) as Arc<dyn PrefixFetcher>);
+
+        assert!(chain.prefetch_prefix("v-single"));
+        assert_eq!(chain.take_prefetched("https://primary.test/v-single"), Some(vec![1, 2, 3]));
+        assert_eq!(chain.take_prefetched("https://primary.test/v-single"), None);
     }
 }

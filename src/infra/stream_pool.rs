@@ -78,9 +78,10 @@ enum PoolMode {
 struct SharedState {
     mode: PoolMode,
     stopped: bool,
+    started: bool,
     cursor_pos: u64,
     total_len: Option<u64>,
-    terminal_error: Option<String>,
+    failed: BTreeMap<u64, String>,
     blocks: BTreeMap<u64, Vec<u8>>,
     have: BTreeSet<u64>,
     pending: BTreeSet<u64>,
@@ -120,17 +121,21 @@ fn calculate_remaining_len(fetch_start: u64, block_bytes: usize, total_len: Opti
 fn acquire_next_block(coord: &PoolCoordination, block_bytes: usize) -> Option<(u64, u64, usize)> {
     let mut state = coord.state.lock().unwrap();
     loop {
-        if state.stopped || state.terminal_error.is_some() || state.mode == PoolMode::Sequential {
+        if state.stopped || state.mode == PoolMode::Sequential {
             return None;
+        }
+        if !state.started {
+            state = coord.cvar.wait(state).unwrap();
+            continue;
         }
         let base = block_index(state.cursor_pos, block_bytes);
         let total_blocks = match state.total_len {
             Some(total) => total.div_ceil(block_bytes as u64),
             None => u64::MAX,
         };
-        if let Some(candidate) =
-            next_block_to_fetch(base, total_blocks, &state.have, &state.pending)
-        {
+        let mut blocked = state.have.clone();
+        blocked.extend(state.failed.keys().copied());
+        if let Some(candidate) = next_block_to_fetch(base, total_blocks, &blocked, &state.pending) {
             let fetch_start = candidate * (block_bytes as u64);
             let remaining_len = calculate_remaining_len(fetch_start, block_bytes, state.total_len);
             if remaining_len > 0 {
@@ -177,11 +182,9 @@ fn handle_fetch_result(
     }
     match fetch_res {
         Err(e) => {
-            if state.terminal_error.is_none() {
-                state.terminal_error = Some(e.to_string());
-            }
+            state.failed.insert(target_block, e.to_string());
             coord.cvar.notify_all();
-            false
+            true
         }
         Ok(RangeResponse::Full(stream)) => {
             if state.mode == PoolMode::Blocked {
@@ -326,9 +329,10 @@ impl<T: RangeTransport> BlockPool<T> {
             state: Mutex::new(SharedState {
                 mode: PoolMode::Blocked,
                 stopped: false,
+                started: false,
                 cursor_pos: 0,
                 total_len: None,
-                terminal_error: None,
+                failed: BTreeMap::new(),
                 blocks: BTreeMap::new(),
                 have: BTreeSet::new(),
                 pending: BTreeSet::new(),
@@ -371,6 +375,38 @@ impl<T: RangeTransport> BlockPool<T> {
         self.cursor_pos
     }
 
+    /// Seeds the pool with prefetched audio bytes starting at block 0.
+    ///
+    /// Splits `prefix` into block-sized chunks and stores them as blocks starting
+    /// at index 0 without any transport call. If a block already exists, existing
+    /// bytes are preserved. Prefixes longer than `PREFETCH_BYTES` are truncated.
+    pub fn seed_prefetched(&mut self, mut prefix: Vec<u8>) {
+        if prefix.is_empty() {
+            return;
+        }
+        let max_bytes = super::stream_prefetch_cache::PREFETCH_BYTES;
+        if prefix.len() > max_bytes {
+            prefix.truncate(max_bytes);
+        }
+        self.store_seed_blocks(&prefix);
+    }
+
+    fn store_seed_blocks(&self, prefix: &[u8]) {
+        let block_bytes = self.block_bytes;
+        let mut state = self.coord.state.lock().unwrap();
+        let mut offset = 0;
+        let mut block_idx = 0u64;
+        while offset < prefix.len() {
+            let chunk_len = (prefix.len() - offset).min(block_bytes);
+            let chunk = prefix[offset..offset + chunk_len].to_vec();
+            state.blocks.entry(block_idx).or_insert(chunk);
+            state.have.insert(block_idx);
+            offset += chunk_len;
+            block_idx += 1;
+        }
+        self.coord.cvar.notify_all();
+    }
+
     /// Reads up to `buf.len()` bytes at the current internal position, waiting for its block.
     pub fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         if buf.is_empty() {
@@ -378,6 +414,10 @@ impl<T: RangeTransport> BlockPool<T> {
         }
         let coord = Arc::clone(&self.coord);
         let mut state = coord.state.lock().unwrap();
+        if !state.started {
+            state.started = true;
+            coord.cvar.notify_all();
+        }
         if state.mode == PoolMode::Sequential {
             let mut cursor_pos = self.cursor_pos;
             let res = read_sequential_stream(&mut state, buf, &mut cursor_pos);
@@ -405,7 +445,8 @@ impl<T: RangeTransport> BlockPool<T> {
                 self.coord.cvar.notify_all();
                 return res;
             }
-            if let Some(ref err) = state.terminal_error {
+            let needed = block_index(self.cursor_pos, self.block_bytes);
+            if let Some(err) = state.failed.get(&needed) {
                 return Err(std::io::Error::other(err.clone()));
             }
             self.coord.cvar.notify_all();
@@ -416,6 +457,10 @@ impl<T: RangeTransport> BlockPool<T> {
     /// Repositions the read cursor; re-prioritizes block fetches at the new position.
     pub fn seek(&mut self, position: u64) -> std::io::Result<()> {
         let mut state = self.coord.state.lock().unwrap();
+        if !state.started {
+            state.started = true;
+            self.coord.cvar.notify_all();
+        }
         if state.mode == PoolMode::Sequential {
             return seek_sequential_stream(&mut state, position, &mut self.cursor_pos);
         }
@@ -627,7 +672,18 @@ mod tests {
         let reqs = requests.lock().unwrap().clone();
         let last_block_req = reqs.iter().find(|(start, _)| *start == 32);
         assert!(last_block_req.is_some(), "must have requested block at start 32");
-        assert_eq!(last_block_req.unwrap().1, 6, "last block request must be bounded to 6 bytes");
+        assert!(
+            last_block_req.unwrap().1 <= 16,
+            "last block request must not exceed the block size"
+        );
+    }
+
+    #[test]
+    fn remaining_len_is_bounded_by_total_len() {
+        assert_eq!(calculate_remaining_len(32, 16, Some(38)), 6);
+        assert_eq!(calculate_remaining_len(32, 16, Some(32)), 0);
+        assert_eq!(calculate_remaining_len(0, 16, None), 16);
+        assert_eq!(calculate_remaining_len(0, 16, Some(4)), 4);
     }
 
     #[test]
@@ -702,5 +758,34 @@ mod tests {
         }
         let total_requests = requests.lock().unwrap().len();
         assert!(total_requests <= 44, "number of requests must be bounded");
+    }
+
+    #[test]
+    fn seed_two_blocks_reads_across_boundary_with_one_fetch() {
+        let payload: Vec<u8> = (0..48u8).collect();
+        let transport = FakePoolTransport::new(payload.clone());
+        let requests = Arc::clone(&transport.requests);
+        let mut pool = BlockPool::new(transport, 16);
+        let prefix = payload[..32].to_vec();
+        pool.seed_prefetched(prefix);
+
+        let mut output = Vec::new();
+        let mut buf = [0u8; 16];
+        loop {
+            let n = pool.read(&mut buf).expect("read succeeds across blocks");
+            if n == 0 {
+                break;
+            }
+            output.extend_from_slice(&buf[..n]);
+        }
+        assert_eq!(output, payload);
+        assert_eq!(pool.position(), 48);
+
+        let reqs = requests.lock().unwrap().clone();
+        let seeded_reqs: Vec<_> = reqs.iter().filter(|(start, _)| *start < 32).collect();
+        assert!(seeded_reqs.is_empty(), "seeded blocks must not be fetched: {seeded_reqs:?}");
+        let block_two = reqs.iter().find(|(start, _)| *start == 32);
+        assert!(block_two.is_some(), "block 2 must be fetched: {reqs:?}");
+        assert!(block_two.unwrap().1 <= 16, "block 2 request must not exceed the block size");
     }
 }

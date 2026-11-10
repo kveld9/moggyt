@@ -4,7 +4,6 @@ use std::io::Read;
 
 use serde::{Deserialize, Serialize};
 
-pub use super::stream_reqwest::open_audio_stream;
 pub use super::stream_stub::StreamStub;
 
 /// Audio stream quality preference: Compact (<=64k), Standard (default), High (highest available AAC).
