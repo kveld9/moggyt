@@ -93,8 +93,9 @@ Playback stream resolution is layered (`stream_chain.rs`):
    provider `loudnessDb` per format.
 4. yt-dlp sidecar (`ytdlp.rs`) whenever InnerTube fails: HTTP error, timeout, a
    `playabilityStatus` other than `OK`, no compatible audio format, a ciphered
-   (`signatureCipher`/`cipher`) entry, or an invalid payload. The failure reason
-   is logged once per cause and playback continues through the sidecar.
+   (`signatureCipher`/`cipher`) entry, an invalid payload, or a bot check
+   ("Sign in to confirm you're not a bot"). The failure reason is logged once per
+   cause and playback continues through the sidecar.
 
 Opus (itag 251) stays excluded because the rodio/symphonia stack has no Opus
 decoder; AAC in MP4 is the only supported stream format. The yt-dlp sidecar and

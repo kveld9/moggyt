@@ -69,6 +69,7 @@ pub enum FallbackReason {
     Http,
     Timeout,
     Playability,
+    BotCheck,
     NoFormats,
     Ciphered,
     InvalidPayload,
@@ -81,6 +82,7 @@ impl FallbackReason {
             Self::Http => "http",
             Self::Timeout => "timeout",
             Self::Playability => "playability",
+            Self::BotCheck => "bot_check",
             Self::NoFormats => "no_formats",
             Self::Ciphered => "ciphered",
             Self::InvalidPayload => "invalid_payload",
@@ -147,7 +149,15 @@ pub fn parse_audio_formats(payload: &Value) -> Vec<AudioFormat> {
 
 fn check_playability_status(payload: &Value) -> Result<(), FallbackReason> {
     let status = payload.pointer("/playabilityStatus/status").and_then(Value::as_str);
-    if status == Some("OK") { Ok(()) } else { Err(FallbackReason::Playability) }
+    if status == Some("OK") {
+        return Ok(());
+    }
+
+    let is_bot = payload
+        .pointer("/playabilityStatus/reason")
+        .and_then(Value::as_str)
+        .is_some_and(|reason| reason.to_ascii_lowercase().contains("not a bot"));
+    if is_bot { Err(FallbackReason::BotCheck) } else { Err(FallbackReason::Playability) }
 }
 
 fn convert_format_to_stream(format: AudioFormat) -> Result<ResolvedStream, FallbackReason> {
@@ -375,6 +385,37 @@ mod tests {
     }
 
     #[test]
+    fn bot_check_reason_is_classified() {
+        let mut fixture: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/innertube_visionos_player.json"
+        ))
+        .expect("fixture parses");
+        fixture["playabilityStatus"]["status"] = Value::String("LOGIN_REQUIRED".to_owned());
+        fixture["playabilityStatus"]["reason"] =
+            Value::String("Sign in to confirm you're not a bot".to_owned());
+        let err = select_stream(&fixture, AudioQuality::Standard)
+            .expect_err("bot check playability must trigger fallback");
+        assert_eq!(err, FallbackReason::BotCheck);
+    }
+
+    #[test]
+    fn plain_playability_failure_stays_playability() {
+        let mut fixture: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/innertube_visionos_player.json"
+        ))
+        .expect("fixture parses");
+        fixture["playabilityStatus"]["status"] = Value::String("LOGIN_REQUIRED".to_owned());
+        let err = select_stream(&fixture, AudioQuality::Standard)
+            .expect_err("plain playability failure must trigger fallback");
+        assert_eq!(err, FallbackReason::Playability);
+
+        fixture["playabilityStatus"]["reason"] = Value::String("Video unavailable".to_owned());
+        let err = select_stream(&fixture, AudioQuality::Standard)
+            .expect_err("plain playability failure with other reason must trigger fallback");
+        assert_eq!(err, FallbackReason::Playability);
+    }
+
+    #[test]
     fn payload_without_formats_falls_back() {
         let mut fixture: Value = serde_json::from_str(include_str!(
             "../../tests/fixtures/innertube_visionos_player.json"
@@ -442,6 +483,7 @@ mod tests {
             (FallbackReason::Http, "http"),
             (FallbackReason::Timeout, "timeout"),
             (FallbackReason::Playability, "playability"),
+            (FallbackReason::BotCheck, "bot_check"),
             (FallbackReason::NoFormats, "no_formats"),
             (FallbackReason::Ciphered, "ciphered"),
             (FallbackReason::InvalidPayload, "invalid_payload"),
