@@ -211,7 +211,8 @@ If a matched track is incorrect or a better alternative exists:
   under the `Playlists` section.
 - Clicking an imported playlist opens the `Detail` view, allowing playback without contacting YouTube Music for catalog
   resolution. Opening an imported playlist displays `Rename` and `Delete` controls in the header, and each track row
-  features a compact `Remove` button. Any edits, deletions, or track removals persist immediately to `playlists.json`.
+  features compact `Up`, `Down`, and `Remove` buttons. Any edits, deletions, track removals, or reorder changes
+  persist immediately to `playlists.json`.
 
 #### Headless CLI Usage
 

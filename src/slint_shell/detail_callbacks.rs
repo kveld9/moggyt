@@ -62,6 +62,12 @@ pub(crate) fn wire_detail_callbacks(
     local_ui.on_remove_track_requested(move |idx| {
         with_window_state(&w, &s, |win, st| handle_local_remove_track(win, st, idx));
     });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    local_ui.on_move_track_requested(move |from, to| {
+        with_window_state(&w, &s, |win, st| handle_local_move_track(win, st, from, to));
+    });
 }
 
 /// Returns the playlist identifier from active detail request only if it is a local playlist.
@@ -118,6 +124,27 @@ fn handle_local_remove_track(win: &MoggytWindow, st: &mut SlintAppState, idx: i3
         return;
     };
     match local_edit::remove_local_track(store.as_ref(), &id, idx as usize) {
+        Ok(playlist) => {
+            st.detail = Some(local_detail(&playlist));
+            st.detail_error = None;
+            reload_local_library(win, store.as_ref());
+            sync_window(win, st);
+        }
+        Err(err) => {
+            st.detail_error = Some(err.to_string());
+            sync_window(win, st);
+        }
+    }
+}
+
+fn handle_local_move_track(win: &MoggytWindow, st: &mut SlintAppState, from: i32, to: i32) {
+    if from < 0 || to < 0 {
+        return;
+    }
+    let (Some(id), Some(store)) = (current_local_detail_id(st), current_store()) else {
+        return;
+    };
+    match local_edit::reorder_local_track(store.as_ref(), &id, from as usize, to as usize) {
         Ok(playlist) => {
             st.detail = Some(local_detail(&playlist));
             st.detail_error = None;

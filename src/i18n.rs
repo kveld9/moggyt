@@ -135,6 +135,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Disk space quota for offline stream cache", "Espacio en disco para la caché de audio"),
     ("Discord Rich Presence", "Discord Rich Presence"),
     ("Dismiss", "Descartar"),
+    ("Down", "Bajar"),
     (
         "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
         "Las importaciones por enlace se limitan a 100 canciones. Exporta un CSV para playlists mas largas.",
@@ -292,6 +293,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Top tracks", "Temas más escuchados"),
     ("Tracks", "Temas"),
     ("Unresolved", "Sin resolver"),
+    ("Up", "Subir"),
     ("Up to date", "Actualizado"),
     ("Update available", "Actualización disponible"),
     ("Update available: {ver}", "Actualización disponible: {ver}"),
@@ -746,6 +748,18 @@ mod tests {
             ("Remove", "Quitar"),
             ("Rename", "Renombrar"),
         ];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key);
+            assert_eq!(es, expected_es);
+            assert_ne!(en, es);
+        }
+    }
+
+    #[test]
+    fn test_local_playlist_reorder_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [("Down", "Bajar"), ("Up", "Subir")];
         for (key, expected_es) in keys_and_expected {
             let en = tr(Locale::English, key);
             let es = tr(Locale::Spanish, key);

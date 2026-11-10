@@ -150,6 +150,8 @@ pub struct StaticLabels {
     pub local_rename_label: &'static str,
     pub local_delete_label: &'static str,
     pub local_remove_track_label: &'static str,
+    pub local_move_up_label: &'static str,
+    pub local_move_down_label: &'static str,
 }
 
 impl StaticLabels {
@@ -314,6 +316,8 @@ impl StaticLabels {
             local_rename_label: tr(locale, "Rename"),
             local_delete_label: tr(locale, "Delete playlist"),
             local_remove_track_label: tr(locale, "Remove"),
+            local_move_up_label: tr(locale, "Up"),
+            local_move_down_label: tr(locale, "Down"),
         }
     }
 
@@ -466,6 +470,8 @@ impl StaticLabels {
         labels.set_local_rename_label(self.local_rename_label.into());
         labels.set_local_delete_label(self.local_delete_label.into());
         labels.set_local_remove_track_label(self.local_remove_track_label.into());
+        labels.set_local_move_up_label(self.local_move_up_label.into());
+        labels.set_local_move_down_label(self.local_move_down_label.into());
     }
 }
 

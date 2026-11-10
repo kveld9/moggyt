@@ -12,6 +12,8 @@ export component TrackRow inherits Rectangle {
     in property <bool> show-remove: false;
     callback clicked();
     callback remove-requested();
+    callback move-up-requested();
+    callback move-down-requested();
 
     property <string> subtitle-text: root.album != "" && root.artist != "" ? root.artist + " - " + root.album : (
         root.artist != "" ? root.artist : root.album
@@ -84,27 +86,81 @@ export component TrackRow inherits Rectangle {
         if root.show-remove : VerticalLayout {
             alignment: center;
 
-            Rectangle {
-                height: 28px;
-                border-radius: 6px;
-                background: remove-touch.pressed ? Theme.overlay : (remove-touch.has-hover ? Theme.hover : Theme.surface);
-                animate background { duration: 150ms; easing: ease-in-out; }
+            HorizontalLayout {
+                spacing: 6px;
 
-                remove-touch := TouchArea {
-                    clicked => { root.remove-requested(); }
+                Rectangle {
+                    height: 28px;
+                    border-radius: 6px;
+                    background: up-touch.pressed ? Theme.overlay : (up-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    up-touch := TouchArea {
+                        clicked => { root.move-up-requested(); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: center;
+
+                        Text {
+                            text: Labels.local-move-up-label;
+                            color: up-touch.has-hover ? Theme.text : Theme.secondary;
+                            font-size: 12px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
                 }
 
-                HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    alignment: center;
+                Rectangle {
+                    height: 28px;
+                    border-radius: 6px;
+                    background: down-touch.pressed ? Theme.overlay : (down-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
-                    Text {
-                        text: Labels.local-remove-track-label;
-                        color: remove-touch.has-hover ? Theme.text : Theme.secondary;
-                        font-size: 12px;
-                        font-weight: 600;
-                        vertical-alignment: center;
+                    down-touch := TouchArea {
+                        clicked => { root.move-down-requested(); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: center;
+
+                        Text {
+                            text: Labels.local-move-down-label;
+                            color: down-touch.has-hover ? Theme.text : Theme.secondary;
+                            font-size: 12px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 28px;
+                    border-radius: 6px;
+                    background: remove-touch.pressed ? Theme.overlay : (remove-touch.has-hover ? Theme.hover : Theme.surface);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    remove-touch := TouchArea {
+                        clicked => { root.remove-requested(); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: center;
+
+                        Text {
+                            text: Labels.local-remove-track-label;
+                            color: remove-touch.has-hover ? Theme.text : Theme.secondary;
+                            font-size: 12px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
                     }
                 }
             }

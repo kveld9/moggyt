@@ -342,8 +342,8 @@ Local playlists with `local:` identifiers support in-place mutation mediated thr
 - **Delete**: Deletes the playlist from `PlaylistStore`, clearing detail view state and returning navigation to the
   calling library page.
 - **Remove Track**: Removes a track by zero-based index, maintaining track sequence and updating `PlaylistStore`.
-- **Track Reorder**: Track reordering is supported in the domain/storage layer (`reorder_local_track`), but does not
-  yet have an interactive UI binding.
+- **Track Reorder**: Up/Down reorder controls in the detail view move tracks via `reorder_local_track`, persisting
+  updated track order immediately to `PlaylistStore` and refreshing detail and library views.
 
 #### 6.1.7 Command-line interface (CLI)
 

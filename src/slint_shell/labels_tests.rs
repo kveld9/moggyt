@@ -37,6 +37,8 @@ mod tests {
         assert_eq!(en_labels.local_rename_label, "Rename");
         assert_eq!(en_labels.local_delete_label, "Delete playlist");
         assert_eq!(en_labels.local_remove_track_label, "Remove");
+        assert_eq!(en_labels.local_move_up_label, "Up");
+        assert_eq!(en_labels.local_move_down_label, "Down");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -64,6 +66,8 @@ mod tests {
         assert_eq!(es_labels.local_rename_label, "Renombrar");
         assert_eq!(es_labels.local_delete_label, "Borrar playlist");
         assert_eq!(es_labels.local_remove_track_label, "Quitar");
+        assert_eq!(es_labels.local_move_up_label, "Subir");
+        assert_eq!(es_labels.local_move_down_label, "Bajar");
     }
 
     #[test]
@@ -225,6 +229,8 @@ mod tests {
         assert_eq!(es.local_rename_label, "Renombrar");
         assert_eq!(es.local_delete_label, "Borrar playlist");
         assert_eq!(es.local_remove_track_label, "Quitar");
+        assert_eq!(es.local_move_up_label, "Subir");
+        assert_eq!(es.local_move_down_label, "Bajar");
 
         let en = StaticLabels::resolve(Locale::English);
         assert_eq!(en.nav_search, "Search");
@@ -377,5 +383,7 @@ mod tests {
         assert_eq!(en.local_rename_label, "Rename");
         assert_eq!(en.local_delete_label, "Delete playlist");
         assert_eq!(en.local_remove_track_label, "Remove");
+        assert_eq!(en.local_move_up_label, "Up");
+        assert_eq!(en.local_move_down_label, "Down");
     }
 }
