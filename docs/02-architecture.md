@@ -137,6 +137,10 @@ in-memory cache (`stream_prefetch_cache.rs`). Starting that track seeds the bloc
 pool with those bytes, so the first read does not issue a cold range request; a
 skipped track keeps at most two prefetched prefixes resident.
 
+Range requests use a 10 s connect timeout and a 60 s total request timeout, so a
+stalled connection fails that block fetch instead of blocking the worker pool, and
+`BlockPool::drop` can join its workers within that bound.
+
 ## Evolution rules
 
 1. One concept, one owner: each domain type lives in a single module (single source of truth).

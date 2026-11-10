@@ -9,6 +9,23 @@ use super::stream_reader::{
     DEFAULT_STREAM_CHUNK_SIZE, RangeReader, SyncReader, parse_content_range_total,
 };
 
+/// Maximum time to establish the TCP/TLS connection for a range request.
+pub const STREAM_CONNECT_TIMEOUT_SECS: u64 = 10;
+
+/// Maximum total time for one range request, including body transfer.
+///
+/// A 256 KiB block needs at most ~51 s even at 5 KiB/s, so 60 s bounds a
+/// stalled connection without aborting slow but progressing transfers.
+pub const STREAM_REQUEST_TIMEOUT_SECS: u64 = 60;
+
+fn streaming_client() -> anyhow::Result<reqwest::blocking::Client> {
+    reqwest::blocking::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(STREAM_CONNECT_TIMEOUT_SECS))
+        .timeout(std::time::Duration::from_secs(STREAM_REQUEST_TIMEOUT_SECS))
+        .build()
+        .context("failed to build reqwest client for audio streaming")
+}
+
 /// Real blocking HTTP transport for range-based streaming via reqwest.
 #[derive(Clone)]
 pub struct ReqwestRangeTransport {
@@ -22,9 +39,7 @@ impl ReqwestRangeTransport {
         let url = url.into();
         let _ = reqwest::Url::parse(&url)
             .with_context(|| format!("invalid audio stream url '{url}'"))?;
-        let client = reqwest::blocking::Client::builder()
-            .build()
-            .context("failed to build reqwest client for audio streaming")?;
+        let client = streaming_client()?;
         Ok(Self { client, url })
     }
 
@@ -132,5 +147,10 @@ mod tests {
         assert!(result.is_err());
         let err = result.err().unwrap().to_string();
         assert!(err.contains("invalid audio stream url"));
+    }
+
+    #[test]
+    fn streaming_client_builds() {
+        assert!(streaming_client().is_ok());
     }
 }
