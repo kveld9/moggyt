@@ -53,7 +53,7 @@ src/
     ├── catalog_client.rs # Catalog API search request builder and parser
     ├── instance.rs    # SingleInstanceGuard lock
     ├── lastfm_auth.rs # Last.fm desktop authentication (token, authorize URL, session)
-    ├── lyrics*.rs     # LyricsSource port and LRCLIB synced lyrics client
+    ├── lyrics*.rs     # LyricsSource port, lrc.red TTML client, LRCLIB client, and cascade
     ├── lyrics_cache.rs # LyricsSource decorator with bounded FIFO cache
     ├── play_log_store.rs # PlayLogStore port and JSON Lines file persistence
     ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence

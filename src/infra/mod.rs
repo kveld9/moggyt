@@ -38,6 +38,7 @@ mod lyric_overrides;
 mod lyrics;
 mod lyrics_cache;
 mod lyrics_lrclib;
+mod lyrics_lrcred;
 mod play_log_store;
 mod playlist_store;
 mod playlist_store_disk;
@@ -116,13 +117,17 @@ pub use lastfm_auth::{
 pub use lyric_overrides::{
     LyricOverrideDir, MAX_OVERRIDE_BYTES, default_lyrics_dir, sanitize_id, sanitize_video_id,
 };
-pub use lyrics::{LrclibStub, LyricLine, LyricsSource, SyncedLyrics};
+pub use lyrics::{LrclibStub, LyricLine, LyricsCascade, LyricsSource, SyncedLyrics};
 pub use lyrics_cache::{CachedLyrics, LYRICS_CACHE_CAPACITY};
 pub use lyrics_lrclib::{
     CONFIDENCE_THRESHOLD, DURATION_NEUTRAL_SCORE, DURATION_TOLERANCE_SECS, LrclibClient,
     LyricsCandidate, PARTIAL_MATCH_SCORE, WEIGHT_ARTIST, WEIGHT_DURATION, WEIGHT_TITLE,
     duration_similarity, lrclib_get_url, match_confidence, normalize_text, parse_lrc,
     payload_matches, text_similarity,
+};
+pub use lyrics_lrcred::{
+    LRC_RED_RELEASE_BASE, LRC_RED_SEARCH_URL, LRC_RED_TIMEOUT_SECS, LrcRedClient, LrcRedHit,
+    build_search_query, parse_hits, parse_ttml_lines, select_hit, ttml_url,
 };
 pub use play_log_store::{DiskPlayLogStore, MemoryPlayLogStore, PLAY_LOG_FILE_NAME, PlayLogStore};
 pub use playlist_store::{MemoryPlaylistStore, PlaylistStore};

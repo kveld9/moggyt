@@ -9,8 +9,9 @@ use std::sync::Arc;
 
 use moggyt::infra::{
     CachedLyrics, CustomThemeFile, DiskPlayLogStore, DiskQueueStore, DiskSettingsStore,
-    DiskSkipStore, KeyringSessionStore, LastFmClient, LiveCatalog, LrclibClient, LyricOverrideDir,
-    Scrobbler, SettingsStore, SingleInstanceGuard, StreamDiskCache, TrayHandle, default_config_dir,
+    DiskSkipStore, KeyringSessionStore, LastFmClient, LiveCatalog, LrcRedClient, LrclibClient,
+    LyricOverrideDir, LyricsCascade, Scrobbler, SettingsStore, SingleInstanceGuard,
+    StreamDiskCache, TrayHandle, default_config_dir,
 };
 use moggyt::slint_shell::app::AppDependencies;
 use moggyt::slint_shell::init::{
@@ -76,7 +77,7 @@ fn main() -> anyhow::Result<()> {
     let audio = init_live_audio(&data_dir, stream_cache);
     let catalog = LiveCatalog::new();
     let session = KeyringSessionStore::moggyt();
-    let lyrics = CachedLyrics::new(LrclibClient::new());
+    let lyrics = CachedLyrics::new(LyricsCascade::new(LrcRedClient::new(), LrclibClient::new()));
     let covers = init_cover_cache(&data_dir);
     let play_log_store = DiskPlayLogStore::new(data_dir.clone());
 
