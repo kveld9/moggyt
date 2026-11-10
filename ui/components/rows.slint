@@ -1,3 +1,4 @@
+import { Labels } from "../labels.slint";
 import { Theme } from "../theme.slint";
 
 export component TrackRow inherits Rectangle {
@@ -8,7 +9,9 @@ export component TrackRow inherits Rectangle {
     in property <string> kind;
     in property <image> cover;
     in property <bool> is-active: false;
+    in property <bool> show-remove: false;
     callback clicked();
+    callback remove-requested();
 
     property <string> subtitle-text: root.album != "" && root.artist != "" ? root.artist + " - " + root.album : (
         root.artist != "" ? root.artist : root.album
@@ -76,6 +79,35 @@ export component TrackRow inherits Rectangle {
             font-weight: 500;
             vertical-alignment: center;
             horizontal-alignment: right;
+        }
+
+        if root.show-remove : VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                height: 28px;
+                border-radius: 6px;
+                background: remove-touch.pressed ? Theme.overlay : (remove-touch.has-hover ? Theme.hover : Theme.surface);
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                remove-touch := TouchArea {
+                    clicked => { root.remove-requested(); }
+                }
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    alignment: center;
+
+                    Text {
+                        text: Labels.local-remove-track-label;
+                        color: remove-touch.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 12px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
+            }
         }
     }
 }

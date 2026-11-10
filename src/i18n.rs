@@ -128,6 +128,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Custom Discord Application ID", "ID de aplicación personalizada de Discord"),
     ("Custom theme loaded from {path}", "Tema personalizado cargado desde {path}"),
     ("Custom theme not loaded: {error}", "Tema personalizado no cargado: {error}"),
+    ("Delete playlist", "Borrar playlist"),
     ("Detail", "Detalle"),
     ("Discard", "Descartar"),
     ("Disconnect", "Desconectar"),
@@ -177,6 +178,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Medium confidence", "Confianza media"),
     ("Mono", "Monocromo"),
     ("Needs review", "Requieren revision"),
+    ("New playlist name", "Nuevo nombre de playlist"),
     ("No albums found.", "No hay álbumes."),
     ("No cover", "Sin portada"),
     ("No details available.", "No hay detalles disponibles."),
@@ -220,6 +222,8 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
         "El archivo de cola estaba corrupto y se puso en cuarentena",
     ),
     ("Recent searches", "Búsquedas recientes"),
+    ("Remove", "Quitar"),
+    ("Rename", "Renombrar"),
     ("Retry", "Reintentar"),
     ("Review matches", "Revisar coincidencias"),
     ("Save credentials", "Guardar credenciales"),
@@ -724,6 +728,23 @@ mod tests {
                 "Se perdió la conexión. Reintenta o guarda las canciones coincidentes.",
             ),
             ("Retry", "Reintentar"),
+        ];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key);
+            assert_eq!(es, expected_es);
+            assert_ne!(en, es);
+        }
+    }
+
+    #[test]
+    fn test_local_playlist_edit_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Delete playlist", "Borrar playlist"),
+            ("New playlist name", "Nuevo nombre de playlist"),
+            ("Remove", "Quitar"),
+            ("Rename", "Renombrar"),
         ];
         for (key, expected_es) in keys_and_expected {
             let en = tr(Locale::English, key);

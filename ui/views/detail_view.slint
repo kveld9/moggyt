@@ -1,7 +1,16 @@
 import { Labels } from "../labels.slint";
 import { Theme, TrackRowData } from "../theme.slint";
 import { TrackRow } from "../components/rows.slint";
+import { StyledInputField } from "../components/controls.slint";
 import { IconPlay, IconShuffle } from "../icons.slint";
+
+export global LocalEditUi {
+    in-out property <bool> is-local: false;
+    in-out property <string> rename-text: "";
+    callback rename-submitted(string);
+    callback delete-requested();
+    callback remove-track-requested(int);
+}
 
 export component DetailView inherits VerticalLayout {
     in property <bool> has-detail: false;
@@ -173,6 +182,67 @@ export component DetailView inherits VerticalLayout {
                         }
                     }
                 }
+
+                if LocalEditUi.is-local : HorizontalLayout {
+                    spacing: 8px;
+                    height: 32px;
+                    alignment: start;
+
+                    StyledInputField {
+                        width: 220px;
+                        text <=> LocalEditUi.rename-text;
+                        placeholder-text: Labels.local-rename-placeholder;
+                        accepted(t) => { LocalEditUi.rename-submitted(t); }
+                    }
+
+                    Rectangle {
+                        border-radius: 6px;
+                        background: rename-touch.pressed ? Theme.overlay : (rename-touch.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        rename-touch := TouchArea {
+                            clicked => { LocalEditUi.rename-submitted(LocalEditUi.rename-text); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+
+                            Text {
+                                text: Labels.local-rename-label;
+                                color: rename-touch.has-hover ? Theme.accent : Theme.text;
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: 6px;
+                        background: delete-touch.pressed ? Theme.overlay : (delete-touch.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        delete-touch := TouchArea {
+                            clicked => { LocalEditUi.delete-requested(); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+
+                            Text {
+                                text: Labels.local-delete-label;
+                                color: delete-touch.has-hover ? Theme.text : Theme.secondary;
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -199,7 +269,9 @@ export component DetailView inherits VerticalLayout {
             duration: track.duration;
             kind: track.kind;
             cover: track.cover;
+            show-remove: LocalEditUi.is-local;
             clicked => { root.track-selected(track.index); }
+            remove-requested => { LocalEditUi.remove-track-requested(track.index); }
         }
     }
 }
