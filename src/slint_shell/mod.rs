@@ -35,6 +35,7 @@ pub use generated::*;
 pub use MoggytWindow as AppWindow;
 
 pub mod app;
+mod auto_skip;
 pub mod callbacks;
 pub mod category;
 pub mod cover_pool;

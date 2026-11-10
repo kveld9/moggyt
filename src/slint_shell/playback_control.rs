@@ -178,11 +178,12 @@ impl SlintAppState {
 
     /// Evaluates auto-skip intervals for active track, seeking past matched range.
     pub fn check_auto_skip(&mut self) {
-        let Some(track) = self.queue.current() else {
+        let Some(track) = self.queue.current().cloned() else {
             self.last_skip_target = None;
             self.cached_skip_ranges = None;
             return;
         };
+        self.request_sponsor_ranges(&track);
         let Ok(mut audio) = self.audio.try_lock() else {
             return;
         };
@@ -195,7 +196,8 @@ impl SlintAppState {
             self.last_skip_target = None;
         }
         if !self.cached_skip_ranges.as_ref().is_some_and(|(id, _)| id == &track.id) {
-            let ranges = self.skip_store.load().remove(&track.id);
+            let local = self.skip_store.load().remove(&track.id);
+            let ranges = local.or_else(|| self.sponsor_ranges.get(&track.id).cloned());
             self.cached_skip_ranges = Some((track.id.clone(), ranges));
         }
         let Some((_, Some(ranges))) = self.cached_skip_ranges.as_ref() else {
@@ -392,33 +394,14 @@ pub fn apply_play_track_completion(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
     use super::*;
 
-    use crate::domain::{PlaybackPhase, SkipRanges, SkipSegment, Track};
-    use crate::infra::{CatalogError, SkipStore};
+    use crate::domain::{PlaybackPhase, Track};
+    use crate::infra::CatalogError;
     use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
     use crate::slint_shell::test_support::{EndedAudio, MockLibraryCatalog, test_wired};
-
-    #[derive(Debug)]
-    struct CountingSkipStore {
-        load_count: Arc<AtomicUsize>,
-        ranges: HashMap<String, SkipRanges>,
-    }
-
-    impl SkipStore for CountingSkipStore {
-        fn load(&self) -> HashMap<String, SkipRanges> {
-            self.load_count.fetch_add(1, Ordering::SeqCst);
-            self.ranges.clone()
-        }
-
-        fn save(&self, _map: &HashMap<String, SkipRanges>) -> anyhow::Result<()> {
-            Ok(())
-        }
-    }
 
     #[test]
     fn test_playback_controls_toggle_and_queue_navigation() {
@@ -452,65 +435,6 @@ mod tests {
         assert_eq!(state.audio.lock().unwrap().position_secs(), 15);
         state.seek_by(-50);
         assert_eq!(state.audio.lock().unwrap().position_secs(), 0);
-    }
-
-    #[test]
-    fn test_auto_skip_evaluation() {
-        let mut state = test_wired();
-        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        let mut ranges = crate::domain::SkipRanges::new();
-        ranges.insert(SkipSegment::new(10, 20).unwrap());
-        let mut map = std::collections::HashMap::new();
-        map.insert("t1".to_string(), ranges);
-        let _ = state.skip_store.save(&map);
-
-        state.seek_by(12);
-        state.check_auto_skip();
-        assert_eq!(state.audio.lock().unwrap().position_secs(), 20);
-    }
-
-    #[test]
-    fn test_auto_skip_repeated_checks_load_once() {
-        let mut state = test_wired();
-        let counter = Arc::new(AtomicUsize::new(0));
-        let mut ranges = SkipRanges::new();
-        ranges.insert(SkipSegment::new(10, 20).unwrap());
-        let mut map = HashMap::new();
-        map.insert("t1".to_string(), ranges);
-
-        state.skip_store =
-            Box::new(CountingSkipStore { load_count: Arc::clone(&counter), ranges: map });
-
-        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.check_auto_skip();
-        state.check_auto_skip();
-        state.check_auto_skip();
-        assert_eq!(counter.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    fn test_auto_skip_switching_track_loads_again() {
-        let mut state = test_wired();
-        let counter = Arc::new(AtomicUsize::new(0));
-        let mut ranges1 = SkipRanges::new();
-        ranges1.insert(SkipSegment::new(10, 20).unwrap());
-        let mut ranges2 = SkipRanges::new();
-        ranges2.insert(SkipSegment::new(30, 40).unwrap());
-        let mut map = HashMap::new();
-        map.insert("t1".to_string(), ranges1);
-        map.insert("t2".to_string(), ranges2);
-
-        state.skip_store =
-            Box::new(CountingSkipStore { load_count: Arc::clone(&counter), ranges: map });
-
-        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
-        state.check_auto_skip();
-        assert_eq!(counter.load(Ordering::SeqCst), 1);
-
-        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(200));
-        state.queue.advance();
-        state.check_auto_skip();
-        assert_eq!(counter.load(Ordering::SeqCst), 2);
     }
 
     #[test]

@@ -17,8 +17,8 @@ use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, AudioError, Catalog, CatalogError, CoverCache, CustomThemeFile, DesktopPresence,
     DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, PlayLogStore,
-    QueueStore, ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipStore, TrayAction,
-    TrayHandle, decode_cover, decode_handoff, fetch_artwork, sanitize_cookie_input,
+    QueueStore, ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipProvider, SkipStore,
+    TrayAction, TrayHandle, decode_cover, decode_handoff, fetch_artwork, sanitize_cookie_input,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
@@ -93,6 +93,16 @@ pub struct SlintAppState {
     pub started_at: Option<StartedPlay>,
     pub last_skip_target: Option<(String, u32)>,
     pub cached_skip_ranges: Option<(String, Option<SkipRanges>)>,
+    /// Community skip ranges fetched per video id.
+    pub sponsor_ranges: HashMap<String, SkipRanges>,
+    /// Video ids already requested from the community skip provider.
+    pub sponsor_requested: HashSet<String>,
+    /// Channel sender for completed community skip fetches.
+    pub sponsor_tx: Option<std::sync::mpsc::Sender<(String, SkipRanges)>>,
+    /// Channel receiver drained by the app timer.
+    pub sponsor_rx: Option<std::sync::mpsc::Receiver<(String, SkipRanges)>>,
+    /// Community skip provider; `None` disables automatic community skipping.
+    pub skip_provider: Option<Arc<dyn SkipProvider>>,
     pub sleep_timer: SleepTimer,
     pub sleep_timer_accumulated: u64,
     pub sleep_timer_base_offset: u64,
