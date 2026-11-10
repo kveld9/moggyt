@@ -1,13 +1,16 @@
 import { Labels } from "../labels.slint";
 import { Theme, ImportAlternativeData } from "../theme.slint";
+import { StyledInputField } from "./controls.slint";
 
 export component AlternativePicker inherits Rectangle {
     in-out property <[ImportAlternativeData]> alternatives: [];
     in-out property <int> selected: 0;
     in-out property <string> heading: "";
+    in-out property <string> custom-id-text: "";
 
     callback alternative-chosen(int);
     callback dismissed();
+    callback custom-id-submitted(string);
 
     background: Theme.overlay;
 
@@ -124,6 +127,36 @@ export component AlternativePicker inherits Rectangle {
                                 vertical-alignment: center;
                             }
                         }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                height: 32px;
+
+                StyledInputField {
+                    horizontal-stretch: 1;
+                    text <=> root.custom-id-text;
+                    placeholder-text: Labels.import-custom-id-placeholder;
+                    accepted => { root.custom-id-submitted(root.custom-id-text); }
+                }
+
+                Rectangle {
+                    width: 72px;
+                    border-radius: 6px;
+                    background: use-id-btn.pressed ? Theme.overlay : (use-id-btn.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    use-id-btn := TouchArea {
+                        clicked => { root.custom-id-submitted(root.custom-id-text); }
+                    }
+                    Text {
+                        text: Labels.import-use-id-label;
+                        color: use-id-btn.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                 }
             }
