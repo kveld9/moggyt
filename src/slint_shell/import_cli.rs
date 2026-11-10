@@ -35,6 +35,7 @@ pub struct ImportCli {
     pub source: ImportSourceArg,
     pub headless: bool,
     pub json: bool,
+    pub name: Option<String>,
 }
 
 #[derive(Default)]
@@ -43,6 +44,7 @@ struct ParsedFlags {
     csv: Option<PathBuf>,
     headless: bool,
     json: bool,
+    name: Option<String>,
 }
 
 fn take_flag_value(args: &[String], i: usize, flag: &str) -> anyhow::Result<(String, usize)> {
@@ -68,6 +70,11 @@ fn extract_flags(args: &[String]) -> anyhow::Result<ParsedFlags> {
             "--import-csv" => {
                 let (val, next) = take_flag_value(args, i, "--import-csv")?;
                 flags.csv = Some(PathBuf::from(val));
+                next
+            }
+            "--name" => {
+                let (val, next) = take_flag_value(args, i, "--name")?;
+                flags.name = Some(val);
                 next
             }
             "--headless" => {
@@ -96,7 +103,7 @@ fn validate_flags(flags: ParsedFlags) -> anyhow::Result<Option<ImportCli>> {
         (None, Some(path)) => ImportSourceArg::Csv(path),
         _ => return Ok(None),
     };
-    Ok(Some(ImportCli { source, headless: flags.headless, json: flags.json }))
+    Ok(Some(ImportCli { source, headless: flags.headless, json: flags.json, name: flags.name }))
 }
 
 /// Parses import-related arguments; `Ok(None)` when no import was requested.
@@ -206,6 +213,7 @@ pub fn build_report(
     source: &SpotifyPlaylist,
     resolutions: &[TrackResolution],
     playlist_id: &str,
+    playlist_title: &str,
 ) -> ImportReport {
     let mut tallies = ReportTallies::default();
     let mut tracks = Vec::with_capacity(resolutions.len());
@@ -217,7 +225,7 @@ pub fn build_report(
 
     ImportReport {
         playlist_id: playlist_id.to_string(),
-        playlist_title: source.title.clone(),
+        playlist_title: playlist_title.to_string(),
         total: source.tracks.len(),
         matched: tallies.matched,
         high: tallies.high,
@@ -261,6 +269,7 @@ fn load_source(source_arg: &ImportSourceArg) -> anyhow::Result<SpotifyPlaylist> 
 }
 
 struct PipelineRunner<'a> {
+    name: Option<&'a str>,
     searcher: &'a dyn TrackSearcher,
     store: &'a dyn PlaylistStore,
     config: &'a WorkerConfig,
@@ -291,9 +300,12 @@ impl<'a> PipelineRunner<'a> {
             &mut on_event,
         );
 
-        let playlist = assemble_playlist(source, &resolutions);
+        let mut playlist = assemble_playlist(source, &resolutions);
+        if let Some(name) = self.name {
+            playlist.title = name.to_string();
+        }
         self.store.save(&playlist)?;
-        Ok(build_report(source, &resolutions, &playlist.id))
+        Ok(build_report(source, &resolutions, &playlist.id, &playlist.title))
     }
 }
 
@@ -323,6 +335,7 @@ pub fn run_headless(
     progress: &mut dyn FnMut(&str),
 ) -> anyhow::Result<ImportReport> {
     let runner = PipelineRunner {
+        name: cli.name.as_deref(),
         searcher: searcher.as_ref(),
         store,
         config: &WorkerConfig::default(),
@@ -569,7 +582,7 @@ mod tests {
             },
         ];
 
-        let report = build_report(&source, &resolutions, "local:sp123");
+        let report = build_report(&source, &resolutions, "local:sp123", &source.title);
         assert_eq!(report.playlist_id, "local:sp123");
         assert_eq!(report.playlist_title, "Road Trip");
         assert_eq!(report.total, 4);
@@ -640,29 +653,66 @@ mod tests {
     }
 
     #[test]
-    fn test_run_headless_with_csv_saves_playlist_and_returns_report() {
+    fn test_parse_import_args_with_name_override() {
+        let args = vec![
+            "--import-spotify".to_string(),
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M".to_string(),
+            "--name".to_string(),
+            "Custom Title".to_string(),
+        ];
+        let cli = parse_import_args(&args).expect("parses with name").expect("some");
+        assert_eq!(cli.name.as_deref(), Some("Custom Title"));
+    }
+
+    #[test]
+    fn test_parse_import_args_name_without_value_errors() {
+        let args = vec![
+            "--import-spotify".to_string(),
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M".to_string(),
+            "--name".to_string(),
+        ];
+        let err = parse_import_args(&args).expect_err("missing value for --name must fail");
+        assert!(format!("{err:#}").contains("--name"));
+
+        let args_next_flag = vec![
+            "--import-spotify".to_string(),
+            "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M".to_string(),
+            "--name".to_string(),
+            "--headless".to_string(),
+        ];
+        let err_flag = parse_import_args(&args_next_flag).expect_err("flag cannot be value");
+        assert!(format!("{err_flag:#}").contains("--name"));
+    }
+
+    fn setup_headless_test_fixture(
+        prefix: &str,
+    ) -> (PathBuf, Arc<FakeSearcher>, MemoryPlaylistStore) {
         let temp_dir = std::env::temp_dir();
-        let csv_path = temp_dir.join(format!("my_playlist_test_{}.csv", std::process::id()));
+        let csv_path = temp_dir.join(format!("{prefix}_{}.csv", std::process::id()));
         let csv_content = "Track URI,Track Name,Artist Name(s),Album Name,Track Duration (ms),ISRC\n\
                            sp:1,Summer Song,Great Artist,Summer Album,180000,US1234567890\n";
         std::fs::write(&csv_path, csv_content).expect("writes temp CSV");
-
-        let cli = ImportCli {
-            source: ImportSourceArg::Csv(csv_path.clone()),
-            headless: true,
-            json: false,
-        };
-
         let hit = CandidateHit::new(
             "yt_video_123",
             None,
             MatchCandidate::new("Summer Song", "Great Artist", Some(180), MusicVideoType::Atv),
         );
-        let searcher = Arc::new(FakeSearcher { hit });
-        let store = MemoryPlaylistStore::new();
+        (csv_path, Arc::new(FakeSearcher { hit }), MemoryPlaylistStore::new())
+    }
+
+    #[test]
+    fn test_run_headless_with_csv_saves_playlist_and_returns_report() {
+        let (csv_path, searcher, store) = setup_headless_test_fixture("my_playlist_test");
+        let cli = ImportCli {
+            source: ImportSourceArg::Csv(csv_path.clone()),
+            headless: true,
+            json: false,
+            name: None,
+        };
 
         let mut progress_lines = Vec::new();
         let runner = PipelineRunner {
+            name: None,
             searcher: searcher.as_ref(),
             store: &store,
             config: &WorkerConfig { interval: Duration::ZERO, ..Default::default() },
@@ -688,5 +738,37 @@ mod tests {
 
         assert!(progress_lines.iter().any(|l| l.contains("matched")));
         assert!(progress_lines.iter().any(|l| l == "import finished"));
+    }
+
+    #[test]
+    fn test_run_headless_with_name_override_saves_overridden_title() {
+        let (csv_path, searcher, store) = setup_headless_test_fixture("my_playlist_name_test");
+        let cli = ImportCli {
+            source: ImportSourceArg::Csv(csv_path.clone()),
+            headless: true,
+            json: false,
+            name: Some("Custom Title".to_string()),
+        };
+
+        let mut progress_lines = Vec::new();
+        let runner = PipelineRunner {
+            name: cli.name.as_deref(),
+            searcher: searcher.as_ref(),
+            store: &store,
+            config: &WorkerConfig { interval: Duration::ZERO, ..Default::default() },
+            sleeper: &|_| {},
+        };
+        let report = run_headless_with_runner(&cli, &runner, &mut |line| {
+            progress_lines.push(line.to_string())
+        })
+        .expect("headless run succeeds");
+
+        let _ = std::fs::remove_file(&csv_path);
+
+        assert_eq!(report.playlist_title, "Custom Title");
+
+        let stored = store.list();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].title, "Custom Title");
     }
 }

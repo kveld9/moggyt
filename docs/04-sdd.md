@@ -333,9 +333,13 @@ Imported playlists are stored locally via `DiskPlaylistStore` (`playlist_store_d
 
 The importer supports headless execution from the terminal:
 
-- Import from Spotify link: `moggyt --import-spotify <URL> [--headless]`
-- Import from Exportify CSV or Spotify JSON backup file: `moggyt --import-csv <PATH> [--headless]`
-- Emit JSON report (`--headless` required): `moggyt --import-spotify <URL> --headless --json`
+- Import from Spotify link: `moggyt --import-spotify <URL> [--name <TITLE>] [--headless]`
+- Import from Exportify CSV or Spotify JSON backup file: `moggyt --import-csv <PATH> [--name <TITLE>] [--headless]`
+- Emit JSON report (`--headless` required): `moggyt --import-spotify <URL> [--name <TITLE>] --headless --json`
+- Override playlist title: `--name <TITLE>` overrides the imported playlist title before saving to the library.
+- Positional Spotify URL queue import: `moggyt "https://open.spotify.com/playlist/<id>"` resolves the playlist
+  synchronously and appends the matched tracks to the GUI playback queue (no playlist is saved to the library).
+- Positional Spotify URL imports honor stored Spotify Web API credentials and stream resolution progress to `stderr`.
 - `--headless` is optional and implied by `--import-spotify` and `--import-csv`. Note the parser rule: `--json`
   still requires `--headless` (`--json requires --headless`), so `--headless` must be included when requesting JSON.
 - `--import-csv` accepts both Exportify CSV files and Spotify JSON backup files.
