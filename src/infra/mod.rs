@@ -50,6 +50,7 @@ mod scrobble_stub;
 mod session;
 mod session_keyring;
 mod settings;
+mod skip_sponsorblock;
 mod skip_store;
 mod spotify_api;
 mod spotify_credentials;
@@ -133,6 +134,10 @@ pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
 pub use settings::{
     DiskSettingsStore, MAX_CROSSFADE_SECONDS, MemorySettingsStore, Settings, SettingsStore,
     clamp_crossfade_seconds, default_config_dir,
+};
+pub use skip_sponsorblock::{
+    SPONSORBLOCK_API_BASE, SPONSORBLOCK_DURATION_TOLERANCE_SECS, SkipProvider, SponsorBlockClient,
+    hash_prefix, parse_response, skip_segments_url,
 };
 pub use skip_store::{DiskSkipStore, MemorySkipStore, SkipStore};
 pub use spotify_api::SpotifyApiClient;
