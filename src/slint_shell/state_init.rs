@@ -10,8 +10,8 @@ use crate::domain::{PlaybackPhase, PlaybackQueue, SearchFilter, SleepTimer, Them
 use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, LyricsSource,
-    MemoryPlayLogStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore, SessionStore,
-    SettingsStore, StubScrobbler,
+    MemoryPlayLogStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore, OutputDeviceWatch,
+    SessionStore, SettingsStore, StubScrobbler,
 };
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
@@ -90,6 +90,7 @@ impl SlintAppState {
             sponsor_tx: None,
             sponsor_rx: None,
             skip_provider: None,
+            output_device_watch: OutputDeviceWatch::default(),
             sleep_timer: SleepTimer::new(),
             sleep_timer_accumulated: 0,
             sleep_timer_base_offset: 0,

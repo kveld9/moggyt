@@ -283,6 +283,8 @@ Users can customize the player bar appearance and element visibility under **Set
 - **Playback Controls**:
   - `Previous`: skips to previous track in the queue and starts playback.
   - `Play` / `Pause`: toggles between playing and paused audio states.
+  - **Device Change**: playback pauses automatically when the system default output
+    device changes (for example, unplugging headphones); press `Play` to resume on the new device.
   - `Next`: skips to next track in the queue and starts playback.
 - **Seek Controls**:
   - `-10s`: rewinds current playback position by 10 seconds (clamped at 0).

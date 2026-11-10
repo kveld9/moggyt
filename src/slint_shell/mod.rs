@@ -57,6 +57,7 @@ pub mod init;
 pub mod labels;
 pub mod lastfm_connect;
 pub mod local_edit;
+mod output_device;
 pub mod page;
 pub mod platform;
 pub mod play_log;

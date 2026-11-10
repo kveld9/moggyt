@@ -3476,6 +3476,7 @@ name = "moggyt"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cpal",
  "discord-rich-presence",
  "gtk",
  "image",
