@@ -97,6 +97,11 @@ Opus (itag 251) stays excluded because the rodio/symphonia stack has no Opus
 decoder; AAC in MP4 is the only supported stream format. The yt-dlp sidecar and
 its `deno` requirement remain mandatory fallbacks.
 
+Unauthenticated playback also has an AAC ceiling: itag 140 (~130 kbps) is the highest
+adaptive format served, while itag 141 (~256 kbps) requires Premium authentication. The
+`High` quality preference therefore resolves to the same itag as `Standard` and shares
+its format selector instead of requesting an unreachable `abr>=192` floor.
+
 ## Loudness normalization
 
 `loudness_normalization` selects exactly one normalization stage per track:

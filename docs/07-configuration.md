@@ -169,8 +169,10 @@ The configuration file uses JSON serialization with atomic replacement:
   - `"compact"`: Low-bandwidth audio stream using yt-dlp selector
     `"bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best"`.
   - `"standard"`: Balanced audio stream using yt-dlp selector `"bestaudio[ext=m4a]/bestaudio/best"` (default).
-  - `"high"`: High-fidelity audio stream using yt-dlp selector
-    `"bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best"`.
+  - `"high"`: Highest available audio stream. Currently identical to `"standard"` and using the same yt-dlp
+    selector `"bestaudio[ext=m4a]/bestaudio/best"`, because unauthenticated YouTube Music caps AAC at itag 140
+    (~130 kbps). AAC itag 141 (~256 kbps) requires Premium authentication and Opus itag 251 is not decodable by
+    the rodio/symphonia stack.
 - **Prefer Songs Over Videos (`songs_only`)**:
   - `false`: Search results and autoplay radio retain both official tracks and music videos (default).
   - `true`: Search results and autoplay radio drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks

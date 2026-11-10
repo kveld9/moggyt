@@ -136,7 +136,7 @@ mod tests {
         assert_eq!(es.audio_quality_hint_label, "Se aplica desde la siguiente canción");
         assert_eq!(es.audio_quality_low_label, "Baja (<=64 kbps)");
         assert_eq!(es.audio_quality_standard_label, "Estándar (~128 kbps)");
-        assert_eq!(es.audio_quality_high_label, "Alta (>=192 kbps)");
+        assert_eq!(es.audio_quality_high_label, "Alta (AAC máx ~130 kbps)");
         assert_eq!(es.songs_only_label, "Preferir canciones a videoclips");
         assert_eq!(es.crossfade, "Fundido cruzado");
         assert_eq!(es.crossfade_hint, "Transición suave entre temas");
@@ -290,7 +290,7 @@ mod tests {
         assert_eq!(en.audio_quality_hint_label, "Applies from the next track");
         assert_eq!(en.audio_quality_low_label, "Low (<=64 kbps)");
         assert_eq!(en.audio_quality_standard_label, "Standard (~128 kbps)");
-        assert_eq!(en.audio_quality_high_label, "High (>=192 kbps)");
+        assert_eq!(en.audio_quality_high_label, "High (AAC max ~130 kbps)");
         assert_eq!(en.songs_only_label, "Prefer songs over music videos");
         assert_eq!(en.crossfade, "Crossfade");
         assert_eq!(en.crossfade_hint, "Smooth transition between tracks");

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub use super::stream_reqwest::open_audio_stream;
 pub use super::stream_stub::StreamStub;
 
-/// Audio stream quality preference: Compact (<=64k), Standard (default), High (>=192k).
+/// Audio stream quality preference: Compact (<=64k), Standard (default), High (highest available AAC).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AudioQuality {
@@ -18,11 +18,16 @@ pub enum AudioQuality {
 }
 
 /// Maps an [`AudioQuality`] preference to yt-dlp format selector (SDD Q-3).
+///
+/// [`AudioQuality::High`] shares the standard selector because unauthenticated
+/// YouTube Music serves AAC itag 140 (~128-130 kbps) as its bitrate ceiling: an
+/// `abr` floor above it never matches and would only add a dead branch. Higher
+/// tiers (AAC itag 141, ~256 kbps) require Premium authentication, and Opus itag
+/// 251 is not decodable by the rodio/symphonia stack.
 pub const fn audio_quality_format(quality: AudioQuality) -> &'static str {
     match quality {
         AudioQuality::Compact => "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
-        AudioQuality::Standard => "bestaudio[ext=m4a]/bestaudio/best",
-        AudioQuality::High => "bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best",
+        AudioQuality::Standard | AudioQuality::High => "bestaudio[ext=m4a]/bestaudio/best",
     }
 }
 
@@ -110,11 +115,21 @@ mod tests {
                 "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
             ),
             (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
-            (AudioQuality::High, "bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best"),
+            (AudioQuality::High, "bestaudio[ext=m4a]/bestaudio/best"),
         ];
         for (quality, expected) in cases {
             assert_eq!(audio_quality_format(quality), expected);
         }
+    }
+
+    #[test]
+    fn audio_quality_high_never_requests_an_unreachable_bitrate_floor() {
+        let high = audio_quality_format(AudioQuality::High);
+        assert_eq!(high, audio_quality_format(AudioQuality::Standard));
+        assert!(
+            !high.contains("abr>="),
+            "High must not request an abr floor above the AAC ceiling (itag 140)"
+        );
     }
 
     #[test]
