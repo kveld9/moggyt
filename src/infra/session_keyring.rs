@@ -375,17 +375,17 @@ mod tests {
         store.clear();
 
         store.save("cookie: SID=probe_test_cookie_123");
-        match store.load() {
-            Some(value) => {
-                assert_eq!(value, "SID=probe_test_cookie_123");
-                store.save("   ");
-                assert_eq!(store.load(), None);
-            }
-            None => {
-                eprintln!("keyring provider absent in current environment; tolerated per SDD D-2");
-                assert_eq!(store.load(), None);
-            }
-        }
+        let Some(value) = store.load() else {
+            // A transient provider failure is indistinguishable from an absent provider
+            // through the `SessionStore` port, so only the successful path is asserted.
+            eprintln!("keyring provider absent in current environment; tolerated per SDD D-2");
+            store.clear();
+            return;
+        };
+        assert_eq!(value, "SID=probe_test_cookie_123");
+
+        store.save("   ");
+        assert_eq!(store.load(), None);
 
         store.clear();
     }
