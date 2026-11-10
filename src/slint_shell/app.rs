@@ -10,9 +10,9 @@ use slint::ComponentHandle;
 
 use crate::domain::ThemeId;
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, CustomThemeFile, DiscordPresence, LyricOverrideDir,
-    LyricsSource, PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings, SettingsStore,
-    SingleInstanceGuard, SkipStore, SponsorBlockClient, TrayHandle,
+    AudioBackend, Catalog, CoverCache, CustomThemeFile, DeviceIdentityMonitor, DiscordPresence,
+    LyricOverrideDir, LyricsSource, PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings,
+    SettingsStore, SingleInstanceGuard, SkipStore, SponsorBlockClient, TrayHandle,
 };
 
 pub use crate::slint_shell::covers::{
@@ -95,6 +95,7 @@ pub fn run(
     } = deps;
 
     let mut state = SlintAppState::new(catalog, audio, session, lyrics, covers);
+    state.device_monitor = Some(DeviceIdentityMonitor::start());
     state.custom_theme = Some(custom_theme);
     state.lyric_overrides = lyric_overrides;
     state.tray = tray;

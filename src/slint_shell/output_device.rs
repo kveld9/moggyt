@@ -5,14 +5,15 @@ use crate::infra::DeviceWatchAction;
 use crate::slint_shell::state::SlintAppState;
 
 impl SlintAppState {
-    /// Polls the default output device and applies the debounced auto-pause decision.
+    /// Applies the debounced auto-pause decision from the background monitor sample.
     ///
-    /// Sampling is paced to every `DEVICE_POLL_TICKS` app timer ticks.
+    /// Without a monitor (unit-test states) this does nothing; tests drive
+    /// `poll_output_device_with` directly.
     pub(crate) fn poll_output_device(&mut self) {
-        if !self.device_poll_gate.should_sample() {
+        let Some(monitor) = self.device_monitor.as_ref() else {
             return;
-        }
-        let current = crate::infra::current_output_device_identity();
+        };
+        let current = monitor.latest();
         self.poll_output_device_with(current.as_deref());
     }
 

@@ -3,6 +3,10 @@
 //! Hexagonal invariant: the decision logic is pure and hardware free; only
 //! `current_output_device_name` touches the platform audio host.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
+
 /// Action requested after observing the current output device.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeviceWatchAction {
@@ -111,31 +115,81 @@ pub fn current_output_device_identity() -> Option<String> {
     select_identity(linux_default_sink(), current_output_device_name())
 }
 
-/// App timer ticks between output device samples (500 ms timer -> 2 s).
-pub const DEVICE_POLL_TICKS: u8 = 4;
+/// Background sampling interval for the output device identity.
+pub const DEVICE_MONITOR_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
-/// Counts app timer ticks and reports when an output device sample is due.
-#[derive(Debug, Clone)]
-pub struct DevicePollGate {
-    interval_ticks: u8,
-    elapsed: u8,
+const MONITOR_STOP_SLICE: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// Background monitor that keeps the latest output device identity.
+///
+/// Sampling runs on its own thread so the UI thread never spawns a process or
+/// queries the audio host. Dropping the monitor stops and joins the worker.
+pub struct DeviceIdentityMonitor {
+    latest: Arc<Mutex<Option<String>>>,
+    stop: Arc<AtomicBool>,
+    handle: Option<std::thread::JoinHandle<()>>,
 }
 
-impl DevicePollGate {
-    /// Creates a gate that opens every `interval_ticks` ticks (minimum 1).
-    pub fn new(interval_ticks: u8) -> Self {
-        Self { interval_ticks: interval_ticks.max(1), elapsed: 0 }
+impl DeviceIdentityMonitor {
+    /// Starts the background monitor with the default interval and platform identity sampler.
+    pub fn start() -> Self {
+        Self::spawn_with(DEVICE_MONITOR_INTERVAL, current_output_device_identity)
     }
 
-    /// Advances one tick and reports whether a sample is due.
-    pub fn should_sample(&mut self) -> bool {
-        self.elapsed = self.elapsed.saturating_add(1);
-        if self.elapsed >= self.interval_ticks {
-            self.elapsed = 0;
-            true
-        } else {
-            false
+    pub(crate) fn spawn_with<F>(interval: std::time::Duration, sampler: F) -> Self
+    where
+        F: Fn() -> Option<String> + Send + 'static,
+    {
+        let initial = sampler();
+        let latest = Arc::new(Mutex::new(initial));
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread_latest = Arc::clone(&latest);
+        let thread_stop = Arc::clone(&stop);
+        let handle = std::thread::Builder::new()
+            .name("moggyt-device-monitor".to_string())
+            .spawn(move || {
+                run_monitor_worker(&thread_stop, &thread_latest, interval, sampler);
+            })
+            .ok();
+        Self { latest, stop, handle }
+    }
+
+    /// Returns the latest sampled output device identity.
+    pub fn latest(&self) -> Option<String> {
+        self.latest.lock().unwrap_or_else(PoisonError::into_inner).clone()
+    }
+}
+
+impl Drop for DeviceIdentityMonitor {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
         }
+    }
+}
+
+fn sleep_until_elapsed(stop: &AtomicBool, interval: Duration) -> bool {
+    let mut remaining = interval;
+    while !stop.load(Ordering::Relaxed) && remaining > Duration::ZERO {
+        let slice = remaining.min(MONITOR_STOP_SLICE);
+        std::thread::sleep(slice);
+        remaining = remaining.saturating_sub(slice);
+    }
+    !stop.load(Ordering::Relaxed)
+}
+
+fn run_monitor_worker<F>(
+    stop: &AtomicBool,
+    latest: &Mutex<Option<String>>,
+    interval: Duration,
+    sampler: F,
+) where
+    F: Fn() -> Option<String>,
+{
+    while sleep_until_elapsed(stop, interval) {
+        let sample = sampler();
+        *latest.lock().unwrap_or_else(PoisonError::into_inner) = sample;
     }
 }
 
@@ -259,18 +313,26 @@ mod tests {
     }
 
     #[test]
-    fn poll_gate_samples_on_interval() {
-        let mut gate = DevicePollGate::new(2);
-        assert!(!gate.should_sample());
-        assert!(gate.should_sample());
-        assert!(!gate.should_sample());
-        assert!(gate.should_sample());
+    fn monitor_publishes_initial_sample() {
+        let monitor = DeviceIdentityMonitor::spawn_with(Duration::from_millis(5), || {
+            Some("Speakers".to_string())
+        });
+        assert_eq!(monitor.latest(), Some("Speakers".to_string()));
+        drop(monitor);
     }
 
     #[test]
-    fn poll_gate_treats_zero_interval_as_one() {
-        let mut gate = DevicePollGate::new(0);
-        assert!(gate.should_sample());
-        assert!(gate.should_sample());
+    fn monitor_returns_none_when_sampler_has_no_device() {
+        let monitor = DeviceIdentityMonitor::spawn_with(Duration::from_millis(5), || None);
+        assert_eq!(monitor.latest(), None);
+    }
+
+    #[test]
+    fn monitor_keeps_last_sample_for_ui_readers() {
+        let monitor =
+            DeviceIdentityMonitor::spawn_with(Duration::from_millis(5), || Some("A".to_string()));
+        assert_eq!(monitor.latest(), Some("A".to_string()));
+        assert_eq!(monitor.latest(), Some("A".to_string()));
+        assert_eq!(monitor.latest(), Some("A".to_string()));
     }
 }
