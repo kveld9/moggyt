@@ -30,6 +30,7 @@ mod cover_disk;
 mod custom_theme;
 mod file_picker;
 mod handoff;
+mod innertube_stream;
 mod instance;
 mod lastfm_auth;
 mod lyric_overrides;
@@ -98,6 +99,11 @@ pub use file_picker::{
 pub use handoff::{
     CHECKSUM_HEX_LEN, HANDOFF_PREFIX, MAX_HANDOFF_COOKIES, decode_handoff, encode_handoff,
 };
+pub use innertube_stream::{
+    AudioFormat, CLIENT_ID, CLIENT_NAME, CLIENT_VERSION, DEVICE_MAKE, DEVICE_MODEL, FallbackReason,
+    ITAG_AAC_COMPACT, ITAG_AAC_STANDARD, InnertubeResolver, OS_NAME, OS_VERSION, PLAYER_ENDPOINT,
+    REQUEST_TIMEOUT_SECS, USER_AGENT, parse_audio_formats, player_body, select_itag, select_stream,
+};
 pub use instance::{SingleInstanceGuard, instance_lock_name};
 pub use lastfm_auth::{
     LASTFM_API_KEY_ENV, LASTFM_AUTH_URL, LASTFM_SECRET_ENV, LastFmAppKeys, LastFmSession,
@@ -160,7 +166,7 @@ pub use spotify_search::{
 };
 pub use spotify_source::load_spotify_link;
 pub use store_health::{HealthFlag, StoreHealth, quarantine};
-pub use stream::{AudioQuality, StreamResolver, StreamStub};
+pub use stream::{AudioQuality, ResolvedStream, StreamResolver, StreamStub};
 pub use stream_disk_cache::StreamDiskCache;
 pub use stream_url_cache::{STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache};
 pub use tray::{TrayAction, TrayHandle};
