@@ -26,8 +26,27 @@ pub const fn audio_quality_format(quality: AudioQuality) -> &'static str {
     }
 }
 
+/// Resolved stream location and optional stream metadata.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedStream {
+    pub url: String,
+    pub mime_type: Option<String>,
+    pub loudness_db: Option<f32>,
+}
+
+impl ResolvedStream {
+    pub fn from_url(url: impl Into<String>) -> Self {
+        Self { url: url.into(), mime_type: None, loudness_db: None }
+    }
+}
+
 pub trait StreamResolver {
     fn resolve(&self, video_id: &str) -> Option<String>;
+
+    /// Resolves a stream with optional provider metadata. Defaults to the URL-only contract.
+    fn resolve_stream(&self, video_id: &str) -> Option<ResolvedStream> {
+        self.resolve(video_id).map(ResolvedStream::from_url)
+    }
 }
 
 /// Response returned by a [`RangeTransport`].
@@ -54,6 +73,26 @@ mod tests {
         for (id, exp) in [("v-1", Some("https://stream.local/v-1")), ("", None), ("   ", None)] {
             assert_eq!(resolver.resolve(id).as_deref(), exp);
         }
+    }
+
+    #[test]
+    fn resolve_stream_default_resolves_non_blank_and_rejects_blank() {
+        let resolver = StreamStub::new();
+        let non_blank =
+            resolver.resolve_stream("v-1").expect("non-blank id resolves with default provider");
+        assert_eq!(non_blank.url, "https://stream.local/v-1");
+        assert_eq!(non_blank.mime_type, None);
+        assert_eq!(non_blank.loudness_db, None);
+        assert_eq!(resolver.resolve_stream(""), None);
+        assert_eq!(resolver.resolve_stream("   "), None);
+    }
+
+    #[test]
+    fn resolved_stream_from_url_sets_empty_metadata() {
+        let stream = ResolvedStream::from_url("https://stream.local/test");
+        assert_eq!(stream.url, "https://stream.local/test");
+        assert_eq!(stream.mime_type, None);
+        assert_eq!(stream.loudness_db, None);
     }
 
     #[test]

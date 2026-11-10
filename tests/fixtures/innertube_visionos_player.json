@@ -1,0 +1,34 @@
+{
+  "playabilityStatus": {
+    "status": "OK",
+    "playableInEmbed": true
+  },
+  "streamingData": {
+    "adaptiveFormats": [
+      {
+        "itag": 139,
+        "mimeType": "audio/mp4; codecs=\"mp4a.40.5\"",
+        "bitrate": 50152,
+        "audioQuality": "AUDIO_QUALITY_LOW",
+        "loudnessDb": 0.9899998,
+        "url": "https://rr1---sn-fixture.googlevideo.com/videoplayback?itag=139&fixture=1"
+      },
+      {
+        "itag": 140,
+        "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+        "bitrate": 130677,
+        "audioQuality": "AUDIO_QUALITY_MEDIUM",
+        "loudnessDb": 0.9899998,
+        "url": "https://rr1---sn-fixture.googlevideo.com/videoplayback?itag=140&fixture=1"
+      },
+      {
+        "itag": 251,
+        "mimeType": "audio/webm; codecs=\"opus\"",
+        "bitrate": 136544,
+        "audioQuality": "AUDIO_QUALITY_MEDIUM",
+        "loudnessDb": 0.97999954,
+        "url": "https://rr1---sn-fixture.googlevideo.com/videoplayback?itag=251&fixture=1"
+      }
+    ]
+  }
+}
