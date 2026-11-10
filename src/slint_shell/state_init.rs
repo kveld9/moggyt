@@ -9,9 +9,9 @@ use std::sync::{Arc, Mutex};
 use crate::domain::{PlaybackPhase, PlaybackQueue, SearchFilter, SleepTimer, ThemeId};
 use crate::i18n::Locale;
 use crate::infra::{
-    AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, LyricsSource,
-    MemoryPlayLogStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore, OutputDeviceWatch,
-    SessionStore, SettingsStore, StubScrobbler,
+    AudioBackend, Catalog, CoverCache, DEVICE_POLL_TICKS, DesktopPresence, DevicePollGate,
+    DiscordPresence, LyricsSource, MemoryPlayLogStore, MemoryQueueStore, MemorySettingsStore,
+    MemorySkipStore, OutputDeviceWatch, SessionStore, SettingsStore, StubScrobbler,
 };
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
@@ -91,6 +91,7 @@ impl SlintAppState {
             sponsor_rx: None,
             skip_provider: None,
             output_device_watch: OutputDeviceWatch::default(),
+            device_poll_gate: DevicePollGate::new(DEVICE_POLL_TICKS),
             sleep_timer: SleepTimer::new(),
             sleep_timer_accumulated: 0,
             sleep_timer_base_offset: 0,
