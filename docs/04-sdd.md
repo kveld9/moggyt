@@ -390,6 +390,17 @@ The import modal configures execution options via `ImportDestination` and sessio
   `parse_spotify_ref`. Valid links display a success indicator with accent coloring; malformed inputs show an invalid
   link status in secondary coloring, while empty input clears validation status.
 
+#### 6.1.11 Import review and track exclusion
+
+The review screen presents resolved matches before committing changes to the library or queue:
+
+- **Track Exclusion**: Each row includes an exclusion toggle checkbox. Excluded rows are dimmed (`opacity: 0.5`)
+  and skipped by `selected_tracks()`, preventing excluded tracks from being saved to `LocalPlaylist` or enqueued.
+  `has_matches()` returns true only when at least one resolved track remains included.
+- **Matched Channel and Duration Delta**: The matched column displays the candidate title alongside its channel or
+  artist attribution. A signed duration delta (e.g. `+3s`, `-2s`, `0s`) highlights playback length differences
+  between the source track and the matched candidate, aiding visual verification before saving or swapping.
+
 ## 7 Data model
 
 Immutable domain types, all serializable: `Track { id, title, artist, album, duration }`,

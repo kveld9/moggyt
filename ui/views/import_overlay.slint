@@ -45,6 +45,7 @@ export component ImportOverlay inherits Rectangle {
     callback close-requested();
     callback row-selected(int);
     callback swap-requested(int);
+    callback row-exclusion-toggled(int);
     callback save-requested();
     callback discard-requested();
     callback alternative-chosen(int);
@@ -88,6 +89,7 @@ export component ImportOverlay inherits Rectangle {
         can-save: root.can-save;
         row-selected(idx) => { root.row-selected(idx); }
         swap-requested(idx) => { root.swap-requested(idx); }
+        row-exclusion-toggled(idx) => { root.row-exclusion-toggled(idx); }
         save-requested => { root.save-requested(); }
         discard-requested => { root.discard-requested(); }
     }

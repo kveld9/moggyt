@@ -25,6 +25,8 @@ pub struct ImportRow {
     pub alternatives: Vec<LocalTrack>,
     pub chosen_alternative: usize,
     pub reason: Option<String>,
+    pub excluded: bool,
+    pub source_duration_secs: Option<u32>,
 }
 
 /// Tallies shown in the review header.
@@ -79,6 +81,8 @@ fn map_row(
     resolution: &TrackResolution,
 ) -> ImportRow {
     let (source_title, source_artist) = resolve_source_meta(source_track, resolution);
+    let source_duration_secs =
+        source_track.map(|st| st.duration_ms).filter(|&ms| ms > 0).map(|ms| (ms + 500) / 1000);
     match resolution {
         TrackResolution::Matched { track, alternatives } => ImportRow {
             index,
@@ -89,6 +93,8 @@ fn map_row(
             alternatives: map_alternatives(track, alternatives),
             chosen_alternative: 0,
             reason: None,
+            excluded: false,
+            source_duration_secs,
         },
         TrackResolution::Unresolved { reason, .. } => ImportRow {
             index,
@@ -99,6 +105,8 @@ fn map_row(
             alternatives: Vec::new(),
             chosen_alternative: 0,
             reason: Some(reason.clone()),
+            excluded: false,
+            source_duration_secs,
         },
     }
 }
@@ -172,14 +180,23 @@ impl ImportReview {
         self.rows.get(self.selected)
     }
 
-    /// Returns `true` if at least one track was successfully matched.
-    pub fn has_matches(&self) -> bool {
-        self.rows.iter().any(|r| r.chosen.is_some())
+    /// Toggles the exclusion state for a review row by index.
+    pub fn toggle_exclusion(&mut self, row: usize) -> bool {
+        let Some(target) = self.rows.get_mut(row) else {
+            return false;
+        };
+        target.excluded = !target.excluded;
+        true
     }
 
-    /// Returns the chosen track of every review row in source order, skipping rows with no match.
+    /// Returns `true` if at least one chosen track is not excluded.
+    pub fn has_matches(&self) -> bool {
+        self.rows.iter().any(|r| !r.excluded && r.chosen.is_some())
+    }
+
+    /// Returns the chosen track of every non-excluded review row in source order.
     pub fn selected_tracks(&self) -> Vec<LocalTrack> {
-        self.rows.iter().filter_map(|r| r.chosen.clone()).collect()
+        self.rows.iter().filter(|r| !r.excluded).filter_map(|r| r.chosen.clone()).collect()
     }
 
     /// Produces a persisted `LocalPlaylist` containing all chosen matches in source order,
@@ -247,7 +264,19 @@ fn row_confidence_text(row: &ImportRow, locale: Locale) -> String {
     row.confidence.map(|c| tr(locale, confidence_label_key(c)).to_string()).unwrap_or_default()
 }
 
+/// Formats the duration difference in seconds between source and chosen track.
+pub fn delta_text(source_secs: Option<u32>, chosen_secs: Option<u32>) -> String {
+    let (Some(source), Some(chosen)) = (source_secs, chosen_secs) else {
+        return String::new();
+    };
+    let diff = chosen as i64 - source as i64;
+    if diff > 0 { format!("+{diff}s") } else { format!("{diff}s") }
+}
+
 fn row_to_slint_data(row: &ImportRow, locale: Locale) -> ImportRowData {
+    let channel = row.chosen.as_ref().map(|t| t.artist.as_str()).unwrap_or("");
+    let chosen_secs = row.chosen.as_ref().and_then(|t| t.duration_secs);
+    let delta = delta_text(row.source_duration_secs, chosen_secs);
     ImportRowData {
         index: row.index as i32,
         source: row_source_text(row).into(),
@@ -255,6 +284,9 @@ fn row_to_slint_data(row: &ImportRow, locale: Locale) -> ImportRowData {
         state: tr(locale, row_state_key(row)).into(),
         confidence: row_confidence_text(row, locale).into(),
         has_match: row.chosen.is_some(),
+        channel: channel.into(),
+        delta: delta.into(),
+        excluded: row.excluded,
     }
 }
 
@@ -504,6 +536,8 @@ mod tests {
             alternatives: Vec::new(),
             chosen_alternative: 0,
             reason: None,
+            excluded: false,
+            source_duration_secs: None,
         };
 
         // None -> No match
@@ -563,12 +597,15 @@ mod tests {
         let matched = LocalTrack::new("id", "T", "A", MatchConfidence::High);
         review.rows[0].chosen = Some(matched);
         assert!(review.has_matches());
+        review.toggle_exclusion(0);
+        assert!(!review.has_matches());
     }
 
     #[test]
     fn test_rows_to_slint_mapping() {
         let playlist = sample_spotify_playlist();
-        let track = LocalTrack::new("vid_1", "Song 1", "Artist 1", MatchConfidence::High);
+        let mut track = LocalTrack::new("vid_1", "Song 1", "Artist 1", MatchConfidence::High);
+        track.duration_secs = Some(183);
         let resolutions = vec![
             TrackResolution::Matched { track, alternatives: Vec::new() },
             TrackResolution::Unresolved {
@@ -587,6 +624,9 @@ mod tests {
         assert_eq!(rows[0].state, "Matched");
         assert_eq!(rows[0].confidence, "High confidence");
         assert!(rows[0].has_match);
+        assert_eq!(rows[0].channel, "Artist 1");
+        assert_eq!(rows[0].delta, "+3s");
+        assert!(!rows[0].excluded);
 
         assert_eq!(rows[1].index, 1);
         assert_eq!(rows[1].source, "Song 2 - Artist 2");
@@ -594,6 +634,9 @@ mod tests {
         assert_eq!(rows[1].state, "No match");
         assert_eq!(rows[1].confidence, "");
         assert!(!rows[1].has_match);
+        assert_eq!(rows[1].channel, "");
+        assert_eq!(rows[1].delta, "");
+        assert!(!rows[1].excluded);
     }
 
     #[test]
@@ -610,6 +653,8 @@ mod tests {
             alternatives: vec![alt1.clone(), alt2.clone()],
             chosen_alternative: 0,
             reason: None,
+            excluded: false,
+            source_duration_secs: None,
         };
 
         let slint_alts_en = alternatives_to_slint(&row, Locale::English);
@@ -722,11 +767,17 @@ mod tests {
             },
             TrackResolution::Matched { track: track3.clone(), alternatives: Vec::new() },
         ];
-        let review = ImportReview::from_resolutions(&playlist, &resolutions);
+        let mut review = ImportReview::from_resolutions(&playlist, &resolutions);
         let selected = review.selected_tracks();
 
         assert_eq!(selected.len(), 2);
         assert_eq!(selected[0].video_id, "id_1");
         assert_eq!(selected[1].video_id, "id_3");
+
+        assert!(review.toggle_exclusion(0));
+        let selected_after = review.selected_tracks();
+        assert_eq!(selected_after.len(), 1);
+        assert_eq!(selected_after[0].video_id, "id_3");
+        assert_eq!(review.to_local_playlist().tracks.len(), 1);
     }
 }

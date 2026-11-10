@@ -307,6 +307,10 @@ fn reset_session_to_idle(window: &MoggytWindow) {
     sync_import(window);
 }
 
+fn toggle_session_exclusion(session: &mut ImportSession, row: usize) -> bool {
+    session.review.as_mut().map(|r| r.toggle_exclusion(row)).unwrap_or(false)
+}
+
 /// Wires import interaction callbacks between MoggytWindow and the import session.
 pub fn install_import_callbacks(window: &MoggytWindow) {
     let w = window.as_weak();
@@ -389,6 +393,13 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
     });
 
     let w = window.as_weak();
+    window.on_import_row_exclusion_toggled(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        with_session(|s| toggle_session_exclusion(s, idx as usize));
+        sync_import(&win);
+    });
+
+    let w = window.as_weak();
     window.on_import_swap_requested(move |idx| {
         let Some(win) = w.upgrade() else { return };
         with_session(|s| s.open_picker(idx as usize));
@@ -420,8 +431,10 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
 mod tests {
     use super::*;
 
-    use crate::domain::SpotifyTrack;
+    use crate::domain::{LocalTrack, MatchConfidence, SpotifyTrack};
     use crate::infra::MemoryPlaylistStore;
+    use crate::slint_shell::import_state::delta_text;
+    use crate::slint_shell::import_worker::TrackResolution;
 
     /// Serializes the tests that touch the process-global import session.
     ///
@@ -576,5 +589,90 @@ mod tests {
         assert_eq!(start2, 2);
         assert_eq!(state.queue.len(), 3);
         assert_eq!(state.queue.tracks()[2].id, "t3");
+    }
+
+    #[test]
+    fn test_delta_text_table() {
+        assert_eq!(delta_text(Some(180), Some(183)), "+3s");
+        assert_eq!(delta_text(Some(180), Some(178)), "-2s");
+        assert_eq!(delta_text(Some(180), Some(180)), "0s");
+        assert_eq!(delta_text(None, Some(180)), "");
+        assert_eq!(delta_text(Some(180), None), "");
+        assert_eq!(delta_text(None, None), "");
+    }
+
+    #[test]
+    fn test_exclusion_skips_in_selected_tracks_and_to_local_playlist() {
+        let playlist = sample_spotify_playlist();
+        let t1 = LocalTrack::new("id1", "Song 1", "Artist 1", MatchConfidence::High);
+        let t2 = LocalTrack::new("id2", "Song 2", "Artist 2", MatchConfidence::Medium);
+        let resolutions = vec![
+            TrackResolution::Matched { track: t1, alternatives: Vec::new() },
+            TrackResolution::Matched { track: t2, alternatives: Vec::new() },
+        ];
+        let mut review = ImportReview::from_resolutions(&playlist, &resolutions);
+        assert_eq!(review.selected_tracks().len(), 2);
+
+        assert!(review.toggle_exclusion(0));
+        let selected = review.selected_tracks();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].video_id, "id2");
+
+        let pl = review.to_local_playlist_with_title(Some("Exclusion Test"));
+        assert_eq!(pl.tracks.len(), 1);
+        assert_eq!(pl.tracks[0].video_id, "id2");
+    }
+
+    #[test]
+    fn test_has_matches_false_when_all_chosen_rows_excluded() {
+        let playlist = sample_spotify_playlist();
+        let t1 = LocalTrack::new("id1", "Song 1", "Artist 1", MatchConfidence::High);
+        let resolutions = vec![TrackResolution::Matched { track: t1, alternatives: Vec::new() }];
+        let mut review = ImportReview::from_resolutions(&playlist, &resolutions);
+        assert!(review.has_matches());
+
+        assert!(review.toggle_exclusion(0));
+        assert!(!review.has_matches());
+    }
+
+    #[test]
+    fn test_channel_and_delta_appear_in_rows_to_slint() {
+        let playlist = sample_spotify_playlist();
+        let mut t1 = LocalTrack::new("id1", "Track 1", "Channel 1", MatchConfidence::High);
+        t1.duration_secs = Some(183);
+        let resolutions = vec![
+            TrackResolution::Matched { track: t1, alternatives: Vec::new() },
+            TrackResolution::Unresolved {
+                title: "Song 2".into(),
+                artist: "Artist 2".into(),
+                reason: "None".into(),
+            },
+        ];
+        let review = ImportReview::from_resolutions(&playlist, &resolutions);
+        let slint_rows = rows_to_slint(&review, Locale::English);
+        assert_eq!(slint_rows.len(), 2);
+        assert_eq!(slint_rows[0].channel, "Channel 1");
+        assert_eq!(slint_rows[0].delta, "+3s");
+        assert!(!slint_rows[0].excluded);
+        assert_eq!(slint_rows[1].channel, "");
+        assert_eq!(slint_rows[1].delta, "");
+        assert!(!slint_rows[1].excluded);
+    }
+
+    #[test]
+    fn test_session_toggle_row_exclusion_flips_and_rejects_out_of_range() {
+        let mut session = ImportSession::new();
+        assert!(!toggle_session_exclusion(&mut session, 0));
+
+        let playlist = sample_spotify_playlist();
+        let t1 = LocalTrack::new("id1", "Song 1", "Artist 1", MatchConfidence::High);
+        let resolutions = vec![TrackResolution::Matched { track: t1, alternatives: Vec::new() }];
+        session.review = Some(ImportReview::from_resolutions(&playlist, &resolutions));
+
+        assert!(toggle_session_exclusion(&mut session, 0));
+        assert!(session.review.as_ref().unwrap().rows[0].excluded);
+        assert!(toggle_session_exclusion(&mut session, 0));
+        assert!(!session.review.as_ref().unwrap().rows[0].excluded);
+        assert!(!toggle_session_exclusion(&mut session, 99));
     }
 }
