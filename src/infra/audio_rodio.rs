@@ -9,8 +9,8 @@ use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink, Source};
 
 use super::audio::{AudioBackend, AudioError, clamp_speed};
-use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
-use super::stream::{AudioQuality, open_audio_stream};
+use super::audio_dsp::{SkipSilence, append_normalized, normalization_stage};
+use super::stream::{AudioQuality, ResolvedStream, open_audio_stream};
 use super::stream_chain::StreamChain;
 use super::stream_disk_cache::StreamDiskCache;
 
@@ -114,31 +114,24 @@ impl RodioBackend {
         self.stream_cache.as_ref()
     }
 
-    fn append_dsp_to_sink<R>(&self, sink: &Sink, source: Decoder<R>)
+    fn append_dsp_to_sink<R>(&self, sink: &Sink, source: Decoder<R>, loudness_db: Option<f32>)
     where
         R: std::io::Read + std::io::Seek + Send + Sync + 'static,
     {
-        match (self.skip_silence, self.loudness_normalization) {
-            (true, true) => {
-                let dsp = LoudnessNormalizer::new(SkipSilence::new(source));
-                sink.append(dsp);
-            }
-            (true, false) => {
-                let dsp = SkipSilence::new(source);
-                sink.append(dsp);
-            }
-            (false, true) => {
-                let dsp = LoudnessNormalizer::new(source);
-                sink.append(dsp);
-            }
-            (false, false) => {
-                sink.append(source);
-            }
+        let stage = normalization_stage(self.loudness_normalization, loudness_db);
+        if self.skip_silence {
+            append_normalized(sink, SkipSilence::new(source), stage);
+        } else {
+            append_normalized(sink, source, stage);
         }
     }
 
-    fn apply_playback_source<R>(&mut self, track_id: &str, source: Decoder<R>)
-    where
+    fn apply_playback_source<R>(
+        &mut self,
+        track_id: &str,
+        source: Decoder<R>,
+        loudness_db: Option<f32>,
+    ) where
         R: std::io::Read + std::io::Seek + Send + Sync + 'static,
     {
         let total_duration = source.total_duration();
@@ -150,7 +143,7 @@ impl RodioBackend {
 
         new_sink_arc.set_speed(self.speed);
         new_sink_arc.set_volume(volume_to_amplitude(self.volume));
-        self.append_dsp_to_sink(&new_sink_arc, source);
+        self.append_dsp_to_sink(&new_sink_arc, source, loudness_db);
         new_sink_arc.play();
 
         self.anchor = Some(Instant::now());
@@ -170,8 +163,13 @@ impl RodioBackend {
         Decoder::new(stream).map_err(|err| log_decode_stream_error(track_id, err))
     }
 
-    fn apply_crossfade_source<R>(&mut self, track_id: &str, source: Decoder<R>, duration: Duration)
-    where
+    fn apply_crossfade_source<R>(
+        &mut self,
+        track_id: &str,
+        source: Decoder<R>,
+        duration: Duration,
+        loudness_db: Option<f32>,
+    ) where
         R: std::io::Read + std::io::Seek + Send + Sync + 'static,
     {
         let total_duration = source.total_duration();
@@ -183,7 +181,7 @@ impl RodioBackend {
 
         new_sink_arc.set_speed(self.speed);
         new_sink_arc.set_volume(0.0);
-        self.append_dsp_to_sink(&new_sink_arc, source);
+        self.append_dsp_to_sink(&new_sink_arc, source, loudness_db);
         new_sink_arc.play();
 
         let target_vol = volume_to_amplitude(self.volume);
@@ -202,16 +200,32 @@ impl RodioBackend {
         self.track_duration = total_duration;
     }
 
+    fn play_resolved(&mut self, track_id: &str, stream: &ResolvedStream) -> anyhow::Result<()> {
+        let source = self.decode_source(&stream.url, track_id)?;
+        self.apply_playback_source(track_id, source, stream.loudness_db);
+        self.maybe_spawn_cache_download(track_id, &stream.url);
+        Ok(())
+    }
+
+    fn play_resolved_crossfade(
+        &mut self,
+        track_id: &str,
+        stream: &ResolvedStream,
+        duration: Duration,
+    ) -> anyhow::Result<()> {
+        let source = self.decode_source(&stream.url, track_id)?;
+        self.apply_crossfade_source(track_id, source, duration, stream.loudness_db);
+        self.maybe_spawn_cache_download(track_id, &stream.url);
+        Ok(())
+    }
+
     /// Downloads and decodes audio from `url`, immediately starting playback.
     ///
     /// Fails loud on transport, HTTP status, or stream decoding errors without mutating state.
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
     pub fn play_url(&mut self, track_id: &str, url: &str) -> anyhow::Result<()> {
-        let source = self.decode_source(url, track_id)?;
-        self.apply_playback_source(track_id, source);
-        self.maybe_spawn_cache_download(track_id, url);
-        Ok(())
+        self.play_resolved(track_id, &ResolvedStream::from_url(url))
     }
 
     /// Downloads and decodes audio from `url`, crossfading with the currently active audio sink.
@@ -225,10 +239,7 @@ impl RodioBackend {
         url: &str,
         duration: Duration,
     ) -> anyhow::Result<()> {
-        let source = self.decode_source(url, track_id)?;
-        self.apply_crossfade_source(track_id, source, duration);
-        self.maybe_spawn_cache_download(track_id, url);
-        Ok(())
+        self.play_resolved_crossfade(track_id, &ResolvedStream::from_url(url), duration)
     }
 
     fn freeze_anchor(&mut self) {
@@ -284,7 +295,7 @@ impl RodioBackend {
         let Some(source) = self.cached_source(track_id) else {
             return false;
         };
-        self.apply_playback_source(track_id, source);
+        self.apply_playback_source(track_id, source, None);
         true
     }
 
@@ -292,7 +303,7 @@ impl RodioBackend {
         let Some(source) = self.cached_source(track_id) else {
             return false;
         };
-        self.apply_crossfade_source(track_id, source, duration);
+        self.apply_crossfade_source(track_id, source, duration, None);
         true
     }
 
@@ -315,11 +326,11 @@ impl RodioBackend {
     #[allow(clippy::cognitive_complexity)]
     fn retry_play_with_fresh_url(&mut self, track_id: &str) -> Result<(), AudioError> {
         self.resolver.invalidate(track_id);
-        let Some(url) = self.resolver.resolve(track_id) else {
+        let Some(stream) = self.resolver.resolve_stream(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to re-resolve audio stream URL on retry");
             return Err(AudioError::Unavailable);
         };
-        self.play_url(track_id, &url).map_err(|err| {
+        self.play_resolved(track_id, &stream).map_err(|err| {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream on retry");
             AudioError::Playback(err.to_string())
         })
@@ -413,11 +424,11 @@ impl AudioBackend for RodioBackend {
         if self.try_play_cached(track_id) {
             return Ok(());
         }
-        let Some(url) = self.resolver.resolve(track_id) else {
+        let Some(stream) = self.resolver.resolve_stream(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL");
             return Err(AudioError::Unavailable);
         };
-        if let Err(err) = self.play_url(track_id, &url) {
+        if let Err(err) = self.play_resolved(track_id, &stream) {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream");
             return self.retry_play_with_fresh_url(track_id);
         }
@@ -433,11 +444,11 @@ impl AudioBackend for RodioBackend {
         if self.try_play_crossfade_cached(track_id, duration) {
             return Ok(());
         }
-        let Some(url) = self.resolver.resolve(track_id) else {
+        let Some(stream) = self.resolver.resolve_stream(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL for crossfade");
             return Err(AudioError::Unavailable);
         };
-        if let Err(err) = self.play_url_crossfade(track_id, &url, duration) {
+        if let Err(err) = self.play_resolved_crossfade(track_id, &stream, duration) {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to crossfade audio stream; retrying immediate play");
             return self.retry_play_with_fresh_url(track_id);
         }
@@ -765,7 +776,7 @@ mod tests {
 
         let source1 =
             Decoder::new(std::io::Cursor::new(MINIMAL_WAV_HEADER)).expect("valid wav decoder 1");
-        backend.apply_playback_source("track-1", source1);
+        backend.apply_playback_source("track-1", source1, None);
 
         assert!(!Arc::ptr_eq(&initial_sink, &backend.sink));
         let second_sink = Arc::clone(&backend.sink);
@@ -774,7 +785,7 @@ mod tests {
 
         let source2 =
             Decoder::new(std::io::Cursor::new(MINIMAL_WAV_HEADER)).expect("valid wav decoder 2");
-        backend.apply_playback_source("track-2", source2);
+        backend.apply_playback_source("track-2", source2, None);
 
         assert!(!Arc::ptr_eq(&second_sink, &backend.sink));
         assert_eq!(backend.last_requested(), Some("track-2"));

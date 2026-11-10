@@ -102,6 +102,22 @@ adaptive format served, while itag 141 (~256 kbps) requires Premium authenticati
 `High` quality preference therefore resolves to the same itag as `Standard` and shares
 its format selector instead of requesting an unreachable `abr>=192` floor.
 
+## Loudness normalization
+
+`loudness_normalization` selects exactly one normalization stage per track:
+
+1. When the resolver reports a provider `loudnessDb` (InnerTube VISIONOS path),
+   the track is scaled by the static ReplayGain factor `10^(-db/20)`; tracks at or
+   below 0 dB use unity gain. The dynamic `LoudnessNormalizer` is not chained in
+   this case.
+2. When no `loudnessDb` is available (yt-dlp fallback path), the dynamic
+   `LoudnessNormalizer` keeps its existing behavior.
+
+Signal order is decoder -> optional `SkipSilence` -> static gain or dynamic
+normalizer -> sink. The static gain sits inside the source graph, so the sink
+volume and the crossfade/fade-in ramps multiply it once and never attenuate the
+same signal twice.
+
 ## Evolution rules
 
 1. One concept, one owner: each domain type lives in a single module (single source of truth).

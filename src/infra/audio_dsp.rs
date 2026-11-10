@@ -7,7 +7,7 @@
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use rodio::Source;
+use rodio::{Sink, Source};
 
 /// Default silence threshold in linear amplitude (~-54 dBFS).
 ///
@@ -419,6 +419,92 @@ impl<I: Source<Item = f32>> Source for LoudnessNormalizer<I> {
     }
 }
 
+/// Computes the static ReplayGain attenuation linear factor relative to YouTube's reference loudness.
+///
+/// Positive `loudness_db` values represent tracks louder than reference and are attenuated
+/// by `10^(-db/20)` (`db_to_linear(-db)`). Non-positive, non-finite, or absent values yield
+/// unity gain (`1.0`).
+pub fn replaygain_linear(loudness_db: Option<f32>) -> f32 {
+    match loudness_db {
+        Some(db) if db.is_finite() && db > 0.0 => 10.0_f32.powf(-db / 20.0),
+        _ => 1.0,
+    }
+}
+
+/// Normalization stage selected for playback.
+///
+/// Exactly one stage is selected per track; the static and dynamic stages are never chained.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NormalizationStage {
+    Off,
+    Static(f32),
+    Dynamic,
+}
+
+/// Selects the normalization stage for a track based on setting and provider loudness.
+///
+/// Exactly one stage is selected per track; the static and dynamic stages are never chained.
+pub fn normalization_stage(enabled: bool, loudness_db: Option<f32>) -> NormalizationStage {
+    if !enabled {
+        return NormalizationStage::Off;
+    }
+    match loudness_db {
+        Some(db) => NormalizationStage::Static(replaygain_linear(Some(db))),
+        None => NormalizationStage::Dynamic,
+    }
+}
+
+/// Rodio [`Source`] wrapper that applies a constant linear gain factor to samples.
+pub struct StaticGain<I> {
+    input: I,
+    gain: f32,
+}
+
+impl<I> StaticGain<I> {
+    /// Creates a new `StaticGain` wrapper.
+    pub fn new(input: I, gain: f32) -> Self {
+        Self { input, gain }
+    }
+}
+
+impl<I: Source<Item = f32>> Iterator for StaticGain<I> {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.input.next().map(|sample| sample * self.gain)
+    }
+}
+
+impl<I: Source<Item = f32>> Source for StaticGain<I> {
+    fn current_span_len(&self) -> Option<usize> {
+        self.input.current_span_len()
+    }
+
+    fn channels(&self) -> u16 {
+        self.input.channels()
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.input.sample_rate()
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        self.input.total_duration()
+    }
+}
+
+/// Appends an audio source to a rodio sink using the selected normalization stage.
+pub fn append_normalized<S>(sink: &Sink, source: S, stage: NormalizationStage)
+where
+    S: Source<Item = f32> + Send + 'static,
+{
+    match stage {
+        NormalizationStage::Off => sink.append(source),
+        NormalizationStage::Static(gain) => sink.append(StaticGain::new(source, gain)),
+        NormalizationStage::Dynamic => sink.append(LoudnessNormalizer::new(source)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -608,5 +694,48 @@ mod tests {
         // Leading silence is trimmed (first sample corresponds to input 1.0)
         // Trailing silence is skipped
         assert_eq!(output.len(), 2);
+    }
+
+    #[test]
+    fn replaygain_linear_matches_static_gain() {
+        assert!((replaygain_linear(Some(6.0)) - 0.5011872).abs() < 1e-5);
+        assert!((replaygain_linear(Some(3.0)) - 0.70794576).abs() < 1e-5);
+        let expected_point_99 = 10.0_f32.powf(-0.99 / 20.0);
+        assert!((replaygain_linear(Some(0.99)) - expected_point_99).abs() < 1e-5);
+        assert_eq!(replaygain_linear(Some(0.0)), 1.0);
+        assert_eq!(replaygain_linear(Some(-3.0)), 1.0);
+        assert_eq!(replaygain_linear(Some(f32::NAN)), 1.0);
+        assert_eq!(replaygain_linear(None), 1.0);
+    }
+
+    #[test]
+    fn static_gain_scales_samples_once() {
+        let buffer = rodio::buffer::SamplesBuffer::new(1, 48_000, vec![0.5_f32, -0.5, 1.0]);
+        let gain_source = StaticGain::new(buffer, 0.5);
+        let output: Vec<f32> = gain_source.collect();
+        assert_eq!(output, vec![0.25, -0.25, 0.5]);
+    }
+
+    #[test]
+    fn normalization_stage_selects_exactly_one_stage() {
+        assert_eq!(normalization_stage(false, Some(3.0)), NormalizationStage::Off);
+        assert_eq!(normalization_stage(false, None), NormalizationStage::Off);
+        match normalization_stage(true, Some(3.0)) {
+            NormalizationStage::Static(gain) => {
+                assert!((gain - 0.70794576).abs() < 1e-4);
+            }
+            other => panic!("expected Static stage, got {other:?}"),
+        }
+        assert_eq!(normalization_stage(true, Some(-1.0)), NormalizationStage::Static(1.0));
+        assert_eq!(normalization_stage(true, None), NormalizationStage::Dynamic);
+    }
+
+    #[test]
+    fn static_gain_composes_with_volume_curve() {
+        use crate::infra::volume_to_amplitude;
+
+        let combined = replaygain_linear(Some(6.0)) * volume_to_amplitude(50);
+        let expected = 0.5011872 * 0.125;
+        assert!((combined - expected).abs() < 1e-6, "expected {expected}, got {combined}");
     }
 }
