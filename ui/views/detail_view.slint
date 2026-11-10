@@ -10,6 +10,7 @@ export global LocalEditUi {
     callback rename-submitted(string);
     callback delete-requested();
     callback remove-track-requested(int);
+    callback move-track-requested(int, int);
 }
 
 export component DetailView inherits VerticalLayout {
@@ -272,6 +273,8 @@ export component DetailView inherits VerticalLayout {
             show-remove: LocalEditUi.is-local;
             clicked => { root.track-selected(track.index); }
             remove-requested => { LocalEditUi.remove-track-requested(track.index); }
+            move-up-requested => { LocalEditUi.move-track-requested(track.index, track.index - 1); }
+            move-down-requested => { LocalEditUi.move-track-requested(track.index, track.index + 1); }
         }
     }
 }
