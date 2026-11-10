@@ -16,9 +16,10 @@ use crate::domain::{
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, AudioError, Catalog, CatalogError, CoverCache, CustomThemeFile, DesktopPresence,
-    DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, PlayLogStore,
-    QueueStore, ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipProvider, SkipStore,
-    TrayAction, TrayHandle, decode_cover, decode_handoff, fetch_artwork, sanitize_cookie_input,
+    DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource, MediaKeyAction, OutputDeviceWatch,
+    PlayLogStore, QueueStore, ReleaseInfo, Scrobbler, SessionStore, SettingsStore, SkipProvider,
+    SkipStore, TrayAction, TrayHandle, decode_cover, decode_handoff, fetch_artwork,
+    sanitize_cookie_input,
 };
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
@@ -103,6 +104,8 @@ pub struct SlintAppState {
     pub sponsor_rx: Option<std::sync::mpsc::Receiver<(String, SkipRanges)>>,
     /// Community skip provider; `None` disables automatic community skipping.
     pub skip_provider: Option<Arc<dyn SkipProvider>>,
+    /// Debounced watcher of the system default output device.
+    pub output_device_watch: OutputDeviceWatch,
     pub sleep_timer: SleepTimer,
     pub sleep_timer_accumulated: u64,
     pub sleep_timer_base_offset: u64,

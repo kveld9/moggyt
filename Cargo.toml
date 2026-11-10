@@ -10,6 +10,7 @@ autoexamples = false
 
 [dependencies]
 anyhow = "1.0.104"
+cpal = "0.16"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"

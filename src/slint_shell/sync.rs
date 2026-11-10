@@ -439,6 +439,7 @@ pub(crate) fn sync_header_title(window: &MoggytWindow, state: &SlintAppState) {
 
 /// Periodic playback tick syncing elapsed timestamps, progress, and lyrics line without blocking.
 pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppState) {
+    state.poll_output_device();
     let Ok(audio) = state.audio.try_lock() else {
         return;
     };

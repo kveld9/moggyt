@@ -6,6 +6,7 @@
 
 mod atomic_file;
 mod audio;
+mod audio_device;
 mod audio_dsp;
 mod audio_live;
 mod audio_rodio;
@@ -74,6 +75,7 @@ mod ytdlp;
 
 pub use atomic_file::{TEMP_FILE_MAX_AGE, sweep_stale_temp_files, write_atomic};
 pub use audio::{AudioBackend, AudioError, AudioStub, NullAudio, clamp_speed};
+pub use audio_device::{DeviceWatchAction, OutputDeviceWatch, current_output_device_name};
 pub use audio_dsp::{
     DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, LoudnessNormalizer,
     SkipSilence, TARGET_LUFS_DB, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
