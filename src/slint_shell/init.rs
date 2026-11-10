@@ -2,19 +2,29 @@
 //!
 //! Hexagonal invariant: provides platform concrete adapters to the composition root.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 use anyhow::Context;
 
+use crate::domain::parse_spotify_ref;
 use crate::infra::{
     CredentialStore, DiskCoverCache, DiskPlaylistStore, GithubUpdater, KeyringCredentialStore,
-    LastFmAppKeys, LastFmClient, LastFmCredentials, LiveAudio, ReleaseInfo, RodioBackend,
-    StreamDiskCache, Updater, client_from_credentials, default_config_dir, is_newer,
-    provision_sidecar, spawn_sidecar_refresh,
+    KeyringSpotifyCredentialStore, LastFmAppKeys, LastFmClient, LastFmCredentials, LiveAudio,
+    ReleaseInfo, RodioBackend, SpotifyCredentialStore, StreamDiskCache, Updater,
+    client_from_credentials, default_config_dir, is_newer, load_spotify_link, provision_sidecar,
+    spawn_sidecar_refresh,
 };
-use crate::slint_shell::import_cli::{ImportCli, parse_import_args, report_to_json, run_headless};
+use crate::slint_shell::import_callbacks::enqueue_imported_tracks;
+use crate::slint_shell::import_cli::{
+    ImportCli, parse_import_args, render_progress, report_to_json, run_headless,
+};
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
+use crate::slint_shell::import_worker::{
+    ImportProgressEvent, WorkerConfig, assemble_playlist, resolve_tracks,
+};
 use crate::slint_shell::state::SlintAppState;
 
 /// Resolves the application data directory using standard platform conventions.
@@ -197,6 +207,40 @@ pub fn run_import_cli_if_requested(args: &[String]) -> Option<i32> {
     }
 }
 
+fn is_spotify_link_arg(arg: &str) -> bool {
+    parse_spotify_ref(arg).is_some()
+}
+
+fn import_spotify_to_queue(state: &mut SlintAppState, url: &str) -> anyhow::Result<usize> {
+    let store = KeyringSpotifyCredentialStore::moggyt();
+    let credentials = store.load();
+    let source = load_spotify_link(url, credentials.as_ref())?;
+    let searcher = LiveTrackSearcher::new();
+    let cancel = AtomicBool::new(false);
+    let config = WorkerConfig::default();
+    let cache = Mutex::new(HashMap::new());
+    let mut on_event = |event: ImportProgressEvent| {
+        if let Some(msg) = render_progress(&event) {
+            eprintln!("{msg}");
+        }
+    };
+    let (resolutions, _, _) = resolve_tracks(
+        &searcher,
+        &source,
+        &cancel,
+        &config,
+        &std::thread::sleep,
+        &cache,
+        &mut on_event,
+    );
+    let playlist = assemble_playlist(&source, &resolutions);
+    let tracks: Vec<crate::domain::Track> =
+        playlist.tracks.into_iter().map(|t| t.to_track(playlist.artwork.clone())).collect();
+    let count = tracks.len();
+    enqueue_imported_tracks(state, tracks);
+    Ok(count)
+}
+
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
 fn handle_legacy_cli_args(state: &mut SlintAppState, raw_args: &[String]) {
@@ -211,6 +255,11 @@ fn handle_legacy_cli_args(state: &mut SlintAppState, raw_args: &[String]) {
         match state.import_playlist_url(first_arg) {
             Ok(count) => tracing::info!("enqueued {count} tracks from CLI playlist URL"),
             Err(err) => tracing::warn!("failed to import playlist from CLI URL: {err:#}"),
+        }
+    } else if is_spotify_link_arg(first_arg) {
+        match import_spotify_to_queue(state, first_arg) {
+            Ok(count) => tracing::info!("enqueued {count} tracks from CLI Spotify URL"),
+            Err(err) => tracing::warn!("failed to import Spotify playlist from CLI URL: {err:#}"),
         }
     }
 }
@@ -368,5 +417,23 @@ mod tests {
         assert!(select_lastfm_client(None, Some(complete)).is_live());
         assert!(!select_lastfm_client(None, Some(incomplete)).is_live());
         assert!(!select_lastfm_client(None, None).is_live());
+    }
+
+    #[test]
+    fn test_is_spotify_link_arg_accepted_variants() {
+        assert!(is_spotify_link_arg("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"));
+        assert!(is_spotify_link_arg("https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy"));
+        assert!(is_spotify_link_arg("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"));
+        assert!(is_spotify_link_arg("spotify:album:4aawyAB9vmqN3uQ7FjRGTy"));
+    }
+
+    #[test]
+    fn test_is_spotify_link_arg_rejected_variants() {
+        assert!(!is_spotify_link_arg("https://music.youtube.com/playlist?list=PL12345"));
+        assert!(!is_spotify_link_arg("https://example.com/playlist/1234567890123456789012"));
+        assert!(!is_spotify_link_arg("moggyt:handoff_payload"));
+        assert!(!is_spotify_link_arg("not_a_url"));
+        assert!(!is_spotify_link_arg(""));
+        assert!(!is_spotify_link_arg("spotify:track:4aawyAB9vmqN3uQ7FjRGTy"));
     }
 }

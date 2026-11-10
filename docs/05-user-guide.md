@@ -218,12 +218,18 @@ while the GUI is actively running:
 # Import from a Spotify link (--headless is optional and implied)
 moggyt --import-spotify <URL>
 
+# Import and override the saved playlist title
+moggyt --import-spotify <URL> --name "Custom Title"
+
 # Import from an Exportify CSV or Spotify JSON backup file
 moggyt --import-csv <PATH>
 
 # Emit machine-readable JSON output to stdout (--json requires --headless)
 moggyt --import-spotify <URL> --headless --json
 moggyt --import-csv <PATH> --headless --json
+
+# Import tracks from a Spotify URL directly into the GUI playback queue
+moggyt "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
 ```
 
 In headless mode:
@@ -231,6 +237,10 @@ In headless mode:
 - The `--headless` flag is optional and implied by `--import-spotify` and `--import-csv`.
 - Note the parser rule: `--json` still requires `--headless` (`--json requires --headless`), so keep `--headless`
   in every `--json` invocation.
+- Use `--name "Custom Title"` to override the playlist title before saving it to the library.
+- Passing a positional Spotify URL (e.g. `moggyt "https://open.spotify.com/playlist/..."`) resolves tracks
+  synchronously, prints progress to `stderr`, and enqueues matched tracks directly into the GUI playback queue
+  without saving a playlist to disk.
 - Operates before single-instance lock acquisition, allowing CLI imports while the GUI is running (a running GUI
   does not refresh its library live; saved playlists become available on restart).
 - `--import-csv` accepts both Exportify CSV files and Spotify JSON backup files.
