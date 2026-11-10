@@ -1,0 +1,37 @@
+{
+  "hits": [
+    {
+      "isrc": "GBUM71029604",
+      "title": "Bohemian Rhapsody (Remastered 2011)",
+      "artist": "Queen",
+      "album": "A Night at the Opera",
+      "year": 1975,
+      "duration": 356.52
+    },
+    {
+      "isrc": "GBUM71100986",
+      "title": "Bohemian Rhapsody (Operatic Section / 2011 A Cappella Mix)",
+      "artist": "Queen",
+      "album": "Queen 40: Limited Edition Collector's Box Set, Vol. 1",
+      "year": 1975,
+      "duration": 64.969
+    },
+    {
+      "isrc": "GBCEG0100046",
+      "title": "Bohemian Rhapsody (Live)",
+      "artist": "Queen",
+      "album": "Live Killers",
+      "year": 1979,
+      "duration": 352.04
+    },
+    {
+      "isrc": "GBUM71805979",
+      "title": "Bohemian Rhapsody (Live Aid)",
+      "artist": "Queen",
+      "album": "Bohemian Rhapsody (The Original Soundtrack)",
+      "year": 2018,
+      "duration": 147.84
+    }
+  ],
+  "next": "p24"
+}
