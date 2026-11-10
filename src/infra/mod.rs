@@ -65,6 +65,7 @@ mod store_health;
 mod stream;
 mod stream_chain;
 pub mod stream_disk_cache;
+mod stream_pool;
 mod stream_reader;
 mod stream_reqwest;
 mod stream_stub;
@@ -178,6 +179,11 @@ pub use store_health::{HealthFlag, StoreHealth, quarantine};
 pub use stream::{AudioQuality, ResolvedStream, StreamResolver, StreamStub};
 pub use stream_chain::{PrimaryStreamResolver, StreamChain};
 pub use stream_disk_cache::StreamDiskCache;
+pub use stream_pool::{
+    BlockPool, LARGE_STREAM_THRESHOLD_BYTES, STREAM_BLOCK_BYTES, STREAM_WINDOW_AHEAD_BLOCKS,
+    STREAM_WINDOW_BEHIND_BLOCKS, STREAM_WORKERS, block_index, block_is_in_window,
+    next_block_to_fetch,
+};
 pub use stream_url_cache::{
     ResolverSource, STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache,
 };

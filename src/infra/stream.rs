@@ -70,7 +70,9 @@ pub enum RangeResponse {
 }
 
 /// Abstraction for fetching audio byte ranges over a transport seam.
-pub trait RangeTransport: Send + Sync + 'static {
+///
+/// Transports are cloned per block worker thread in streaming pools.
+pub trait RangeTransport: Send + Sync + 'static + Clone {
     /// Fetches a byte range `[start, start + length - 1]`.
     fn fetch_range(&mut self, start: u64, length: usize) -> std::io::Result<RangeResponse>;
 }
