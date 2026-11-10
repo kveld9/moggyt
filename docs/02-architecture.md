@@ -47,6 +47,8 @@ src/
     ├── audio.rs       # AudioBackend trait definition (playback, crossfade, seeking, volume)
     ├── audio_live.rs  # Dual-mode live rodio vs. muted audio backend fallback
     ├── audio_rodio.rs # rodio playback adapter with dual-sink crossfade and stream cache support
+    ├── audio_fade.rs  # Fade-out and fade-in ramps applied to rodio sinks
+    ├── audio_stream_cache_worker.rs # Background download of a resolved track into the disk stream cache
     ├── browser.rs     # Platform browser opener adapter
     ├── cover*.rs      # CoverCache port and memory/disk caching adapters
     ├── custom_theme.rs # Custom theme JSON loader with file modification monitoring
