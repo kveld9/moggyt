@@ -177,6 +177,10 @@ Clicking `Start import` initiates the matching process and displays the progress
 After matching completes or is cancelled, the review screen presents each Spotify track alongside its matched YouTube
 Music candidate:
 
+- **Exclude Checkbox**: A checkbox on the left of each row allows excluding specific tracks from import. Excluded
+  rows are dimmed and skipped entirely when saving to your library or loading into the queue.
+- **Matched Channel & Duration Delta**: The matched candidate shows its YouTube channel or artist name beneath the
+  title, accompanied by a signed duration delta (e.g. `+3s`, `-2s`, `0s`) comparing source and matched durations.
 - **High Confidence (`Matched` badge)**: Score `>= 0.85`. High-confidence match where title, artist, and duration align
   closely with official audio tracks.
 - **Medium Confidence (`Needs review` badge)**: Score in `[0.60, 0.85)`. Acceptable match that may differ slightly in

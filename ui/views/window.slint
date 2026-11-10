@@ -176,6 +176,7 @@ export component MoggytWindow inherits Window {
     callback import-close-requested();
     callback import-row-selected(int);
     callback import-swap-requested(int);
+    callback import-row-exclusion-toggled(int);
     callback import-save-requested();
     callback import-discard-requested();
     callback import-alternative-chosen(int);
@@ -354,7 +355,6 @@ export component MoggytWindow inherits Window {
             }
         }
     }
-
     ImportOverlay {
         show-modal <=> root.show-import-modal;
         active-tab <=> root.import-tab;
@@ -390,6 +390,7 @@ export component MoggytWindow inherits Window {
         close-requested => { root.show-import-modal = false; root.import-close-requested(); }
         row-selected(idx) => { root.import-row-selected(idx); }
         swap-requested(idx) => { root.import-swap-requested(idx); }
+        row-exclusion-toggled(idx) => { root.import-row-exclusion-toggled(idx); }
         save-requested => { root.import-save-requested(); }
         discard-requested => { root.import-discard-requested(); }
         alternative-chosen(idx) => { root.import-alternative-chosen(idx); }
