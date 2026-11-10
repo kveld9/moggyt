@@ -69,6 +69,12 @@ impl<T: RangeTransport> RangeReader<T> {
         self
     }
 
+    /// Seeds the underlying block pool with prefetched audio bytes.
+    pub fn with_prefetched(mut self, prefix: Vec<u8>) -> Self {
+        self.pool.seed_prefetched(prefix);
+        self
+    }
+
     /// Returns the current logical read position in the stream.
     pub const fn position(&self) -> u64 {
         self.logical_pos
@@ -135,6 +141,8 @@ impl<T: RangeTransport> Seek for RangeReader<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::super::stream::RangeResponse;
     use super::*;
 
@@ -144,16 +152,29 @@ mod tests {
         total_len: Option<u64>,
         ignore_range: bool,
         error_at_start: Option<u64>,
+        requests: Arc<Mutex<Vec<(u64, usize)>>>,
     }
 
     impl FakeRangeTransport {
         fn new(payload: Vec<u8>) -> Self {
             let total = payload.len() as u64;
-            Self { payload, total_len: Some(total), ignore_range: false, error_at_start: None }
+            Self {
+                payload,
+                total_len: Some(total),
+                ignore_range: false,
+                error_at_start: None,
+                requests: Arc::new(Mutex::new(Vec::new())),
+            }
         }
 
         fn ignoring_range(payload: Vec<u8>) -> Self {
-            Self { payload, total_len: None, ignore_range: true, error_at_start: None }
+            Self {
+                payload,
+                total_len: None,
+                ignore_range: true,
+                error_at_start: None,
+                requests: Arc::new(Mutex::new(Vec::new())),
+            }
         }
 
         fn failing_at(payload: Vec<u8>, error_start: u64) -> Self {
@@ -163,12 +184,14 @@ mod tests {
                 total_len: Some(total),
                 ignore_range: false,
                 error_at_start: Some(error_start),
+                requests: Arc::new(Mutex::new(Vec::new())),
             }
         }
     }
 
     impl RangeTransport for FakeRangeTransport {
         fn fetch_range(&mut self, start: u64, length: usize) -> std::io::Result<RangeResponse> {
+            self.requests.lock().unwrap().push((start, length));
             if self.ignore_range {
                 let cursor = std::io::Cursor::new(self.payload.clone());
                 return Ok(RangeResponse::Full(Box::new(SyncReader::new(cursor))));
@@ -341,5 +364,30 @@ mod tests {
             .seek(SeekFrom::Start(2))
             .expect_err("backward seek in sequential stream unsupported");
         assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
+    }
+
+    #[test]
+    fn seeded_reader_reads_prefix_without_transport_requests() {
+        let payload = b"0123456789abcdef".to_vec();
+        let transport = FakeRangeTransport::new(payload.clone());
+        let requests = Arc::clone(&transport.requests);
+        let prefix = payload[..16].to_vec();
+        let mut reader = RangeReader::new(transport).with_chunk_size(8).with_prefetched(prefix);
+
+        let mut output = Vec::new();
+        let mut buf = [0u8; 4];
+        for _ in 0..4 {
+            let n = reader.read(&mut buf).expect("read succeeds from prefix");
+            output.extend_from_slice(&buf[..n]);
+        }
+        assert_eq!(output, payload);
+        assert_eq!(reader.position(), 16);
+
+        let reqs = requests.lock().unwrap().clone();
+        let prefix_reqs: Vec<_> = reqs.into_iter().filter(|(start, _)| *start < 16).collect();
+        assert!(
+            prefix_reqs.is_empty(),
+            "seeded blocks must not trigger transport requests: {prefix_reqs:?}"
+        );
     }
 }

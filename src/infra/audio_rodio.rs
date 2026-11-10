@@ -10,9 +10,10 @@ use rodio::{Decoder, OutputStream, Sink, Source};
 
 use super::audio::{AudioBackend, AudioError, clamp_speed};
 use super::audio_dsp::{SkipSilence, append_normalized, normalization_stage};
-use super::stream::{AudioQuality, ResolvedStream, open_audio_stream};
+use super::stream::{AudioQuality, ResolvedStream};
 use super::stream_chain::StreamChain;
 use super::stream_disk_cache::StreamDiskCache;
+use super::stream_reqwest::open_audio_stream_with_prefix;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
 ///
@@ -156,10 +157,12 @@ impl RodioBackend {
         &self,
         url: &str,
         track_id: &str,
+        prefix: Option<Vec<u8>>,
     ) -> anyhow::Result<
         Decoder<super::stream_reader::RangeReader<super::stream_reqwest::ReqwestRangeTransport>>,
     > {
-        let stream = open_audio_stream(url).map_err(|err| log_open_stream_error(track_id, err))?;
+        let stream = open_audio_stream_with_prefix(url, prefix)
+            .map_err(|err| log_open_stream_error(track_id, err))?;
         Decoder::new(stream).map_err(|err| log_decode_stream_error(track_id, err))
     }
 
@@ -201,7 +204,8 @@ impl RodioBackend {
     }
 
     fn play_resolved(&mut self, track_id: &str, stream: &ResolvedStream) -> anyhow::Result<()> {
-        let source = self.decode_source(&stream.url, track_id)?;
+        let prefix = self.resolver.take_prefetched(&stream.url);
+        let source = self.decode_source(&stream.url, track_id, prefix)?;
         self.apply_playback_source(track_id, source, stream.loudness_db);
         self.maybe_spawn_cache_download(track_id, &stream.url);
         Ok(())
@@ -213,7 +217,8 @@ impl RodioBackend {
         stream: &ResolvedStream,
         duration: Duration,
     ) -> anyhow::Result<()> {
-        let source = self.decode_source(&stream.url, track_id)?;
+        let prefix = self.resolver.take_prefetched(&stream.url);
+        let source = self.decode_source(&stream.url, track_id, prefix)?;
         self.apply_crossfade_source(track_id, source, duration, stream.loudness_db);
         self.maybe_spawn_cache_download(track_id, &stream.url);
         Ok(())

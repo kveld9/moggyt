@@ -86,6 +86,18 @@ pub fn open_audio_stream(url: &str) -> anyhow::Result<RangeReader<ReqwestRangeTr
     Ok(RangeReader::new(transport).with_chunk_size(DEFAULT_STREAM_CHUNK_SIZE))
 }
 
+/// Opens a streaming audio source seeded with prefetched leading bytes.
+pub fn open_audio_stream_with_prefix(
+    url: &str,
+    prefix: Option<Vec<u8>>,
+) -> anyhow::Result<RangeReader<ReqwestRangeTransport>> {
+    let reader = open_audio_stream(url)?;
+    Ok(match prefix {
+        Some(bytes) => reader.with_prefetched(bytes),
+        None => reader,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,6 +121,14 @@ mod tests {
     #[test]
     fn open_audio_stream_on_unparseable_url_fails_with_expected_message() {
         let result = open_audio_stream("invalid-url-without-scheme");
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(err.contains("invalid audio stream url"));
+    }
+
+    #[test]
+    fn open_audio_stream_with_prefix_fails_loud_on_invalid_url() {
+        let result = open_audio_stream_with_prefix("invalid-url", Some(vec![1, 2, 3]));
         assert!(result.is_err());
         let err = result.err().unwrap().to_string();
         assert!(err.contains("invalid audio stream url"));

@@ -66,6 +66,7 @@ mod stream;
 mod stream_chain;
 pub mod stream_disk_cache;
 mod stream_pool;
+mod stream_prefetch_cache;
 mod stream_reader;
 mod stream_reqwest;
 mod stream_stub;
@@ -183,6 +184,9 @@ pub use stream_pool::{
     BlockPool, LARGE_STREAM_THRESHOLD_BYTES, STREAM_BLOCK_BYTES, STREAM_WINDOW_AHEAD_BLOCKS,
     STREAM_WINDOW_BEHIND_BLOCKS, STREAM_WORKERS, block_index, block_is_in_window,
     next_block_to_fetch,
+};
+pub use stream_prefetch_cache::{
+    PREFETCH_BLOCK_COUNT, PREFETCH_BYTES, PREFETCH_CAPACITY, StreamPrefetchCache,
 };
 pub use stream_url_cache::{
     ResolverSource, STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache,
