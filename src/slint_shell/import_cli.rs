@@ -247,6 +247,9 @@ pub fn render_progress(event: &ImportProgressEvent) -> Option<String> {
         ImportProgressEvent::Finished { .. } => Some("import finished".to_string()),
         ImportProgressEvent::Cancelled { .. } => Some("import cancelled".to_string()),
         ImportProgressEvent::Failed { message } => Some(format!("import failed: {message}")),
+        ImportProgressEvent::ConnectionLost { message } => {
+            Some(format!("connection lost: {message}"))
+        }
         ImportProgressEvent::Track { .. } => None,
     }
 }
@@ -516,6 +519,9 @@ mod tests {
 
         let failed = ImportProgressEvent::Failed { message: "timeout".to_string() };
         assert_eq!(render_progress(&failed), Some("import failed: timeout".to_string()));
+
+        let lost = ImportProgressEvent::ConnectionLost { message: "peer reset".to_string() };
+        assert_eq!(render_progress(&lost), Some("connection lost: peer reset".to_string()));
 
         let track = ImportProgressEvent::Track {
             index: 0,

@@ -14,7 +14,6 @@ use crate::infra::{
     FilePicker, KeyringSpotifyCredentialStore, PlaylistStore, RfdFilePicker,
     SpotifyCredentialStore, load_playlist_file, load_spotify_link,
 };
-use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
 use crate::slint_shell::import_session::{ImportDestination, ImportSession, ImportStage};
 use crate::slint_shell::import_state::{
@@ -22,6 +21,7 @@ use crate::slint_shell::import_state::{
 };
 use crate::slint_shell::import_worker::{WorkerConfig, spawn_import};
 use crate::slint_shell::state::SlintAppState;
+use crate::slint_shell::{ImportUi, MoggytWindow};
 
 static SESSION: Mutex<Option<ImportSession>> = Mutex::new(None);
 static STORE: Mutex<Option<Arc<dyn PlaylistStore>>> = Mutex::new(None);
@@ -154,7 +154,10 @@ pub fn sync_import(window: &MoggytWindow) {
 
 /// Drains pending background events and synchronizes the window.
 pub fn poll_import(window: &MoggytWindow) {
-    with_session(|s| s.drain());
+    let outcome = with_session(|s| s.drain());
+    if outcome.connection_lost {
+        window.global::<ImportUi>().set_connection_lost(true);
+    }
     sync_import(window);
 }
 
@@ -338,6 +341,7 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
         if with_session(|s| s.is_busy()) {
             return;
         }
+        win.global::<ImportUi>().set_connection_lost(false);
         let tab = win.get_import_tab();
         let link_text = win.get_import_link_text().to_string();
         let file_path = win.get_import_file_path().to_string();
@@ -438,6 +442,25 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
     window.on_import_save_requested(move || {
         let Some(win) = w.upgrade() else { return };
         handle_save_requested(&win);
+    });
+
+    let w = window.as_weak();
+    window.global::<ImportUi>().on_retry_requested(move || {
+        let Some(win) = w.upgrade() else { return };
+        let Some(source) = with_session(|s| s.source.clone()) else { return };
+        win.global::<ImportUi>().set_connection_lost(false);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let rx = spawn_import(
+            Arc::new(LiveTrackSearcher::new()),
+            source.clone(),
+            Arc::clone(&cancel),
+            WorkerConfig::default(),
+        );
+        with_session(|s| {
+            s.begin_matching(source, rx);
+            s.set_cancel(cancel);
+        });
+        sync_import(&win);
     });
 }
 

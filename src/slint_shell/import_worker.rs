@@ -12,8 +12,9 @@ use std::time::Duration;
 use crate::domain::{LocalPlaylist, LocalTrack, MatchConfidence, SpotifyPlaylist, SpotifyTrack};
 pub use crate::infra::SearchFailure;
 
-use super::import_searcher::{
-    CandidateHit, compute_backoff, failure_to_resolution, hits_to_resolution, search_queries,
+pub use super::import_searcher::{
+    CandidateHit, assemble_playlist, compute_backoff, failure_to_resolution, hits_to_resolution,
+    search_queries,
 };
 
 /// Port for candidate search used by the import worker.
@@ -57,6 +58,7 @@ pub enum ImportProgressEvent {
     Finished { playlist: LocalPlaylist },
     Cancelled { playlist: LocalPlaylist },
     Failed { message: String },
+    ConnectionLost { message: String },
 }
 
 /// Final tallies for one import run.
@@ -71,11 +73,10 @@ pub struct ImportStats {
     pub with_alternatives: usize,
 }
 
-pub use super::import_searcher::assemble_playlist;
-
 struct WorkerEnv<'a> {
     searcher: &'a dyn TrackSearcher,
     cancel: &'a AtomicBool,
+    connection_lost: &'a AtomicBool,
     config: &'a WorkerConfig,
     sleeper: &'a (dyn Fn(Duration) + Sync),
     cache: &'a Mutex<HashMap<String, Vec<CandidateHit>>>,
@@ -107,7 +108,10 @@ fn search_with_retries(
         }
         match execute_search_attempt(env, query, attempt) {
             Ok(hits) => return Ok(hits),
-            Err(SearchFailure::Unavailable(err)) => return Err(SearchFailure::Unavailable(err)),
+            Err(SearchFailure::Unavailable(err)) => {
+                env.connection_lost.store(true, Ordering::Relaxed);
+                return Err(SearchFailure::Unavailable(err));
+            }
             Err(SearchFailure::RateLimited) => {}
         }
     }
@@ -226,6 +230,21 @@ fn finish_pipeline_event(
     }
 }
 
+fn emit_pipeline_finish(
+    tx: &mut dyn FnMut(ImportProgressEvent),
+    source: &SpotifyPlaylist,
+    resolutions: &[TrackResolution],
+    connection_lost: bool,
+    cancelled: bool,
+) {
+    if connection_lost {
+        tx(ImportProgressEvent::ConnectionLost { message: "connection lost".to_string() });
+        tx(ImportProgressEvent::Finished { playlist: assemble_playlist(source, resolutions) });
+    } else {
+        tx(finish_pipeline_event(source, resolutions, cancelled));
+    }
+}
+
 /// Pure sequential pipeline: search, score, retry, pace, cache. Returns one entry per source track.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_tracks(
@@ -237,13 +256,15 @@ pub fn resolve_tracks(
     cache: &Mutex<HashMap<String, Vec<CandidateHit>>>,
     on_event: &mut dyn FnMut(ImportProgressEvent),
 ) -> (Vec<TrackResolution>, ImportStats, bool) {
-    let env = WorkerEnv { searcher, cancel, config, sleeper, cache };
+    let connection_lost = AtomicBool::new(false);
+    let env =
+        WorkerEnv { searcher, cancel, connection_lost: &connection_lost, config, sleeper, cache };
     let mut stats = ImportStats { total: source.tracks.len(), ..Default::default() };
     let mut resolutions = Vec::with_capacity(source.tracks.len());
     on_event(ImportProgressEvent::Started { total: stats.total });
 
     for (i, t) in source.tracks.iter().enumerate() {
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.load(Ordering::Relaxed) || connection_lost.load(Ordering::Relaxed) {
             break;
         }
         let Some(res) = resolve_one_track(&env, t) else {
@@ -253,8 +274,9 @@ pub fn resolve_tracks(
         emit_track_progress(on_event, i, res, &stats);
     }
     let cancelled = cancel.load(Ordering::Relaxed) || resolutions.len() < source.tracks.len();
-    on_event(finish_pipeline_event(source, &resolutions, cancelled));
-    (resolutions, stats, cancelled)
+    let is_lost = connection_lost.load(Ordering::Relaxed);
+    emit_pipeline_finish(on_event, source, &resolutions, is_lost, cancelled);
+    (resolutions, stats, !is_lost && cancelled)
 }
 
 fn drain_and_emit(
@@ -291,7 +313,7 @@ fn worker_thread_loop(
     next: &AtomicUsize,
     tx: &mpsc::Sender<(usize, TrackResolution)>,
 ) {
-    while !env.cancel.load(Ordering::Relaxed) {
+    while !env.cancel.load(Ordering::Relaxed) && !env.connection_lost.load(Ordering::Relaxed) {
         let idx = next.fetch_add(1, Ordering::SeqCst);
         if idx >= tracks.len() {
             break;
@@ -320,6 +342,7 @@ fn run_pipeline(
         return;
     }
 
+    let connection_lost = Arc::new(AtomicBool::new(false));
     let (cache, tracks, next) = (
         Arc::new(Mutex::new(HashMap::new())),
         Arc::new(source.tracks.clone()),
@@ -329,9 +352,10 @@ fn run_pipeline(
     let num_workers = config.workers.clamp(1, total);
     let handles: Vec<_> = (0..num_workers)
         .map(|_| {
-            let (sr, ca, ch, tr, wtx, n) = (
+            let (sr, ca, cl, ch, tr, wtx, n) = (
                 Arc::clone(&searcher),
                 Arc::clone(&cancel),
+                Arc::clone(&connection_lost),
                 Arc::clone(&cache),
                 Arc::clone(&tracks),
                 worker_tx.clone(),
@@ -341,6 +365,7 @@ fn run_pipeline(
                 let env = WorkerEnv {
                     searcher: sr.as_ref(),
                     cancel: ca.as_ref(),
+                    connection_lost: cl.as_ref(),
                     config: &config,
                     sleeper: &std::thread::sleep,
                     cache: ch.as_ref(),
@@ -353,7 +378,13 @@ fn run_pipeline(
 
     let (resolutions, was_cancelled) = drain_and_emit(&source, &cancel, &worker_rx, &tx);
     let is_cancelled = was_cancelled || cancel.load(Ordering::Relaxed);
-    drop(tx.send(finish_pipeline_event(&source, &resolutions, is_cancelled)));
+    emit_pipeline_finish(
+        &mut |ev| drop(tx.send(ev)),
+        &source,
+        &resolutions,
+        connection_lost.load(Ordering::Relaxed),
+        is_cancelled,
+    );
     for h in handles {
         drop(h.join());
     }
@@ -763,3 +794,7 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+#[path = "import_worker_connection_tests.rs"]
+mod connection_tests;

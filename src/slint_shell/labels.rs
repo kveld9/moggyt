@@ -133,6 +133,8 @@ pub struct StaticLabels {
     pub import_all_matched_label: &'static str,
     pub import_custom_id_placeholder: &'static str,
     pub import_use_id_label: &'static str,
+    pub import_connection_lost_label: &'static str,
+    pub import_retry_label: &'static str,
     pub nav_stats: &'static str,
     pub stats_last_4_weeks: &'static str,
     pub stats_last_6_months: &'static str,
@@ -285,6 +287,11 @@ impl StaticLabels {
             import_all_matched_label: tr(locale, "All matched"),
             import_custom_id_placeholder: tr(locale, "YouTube video ID"),
             import_use_id_label: tr(locale, "Use ID"),
+            import_connection_lost_label: tr(
+                locale,
+                "Connection lost. Retry or save the matched tracks.",
+            ),
+            import_retry_label: tr(locale, "Retry"),
             nav_stats: tr(locale, "Stats"),
             stats_last_4_weeks: tr(locale, "Last 4 weeks"),
             stats_last_6_months: tr(locale, "Last 6 months"),
@@ -434,6 +441,8 @@ impl StaticLabels {
         labels.set_import_all_matched_label(self.import_all_matched_label.into());
         labels.set_import_custom_id_placeholder(self.import_custom_id_placeholder.into());
         labels.set_import_use_id_label(self.import_use_id_label.into());
+        labels.set_import_connection_lost_label(self.import_connection_lost_label.into());
+        labels.set_import_retry_label(self.import_retry_label.into());
         labels.set_nav_stats_label(self.nav_stats.into());
         labels.set_stats_last_4_weeks_label(self.stats_last_4_weeks.into());
         labels.set_stats_last_6_months_label(self.stats_last_6_months.into());

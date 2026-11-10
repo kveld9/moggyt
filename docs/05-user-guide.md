@@ -177,6 +177,10 @@ Clicking `Start import` initiates the matching process and displays the progress
 After matching completes or is cancelled, the review screen presents each Spotify track alongside its matched YouTube
 Music candidate:
 
+- **Connection Lost Banner & Retry**: If the network connection drops during matching, the pipeline stops immediately
+  and presents the review screen with the tracks matched so far. A "Connection lost. Retry or save the matched tracks."
+  banner appears with a `Retry` button. Clicking `Retry` re-runs matching from the beginning, while clicking `Save
+  playlist` keeps the tracks matched so far.
 - **Exclude Checkbox**: A checkbox on the left of each row allows excluding specific tracks from import. Excluded
   rows are dimmed and skipped entirely when saving to your library or loading into the queue.
 - **Matched Channel & Duration Delta**: The matched candidate shows its YouTube channel or artist name beneath the

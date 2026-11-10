@@ -4,6 +4,11 @@ import { ImportModal } from "./import_modal.slint";
 import { ImportProgress } from "./import_progress.slint";
 import { ImportReviewView } from "./import_review.slint";
 
+export global ImportUi {
+    in-out property <bool> connection-lost: false;
+    callback retry-requested();
+}
+
 export component ImportOverlay inherits Rectangle {
     width: 100%;
     height: 100%;
@@ -89,11 +94,13 @@ export component ImportOverlay inherits Rectangle {
         rows: root.rows;
         selected: root.selected-row;
         can-save: root.can-save;
+        retry-visible: ImportUi.connection-lost;
         row-selected(idx) => { root.row-selected(idx); }
         swap-requested(idx) => { root.swap-requested(idx); }
         row-exclusion-toggled(idx) => { root.row-exclusion-toggled(idx); }
         save-requested => { root.save-requested(); }
         discard-requested => { root.discard-requested(); }
+        retry-requested => { ImportUi.retry-requested(); }
     }
     AlternativePicker {
         visible: root.picker-open;

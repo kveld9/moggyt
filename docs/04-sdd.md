@@ -309,10 +309,14 @@ The matching worker (`import_worker.rs`, `import_searcher.rs`) executes in backg
   jitter (base 500 ms, up to 3 retries).
 - **Atomic Cancellation**: Supports cancellation via `AtomicBool`, cleanly stopping worker execution and returning
   partial resolutions.
+- **Connection Loss Handling**: A network connection failure (`SearchFailure::Unavailable`) stops worker matching on
+  the first failure, emits `ConnectionLost`, and finishes with partial results matched so far. The review screen
+  displays a connection lost banner with a Retry action; clicking Retry re-runs matching from the beginning, while
+  partial matches can still be saved using the standard Save playlist action.
 - **Ranked Alternatives**: Retains up to 5 alternative candidate hits (`MAX_ALTERNATIVES = 5`) scoring at or above
   `0.50` for user review.
-- **Event Streaming**: Dispatches progress events (`Started`, `Track`, `Progress`, `Finished`, `Cancelled`, `Failed`)
-  to update UI overlays.
+- **Event Streaming**: Dispatches progress events (`Started`, `Track`, `Progress`, `Finished`, `Cancelled`, `Failed`,
+  `ConnectionLost`) to update UI overlays.
 
 #### 6.1.6 Persistence and storage
 
