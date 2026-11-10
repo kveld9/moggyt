@@ -61,6 +61,7 @@ mod spotify_search;
 mod spotify_source;
 mod store_health;
 mod stream;
+mod stream_chain;
 pub mod stream_disk_cache;
 mod stream_reader;
 mod stream_reqwest;
@@ -167,8 +168,11 @@ pub use spotify_search::{
 pub use spotify_source::load_spotify_link;
 pub use store_health::{HealthFlag, StoreHealth, quarantine};
 pub use stream::{AudioQuality, ResolvedStream, StreamResolver, StreamStub};
+pub use stream_chain::{PrimaryStreamResolver, StreamChain};
 pub use stream_disk_cache::StreamDiskCache;
-pub use stream_url_cache::{STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache};
+pub use stream_url_cache::{
+    ResolverSource, STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache,
+};
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
 pub use updater_github::{

@@ -6,7 +6,8 @@
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-use super::stream::AudioQuality;
+pub use super::stream::ResolverSource;
+use super::stream::{AudioQuality, ResolvedStream};
 
 /// Duration for which a resolved stream URL remains valid (20 minutes).
 ///
@@ -19,9 +20,12 @@ pub const STREAM_URL_CACHE_CAPACITY: usize = 8;
 
 #[derive(Debug, Clone)]
 struct CachedUrl {
+    source: ResolverSource,
     video_id: String,
     quality: AudioQuality,
     url: String,
+    mime_type: Option<String>,
+    loudness_db: Option<f32>,
     stored_at: Instant,
 }
 
@@ -53,33 +57,108 @@ impl StreamUrlCache {
 
     /// Retrieves a cached stream URL if present, matching quality, and not expired.
     ///
+    /// Reads entries belonging to the [`ResolverSource::YtDlp`] tier with no metadata.
     /// Drops any expired entries encountered during cache lookup.
     pub fn get(&self, video_id: &str, quality: AudioQuality, now: Instant) -> Option<String> {
         let mut entries = self.lock_entries();
         entries.retain(|e| now.saturating_duration_since(e.stored_at) < STREAM_URL_TTL);
         entries
             .iter()
-            .find(|e| e.video_id == video_id && e.quality == quality)
+            .find(|e| {
+                e.source == ResolverSource::YtDlp && e.video_id == video_id && e.quality == quality
+            })
             .map(|e| e.url.clone())
     }
 
     /// Inserts or replaces a resolved stream URL for the given video ID and quality.
     ///
+    /// Writes entries to the [`ResolverSource::YtDlp`] tier with no metadata.
     /// Replaces existing entries for the same video ID and quality; evicts the oldest
     /// entry when inserting a new key at capacity.
     pub fn insert(&self, video_id: &str, quality: AudioQuality, url: String, now: Instant) {
         let mut entries = self.lock_entries();
-        if let Some(existing) =
-            entries.iter_mut().find(|e| e.video_id == video_id && e.quality == quality)
-        {
+        if let Some(existing) = entries.iter_mut().find(|e| {
+            e.source == ResolverSource::YtDlp && e.video_id == video_id && e.quality == quality
+        }) {
             existing.url = url;
+            existing.mime_type = None;
+            existing.loudness_db = None;
             existing.stored_at = now;
             return;
         }
         if entries.len() >= STREAM_URL_CACHE_CAPACITY {
             evict_oldest(&mut entries);
         }
-        entries.push(CachedUrl { video_id: video_id.to_string(), quality, url, stored_at: now });
+        entries.push(CachedUrl {
+            source: ResolverSource::YtDlp,
+            video_id: video_id.to_string(),
+            quality,
+            url,
+            mime_type: None,
+            loudness_db: None,
+            stored_at: now,
+        });
+    }
+
+    /// Retrieves a cached stream if present for the given tier, matching quality, and not expired.
+    ///
+    /// Drops any expired entries encountered during cache lookup.
+    pub fn get_stream(
+        &self,
+        source: ResolverSource,
+        video_id: &str,
+        quality: AudioQuality,
+        now: Instant,
+    ) -> Option<ResolvedStream> {
+        let mut entries = self.lock_entries();
+        entries.retain(|e| now.saturating_duration_since(e.stored_at) < STREAM_URL_TTL);
+        entries
+            .iter()
+            .find(|e| e.source == source && e.video_id == video_id && e.quality == quality)
+            .map(|e| ResolvedStream {
+                url: e.url.clone(),
+                mime_type: e.mime_type.clone(),
+                loudness_db: e.loudness_db,
+            })
+    }
+
+    /// Inserts or replaces a resolved stream with metadata for the given tier, video ID, and quality.
+    ///
+    /// Replacement is keyed by `(source, video_id, quality)`. Evicts the oldest entry across all
+    /// tiers when inserting at capacity.
+    // NOTE(clippy): cache setters take the same value arguments as the legacy insert.
+    #[allow(clippy::too_many_arguments)]
+    pub fn insert_stream(
+        &self,
+        source: ResolverSource,
+        video_id: &str,
+        quality: AudioQuality,
+        stream: &ResolvedStream,
+        now: Instant,
+    ) {
+        let mut entries = self.lock_entries();
+        if let Some(existing) = entries
+            .iter_mut()
+            .find(|e| e.source == source && e.video_id == video_id && e.quality == quality)
+        {
+            existing.url = stream.url.clone();
+            existing.mime_type = stream.mime_type.clone();
+            existing.loudness_db = stream.loudness_db;
+            existing.stored_at = now;
+            return;
+        }
+        if entries.len() >= STREAM_URL_CACHE_CAPACITY {
+            evict_oldest(&mut entries);
+        }
+        entries.push(CachedUrl {
+            source,
+            video_id: video_id.to_string(),
+            quality,
+            url: stream.url.clone(),
+            mime_type: stream.mime_type.clone(),
+            loudness_db: stream.loudness_db,
+            stored_at: now,
+        });
     }
 
     /// Invalidates all cached stream URLs for `video_id` regardless of quality.
@@ -243,5 +322,86 @@ mod tests {
         assert_eq!(cache.len(), 2);
         cache.invalidate("vid1");
         assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn stream_metadata_roundtrip_by_source() {
+        let cache = StreamUrlCache::new();
+        let now = Instant::now();
+        let stream = ResolvedStream {
+            url: "https://innertube.test/stream".to_string(),
+            mime_type: Some("audio/mp4".to_string()),
+            loudness_db: Some(0.99),
+        };
+        cache.insert_stream(ResolverSource::InnerTube, "v", AudioQuality::Standard, &stream, now);
+
+        let hit = cache.get_stream(ResolverSource::InnerTube, "v", AudioQuality::Standard, now);
+        assert_eq!(hit, Some(stream));
+
+        let legacy = cache.get("v", AudioQuality::Standard, now);
+        assert_eq!(legacy, None);
+    }
+
+    #[test]
+    fn same_key_different_source_is_isolated() {
+        let cache = StreamUrlCache::new();
+        let now = Instant::now();
+
+        cache.insert("v", AudioQuality::Standard, "https://a".to_string(), now);
+
+        let stream_it = ResolvedStream {
+            url: "https://innertube.test/v".to_string(),
+            mime_type: Some("audio/mp4".to_string()),
+            loudness_db: Some(0.5),
+        };
+        cache.insert_stream(
+            ResolverSource::InnerTube,
+            "v",
+            AudioQuality::Standard,
+            &stream_it,
+            now,
+        );
+
+        let it_hit = cache.get_stream(ResolverSource::InnerTube, "v", AudioQuality::Standard, now);
+        assert_eq!(it_hit, Some(stream_it));
+
+        let legacy_hit = cache.get("v", AudioQuality::Standard, now);
+        assert_eq!(legacy_hit.as_deref(), Some("https://a"));
+
+        let stream_yt = ResolvedStream {
+            url: "https://ytdlp.test/v".to_string(),
+            mime_type: Some("audio/mp4".to_string()),
+            loudness_db: None,
+        };
+        cache.insert_stream(ResolverSource::YtDlp, "v", AudioQuality::Standard, &stream_yt, now);
+
+        let yt_hit = cache.get_stream(ResolverSource::YtDlp, "v", AudioQuality::Standard, now);
+        assert_eq!(yt_hit, Some(stream_yt));
+
+        let updated_legacy = cache.get("v", AudioQuality::Standard, now);
+        assert_eq!(updated_legacy.as_deref(), Some("https://ytdlp.test/v"));
+    }
+
+    #[test]
+    fn stream_entry_expires_at_ttl() {
+        let cache = StreamUrlCache::new();
+        let now = Instant::now();
+        let stream = ResolvedStream::from_url("https://stream.test/v");
+        cache.insert_stream(ResolverSource::InnerTube, "v", AudioQuality::Standard, &stream, now);
+
+        let before_ttl = now + STREAM_URL_TTL - Duration::from_millis(1);
+        assert!(
+            cache
+                .get_stream(ResolverSource::InnerTube, "v", AudioQuality::Standard, before_ttl)
+                .is_some()
+        );
+        assert_eq!(cache.len(), 1);
+
+        let at_ttl = now + STREAM_URL_TTL;
+        assert_eq!(
+            cache.get_stream(ResolverSource::InnerTube, "v", AudioQuality::Standard, at_ttl),
+            None
+        );
+        assert_eq!(cache.len(), 0);
     }
 }

@@ -257,6 +257,17 @@ impl InnertubeResolver {
         }
         result
     }
+
+    /// Fetches and resolves a stream honoring an explicit quality preference.
+    pub fn fetch_stream_with(
+        &self,
+        video_id: &str,
+        quality: AudioQuality,
+    ) -> Result<ResolvedStream, FallbackReason> {
+        let mut resolver = self.clone();
+        resolver.set_quality(quality);
+        resolver.fetch_stream(video_id)
+    }
 }
 
 impl Default for InnertubeResolver {
@@ -504,5 +515,13 @@ mod tests {
         let resolver = InnertubeResolver::new();
         assert_eq!(resolver.resolve("   "), None);
         assert_eq!(resolver.resolve_stream("   "), None);
+    }
+
+    #[test]
+    fn fetch_stream_with_blank_id_reports_invalid_payload() {
+        assert_eq!(
+            InnertubeResolver::new().fetch_stream_with("  ", AudioQuality::High),
+            Err(FallbackReason::InvalidPayload)
+        );
     }
 }

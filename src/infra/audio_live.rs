@@ -6,8 +6,8 @@ use std::time::Duration;
 use super::audio::{AudioBackend, AudioError, AudioStub};
 use super::audio_rodio::RodioBackend;
 use super::stream::AudioQuality;
+use super::stream_chain::StreamChain;
 use super::stream_disk_cache::StreamDiskCache;
-use super::ytdlp::YtDlpResolver;
 
 /// Dual-mode audio backend: hardware playback with graceful fallback to an in-memory stub.
 pub enum LiveAudio {
@@ -116,7 +116,7 @@ impl AudioBackend for LiveAudio {
         delegate_audio!(self, set_loudness_normalization, on);
     }
 
-    fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
+    fn stream_prefetcher(&self) -> Option<StreamChain> {
         delegate_audio!(self, stream_prefetcher)
     }
 }
