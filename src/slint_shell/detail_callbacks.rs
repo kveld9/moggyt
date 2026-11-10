@@ -4,13 +4,17 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::slint_shell::MoggytWindow;
+use crate::domain::is_local_playlist_id;
 use crate::slint_shell::callbacks::with_window_state;
 use crate::slint_shell::covers::request_queue_track_cover;
+use crate::slint_shell::import_callbacks::{current_store, reload_local_library};
+use crate::slint_shell::import_state::local_detail;
+use crate::slint_shell::local_edit;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::sync_window;
 use crate::slint_shell::window::trigger_playback;
+use crate::slint_shell::{LocalEditUi, MoggytWindow};
 
 /// Wires detail view track selection and playback action callbacks.
 pub(crate) fn wire_detail_callbacks(
@@ -38,6 +42,93 @@ pub(crate) fn wire_detail_callbacks(
     window.on_detail_shuffle(move || {
         with_window_state(&w, &s, |win, st| handle_detail_shuffle(win, st, &tx));
     });
+
+    let local_ui = window.global::<LocalEditUi>();
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    local_ui.on_rename_submitted(move |title| {
+        with_window_state(&w, &s, |win, st| handle_local_rename(win, st, title.as_str()));
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    local_ui.on_delete_requested(move || {
+        with_window_state(&w, &s, handle_local_delete);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    local_ui.on_remove_track_requested(move |idx| {
+        with_window_state(&w, &s, |win, st| handle_local_remove_track(win, st, idx));
+    });
+}
+
+/// Returns the playlist identifier from active detail request only if it is a local playlist.
+pub(crate) fn current_local_detail_id(state: &SlintAppState) -> Option<String> {
+    state
+        .detail_request
+        .as_ref()
+        .filter(|(id, _)| is_local_playlist_id(id))
+        .map(|(id, _)| id.clone())
+}
+
+fn handle_local_rename(win: &MoggytWindow, st: &mut SlintAppState, title: &str) {
+    let (Some(id), Some(store)) = (current_local_detail_id(st), current_store()) else {
+        return;
+    };
+    match local_edit::rename_local_playlist(store.as_ref(), &id, title) {
+        Ok(playlist) => {
+            st.detail = Some(local_detail(&playlist));
+            st.detail_error = None;
+            reload_local_library(win, store.as_ref());
+            sync_window(win, st);
+        }
+        Err(err) => {
+            st.detail_error = Some(err.to_string());
+            sync_window(win, st);
+        }
+    }
+}
+
+fn handle_local_delete(win: &MoggytWindow, st: &mut SlintAppState) {
+    let (Some(id), Some(store)) = (current_local_detail_id(st), current_store()) else {
+        return;
+    };
+    match local_edit::delete_local_playlist(store.as_ref(), &id) {
+        Ok(()) => {
+            st.page = st.detail_return;
+            st.detail = None;
+            st.detail_error = None;
+            reload_local_library(win, store.as_ref());
+            sync_window(win, st);
+        }
+        Err(err) => {
+            st.detail_error = Some(err.to_string());
+            sync_window(win, st);
+        }
+    }
+}
+
+fn handle_local_remove_track(win: &MoggytWindow, st: &mut SlintAppState, idx: i32) {
+    if idx < 0 {
+        return;
+    }
+    let (Some(id), Some(store)) = (current_local_detail_id(st), current_store()) else {
+        return;
+    };
+    match local_edit::remove_local_track(store.as_ref(), &id, idx as usize) {
+        Ok(playlist) => {
+            st.detail = Some(local_detail(&playlist));
+            st.detail_error = None;
+            reload_local_library(win, store.as_ref());
+            sync_window(win, st);
+        }
+        Err(err) => {
+            st.detail_error = Some(err.to_string());
+            sync_window(win, st);
+        }
+    }
 }
 
 fn enqueue_detail_tracks(
@@ -189,5 +280,17 @@ mod tests {
             assert!(state.queue.is_empty());
             assert!(state.unshuffled_tracks.is_none());
         }
+    }
+
+    #[test]
+    fn test_current_local_detail_id() {
+        let mut state = test_wired();
+        assert_eq!(current_local_detail_id(&state), None);
+
+        state.detail_request = Some(("spotify:abc".to_string(), DetailKind::Playlist));
+        assert_eq!(current_local_detail_id(&state), None);
+
+        state.detail_request = Some(("local:my_playlist".to_string(), DetailKind::Playlist));
+        assert_eq!(current_local_detail_id(&state), Some("local:my_playlist".to_string()));
     }
 }

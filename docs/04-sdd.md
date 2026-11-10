@@ -333,6 +333,18 @@ Imported playlists are stored locally via `DiskPlaylistStore` (`playlist_store_d
 - **Offline Resolution**: Stored playlists display in the Library page and open in the Detail view without contacting
   YouTube Music for catalog lookups.
 
+##### Local playlist mutation layer
+
+Local playlists with `local:` identifiers support in-place mutation mediated through `local_edit.rs`:
+
+- **Rename**: Trims and updates the playlist title, persisting the change to `PlaylistStore` and refreshing the detail
+  view and library view model.
+- **Delete**: Deletes the playlist from `PlaylistStore`, clearing detail view state and returning navigation to the
+  calling library page.
+- **Remove Track**: Removes a track by zero-based index, maintaining track sequence and updating `PlaylistStore`.
+- **Track Reorder**: Track reordering is supported in the domain/storage layer (`reorder_local_track`), but does not
+  yet have an interactive UI binding.
+
 #### 6.1.7 Command-line interface (CLI)
 
 The importer supports headless execution from the terminal:

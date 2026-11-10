@@ -231,7 +231,7 @@ fn spawn_import_file_picker(weak: slint::Weak<MoggytWindow>, title: String) {
         .expect("spawn import file picker thread");
 }
 
-fn reload_local_library(window: &MoggytWindow, store: &dyn PlaylistStore) {
+pub(crate) fn reload_local_library(window: &MoggytWindow, store: &dyn PlaylistStore) {
     let local = store.list();
     crate::slint_shell::window::with_ui_state(|st| {
         let catalog: Vec<_> = st

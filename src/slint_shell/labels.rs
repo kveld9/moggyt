@@ -146,6 +146,10 @@ pub struct StaticLabels {
     pub stats_top_artists: &'static str,
     pub stats_top_tracks: &'static str,
     pub stats_empty: &'static str,
+    pub local_rename_placeholder: &'static str,
+    pub local_rename_label: &'static str,
+    pub local_delete_label: &'static str,
+    pub local_remove_track_label: &'static str,
 }
 
 impl StaticLabels {
@@ -306,6 +310,10 @@ impl StaticLabels {
                 locale,
                 "No plays recorded yet. Songs you listen to for at least 30 seconds show up here.",
             ),
+            local_rename_placeholder: tr(locale, "New playlist name"),
+            local_rename_label: tr(locale, "Rename"),
+            local_delete_label: tr(locale, "Delete playlist"),
+            local_remove_track_label: tr(locale, "Remove"),
         }
     }
 
@@ -454,6 +462,10 @@ impl StaticLabels {
         labels.set_stats_top_artists_header(self.stats_top_artists.into());
         labels.set_stats_top_tracks_header(self.stats_top_tracks.into());
         labels.set_stats_empty_label(self.stats_empty.into());
+        labels.set_local_rename_placeholder(self.local_rename_placeholder.into());
+        labels.set_local_rename_label(self.local_rename_label.into());
+        labels.set_local_delete_label(self.local_delete_label.into());
+        labels.set_local_remove_track_label(self.local_remove_track_label.into());
     }
 }
 

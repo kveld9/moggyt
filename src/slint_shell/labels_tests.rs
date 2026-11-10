@@ -33,6 +33,10 @@ mod tests {
         assert_eq!(en_labels.import_to_queue_label, "Load directly to queue");
         assert_eq!(en_labels.import_valid_link_label, "Valid Spotify link");
         assert_eq!(en_labels.import_invalid_link_label, "Invalid Spotify link");
+        assert_eq!(en_labels.local_rename_placeholder, "New playlist name");
+        assert_eq!(en_labels.local_rename_label, "Rename");
+        assert_eq!(en_labels.local_delete_label, "Delete playlist");
+        assert_eq!(en_labels.local_remove_track_label, "Remove");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -56,6 +60,10 @@ mod tests {
         assert_eq!(es_labels.import_to_queue_label, "Cargar directamente en la cola");
         assert_eq!(es_labels.import_valid_link_label, "Enlace de Spotify valido");
         assert_eq!(es_labels.import_invalid_link_label, "Enlace de Spotify no valido");
+        assert_eq!(es_labels.local_rename_placeholder, "Nuevo nombre de playlist");
+        assert_eq!(es_labels.local_rename_label, "Renombrar");
+        assert_eq!(es_labels.local_delete_label, "Borrar playlist");
+        assert_eq!(es_labels.local_remove_track_label, "Quitar");
     }
 
     #[test]
@@ -213,6 +221,10 @@ mod tests {
             es.stats_empty,
             "Todavía no hay reproducciones. Los temas que escuches al menos 30 segundos aparecen acá."
         );
+        assert_eq!(es.local_rename_placeholder, "Nuevo nombre de playlist");
+        assert_eq!(es.local_rename_label, "Renombrar");
+        assert_eq!(es.local_delete_label, "Borrar playlist");
+        assert_eq!(es.local_remove_track_label, "Quitar");
 
         let en = StaticLabels::resolve(Locale::English);
         assert_eq!(en.nav_search, "Search");
@@ -361,5 +373,9 @@ mod tests {
             en.stats_empty,
             "No plays recorded yet. Songs you listen to for at least 30 seconds show up here."
         );
+        assert_eq!(en.local_rename_placeholder, "New playlist name");
+        assert_eq!(en.local_rename_label, "Rename");
+        assert_eq!(en.local_delete_label, "Delete playlist");
+        assert_eq!(en.local_remove_track_label, "Remove");
     }
 }

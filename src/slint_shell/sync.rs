@@ -4,9 +4,9 @@
 
 use std::collections::HashMap;
 
-use slint::{ModelRc, VecModel};
+use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::{Album, PlaybackFacts, Playlist, SearchFilter, Track};
+use crate::domain::{Album, PlaybackFacts, Playlist, SearchFilter, Track, is_local_playlist_id};
 use crate::i18n::{Locale, tr};
 use crate::infra::{CatalogError, GithubUpdater, StoreHealth};
 use crate::slint_shell::covers::resolve_row_cover_image;
@@ -27,7 +27,9 @@ use crate::slint_shell::search::{SearchRow, format_duration};
 use crate::slint_shell::state::{PersistenceError, PersistenceStore, SlintAppState};
 use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
-use crate::slint_shell::{LibraryItemData, LyricLineData, MoggytWindow, ShelfData, TrackRowData};
+use crate::slint_shell::{
+    LibraryItemData, LocalEditUi, LyricLineData, MoggytWindow, ShelfData, TrackRowData,
+};
 
 fn derive_library_phase(state: &SlintAppState) -> ViewPhase {
     if state.library_phase == ViewPhase::Error {
@@ -377,6 +379,18 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
         window.set_detail_has_artwork(false);
         window.set_detail_description("".into());
         window.set_detail_cover(slint::Image::default());
+    }
+    sync_local_edit_ui(window, state);
+}
+
+fn sync_local_edit_ui(window: &MoggytWindow, state: &SlintAppState) {
+    let local_ui = window.global::<LocalEditUi>();
+    let is_local =
+        state.detail_request.as_ref().map(|(id, _)| is_local_playlist_id(id)).unwrap_or(false);
+    local_ui.set_is_local(is_local);
+    if is_local {
+        let title = state.detail.as_ref().map(|d| d.title.as_str()).unwrap_or("");
+        local_ui.set_rename_text(title.into());
     }
 }
 
