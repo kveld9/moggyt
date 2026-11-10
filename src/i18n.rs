@@ -151,7 +151,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Floating", "Flotante"),
     ("From file", "Desde archivo"),
     ("From link", "Desde enlace"),
-    ("High (>=192 kbps)", "Alta (>=192 kbps)"),
+    ("High (AAC max ~130 kbps)", "Alta (AAC máx ~130 kbps)"),
     ("High confidence", "Confianza alta"),
     ("History", "Historial"),
     ("Import", "Importar"),
@@ -525,7 +525,7 @@ mod tests {
             "Applies from the next track",
             "Low (<=64 kbps)",
             "Standard (~128 kbps)",
-            "High (>=192 kbps)",
+            "High (AAC max ~130 kbps)",
         ];
         for key in keys {
             let en = tr(Locale::English, key);

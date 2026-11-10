@@ -571,7 +571,7 @@ mod tests {
                 "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
             ),
             (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
-            (AudioQuality::High, "bestaudio[ext=m4a][abr>=192]/bestaudio[ext=m4a]/bestaudio/best"),
+            (AudioQuality::High, "bestaudio[ext=m4a]/bestaudio/best"),
         ] {
             let args = format_args_with_quality("v123", q);
             assert_eq!(
