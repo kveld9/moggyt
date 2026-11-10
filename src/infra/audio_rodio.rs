@@ -10,6 +10,8 @@ use rodio::{Decoder, OutputStream, Sink, Source};
 
 use super::audio::{AudioBackend, AudioError, clamp_speed};
 use super::audio_dsp::{SkipSilence, append_normalized, normalization_stage};
+use super::audio_fade::{spawn_fade_in, spawn_fade_out};
+use super::audio_stream_cache_worker::cache_download_worker;
 use super::stream::{AudioQuality, ResolvedStream};
 use super::stream_chain::StreamChain;
 use super::stream_disk_cache::StreamDiskCache;
@@ -340,82 +342,6 @@ impl RodioBackend {
             AudioError::Playback(err.to_string())
         })
     }
-}
-
-fn download_stream_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
-    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(120)).build()?;
-    let resp = client.get(url).send()?;
-    if !resp.status().is_success() {
-        anyhow::bail!("stream download returned HTTP {}", resp.status());
-    }
-    Ok(resp.bytes()?.to_vec())
-}
-
-// NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
-#[allow(clippy::cognitive_complexity)]
-fn cache_download_worker(cache: Arc<StreamDiskCache>, track_id: &str, url: &str) {
-    match download_stream_bytes(url) {
-        Ok(data) => {
-            if let Err(err) = cache.put(track_id, &data) {
-                tracing::warn!(track_id = %track_id, error = ?err, "failed to cache stream to disk");
-            }
-        }
-        Err(err) => {
-            tracing::warn!(track_id = %track_id, error = ?err, "failed to download stream for caching");
-        }
-    }
-}
-
-fn spawn_fade_out(sink: Arc<Sink>, duration: Duration) {
-    if duration.is_zero() {
-        sink.stop();
-        return;
-    }
-    std::thread::Builder::new()
-        .name("audio-fade-out".to_string())
-        .spawn(move || {
-            let steps: u32 = 20;
-            let step_duration = duration / steps;
-            let initial_vol = sink.volume();
-            for step in 1..=steps {
-                std::thread::sleep(step_duration);
-                let factor = (steps - step) as f32 / steps as f32;
-                sink.set_volume(initial_vol * factor);
-            }
-            sink.stop();
-        })
-        .ok();
-}
-
-fn spawn_fade_in(
-    sink: Arc<Sink>,
-    target_vol: f32,
-    duration: Duration,
-    generation: Arc<AtomicU64>,
-    expected_gen: u64,
-) {
-    if duration.is_zero() || target_vol <= 0.0 {
-        sink.set_volume(target_vol);
-        return;
-    }
-    std::thread::Builder::new()
-        .name("audio-fade-in".to_string())
-        .spawn(move || {
-            let steps: u32 = 20;
-            let step_duration = duration / steps;
-            for step in 1..=steps {
-                std::thread::sleep(step_duration);
-                if generation.load(Ordering::SeqCst) != expected_gen {
-                    return;
-                }
-                let factor = step as f32 / steps as f32;
-                sink.set_volume(target_vol * factor);
-            }
-            if generation.load(Ordering::SeqCst) == expected_gen {
-                sink.set_volume(target_vol);
-            }
-        })
-        .ok();
 }
 
 impl AudioBackend for RodioBackend {
