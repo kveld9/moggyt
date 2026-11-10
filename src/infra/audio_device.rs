@@ -77,6 +77,68 @@ pub fn current_output_device_name() -> Option<String> {
     Some(trimmed.to_string())
 }
 
+/// Parses the default sink name from `pactl get-default-sink` output.
+pub fn parse_default_sink(stdout: &str) -> Option<String> {
+    stdout.lines().map(str::trim).find(|line| !line.is_empty()).map(str::to_string)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_default_sink() -> Option<String> {
+    let output = std::process::Command::new("pactl").arg("get-default-sink").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    parse_default_sink(&stdout)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn linux_default_sink() -> Option<String> {
+    None
+}
+
+/// Chooses the identity used for change detection: the audio-server default sink
+/// when available, otherwise the cpal device name.
+fn select_identity(default_sink: Option<String>, device_name: Option<String>) -> Option<String> {
+    default_sink.or(device_name)
+}
+
+/// Samples the output device identity used for change detection.
+///
+/// On Linux the PulseAudio/PipeWire default sink is preferred because cpal
+/// reports a stable ALSA alias; other platforms use the cpal device name.
+pub fn current_output_device_identity() -> Option<String> {
+    select_identity(linux_default_sink(), current_output_device_name())
+}
+
+/// App timer ticks between output device samples (500 ms timer -> 2 s).
+pub const DEVICE_POLL_TICKS: u8 = 4;
+
+/// Counts app timer ticks and reports when an output device sample is due.
+#[derive(Debug, Clone)]
+pub struct DevicePollGate {
+    interval_ticks: u8,
+    elapsed: u8,
+}
+
+impl DevicePollGate {
+    /// Creates a gate that opens every `interval_ticks` ticks (minimum 1).
+    pub fn new(interval_ticks: u8) -> Self {
+        Self { interval_ticks: interval_ticks.max(1), elapsed: 0 }
+    }
+
+    /// Advances one tick and reports whether a sample is due.
+    pub fn should_sample(&mut self) -> bool {
+        self.elapsed = self.elapsed.saturating_add(1);
+        if self.elapsed >= self.interval_ticks {
+            self.elapsed = 0;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,5 +223,54 @@ mod tests {
         let mut watch = OutputDeviceWatch::new();
         assert_eq!(watch.step(Some(""), true), DeviceWatchAction::Idle);
         assert_eq!(watch.previous(), Some(""));
+    }
+
+    #[test]
+    fn parse_default_sink_reads_first_non_blank_line() {
+        let stdout = "   \n\n  alsa_output.pci-0000_00_1f.3.analog-stereo  \nother_sink\n";
+        assert_eq!(
+            parse_default_sink(stdout),
+            Some("alsa_output.pci-0000_00_1f.3.analog-stereo".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_default_sink_rejects_blank_output() {
+        assert_eq!(parse_default_sink(""), None);
+        assert_eq!(parse_default_sink("   \n\t  \n  \n"), None);
+    }
+
+    #[test]
+    fn select_identity_prefers_default_sink() {
+        let sink = Some("alsa_output.pci.stereo".to_string());
+        let device = Some("default".to_string());
+        assert_eq!(select_identity(sink, device), Some("alsa_output.pci.stereo".to_string()));
+    }
+
+    #[test]
+    fn select_identity_falls_back_to_device_name() {
+        let device = Some("Speakers".to_string());
+        assert_eq!(select_identity(None, device), Some("Speakers".to_string()));
+    }
+
+    #[test]
+    fn select_identity_returns_none_when_both_missing() {
+        assert_eq!(select_identity(None, None), None);
+    }
+
+    #[test]
+    fn poll_gate_samples_on_interval() {
+        let mut gate = DevicePollGate::new(2);
+        assert!(!gate.should_sample());
+        assert!(gate.should_sample());
+        assert!(!gate.should_sample());
+        assert!(gate.should_sample());
+    }
+
+    #[test]
+    fn poll_gate_treats_zero_interval_as_one() {
+        let mut gate = DevicePollGate::new(0);
+        assert!(gate.should_sample());
+        assert!(gate.should_sample());
     }
 }

@@ -6,8 +6,13 @@ use crate::slint_shell::state::SlintAppState;
 
 impl SlintAppState {
     /// Polls the default output device and applies the debounced auto-pause decision.
+    ///
+    /// Sampling is paced to every `DEVICE_POLL_TICKS` app timer ticks.
     pub(crate) fn poll_output_device(&mut self) {
-        let current = crate::infra::current_output_device_name();
+        if !self.device_poll_gate.should_sample() {
+            return;
+        }
+        let current = crate::infra::current_output_device_identity();
         self.poll_output_device_with(current.as_deref());
     }
 
