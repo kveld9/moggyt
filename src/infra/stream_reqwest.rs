@@ -10,6 +10,7 @@ use super::stream_reader::{
 };
 
 /// Real blocking HTTP transport for range-based streaming via reqwest.
+#[derive(Clone)]
 pub struct ReqwestRangeTransport {
     client: reqwest::blocking::Client,
     url: String,

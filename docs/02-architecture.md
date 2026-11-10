@@ -61,6 +61,7 @@ src/
     ├── session*.rs    # SessionStore port and Keyring cookie persistence
     ├── settings.rs    # SettingsStore port and atomic JSON persistence
     ├── stream.rs      # StreamResolver trait definition
+    ├── stream_pool.rs # Prefetching 256 KiB block pool with worker threads and sliding window
     ├── stream_chain.rs # Layered stream resolution: InnerTube primary, yt-dlp fallback
     ├── stream_disk_cache.rs # Disk-backed audio stream cache with quota and LRU eviction
     ├── stream_url_cache.rs # Stream URL cache with TTL and capacity eviction
@@ -117,6 +118,19 @@ Signal order is decoder -> optional `SkipSilence` -> static gain or dynamic
 normalizer -> sink. The static gain sits inside the source graph, so the sink
 volume and the crossfade/fade-in ramps multiply it once and never attenuate the
 same signal twice.
+
+## Block streaming and seek behavior
+
+Audio byte ranges are fetched by a pool of four workers in 256 KiB blocks
+(`stream_pool.rs`). The read position selects the base block; workers fetch the
+block at the read position first and then walk forward up to 40 blocks, with 8
+blocks retained behind, so playback never performs a network read on the audio
+callback thread. Blocks outside the window are dropped, which bounds memory on
+long streams to roughly 12 MiB.
+
+A seek re-targets the pool at the new block and discards results outside the
+window; `Read + Seek` semantics, the EOF boundary at the reported total length,
+and the sequential fallback for servers that ignore `Range` are unchanged.
 
 ## Evolution rules
 

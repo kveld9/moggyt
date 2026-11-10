@@ -3,10 +3,11 @@
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Mutex;
 
-use super::stream::{RangeResponse, RangeTransport};
+use super::stream::RangeTransport;
+use super::stream_pool::{BlockPool, STREAM_BLOCK_BYTES};
 
-/// Default chunk size for streaming range requests (1 MiB).
-pub const DEFAULT_STREAM_CHUNK_SIZE: usize = 1024 * 1024;
+/// Default chunk size for streaming range requests (256 KiB alias of `STREAM_BLOCK_BYTES`).
+pub const DEFAULT_STREAM_CHUNK_SIZE: usize = STREAM_BLOCK_BYTES;
 
 /// Parses total stream length from a `Content-Range` header value if present.
 pub fn parse_content_range_total(header_val: &str) -> Option<u64> {
@@ -31,28 +32,20 @@ impl<R: Read + Send> Read for SyncReader<R> {
     }
 }
 
-/// Stream adapter fetching sequential HTTP Range chunks and feeding rodio Decoder.
-pub struct RangeReader<T> {
+/// Stream adapter wrapping a prefetching block pool for rodio Decoder consumption.
+pub struct RangeReader<T: RangeTransport> {
     transport: T,
     chunk_size: usize,
-    buffer: Vec<u8>,
-    buffer_offset: usize,
-    chunk_start: u64,
     logical_pos: u64,
-    total_len: Option<u64>,
-    sequential_stream: Option<Box<dyn Read + Send + Sync>>,
+    pool: BlockPool<T>,
 }
 
-impl<T> std::fmt::Debug for RangeReader<T> {
+impl<T: RangeTransport> std::fmt::Debug for RangeReader<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RangeReader")
             .field("chunk_size", &self.chunk_size)
-            .field("buffer_len", &self.buffer.len())
-            .field("buffer_offset", &self.buffer_offset)
-            .field("chunk_start", &self.chunk_start)
             .field("logical_pos", &self.logical_pos)
-            .field("total_len", &self.total_len)
-            .field("is_sequential", &self.sequential_stream.is_some())
+            .field("total_len", &self.pool.total_len())
             .finish()
     }
 }
@@ -60,88 +53,25 @@ impl<T> std::fmt::Debug for RangeReader<T> {
 impl<T: RangeTransport> RangeReader<T> {
     /// Creates a new range reader wrapping the provided transport.
     pub fn new(transport: T) -> Self {
-        Self {
-            transport,
-            chunk_size: DEFAULT_STREAM_CHUNK_SIZE,
-            buffer: Vec::new(),
-            buffer_offset: 0,
-            chunk_start: 0,
-            logical_pos: 0,
-            total_len: None,
-            sequential_stream: None,
-        }
+        let chunk_size = DEFAULT_STREAM_CHUNK_SIZE;
+        let pool = BlockPool::new(transport.clone(), chunk_size);
+        Self { transport, chunk_size, logical_pos: 0, pool }
     }
 
     /// Sets a custom chunk size (useful for fine-grained chunk testing).
     pub fn with_chunk_size(mut self, size: usize) -> Self {
-        self.chunk_size = size.max(1);
+        let chunk_size = size.max(1);
+        if chunk_size != self.chunk_size {
+            self.chunk_size = chunk_size;
+            self.pool = BlockPool::new(self.transport.clone(), chunk_size);
+            self.logical_pos = 0;
+        }
         self
     }
 
     /// Returns the current logical read position in the stream.
     pub const fn position(&self) -> u64 {
         self.logical_pos
-    }
-
-    fn read_buffered(&mut self, buf: &mut [u8]) -> usize {
-        let available = self.buffer.len().saturating_sub(self.buffer_offset);
-        let to_copy = buf.len().min(available);
-        buf[..to_copy]
-            .copy_from_slice(&self.buffer[self.buffer_offset..self.buffer_offset + to_copy]);
-        self.buffer_offset += to_copy;
-        self.logical_pos += to_copy as u64;
-        to_copy
-    }
-
-    fn read_sequential(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let Some(ref mut stream) = self.sequential_stream else {
-            return Ok(0);
-        };
-        let bytes_read = stream.read(buf)?;
-        self.logical_pos += bytes_read as u64;
-        Ok(bytes_read)
-    }
-
-    fn handle_range_response(&mut self, response: RangeResponse) -> bool {
-        match response {
-            RangeResponse::Full(stream) => {
-                self.sequential_stream = Some(stream);
-                true
-            }
-            RangeResponse::Partial { data, total_len } => {
-                if let Some(total) = total_len {
-                    self.total_len = Some(total);
-                }
-                let is_empty = data.is_empty();
-                self.chunk_start = self.logical_pos;
-                self.buffer = data;
-                self.buffer_offset = 0;
-                !is_empty
-            }
-        }
-    }
-
-    fn fetch_next_chunk(&mut self) -> std::io::Result<bool> {
-        if let Some(total) = self.total_len {
-            if self.logical_pos >= total {
-                return Ok(false);
-            }
-        }
-        let response = self.transport.fetch_range(self.logical_pos, self.chunk_size)?;
-        Ok(self.handle_range_response(response))
-    }
-
-    fn read_ranged(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if self.buffer_offset < self.buffer.len() {
-            return Ok(self.read_buffered(buf));
-        }
-        if !self.fetch_next_chunk()? {
-            return Ok(0);
-        }
-        if self.sequential_stream.is_some() {
-            return self.read_sequential(buf);
-        }
-        Ok(self.read_buffered(buf))
     }
 
     fn compute_current_target(&self, delta: i64) -> std::io::Result<u64> {
@@ -159,7 +89,7 @@ impl<T: RangeTransport> RangeReader<T> {
     }
 
     fn compute_end_target(&self, delta: i64) -> std::io::Result<u64> {
-        let total = self.total_len.ok_or_else(|| {
+        let total = self.pool.total_len().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
                 "cannot seek from end when stream length is unknown",
@@ -184,100 +114,56 @@ impl<T: RangeTransport> RangeReader<T> {
             SeekFrom::End(delta) => self.compute_end_target(delta),
         }
     }
-
-    fn seek_sequential(&mut self, new_pos: u64) -> std::io::Result<u64> {
-        let unconsumed = self.buffer.len().saturating_sub(self.buffer_offset) as u64;
-        self.buffer.clear();
-        self.buffer_offset = 0;
-
-        if new_pos == self.logical_pos {
-            return Ok(self.logical_pos);
-        }
-        if new_pos < self.logical_pos {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                "cannot seek backwards in sequential fallback stream",
-            ));
-        }
-        let total_skip = new_pos - self.logical_pos;
-        let discard_from_stream = total_skip.saturating_sub(unconsumed);
-        if discard_from_stream > 0 {
-            let mut sink = std::io::sink();
-            let Some(ref mut stream) = self.sequential_stream else {
-                self.logical_pos = new_pos;
-                return Ok(self.logical_pos);
-            };
-            let mut limited = Read::by_ref(stream).take(discard_from_stream);
-            std::io::copy(&mut limited, &mut sink)?;
-        }
-        self.logical_pos = new_pos;
-        Ok(self.position())
-    }
-
-    fn seek_ranged(&mut self, new_pos: u64) -> std::io::Result<u64> {
-        self.buffer.clear();
-        self.buffer_offset = 0;
-        self.chunk_start = new_pos;
-        self.logical_pos = new_pos;
-        Ok(self.position())
-    }
 }
 
 impl<T: RangeTransport> Read for RangeReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if buf.is_empty() {
-            return Ok(0);
-        }
-        if self.sequential_stream.is_some() {
-            return self.read_sequential(buf);
-        }
-        self.read_ranged(buf)
+        let n = self.pool.read(buf)?;
+        self.logical_pos = self.pool.position();
+        Ok(n)
     }
 }
 
 impl<T: RangeTransport> Seek for RangeReader<T> {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
         let target = self.compute_target(pos)?;
-        if self.sequential_stream.is_some() {
-            self.seek_sequential(target)
-        } else {
-            self.seek_ranged(target)
-        }
+        self.pool.seek(target)?;
+        self.logical_pos = self.pool.position();
+        Ok(self.position())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::stream::RangeResponse;
     use super::*;
 
+    #[derive(Clone)]
     struct FakeRangeTransport {
         payload: Vec<u8>,
+        total_len: Option<u64>,
         ignore_range: bool,
         error_at_start: Option<u64>,
-        max_slice_len: Option<usize>,
     }
 
     impl FakeRangeTransport {
         fn new(payload: Vec<u8>) -> Self {
-            Self { payload, ignore_range: false, error_at_start: None, max_slice_len: None }
+            let total = payload.len() as u64;
+            Self { payload, total_len: Some(total), ignore_range: false, error_at_start: None }
         }
 
         fn ignoring_range(payload: Vec<u8>) -> Self {
-            Self { payload, ignore_range: true, error_at_start: None, max_slice_len: None }
+            Self { payload, total_len: None, ignore_range: true, error_at_start: None }
         }
 
         fn failing_at(payload: Vec<u8>, error_start: u64) -> Self {
+            let total = payload.len() as u64;
             Self {
                 payload,
+                total_len: Some(total),
                 ignore_range: false,
                 error_at_start: Some(error_start),
-                max_slice_len: None,
             }
-        }
-
-        fn with_max_slice(mut self, max_slice: usize) -> Self {
-            self.max_slice_len = Some(max_slice);
-            self
         }
     }
 
@@ -292,17 +178,14 @@ mod tests {
                     return Err(std::io::Error::other("simulated transport failure"));
                 }
             }
-            let total = self.payload.len() as u64;
+            let total = self.total_len.unwrap_or(self.payload.len() as u64);
             if start >= total {
-                return Ok(RangeResponse::Partial { data: Vec::new(), total_len: Some(total) });
+                return Ok(RangeResponse::Partial { data: Vec::new(), total_len: self.total_len });
             }
             let start_idx = start as usize;
-            let mut end_idx = (start_idx + length).min(self.payload.len());
-            if let Some(max_slice) = self.max_slice_len {
-                end_idx = end_idx.min(start_idx + max_slice);
-            }
+            let end_idx = (start_idx + length).min(self.payload.len());
             let data = self.payload[start_idx..end_idx].to_vec();
-            Ok(RangeResponse::Partial { data, total_len: Some(total) })
+            Ok(RangeResponse::Partial { data, total_len: self.total_len })
         }
     }
 
@@ -340,15 +223,15 @@ mod tests {
     }
 
     #[test]
-    fn chunk_reader_handles_short_reads_and_final_chunks() {
-        let payload = b"short-chunk-data".to_vec();
-        let transport = FakeRangeTransport::new(payload.clone()).with_max_slice(3);
+    fn chunk_reader_reads_final_partial_block() {
+        let payload = b"partial-final-block".to_vec();
+        let transport = FakeRangeTransport::new(payload.clone());
         let mut reader = RangeReader::new(transport).with_chunk_size(8);
 
         let mut output = Vec::new();
         let mut buf = [0u8; 16];
         loop {
-            let n = reader.read(&mut buf).expect("read succeeds with short chunks");
+            let n = reader.read(&mut buf).expect("read succeeds across the final partial block");
             if n == 0 {
                 break;
             }
@@ -419,5 +302,44 @@ mod tests {
 
         let pos = reader.position();
         assert_eq!(pos, 26);
+    }
+
+    #[test]
+    fn chunk_reader_negative_seek_rejected() {
+        let payload = b"abcdefghij".to_vec();
+        let transport = FakeRangeTransport::new(payload);
+        let mut reader = RangeReader::new(transport).with_chunk_size(4);
+
+        let mut buf = [0u8; 2];
+        reader.read_exact(&mut buf).expect("reads 2 bytes");
+
+        let err = reader.seek(SeekFrom::Current(-10)).expect_err("negative target rejected");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn chunk_reader_empty_read_returns_zero() {
+        let payload = b"hello".to_vec();
+        let transport = FakeRangeTransport::new(payload);
+        let mut reader = RangeReader::new(transport).with_chunk_size(4);
+
+        let mut empty_buf = [0u8; 0];
+        let n = reader.read(&mut empty_buf).expect("empty read succeeds");
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn chunk_reader_sequential_backward_seek_unsupported() {
+        let payload = b"sequential-seek-test".to_vec();
+        let transport = FakeRangeTransport::ignoring_range(payload);
+        let mut reader = RangeReader::new(transport).with_chunk_size(4);
+
+        let mut buf = [0u8; 6];
+        reader.read_exact(&mut buf).expect("reads 6 bytes");
+
+        let err = reader
+            .seek(SeekFrom::Start(2))
+            .expect_err("backward seek in sequential stream unsupported");
+        assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
     }
 }
