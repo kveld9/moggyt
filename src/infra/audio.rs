@@ -1,7 +1,7 @@
 //! Audio port and no-op stub (no sound yet).
 
 use super::stream::AudioQuality;
-use super::ytdlp::YtDlpResolver;
+use super::stream_chain::StreamChain;
 
 /// Clamps a playback speed factor to the valid `0.5..=2.0` range.
 ///
@@ -87,8 +87,8 @@ pub trait AudioBackend {
     fn speed(&self) -> f32 {
         1.0
     }
-    /// Returns a resolver handle sharing this backend's stream URL cache, for off-lock prefetching.
-    fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
+    /// Returns a resolver handle sharing this backend's stream chain caches, for off-lock prefetching.
+    fn stream_prefetcher(&self) -> Option<StreamChain> {
         None
     }
 }

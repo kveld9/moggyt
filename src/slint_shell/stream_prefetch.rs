@@ -4,9 +4,9 @@ use std::sync::{Arc, Mutex};
 
 use tracing::{debug, warn};
 
-use crate::infra::{AudioBackend, YtDlpResolver};
+use crate::infra::{AudioBackend, StreamChain};
 
-fn acquire_prefetcher<A: AudioBackend>(audio: &Arc<Mutex<A>>) -> Option<YtDlpResolver> {
+fn acquire_prefetcher<A: AudioBackend>(audio: &Arc<Mutex<A>>) -> Option<StreamChain> {
     let guard = audio.lock().ok()?;
     guard.stream_prefetcher()
 }
@@ -47,7 +47,7 @@ pub fn spawn_stream_prefetch<A: AudioBackend>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infra::{AudioError, AudioQuality, AudioStub};
+    use crate::infra::{AudioError, AudioQuality, AudioStub, YtDlpResolver};
 
     #[test]
     fn spawn_stream_prefetch_none_id_returns_none() {
@@ -106,8 +106,8 @@ mod tests {
         fn last_requested(&self) -> Option<&str> {
             None
         }
-        fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
-            Some(self.resolver.clone())
+        fn stream_prefetcher(&self) -> Option<StreamChain> {
+            Some(StreamChain::from(self.resolver.clone()))
         }
     }
 

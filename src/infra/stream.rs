@@ -26,6 +26,13 @@ pub const fn audio_quality_format(quality: AudioQuality) -> &'static str {
     }
 }
 
+/// Identifies which resolver tier produced a cached stream entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolverSource {
+    InnerTube,
+    YtDlp,
+}
+
 /// Resolved stream location and optional stream metadata.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResolvedStream {

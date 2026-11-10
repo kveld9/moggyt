@@ -11,8 +11,8 @@ use rodio::{Decoder, OutputStream, Sink, Source};
 use super::audio::{AudioBackend, AudioError, clamp_speed};
 use super::audio_dsp::{LoudnessNormalizer, SkipSilence};
 use super::stream::{AudioQuality, open_audio_stream};
+use super::stream_chain::StreamChain;
 use super::stream_disk_cache::StreamDiskCache;
-use super::ytdlp::YtDlpResolver;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
 ///
@@ -49,7 +49,7 @@ fn log_decode_stream_error(
 pub struct RodioBackend {
     _stream: OutputStream,
     sink: Arc<Sink>,
-    resolver: YtDlpResolver,
+    resolver: Box<StreamChain>,
     stream_cache: Option<Arc<StreamDiskCache>>,
     last_requested: Option<String>,
     track_duration: Option<Duration>,
@@ -85,7 +85,7 @@ impl RodioBackend {
         Ok(Self {
             _stream: stream,
             sink: Arc::new(sink),
-            resolver: YtDlpResolver::new(binary),
+            resolver: Box::new(StreamChain::new(binary)),
             stream_cache,
             last_requested: None,
             track_duration: None,
@@ -97,6 +97,11 @@ impl RodioBackend {
             loudness_normalization: false,
             fade_generation: Arc::new(AtomicU64::new(0)),
         })
+    }
+
+    /// Replaces the resolver chain, for tests and custom wiring.
+    pub fn set_resolver_chain(&mut self, resolver: StreamChain) {
+        *self.resolver = resolver;
     }
 
     /// Configures or clears the backing stream disk cache.
@@ -398,7 +403,7 @@ fn spawn_fade_in(
 }
 
 impl AudioBackend for RodioBackend {
-    /// Resolves stream URL via [`YtDlpResolver`] and begins playback.
+    /// Resolves stream URL via [`StreamChain`] and begins playback.
     ///
     /// Soft-fails to a no-state-change on missing binary or decoding failures.
     /// Records `last_requested` strictly upon successful playback start.
@@ -439,8 +444,8 @@ impl AudioBackend for RodioBackend {
         Ok(())
     }
 
-    fn stream_prefetcher(&self) -> Option<YtDlpResolver> {
-        Some(self.resolver.clone())
+    fn stream_prefetcher(&self) -> Option<StreamChain> {
+        Some((*self.resolver).clone())
     }
 
     fn pause(&mut self) {
@@ -525,15 +530,20 @@ impl AudioBackend for RodioBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::infra::YtDlpResolver;
 
     fn test_backend() -> Option<RodioBackend> {
-        match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
-            Ok(backend) => Some(backend),
+        let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
+            Ok(backend) => backend,
             Err(err) => {
                 eprintln!("Skipping audio hardware assertions in headless environment: {err:#}");
-                None
+                return None;
             }
-        }
+        };
+        backend.set_resolver_chain(StreamChain::from_ytdlp(YtDlpResolver::new(
+            "/definitely/missing/binary/yt-dlp",
+        )));
+        Some(backend)
     }
 
     #[test]

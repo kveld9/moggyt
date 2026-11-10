@@ -61,11 +61,13 @@ src/
     ├── session*.rs    # SessionStore port and Keyring cookie persistence
     ├── settings.rs    # SettingsStore port and atomic JSON persistence
     ├── stream.rs      # StreamResolver trait definition
+    ├── stream_chain.rs # Layered stream resolution: InnerTube primary, yt-dlp fallback
     ├── stream_disk_cache.rs # Disk-backed audio stream cache with quota and LRU eviction
     ├── stream_url_cache.rs # Stream URL cache with TTL and capacity eviction
     ├── tray.rs        # System tray handle and action event loop
     ├── updater*.rs    # Updater port and GitHub Releases release checker
     ├── ytdlp.rs       # yt-dlp sidecar download and stream resolution adapter
+    ├── innertube_stream.rs # InnerTube VISIONOS player adapter (direct AAC URLs, loudnessDb)
     ├── catalog.rs      # Catalog port trait definition
     ├── catalog_live.rs # Catalog API-backed live adapter
     └── catalog_stub.rs # Deterministic catalog stub for testing
@@ -76,6 +78,24 @@ ui/
 └── views/
     └── stats_view.slint # Wrapped-style statistics view with period chips and rankings
 ```
+
+## Stream resolution order
+
+Playback stream resolution is layered (`stream_chain.rs`):
+
+1. InnerTube tier cache entries for the track and quality (20 min TTL, 8 entries).
+2. yt-dlp tier cache entries for the same track and quality.
+3. InnerTube `player` endpoint with the `VISIONOS` client (`innertube_stream.rs`):
+   direct AAC URLs (itag 139 for compact, 140 for standard and high) with the
+   provider `loudnessDb` per format.
+4. yt-dlp sidecar (`ytdlp.rs`) whenever InnerTube fails: HTTP error, timeout, a
+   `playabilityStatus` other than `OK`, no compatible audio format, a ciphered
+   (`signatureCipher`/`cipher`) entry, or an invalid payload. The failure reason
+   is logged once per cause and playback continues through the sidecar.
+
+Opus (itag 251) stays excluded because the rodio/symphonia stack has no Opus
+decoder; AAC in MP4 is the only supported stream format. The yt-dlp sidecar and
+its `deno` requirement remain mandatory fallbacks.
 
 ## Evolution rules
 
