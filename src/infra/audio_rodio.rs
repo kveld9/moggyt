@@ -15,8 +15,15 @@ use super::stream_disk_cache::StreamDiskCache;
 use super::ytdlp::YtDlpResolver;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
+///
+/// The curve is cubic (`gain = (volume / 100)^3`), matching the perceptual mapping used by
+/// PulseAudio. A linear curve compresses most of the perceived loudness change into the
+/// lowest fifth of the slider; at 50 percent this curve yields an amplitude of 0.125
+/// (-18 dB), which preserves usable resolution at quiet listening levels. Levels above 100
+/// clamp to full amplitude.
 pub fn volume_to_amplitude(volume: u8) -> f32 {
-    volume.min(100) as f32 / 100.0
+    let normalized = volume.min(100) as f32 / 100.0;
+    normalized * normalized * normalized
 }
 
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
@@ -531,10 +538,12 @@ mod tests {
 
     #[test]
     fn volume_to_amplitude_mapping() {
-        for (vol, expected) in [(0, 0.0_f32), (50, 0.5_f32), (100, 1.0_f32), (150, 1.0_f32)] {
+        for (vol, expected) in
+            [(0, 0.0_f32), (50, 0.125_f32), (100, 1.0_f32), (150, 1.0_f32), (25, 0.015625_f32)]
+        {
             let actual = volume_to_amplitude(vol);
             assert!(
-                (actual - expected).abs() < f32::EPSILON,
+                (actual - expected).abs() < 1e-6,
                 "volume {vol} mapped to {actual}, expected {expected}"
             );
         }

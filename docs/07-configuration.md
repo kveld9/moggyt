@@ -154,7 +154,9 @@ The configuration file uses JSON serialization with atomic replacement:
   - First-run resolution detects the system locale via environment variables (`LC_ALL`, `LC_MESSAGES`, `LANG`),
     falling back to English; explicitly saved choices in `settings.json` take precedence.
 - **Volume (`volume`)**:
-  - Integer audio level between `0` and `100` (default `100`). Clamped to `0..=100` on load.
+  - Integer audio level between `0` and `100` (default `100`). Clamped to `0..=100` on load. The slider maps to
+    amplitude through a cubic perceptual curve (`(volume / 100)^3`), where 50 percent equals -18 dB and 100 is unity
+    gain.
 - **Track Crossfade (`crossfade_seconds`)**:
   - Integer crossfade transition duration in seconds between `0` and `15` (default `0` = disabled). Clamped to
     `0..=15` on load. When enabled, smoothly crossfades between tracks using dual-sink volume ramps.
