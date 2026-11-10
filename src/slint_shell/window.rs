@@ -494,7 +494,7 @@ pub fn build_window(state: SlintAppState) -> anyhow::Result<(MoggytWindow, slint
     Ok((window, timer))
 }
 
-/// Sets up periodic background timer for tray events, media keys, auto-skip, and tick sync.
+/// Sets up periodic background timer for tray events, media keys, community skip polling, auto-skip, and tick sync.
 pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> slint::Timer {
     let weak = window.as_weak();
     let timer = slint::Timer::default();
@@ -510,6 +510,7 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
             return;
         }
         state.drain_media_keys();
+        state.poll_sponsor_ranges();
         state.check_auto_skip();
         state.continue_autoplay_if_ended();
         state.poll_sleep_timer();

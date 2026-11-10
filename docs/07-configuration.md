@@ -119,6 +119,7 @@ The configuration file uses JSON serialization with atomic replacement:
   "stream_cache_limit_mb": 512,
   "quality": "standard",
   "songs_only": false,
+  "sponsorblock_enabled": true,
   "discord_presence_enabled": false,
   "discord_app_id": null,
   "lastfm_enabled": false,
@@ -173,6 +174,12 @@ The configuration file uses JSON serialization with atomic replacement:
   - `true`: Search results and autoplay radio drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks
     (`ATV`) and unknown types. If dropping music videos would remove every track from a result list, the fallback
     preserves the original list unfiltered so playback and autoplay do not stall.
+- **Community Skip Segments (`sponsorblock_enabled`)**:
+  - `sponsorblock_enabled` (boolean, default `true`):
+    - `true`: Community SponsorBlock segments are fetched once per track and skipped automatically during playback.
+      Only the first 4 hexadecimal characters of the SHA-256 digest of the video id are sent (k-anonymity).
+      Locally persisted ranges stored in `skips.json` always take precedence over community ranges.
+    - `false`: Community skip segment fetching and automatic skipping are disabled.
 - **Discord Rich Presence (`discord_presence_enabled`)**:
   - `discord_presence_enabled` (boolean, default `false`):
     - `false`: Discord Rich Presence disabled; no IPC connection is attempted (default).

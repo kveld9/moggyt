@@ -12,7 +12,7 @@ use crate::domain::ThemeId;
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CustomThemeFile, DiscordPresence, LyricOverrideDir,
     LyricsSource, PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings, SettingsStore,
-    SingleInstanceGuard, SkipStore, TrayHandle,
+    SingleInstanceGuard, SkipStore, SponsorBlockClient, TrayHandle,
 };
 
 pub use crate::slint_shell::covers::{
@@ -105,6 +105,12 @@ pub fn run(
         a.set_quality(settings.quality);
         a.set_skip_silence(settings.skip_silence);
         a.set_loudness_normalization(settings.loudness_normalization);
+    }
+    if settings.sponsorblock_enabled {
+        match SponsorBlockClient::new() {
+            Ok(provider) => state.skip_provider = Some(Arc::new(provider)),
+            Err(err) => tracing::warn!(error = %err, "failed to build community skip client"),
+        }
     }
     state.crossfade_seconds = settings.crossfade_seconds;
     state.stream_cache_limit_mb = settings.stream_cache_limit_mb;
