@@ -81,7 +81,7 @@ mod ytdlp;
 pub use atomic_file::{TEMP_FILE_MAX_AGE, sweep_stale_temp_files, write_atomic};
 pub use audio::{AudioBackend, AudioError, AudioStub, NullAudio, clamp_speed};
 pub use audio_device::{
-    DEVICE_POLL_TICKS, DevicePollGate, DeviceWatchAction, OutputDeviceWatch,
+    DEVICE_MONITOR_INTERVAL, DeviceIdentityMonitor, DeviceWatchAction, OutputDeviceWatch,
     current_output_device_identity, current_output_device_name, parse_default_sink,
 };
 pub use audio_dsp::{
