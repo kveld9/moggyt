@@ -47,6 +47,7 @@ pub mod format;
 mod history;
 pub mod import_callbacks;
 mod import_cli;
+mod import_override;
 pub mod import_searcher;
 pub mod import_session;
 pub mod import_state;

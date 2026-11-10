@@ -17,6 +17,7 @@ export component ImportOverlay inherits Rectangle {
     in-out property <bool> to-queue: false;
     in-out property <bool> link-valid: false;
     in-out property <string> link-status: "";
+    in-out property <string> custom-id-text: "";
 
     in property <bool> busy: false;
     in property <bool> failed: false;
@@ -50,6 +51,7 @@ export component ImportOverlay inherits Rectangle {
     callback discard-requested();
     callback alternative-chosen(int);
     callback picker-dismissed();
+    callback custom-id-submitted(string);
 
     ImportModal {
         visible: root.show-modal;
@@ -97,7 +99,9 @@ export component ImportOverlay inherits Rectangle {
         visible: root.picker-open;
         alternatives: root.alternatives;
         selected: root.alternative-selected;
+        custom-id-text <=> root.custom-id-text;
         alternative-chosen(idx) => { root.alternative-chosen(idx); }
+        custom-id-submitted(text) => { root.custom-id-submitted(text); }
         dismissed => { root.picker-dismissed(); }
     }
 }

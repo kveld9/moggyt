@@ -400,6 +400,9 @@ The review screen presents resolved matches before committing changes to the lib
 - **Matched Channel and Duration Delta**: The matched column displays the candidate title alongside its channel or
   artist attribution. A signed duration delta (e.g. `+3s`, `-2s`, `0s`) highlights playback length differences
   between the source track and the matched candidate, aiding visual verification before saving or swapping.
+- **Custom Video ID Override**: Users can override any row's match by entering an explicit 11-character YouTube video ID
+  in the alternative picker. The manual override is applied as a high-confidence choice (`MatchConfidence::High`),
+  replaces the row's chosen track, and clears any unresolved reason.
 
 ## 7 Data model
 

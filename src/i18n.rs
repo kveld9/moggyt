@@ -287,9 +287,11 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Update available", "Actualización disponible"),
     ("Update available: {ver}", "Actualización disponible: {ver}"),
     ("Update status", "Estado de actualización"),
+    ("Use ID", "Usar ID"),
     ("Valid Spotify link", "Enlace de Spotify valido"),
     ("Waiting for authorization in your browser", "Esperando la autorización en tu navegador"),
     ("White", "Blanco"),
+    ("YouTube video ID", "ID de video de YouTube"),
     ("plays", "reproducciones"),
 ];
 
@@ -677,6 +679,20 @@ mod tests {
                 "Inicia sesión desde Ajustes para cargar tu biblioteca.",
             ),
         ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_custom_video_id_i18n_strings_exist_and_differ() {
+        let keys_and_expected =
+            [("YouTube video ID", "ID de video de YouTube"), ("Use ID", "Usar ID")];
 
         for (key, expected_es) in keys_and_expected {
             let en = tr(Locale::English, key);

@@ -421,6 +421,20 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
     });
 
     let w = window.as_weak();
+    window.on_import_custom_id_submitted(move |text| {
+        let Some(win) = w.upgrade() else { return };
+        with_session(|s| {
+            let Some(row) = s.picker_row else {
+                return;
+            };
+            if s.review.as_mut().is_some_and(|r| r.apply_custom_video_id(row, &text)) {
+                s.close_picker();
+            }
+        });
+        sync_import(&win);
+    });
+
+    let w = window.as_weak();
     window.on_import_save_requested(move || {
         let Some(win) = w.upgrade() else { return };
         handle_save_requested(&win);
@@ -674,5 +688,26 @@ mod tests {
         assert!(toggle_session_exclusion(&mut session, 0));
         assert!(!session.review.as_ref().unwrap().rows[0].excluded);
         assert!(!toggle_session_exclusion(&mut session, 99));
+    }
+
+    #[test]
+    fn test_custom_video_id_submission_updates_review_and_closes_picker() {
+        let mut session = ImportSession::new();
+        let playlist = sample_spotify_playlist();
+        let t1 = LocalTrack::new("old_id_1111", "Song 1", "Artist 1", MatchConfidence::Low);
+        let resolutions = vec![TrackResolution::Matched { track: t1, alternatives: Vec::new() }];
+        session.review = Some(ImportReview::from_resolutions(&playlist, &resolutions));
+        session.picker_row = Some(0);
+
+        let row = session.picker_row.unwrap();
+        let applied =
+            session.review.as_mut().is_some_and(|r| r.apply_custom_video_id(row, "dQw4w9WgXcQ"));
+        assert!(applied);
+        session.close_picker();
+
+        assert_eq!(session.picker_row, None);
+        let updated = &session.review.unwrap().rows[0];
+        assert_eq!(updated.chosen.as_ref().unwrap().video_id, "dQw4w9WgXcQ");
+        assert_eq!(updated.confidence, Some(MatchConfidence::High));
     }
 }

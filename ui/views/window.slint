@@ -15,7 +15,6 @@ export component MoggytWindow inherits Window {
     background: Theme.window;
     default-font-family: "Inter";
     forward-focus: shortcuts;
-
     in-out property <color> theme-window <=> Theme.window;
     in-out property <color> theme-panel <=> Theme.panel;
     in-out property <color> theme-surface <=> Theme.surface;
@@ -26,7 +25,6 @@ export component MoggytWindow inherits Window {
     in-out property <color> theme-hover <=> Theme.hover;
     in-out property <color> theme-overlay <=> Theme.overlay;
     in-out property <bool> theme-dark <=> Theme.dark;
-
     in-out property <bool> queue-panel-open: false;
     in-out property <int> active-page: 0;
     in-out property <string> header-title: "Search";
@@ -181,6 +179,7 @@ export component MoggytWindow inherits Window {
     callback import-discard-requested();
     callback import-alternative-chosen(int);
     callback import-picker-dismissed();
+    callback import-custom-id-submitted(string);
     callback library-import-requested();
     library-import-requested => { root.show-import-modal = true; }
     changed width => { root.width-changed(self.width / 1px); }
@@ -395,5 +394,6 @@ export component MoggytWindow inherits Window {
         discard-requested => { root.import-discard-requested(); }
         alternative-chosen(idx) => { root.import-alternative-chosen(idx); }
         picker-dismissed => { root.import-picker-dismissed(); }
+        custom-id-submitted(text) => { root.import-custom-id-submitted(text); }
     }
 }
