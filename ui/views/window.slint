@@ -32,6 +32,7 @@ export component MoggytWindow inherits Window {
     in-out property <int> active-theme-index: 0;
     in-out property <bool> accent-customized: false;
     in-out property <string> custom-theme-status-text: "";
+    in-out property <string> matugen-theme-status-text: "";
     in-out property <[string]> custom-theme-names: [];
     in-out property <string> active-custom-theme-name: "";
     in-out property <string> playback-speed-text: "1.00x";
@@ -221,6 +222,7 @@ export component MoggytWindow inherits Window {
                     active-theme-index: root.active-theme-index;
                     accent-customized: root.accent-customized;
                     custom-theme-status-text: root.custom-theme-status-text;
+                    matugen-theme-status-text: root.matugen-theme-status-text;
                     custom-theme-names: root.custom-theme-names;
                     active-custom-theme-name: root.active-custom-theme-name;
                     playback-speed-text: root.playback-speed-text;

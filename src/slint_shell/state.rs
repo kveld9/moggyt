@@ -130,6 +130,12 @@ pub struct SlintAppState {
     pub custom_theme: Option<CustomThemeFile>,
     pub custom_palette: Option<Palette>,
     pub custom_theme_status: String,
+    /// Watcher for the matugen-generated palette file.
+    pub matugen_theme: Option<CustomThemeFile>,
+    /// Palette loaded from the matugen file, when available.
+    pub matugen_palette: Option<Palette>,
+    /// Human-readable status of the last matugen theme load attempt.
+    pub matugen_theme_status: String,
     /// Optional accent override for the built-in preset themes.
     pub accent_override: Option<[u8; 3]>,
     pub locale: Locale,

@@ -30,6 +30,8 @@ pub enum ThemeId {
     BlackOled,
     /// High-contrast monochromatic theme with zero saturation.
     Mono,
+    /// Material You palette produced by matugen and read from `custom-theme.json`.
+    Matugen,
     /// User palette loaded from the custom theme file.
     Custom,
 }
@@ -236,6 +238,7 @@ impl ThemeId {
             Self::White => Palette::white(),
             Self::BlackOled => Palette::black_oled(),
             Self::Mono => Palette::mono(),
+            Self::Matugen => Palette::black_oled(),
             // Fallback until a custom file is loaded.
             Self::Custom => Palette::black_oled(),
         }
@@ -447,6 +450,17 @@ mod tests {
         assert_eq!(json, "\"custom\"");
         let deserialized: ThemeId = serde_json::from_str("\"custom\"").expect("deserialize custom");
         assert_eq!(deserialized, ThemeId::Custom);
+    }
+
+    #[test]
+    fn test_theme_id_matugen_serde_and_fallback_palette() {
+        assert_eq!(ThemeId::Matugen.palette(), Palette::black_oled());
+
+        let json = serde_json::to_string(&ThemeId::Matugen).expect("serialize matugen");
+        assert_eq!(json, "\"matugen\"");
+        let deserialized: ThemeId =
+            serde_json::from_str("\"matugen\"").expect("deserialize matugen");
+        assert_eq!(deserialized, ThemeId::Matugen);
     }
 
     #[test]

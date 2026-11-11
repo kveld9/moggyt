@@ -86,6 +86,7 @@ fn main() -> anyhow::Result<()> {
     let tray = init_tray();
 
     let custom_theme = CustomThemeFile::new(&config_dir);
+    let matugen_theme = CustomThemeFile::for_matugen(&config_dir);
     let queue_store = DiskQueueStore::new(config_dir.clone());
     let skip_store = DiskSkipStore::new(config_dir);
 
@@ -114,5 +115,6 @@ fn main() -> anyhow::Result<()> {
         version_store: Box::new(version_store),
         tray,
         custom_theme,
+        matugen_theme,
     })
 }

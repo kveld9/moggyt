@@ -9,6 +9,7 @@ export component SettingsView inherits VerticalLayout {
     in property <int> active-theme-index: 0;
     in property <bool> accent-customized: false;
     in property <string> custom-theme-status-text: "";
+    in property <string> matugen-theme-status-text: "";
     in property <[string]> custom-theme-names: [];
     in property <string> active-custom-theme-name: "";
     in property <string> playback-speed-text: "1.00x";
@@ -54,6 +55,7 @@ export component SettingsView inherits VerticalLayout {
         active-theme-index: root.active-theme-index;
         accent-customized: root.accent-customized;
         custom-theme-status-text: root.custom-theme-status-text;
+        matugen-theme-status-text: root.matugen-theme-status-text;
         custom-themes: root.custom-theme-names;
         active-custom-theme: root.active-custom-theme-name;
         theme-selected(idx) => { root.theme-selected(idx); }

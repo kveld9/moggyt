@@ -56,8 +56,12 @@ pub(crate) fn wire_settings_callbacks(
         if theme == ThemeId::Custom {
             st.reload_custom_theme();
         }
+        if theme == ThemeId::Matugen {
+            st.reload_matugen_theme();
+        }
         apply_palette(&win, &st.active_palette());
         win.set_custom_theme_status_text(st.custom_theme_status.clone().into());
+        win.set_matugen_theme_status_text(st.matugen_theme_status.clone().into());
         let active_custom =
             st.custom_theme.as_ref().and_then(|ct| ct.active_theme_name()).unwrap_or("");
         win.set_active_custom_theme_name(active_custom.into());
