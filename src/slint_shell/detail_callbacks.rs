@@ -222,15 +222,27 @@ fn handle_detail_shuffle(
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
     if st.detail.as_ref().is_some_and(|d| !d.tracks.is_empty()) {
-        st.is_shuffle = true;
-        let start = enqueue_detail_tracks(st, tx);
-        st.unshuffled_tracks = Some(st.queue.tracks().to_vec());
-        let order = crate::slint_shell::playback::shuffle_permutation(st.queue.len(), Some(start));
-        st.queue.shuffle_with(&order);
-        st.play_track_at_index_in_memory(0);
+        shuffle_detail_into_queue(st, tx);
         trigger_playback(win, st);
     }
     sync_window(win, st);
+}
+
+/// Enqueues the open detail and shuffles it, rebuilding the linear queue first so the
+/// unshuffled baseline always holds every queued track in its real order.
+fn shuffle_detail_into_queue(
+    st: &mut SlintAppState,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    if st.is_shuffle {
+        st.restore_unshuffled_queue();
+    }
+    st.is_shuffle = true;
+    let start = enqueue_detail_tracks(st, tx);
+    st.unshuffled_tracks = Some(st.queue.tracks().to_vec());
+    let order = crate::slint_shell::playback::shuffle_permutation(st.queue.len(), Some(start));
+    st.queue.shuffle_with(&order);
+    st.play_track_at_index_in_memory(0);
 }
 
 #[cfg(test)]
@@ -281,12 +293,7 @@ mod tests {
             assert_eq!(state.queue.cursor(), 0);
             assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
         } else {
-            let start = enqueue_detail_tracks(&mut state, &tx);
-            state.unshuffled_tracks = Some(state.queue.tracks().to_vec());
-            let order =
-                crate::slint_shell::playback::shuffle_permutation(state.queue.len(), Some(start));
-            state.queue.shuffle_with(&order);
-            state.play_track_at_index_in_memory(0);
+            shuffle_detail_into_queue(&mut state, &tx);
             assert_eq!(state.queue.len(), 3);
             assert!(state.unshuffled_tracks.is_some());
             assert_eq!(state.unshuffled_tracks.as_ref().unwrap().len(), 3);
@@ -319,5 +326,39 @@ mod tests {
 
         state.detail_request = Some(("local:my_playlist".to_string(), DetailKind::Playlist));
         assert_eq!(current_local_detail_id(&state), Some("local:my_playlist".to_string()));
+    }
+
+    #[test]
+    fn test_detail_shuffle_keeps_original_order_when_already_shuffled() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        let track1 = Track::new("t1", "Track 1", "Artist 1").with_duration(180);
+        let track2 = Track::new("t2", "Track 2", "Artist 2").with_duration(200);
+        state.queue.push(track1.clone());
+        state.queue.push(track2.clone());
+        state.unshuffled_tracks = Some(vec![track2, track1]);
+        state.is_shuffle = true;
+
+        state.detail = Some(Detail::new(
+            DetailKind::Album,
+            "Album Title",
+            "Album Subtitle",
+            vec![Track::new("d1", "Detail 1", "Artist D").with_duration(210)],
+        ));
+        shuffle_detail_into_queue(&mut state, &tx);
+
+        let snapshot: Vec<&str> = state
+            .unshuffled_tracks
+            .as_ref()
+            .expect("snapshot present")
+            .iter()
+            .map(|t| t.id.as_str())
+            .collect();
+        assert_eq!(snapshot, vec!["t2", "t1", "d1"]);
+
+        state.toggle_shuffle();
+        assert!(!state.is_shuffle);
+        let restored: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(restored, vec!["t2", "t1", "d1"]);
     }
 }
