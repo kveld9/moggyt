@@ -128,7 +128,7 @@ export component ContentArea inherits Rectangle {
             spacing: 16px;
             alignment: start;
 
-            PersistenceBanner {
+            if root.persistence-error-text != "" : PersistenceBanner {
                 text: root.persistence-error-text;
                 dismiss-text: root.persistence-dismiss-text;
                 dismissed => { root.persistence-error-dismissed(); }
