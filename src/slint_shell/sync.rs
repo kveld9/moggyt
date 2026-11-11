@@ -9,12 +9,12 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use crate::domain::{Album, PlaybackFacts, Playlist, SearchFilter, Track, is_local_playlist_id};
 use crate::i18n::{Locale, tr};
 use crate::infra::{CatalogError, GithubUpdater, StoreHealth};
+use crate::slint_shell::audio_snapshot::sync_audio_snapshot;
 use crate::slint_shell::covers::resolve_row_cover_image;
 use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
 use crate::slint_shell::explore::explore_card_shelves;
 use crate::slint_shell::format::{
-    audio_quality_to_index, format_playback_speed, format_queue_label, format_sleep_timer_status,
-    format_update_status, timer_preset_to_index,
+    format_queue_label, format_sleep_timer_status, format_update_status, timer_preset_to_index,
 };
 use crate::slint_shell::history::library_item_subtitle;
 use crate::slint_shell::labels::sync_static_labels;
@@ -166,14 +166,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     sync_header_title(window, state);
     window.set_queue_panel_open(state.queue_panel_open);
     let player = window.global::<PlayerUi>();
-    let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
-    player.set_is_playing(is_playing);
-    let volume = state.audio.try_lock().map(|a| a.volume()).unwrap_or(100);
-    player.set_volume(volume as i32);
-    let speed = state.audio.try_lock().map(|a| a.speed()).unwrap_or(1.0);
-    window.set_playback_speed_text(format_playback_speed(speed).into());
-    let quality = state.audio.try_lock().map(|a| a.quality()).unwrap_or_default();
-    window.set_active_audio_quality_index(audio_quality_to_index(quality));
+    sync_audio_snapshot(window, state);
     window.set_songs_only(state.songs_only);
     window.global::<PlaybackUi>().set_autoplay_enabled(state.autoplay);
     window.set_crossfade_seconds(state.crossfade_seconds as i32);
@@ -470,6 +463,7 @@ pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppStat
     set_lyrics_highlight(window, sung, rest);
     player.set_is_playing(is_playing);
     sync_sleep_timer(window, state);
+    sync_audio_snapshot(window, state);
 }
 
 /// Samples raw backend facts and advances the stored playback phase.
