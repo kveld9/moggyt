@@ -222,6 +222,20 @@ mod tests {
     }
 
     #[test]
+    fn test_autoplay_enabled_setting_defaults_false_and_roundtrips() {
+        let default_settings = Settings::default();
+        assert!(!default_settings.autoplay_enabled);
+        let missing_key: Settings = serde_json::from_str("{}").expect("deserialize empty json");
+        assert!(!missing_key.autoplay_enabled);
+        let json_true = r#"{"autoplay_enabled": true}"#;
+        let loaded: Settings = serde_json::from_str(json_true).expect("deserialize true");
+        assert!(loaded.autoplay_enabled);
+        let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
+        let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
+        assert!(decoded.autoplay_enabled);
+    }
+
+    #[test]
     fn test_player_bar_settings_serde_defaults_and_explicit_deserialization() {
         let empty: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert_eq!(empty.player_bar_mode, PlayerBarMode::Classic);

@@ -219,6 +219,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Playlists", "Listas de reproducción"),
     ("Plays", "Reproducciones"),
     ("Prefer songs over music videos", "Preferir canciones a videoclips"),
+    ("Autoplay similar tracks", "Reproduccion automatica de similares"),
     ("Queue", "Cola"),
     ("Queue ({count})", "Cola ({count})"),
     ("Queue file uses a newer schema", "El archivo de cola usa un esquema mas nuevo"),

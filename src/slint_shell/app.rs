@@ -117,6 +117,7 @@ pub fn run(
     state.stream_cache_limit_mb = settings.stream_cache_limit_mb;
     state.hi_res_covers = settings.hi_res_covers;
     state.songs_only = settings.songs_only;
+    state.autoplay = settings.autoplay_enabled;
     if settings.discord_presence_enabled {
         state.discord = DiscordPresence::new();
     }

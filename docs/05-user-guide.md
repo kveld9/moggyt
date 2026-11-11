@@ -265,6 +265,15 @@ In headless mode:
 - A summary report is printed to `stdout` upon completion (JSON format with `--json`, plain text otherwise).
 - Successfully imported playlists are saved directly to `playlists.json` in the configuration directory.
 
+### Playback Settings
+
+Playback options can be configured under **Settings -> Playback**:
+
+- **Prefer songs over music videos**: When enabled, filters catalog search results and autoplay recommendations
+  to prefer audio tracks over music videos.
+- **Autoplay similar tracks**: Appends similar tracks when the queue ends. It is off by default; when enabled,
+  playback continues with catalog radio recommendations after the last track.
+
 ## Persistent Player Bar
 
 The bottom player bar remains visible across all pages and provides continuous transport controls.

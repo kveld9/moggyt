@@ -8,7 +8,6 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 
 use crate::domain::{DetailKind, PlaybackPhase, SearchFilter, SearchResult};
-use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::explore::{
     explore_item_at, load_category_async, load_explore_async, refresh_explore_covers_if_loaded,
@@ -31,6 +30,7 @@ use crate::slint_shell::window::{
     clear_search_and_sync, open_detail_async, refresh_library_async, submit_search_async,
     submit_search_with_filter_async, trigger_playback,
 };
+use crate::slint_shell::{MoggytWindow, PlaybackUi};
 
 /// Maps a clicked search result item to playback or container detail view.
 pub(crate) fn handle_filtered_item_click(
@@ -447,6 +447,15 @@ fn wire_playback_callbacks(
     window.on_songs_only_toggled(move || {
         with_window_state(&w, &s, |win, st| {
             st.toggle_songs_only();
+            sync_window(win, st);
+        });
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.global::<PlaybackUi>().on_autoplay_toggled(move || {
+        with_window_state(&w, &s, |win, st| {
+            st.toggle_autoplay();
             sync_window(win, st);
         });
     });

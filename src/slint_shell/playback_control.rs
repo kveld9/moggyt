@@ -177,6 +177,14 @@ impl SlintAppState {
         let _ = self.settings_store.save(&settings);
     }
 
+    /// Toggles autoplay continuation and persists the preference to disk.
+    pub fn toggle_autoplay(&mut self) {
+        self.autoplay = !self.autoplay;
+        let mut settings = self.settings_store.load();
+        settings.autoplay_enabled = self.autoplay;
+        let _ = self.settings_store.save(&settings);
+    }
+
     /// Evaluates auto-skip intervals for active track, seeking past matched range.
     pub fn check_auto_skip(&mut self) {
         let Some(track) = self.queue.current().cloned() else {
@@ -478,6 +486,21 @@ mod tests {
         state.toggle_songs_only();
         assert!(!state.songs_only);
         assert!(!state.settings_store.load().songs_only);
+    }
+
+    #[test]
+    fn test_toggle_autoplay_flips_and_persists() {
+        let mut state = test_wired();
+        assert!(!state.autoplay);
+        assert!(!state.settings_store.load().autoplay_enabled);
+
+        state.toggle_autoplay();
+        assert!(state.autoplay);
+        assert!(state.settings_store.load().autoplay_enabled);
+
+        state.toggle_autoplay();
+        assert!(!state.autoplay);
+        assert!(!state.settings_store.load().autoplay_enabled);
     }
 
     #[test]

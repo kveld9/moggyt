@@ -138,6 +138,7 @@ mod tests {
         assert_eq!(es.audio_quality_standard_label, "Estándar (~128 kbps)");
         assert_eq!(es.audio_quality_high_label, "Alta (AAC máx ~130 kbps)");
         assert_eq!(es.songs_only_label, "Preferir canciones a videoclips");
+        assert_eq!(es.autoplay_label, "Reproduccion automatica de similares");
         assert_eq!(es.crossfade, "Fundido cruzado");
         assert_eq!(es.crossfade_hint, "Transición suave entre temas");
         assert_eq!(es.stream_cache, "Límite de caché de streams");
@@ -293,6 +294,7 @@ mod tests {
         assert_eq!(en.audio_quality_standard_label, "Standard (~128 kbps)");
         assert_eq!(en.audio_quality_high_label, "High (AAC max ~130 kbps)");
         assert_eq!(en.songs_only_label, "Prefer songs over music videos");
+        assert_eq!(en.autoplay_label, "Autoplay similar tracks");
         assert_eq!(en.crossfade, "Crossfade");
         assert_eq!(en.crossfade_hint, "Smooth transition between tracks");
         assert_eq!(en.stream_cache, "Stream Cache Limit");
