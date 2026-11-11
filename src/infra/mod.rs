@@ -41,6 +41,7 @@ mod lyrics;
 mod lyrics_cache;
 mod lyrics_lrclib;
 mod lyrics_lrcred;
+mod lyrics_search;
 mod play_log_store;
 mod playlist_store;
 mod playlist_store_disk;
@@ -137,6 +138,10 @@ pub use lyrics_lrclib::{
 pub use lyrics_lrcred::{
     LRC_RED_RELEASE_BASE, LRC_RED_SEARCH_URL, LRC_RED_TIMEOUT_SECS, LrcRedClient, LrcRedHit,
     build_search_query, parse_hits, parse_ttml_lines, select_hit, ttml_url,
+};
+pub use lyrics_search::{
+    LYRICS_HIT_LIMIT, LYRICS_MATCH_THRESHOLD, LYRICS_RESULT_LIMIT, lyrics_match_score,
+    rank_lyrics_candidates,
 };
 pub use play_log_store::{DiskPlayLogStore, MemoryPlayLogStore, PLAY_LOG_FILE_NAME, PlayLogStore};
 pub use playlist_store::{MemoryPlaylistStore, PlaylistStore};

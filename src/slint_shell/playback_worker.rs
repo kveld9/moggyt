@@ -35,8 +35,11 @@ use std::sync::{Arc, Mutex};
 
 use tracing::{debug, warn};
 
-use crate::domain::{Detail, DetailKind, SearchQuery, Shelf};
-use crate::i18n::{Locale, tr};
+use crate::domain::{Detail, DetailKind};
+#[cfg(test)]
+use crate::domain::{LyricsSnippet, SearchQuery, SearchResult, Shelf};
+#[cfg(test)]
+use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, AudioError, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CatalogError, CoverCache,
     LyricLine, LyricOverrideDir, LyricsSource, Scrobbler, decode_cover, fetch_artwork,
@@ -295,26 +298,7 @@ pub fn execute_seek<A: AudioBackend>(position_secs: u64, audio: &Arc<Mutex<A>>) 
     }
 }
 
-/// Executes blocking search request off the UI thread and wraps results in a shelf.
-pub fn execute_search<C: Catalog>(
-    generation: u64,
-    query: &SearchQuery,
-    catalog: &Arc<Mutex<C>>,
-    locale: Locale,
-    songs_only: bool,
-) -> (u64, String, Result<Vec<Shelf>, CatalogError>) {
-    let res =
-        catalog.lock().map_err(|_| CatalogError::Transport).and_then(|c| c.search_filtered(query));
-    let shelves = res.map(|mut items| {
-        if songs_only {
-            items = crate::domain::retain_song_results(items);
-        }
-        let mut shelf = Shelf::new(tr(locale, "Search Results"));
-        shelf.items = items;
-        vec![shelf]
-    });
-    (generation, query.text().to_string(), shelves)
-}
+pub use super::worker_catalog::{execute_search, resolve_search};
 
 /// Executes blocking detail lookup off the UI thread.
 pub fn execute_detail<C: Catalog>(
@@ -349,7 +333,7 @@ pub fn execute_refresh_library<C: Catalog>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::SearchFilter;
+    use crate::domain::{MusicVideoType, SearchFilter, Track};
     use crate::infra::{AudioStub, CatalogStub, LrclibStub, MemoryCoverCache, StubScrobbler};
     use crate::slint_shell::test_support::NoLastRequestedAudio;
 
@@ -458,20 +442,13 @@ mod tests {
         fn search(&self, _: &str) -> Result<Vec<crate::domain::Track>, CatalogError> {
             Ok(Vec::new())
         }
-        fn search_filtered(
-            &self,
-            _: &SearchQuery,
-        ) -> Result<Vec<crate::domain::SearchResult>, CatalogError> {
-            Ok(vec![
-                crate::domain::SearchResult::Track(
-                    crate::domain::Track::new("t1", "Video", "Artist")
-                        .with_video_type(crate::domain::MusicVideoType::Omv),
-                ),
-                crate::domain::SearchResult::Track(
-                    crate::domain::Track::new("t2", "Song", "Artist")
-                        .with_video_type(crate::domain::MusicVideoType::Atv),
-                ),
-            ])
+        fn search_filtered(&self, _: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
+            let t1 = Track::new("t1", "Video", "Artist").with_video_type(MusicVideoType::Omv);
+            let t2 = Track::new("t2", "Song", "Artist").with_video_type(MusicVideoType::Atv);
+            Ok(vec![SearchResult::Track(t1), SearchResult::Track(t2)])
+        }
+        fn search_by_lyrics(&self, s: &LyricsSnippet) -> Result<Vec<Track>, CatalogError> {
+            Ok(vec![Track::new("lyric-hit", s.as_str(), "Artist")])
         }
         fn radio(&self, _: &str) -> Result<Vec<crate::domain::Track>, CatalogError> {
             Ok(Vec::new())
@@ -488,6 +465,20 @@ mod tests {
         fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
             Ok(None)
         }
+    }
+
+    #[test]
+    fn test_execute_search_routes_by_lyrics_flag() {
+        let catalog = Arc::new(Mutex::new(VideoTrackSearchCatalog));
+        let q = SearchQuery::parse("text").expect("query");
+        let (_, _, plain) = execute_search(1, &q, &catalog, Locale::English, false);
+        assert_eq!(plain.expect("plain")[0].items.len(), 2);
+
+        let lyrics = q.with_lyrics(true);
+        let (_, _, lyric_res) = execute_search(2, &lyrics, &catalog, Locale::English, false);
+        let items = &lyric_res.expect("lyrics")[0].items;
+        assert_eq!(items.len(), 1);
+        assert!(matches!(&items[0], crate::domain::SearchResult::Track(t) if t.id == "lyric-hit"));
     }
 
     #[test]

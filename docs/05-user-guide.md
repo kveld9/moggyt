@@ -27,6 +27,14 @@ The search view accepts queries for tracks, artists, and albums, and maintains a
     indicates no recent searches.
 - **Search Execution**: type your query into the input field and press `Enter` or click `Search` to view filtered
   search results.
+- `All`: displays results across all categories.
+- `Songs`: filters results to individual tracks.
+- `Albums`: filters results to albums.
+- `Artists`: filters results to artists.
+- `Playlists`: filters results to playlists.
+- `Lyrics`: treats the query as a remembered lyric fragment. The fragment is resolved
+  through lrc.red and matched against the catalog by title, artist, and duration, so
+  results are real tracks rather than catalog text matches.
 - **Clearing**: clearing the input (the `X` button or backspacing to empty) returns the page to the
   Idle state with the recent-search list.
 - **Zero hits**: a query with no matches shows an empty-results message. A failed catalog request

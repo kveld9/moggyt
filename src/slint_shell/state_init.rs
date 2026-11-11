@@ -110,6 +110,7 @@ impl SlintAppState {
             locale: Locale::default(),
             player_bar: PlayerBarPrefs::default(),
             search_filter: SearchFilter::All,
+            lyrics_search: false,
             search_covers: HashMap::new(),
             liked_ids: HashSet::new(),
             now_playing_cover: None,

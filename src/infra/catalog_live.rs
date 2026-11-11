@@ -4,9 +4,11 @@ use super::catalog::{Catalog, CatalogError};
 use super::catalog_client::{
     CatalogClient, RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits,
 };
+use super::lyrics_lrcred::LrcRedClient;
+use super::lyrics_search::{LYRICS_HIT_LIMIT, rank_lyrics_candidates};
 use crate::domain::{
-    Album, Artist, Detail, DetailKind, Playlist, SearchFilter, SearchQuery, SearchResult, Shelf,
-    Track,
+    Album, Artist, Detail, DetailKind, LyricsSnippet, Playlist, SearchFilter, SearchQuery,
+    SearchResult, Shelf, Track,
 };
 
 /// Catalog API-backed YouTube Music catalog implementing the [`Catalog`] port.
@@ -105,6 +107,24 @@ fn map_playlists(playlists: Vec<RawPlaylist>) -> impl Iterator<Item = SearchResu
 }
 
 impl Catalog for LiveCatalog {
+    /// Resolves a lyric fragment through lrc.red and the catalog, ranked by metadata fit.
+    fn search_by_lyrics(&self, snippet: &LyricsSnippet) -> Result<Vec<Track>, CatalogError> {
+        let hits = LrcRedClient::new().lookup_hits(snippet.as_str()).unwrap_or_default();
+        let mut matches: Vec<Track> = Vec::new();
+        for hit in hits.iter().take(LYRICS_HIT_LIMIT) {
+            let query = format!("{} {}", hit.title, hit.artist);
+            let Ok(candidates) = self.client.search(&query) else {
+                continue;
+            };
+            for track in rank_lyrics_candidates(hit, &candidates) {
+                if !matches.iter().any(|known| known.id == track.id) {
+                    matches.push(track);
+                }
+            }
+        }
+        Ok(matches)
+    }
+
     /// Returns catalog hits for `query`.
     fn search(&self, query: &str) -> Result<Vec<Track>, CatalogError> {
         self.client.search(query)

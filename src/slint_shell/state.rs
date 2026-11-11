@@ -127,6 +127,8 @@ pub struct SlintAppState {
     pub locale: Locale,
     pub player_bar: PlayerBarPrefs,
     pub search_filter: SearchFilter,
+    /// Whether the active search treats the query text as a lyric fragment.
+    pub lyrics_search: bool,
     pub search_covers: HashMap<String, slint::Image>,
     pub liked_ids: HashSet<String>,
     pub now_playing_cover: Option<slint::Image>,
@@ -297,6 +299,7 @@ impl SlintAppState {
     pub fn clear_search(&mut self) {
         self.search_generation = self.search_generation.wrapping_add(1);
         self.search_query.clear();
+        self.lyrics_search = false;
         self.search_active = false;
         self.home_shelves.clear();
         self.search_results.clear();

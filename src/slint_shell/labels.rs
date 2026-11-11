@@ -18,6 +18,7 @@ pub struct StaticLabels {
     pub search_button: &'static str,
     pub filter_all: &'static str,
     pub filter_songs: &'static str,
+    pub filter_lyrics: &'static str,
     pub filter_albums: &'static str,
     pub filter_artists: &'static str,
     pub filter_playlists: &'static str,
@@ -169,6 +170,7 @@ impl StaticLabels {
             search_button: tr(locale, "Search"),
             filter_all: tr(locale, "All"),
             filter_songs: tr(locale, "Songs"),
+            filter_lyrics: tr(locale, "Lyrics"),
             filter_albums: tr(locale, "Albums"),
             filter_artists: tr(locale, "Artists"),
             filter_playlists: tr(locale, "Playlists"),
@@ -339,6 +341,7 @@ impl StaticLabels {
         labels.set_search_button_label(self.search_button.into());
         labels.set_filter_all_label(self.filter_all.into());
         labels.set_filter_songs_label(self.filter_songs.into());
+        labels.set_filter_lyrics_label(self.filter_lyrics.into());
         labels.set_filter_albums_label(self.filter_albums.into());
         labels.set_filter_artists_label(self.filter_artists.into());
         labels.set_filter_playlists_label(self.filter_playlists.into());
