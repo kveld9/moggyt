@@ -13,9 +13,11 @@ export component PlayerCenterControls inherits VerticalLayout {
     in property <int> duration-secs: 0;
     in property <string> position-text: "0:00";
     in property <string> duration-text: "0:00";
+    in property <string> remaining-text: "";
     in property <bool> show-shuffle: true;
     in property <bool> show-repeat: true;
     in property <bool> show-skip-seconds: false;
+    in property <bool> show-remaining-time: false;
 
     callback toggle-play();
     callback prev-track();
@@ -24,6 +26,7 @@ export component PlayerCenterControls inherits VerticalLayout {
     callback seek-to(int);
     callback toggle-shuffle();
     callback cycle-repeat();
+    callback toggle-time-display();
 
     horizontal-stretch: 1;
     min-width: 240px;
@@ -236,11 +239,31 @@ export component PlayerCenterControls inherits VerticalLayout {
             }
         }
 
-        Text {
-            text: root.duration-text != "" ? root.duration-text : "--:--";
-            color: Theme.secondary;
-            font-size: 11px;
-            vertical-alignment: center;
+        // Clickable duration label: toggles between the total duration and the time
+        // remaining. Hover brightens the text and shows a subtle pill behind it.
+        Rectangle {
+            width: max(48px, duration-label.preferred-width + 8px);
+            horizontal-stretch: 0;
+            border-radius: 4px;
+            background: duration-touch.has-hover ? Theme.hover : transparent;
+
+            duration-touch := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: pointer;
+                clicked => { root.toggle-time-display(); }
+            }
+
+            duration-label := Text {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                text: root.show-remaining-time && root.remaining-text != ""
+                    ? root.remaining-text
+                    : (root.duration-text != "" ? root.duration-text : "--:--");
+                color: duration-touch.has-hover ? Theme.text : Theme.secondary;
+                font-size: 11px;
+                vertical-alignment: center;
+            }
         }
     }
 }

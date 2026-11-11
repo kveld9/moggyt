@@ -17,8 +17,8 @@ use crate::slint_shell::format::{
 };
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
-    cycle_repeat_mode, format_position, progress_fraction, repeat_mode_to_int, should_seek,
-    toggle_like,
+    cycle_repeat_mode, progress_fraction, push_time_labels, repeat_mode_to_int,
+    resolve_display_duration, should_seek, toggle_like,
 };
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::iter_shelf_items;
@@ -492,17 +492,19 @@ fn handle_seek_to(
     secs: i32,
 ) {
     let target = secs.max(0) as u64;
-    if let Ok(current) = st.audio.try_lock().map(|a| a.position_secs()) {
+    let known = st.audio.try_lock().map(|a| (a.position_secs(), a.duration_secs())).ok();
+    if let Some((current, _)) = known {
         if !should_seek(target, current) {
             return;
         }
     }
     let _ = tx.send(PlaybackWorkerCommand::Seek { position_secs: target });
+    let decoded_secs = known.map_or(0, |(_, duration)| duration);
+    let catalog_dur = st.queue.current().and_then(|t| t.duration_secs);
+    let dur = resolve_display_duration(catalog_dur, decoded_secs);
     let player = win.global::<PlayerUi>();
-    player.set_position_secs(target as i32);
-    player.set_position_text(format_position(target as u32).into());
-    let dur = st.queue.current().and_then(|t| t.duration_secs).unwrap_or(0);
-    player.set_progress(progress_fraction(target as u32, dur));
+    push_time_labels(&player, target as u32, dur);
+    player.set_progress(progress_fraction(target as u32, dur.unwrap_or(0)));
 }
 
 fn handle_toggle_like(win: &MoggytWindow, st: &mut SlintAppState) {

@@ -20,7 +20,8 @@ use crate::slint_shell::history::library_item_subtitle;
 use crate::slint_shell::labels::sync_static_labels;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
-    format_position, format_track_duration, is_track_liked, progress_fraction, repeat_mode_to_int,
+    is_track_liked, progress_fraction, push_time_labels, repeat_mode_to_int,
+    resolve_display_duration,
 };
 use crate::slint_shell::player_bar::mode_to_index;
 use crate::slint_shell::search::{SearchRow, format_duration};
@@ -192,26 +193,21 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
         state.queue.current().map(|t| is_track_liked(&state.liked_ids, &t.id)).unwrap_or(false);
     player.set_is_liked(is_liked);
 
-    let (title, artist, dur_str, dur_secs) = match state.queue.current() {
-        Some(t) => (
-            t.title.clone(),
-            t.artist.clone(),
-            format_track_duration(t.duration_secs),
-            t.duration_secs.unwrap_or(0),
-        ),
-        None => {
-            (tr(state.locale, "No track playing").to_string(), String::new(), "0:00".to_string(), 0)
-        }
+    let (title, artist, catalog_dur) = match state.queue.current() {
+        Some(t) => (t.title.clone(), t.artist.clone(), t.duration_secs),
+        None => (tr(state.locale, "No track playing").to_string(), String::new(), None),
     };
     window.set_active_track_title(title.into());
     window.set_active_track_artist(artist.into());
-    player.set_duration_text(dur_str.into());
-    player.set_duration_secs(dur_secs as i32);
 
-    let pos_secs = state.audio.try_lock().map(|a| a.position_secs()).unwrap_or(0) as u32;
-    player.set_position_secs(pos_secs as i32);
-    player.set_position_text(format_position(pos_secs).into());
-    player.set_progress(progress_fraction(pos_secs, dur_secs));
+    let (pos_secs, decoded_secs) = state
+        .audio
+        .try_lock()
+        .map(|a| (a.position_secs() as u32, a.duration_secs()))
+        .unwrap_or((0, 0));
+    let dur = resolve_display_duration(catalog_dur, decoded_secs);
+    push_time_labels(&player, pos_secs, dur);
+    player.set_progress(progress_fraction(pos_secs, dur.unwrap_or(0)));
 
     sync_cover_and_lyrics(window, state);
     sync_recent_searches(window, state);
@@ -449,15 +445,15 @@ pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppStat
         return;
     };
     let pos_secs = audio.position_secs() as u32;
+    let decoded_secs = audio.duration_secs();
     let is_playing = audio.is_playing();
     drop(audio);
 
-    let dur_secs = state.queue.current().and_then(|t| t.duration_secs).unwrap_or(0);
+    let catalog_dur = state.queue.current().and_then(|t| t.duration_secs);
+    let dur = resolve_display_duration(catalog_dur, decoded_secs);
     let player = window.global::<PlayerUi>();
-    player.set_position_secs(pos_secs as i32);
-    player.set_duration_secs(dur_secs as i32);
-    player.set_position_text(format_position(pos_secs).into());
-    player.set_progress(progress_fraction(pos_secs, dur_secs));
+    push_time_labels(&player, pos_secs, dur);
+    player.set_progress(progress_fraction(pos_secs, dur.unwrap_or(0)));
     window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
     let (sung, rest) = state.active_lyric_text_split_at(u64::from(pos_secs) * 1000);
     set_lyrics_highlight(window, sung, rest);

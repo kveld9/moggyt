@@ -30,7 +30,7 @@ use crate::slint_shell::import_callbacks::{
 use crate::slint_shell::import_state::{local_detail, merge_local_library};
 use crate::slint_shell::init::apply_updater_release;
 use crate::slint_shell::platform::dispatch_to_ui;
-use crate::slint_shell::playback::{format_track_duration, is_track_liked};
+use crate::slint_shell::playback::{is_track_liked, push_time_labels};
 use crate::slint_shell::playback_control::apply_play_track_completion;
 use crate::slint_shell::playback_worker::{
     PlaybackWorkerAdapters, PlaybackWorkerCommand, execute_detail, execute_play_track,
@@ -107,11 +107,7 @@ pub(crate) fn trigger_playback(window: &MoggytWindow, state: &mut SlintAppState)
     player.set_is_playing(true);
     window.set_active_track_title(track.title.clone().into());
     window.set_active_track_artist(track.artist.clone().into());
-    let dur_secs = track.duration_secs.unwrap_or(0);
-    player.set_duration_text(format_track_duration(track.duration_secs).into());
-    player.set_duration_secs(dur_secs as i32);
-    player.set_position_text("0:00".into());
-    player.set_position_secs(0);
+    push_time_labels(&player, 0, track.duration_secs);
     player.set_progress(0.0);
     player.set_is_liked(is_track_liked(&state.liked_ids, &track.id));
     window.set_queue_count(state.queue.len() as i32);

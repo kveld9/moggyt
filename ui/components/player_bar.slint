@@ -141,6 +141,8 @@ export component PlayerBar inherits Rectangle {
             duration-secs: PlayerUi.duration-secs;
             position-text: PlayerUi.position-text;
             duration-text: PlayerUi.duration-text;
+            remaining-text: PlayerUi.remaining-text;
+            show-remaining-time: PlayerUi.show-remaining-time;
             show-shuffle: root.show-shuffle;
             show-repeat: root.show-repeat;
             show-skip-seconds: root.show-skip-seconds;
@@ -152,6 +154,7 @@ export component PlayerBar inherits Rectangle {
             seek-to(secs) => { PlayerUi.seek-to(secs); }
             toggle-shuffle => { PlayerUi.toggle-shuffle(); }
             cycle-repeat => { PlayerUi.cycle-repeat(); }
+            toggle-time-display => { PlayerUi.show-remaining-time = !PlayerUi.show-remaining-time; }
         }
 
         // RIGHT ZONE: Queue button, Volume Slider
