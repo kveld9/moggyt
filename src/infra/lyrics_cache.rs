@@ -124,9 +124,7 @@ mod tests {
             if self.return_none {
                 return None;
             }
-            Some(SyncedLyrics {
-                lines: vec![LyricLine { start_ms: 0, text: format!("{title} by {artist}") }],
-            })
+            Some(SyncedLyrics { lines: vec![LyricLine::new(0, format!("{title} by {artist}"))] })
         }
     }
 

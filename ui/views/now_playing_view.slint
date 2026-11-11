@@ -1,5 +1,5 @@
 import { Labels } from "../labels.slint";
-import { Theme, LyricLineData } from "../theme.slint";
+import { LyricsHighlight, Theme, LyricLineData } from "../theme.slint";
 
 export component NowPlayingView inherits VerticalLayout {
     in property <string> track-title: "No track playing";
@@ -59,11 +59,29 @@ export component NowPlayingView inherits VerticalLayout {
         border-radius: 8px; background: Theme.panel; clip: true;
         VerticalLayout {
             padding: 12px; spacing: 8px; alignment: start;
-            for line in root.lyrics-lines : Text {
-                text: line.text;
-                color: line.index == root.active-lyric-index ? Theme.accent : Theme.secondary;
-                font-size: line.index == root.active-lyric-index ? 15px : 13px;
-                font-weight: line.index == root.active-lyric-index ? 700 : 400;
+            // Slint 1.18: Text does not wrap unless `wrap` is set, and a no-wrap Text
+            // keeps its full single-line preferred width. The sung/rest split therefore
+            // renders as one continuous line that clips instead of wrapping.
+            // https://docs.slint.dev/docs/slint/reference/elements/text/
+            for line in root.lyrics-lines : HorizontalLayout {
+                if line.index != root.active-lyric-index : Text {
+                    text: line.text;
+                    color: Theme.secondary;
+                    font-size: 13px;
+                    font-weight: 400;
+                }
+                if line.index == root.active-lyric-index && LyricsHighlight.sung-text != "" : Text {
+                    text: LyricsHighlight.sung-text;
+                    color: Theme.accent;
+                    font-size: 15px;
+                    font-weight: 700;
+                }
+                if line.index == root.active-lyric-index : Text {
+                    text: LyricsHighlight.rest-text;
+                    color: LyricsHighlight.sung-text == "" ? Theme.accent : Theme.secondary;
+                    font-size: 15px;
+                    font-weight: 700;
+                }
             }
         }
     }

@@ -63,6 +63,8 @@ The now playing view presents rich playback details for the track under the acti
   shows `Cover art unavailable (offline or pending fetch)`.
 - **Synced Lyrics**: displays timestamped lyrics fetched from LRCLIB for the active artist and title pair.
   - Offset controls: click `-250ms` or `+250ms` to adjust lyric synchronization dynamically.
+  - Word-level highlight: when the provider supplies word timings (lrc.red Apple TTML),
+    the active line fills word by word. LRCLIB lines keep the line-level highlight.
   - Formatted timestamps (`m:ss`) precede each line of text.
   - Shows `No synced lyrics for this track.` when no matching lyrics exist on LRCLIB.
 - If the queue is empty, displays `Queue is empty. Search and enqueue a track first.`.

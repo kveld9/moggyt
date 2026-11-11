@@ -307,7 +307,7 @@ fn append_line_lyrics(line: &str, out: &mut Vec<LyricLine>) {
         return;
     }
     for ts in timestamps {
-        out.push(LyricLine { start_ms: ts, text: text.to_owned() });
+        out.push(LyricLine::new(ts, text.to_owned()));
     }
 }
 
@@ -353,8 +353,8 @@ mod tests {
         assert_eq!(
             lines,
             vec![
-                LyricLine { start_ms: 3000, text: "Intro".to_owned() },
-                LyricLine { start_ms: 12340, text: "Line 1".to_owned() },
+                LyricLine::new(3000, "Intro".to_owned()),
+                LyricLine::new(12340, "Line 1".to_owned()),
             ]
         );
     }
@@ -366,9 +366,9 @@ mod tests {
         assert_eq!(
             lines,
             vec![
-                LyricLine { start_ms: 10000, text: "Duplicated chorus".to_owned() },
-                LyricLine { start_ms: 20000, text: "Duplicated chorus".to_owned() },
-                LyricLine { start_ms: 62345, text: "Chorus".to_owned() },
+                LyricLine::new(10000, "Duplicated chorus".to_owned()),
+                LyricLine::new(20000, "Duplicated chorus".to_owned()),
+                LyricLine::new(62345, "Chorus".to_owned()),
             ]
         );
     }
@@ -386,8 +386,8 @@ Just plain text without tag
         assert_eq!(
             lines,
             vec![
-                LyricLine { start_ms: 2000, text: "Earlier line".to_owned() },
-                LyricLine { start_ms: 5000, text: "Later line".to_owned() },
+                LyricLine::new(2000, "Earlier line".to_owned()),
+                LyricLine::new(5000, "Later line".to_owned()),
             ]
         );
         assert!(parse_lrc("").is_empty());

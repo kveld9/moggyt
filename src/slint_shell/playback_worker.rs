@@ -754,7 +754,7 @@ mod tests {
         ) -> Option<crate::infra::SyncedLyrics> {
             self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Some(crate::infra::SyncedLyrics {
-                lines: vec![LyricLine { start_ms: 0, text: format!("{title} by {artist}") }],
+                lines: vec![LyricLine::new(0, format!("{title} by {artist}"))],
             })
         }
     }

@@ -28,7 +28,8 @@ use crate::slint_shell::state::{PersistenceError, PersistenceStore, SlintAppStat
 use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{
-    LibraryItemData, LocalEditUi, LyricLineData, MoggytWindow, ShelfData, TrackRowData,
+    LibraryItemData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow, ShelfData,
+    TrackRowData,
 };
 
 fn derive_library_phase(state: &SlintAppState) -> ViewPhase {
@@ -437,6 +438,13 @@ pub(crate) fn sync_header_title(window: &MoggytWindow, state: &SlintAppState) {
     window.set_header_title(resolve_header_title(state));
 }
 
+/// Pushes the sung/rest split of the active lyric line into the UI global.
+pub(crate) fn set_lyrics_highlight(window: &MoggytWindow, sung: String, rest: String) {
+    let highlight = window.global::<LyricsHighlight>();
+    highlight.set_sung_text(sung.into());
+    highlight.set_rest_text(rest.into());
+}
+
 /// Periodic playback tick syncing elapsed timestamps, progress, and lyrics line without blocking.
 pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppState) {
     state.poll_output_device();
@@ -453,6 +461,8 @@ pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppStat
     window.set_position_text(format_position(pos_secs).into());
     window.set_playback_progress(progress_fraction(pos_secs, dur_secs));
     window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
+    let (sung, rest) = state.active_lyric_text_split_at(u64::from(pos_secs) * 1000);
+    set_lyrics_highlight(window, sung, rest);
     window.set_is_playing(is_playing);
     sync_sleep_timer(window, state);
 }

@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use slint::{ModelRc, VecModel};
 
+use super::sync::set_lyrics_highlight;
 use crate::domain::{PlaybackPhase, Track};
 use crate::i18n::tr;
 use crate::infra::{AudioBackend, AudioQuality, Catalog};
@@ -363,6 +364,7 @@ pub fn apply_play_track_completion(
         .collect();
     window.set_lyrics_lines(ModelRc::new(VecModel::from(line_data)));
     window.set_active_lyric_index(state.active_lyric_index());
+    set_lyrics_highlight(window, String::new(), String::new());
 
     if let Some(cover) = res.cover_data {
         if let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) {

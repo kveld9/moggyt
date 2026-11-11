@@ -5,7 +5,7 @@
 
 use serde_json::Value;
 
-use super::lyrics::{LyricLine, LyricsSource, SyncedLyrics};
+use super::lyrics::{LyricLine, LyricWord, LyricsSource, SyncedLyrics};
 use super::lyrics_lrclib::{CONFIDENCE_THRESHOLD, LyricsCandidate, match_confidence};
 
 pub const LRC_RED_SEARCH_URL: &str = "https://lrc.red/search.json";
@@ -165,10 +165,18 @@ fn extract_attribute_value_ms(after: &str) -> Option<u64> {
 }
 
 fn parse_begin_ms(tag: &str) -> Option<u64> {
+    parse_attribute_ms(tag, "begin")
+}
+
+fn parse_end_ms(tag: &str) -> Option<u64> {
+    parse_attribute_ms(tag, "end")
+}
+
+fn parse_attribute_ms(tag: &str, name: &str) -> Option<u64> {
     let mut remainder = tag;
-    while let Some(pos) = remainder.find("begin") {
+    while let Some(pos) = remainder.find(name) {
         let before = &remainder[..pos];
-        let after = &remainder[pos + 5..];
+        let after = &remainder[pos + name.len()..];
         if before.ends_with(char::is_whitespace) {
             if let Some(ms) = extract_attribute_value_ms(after) {
                 return Some(ms);
@@ -291,9 +299,42 @@ pub fn parse_ttml_lines(ttml: &str) -> Vec<LyricLine> {
         if text.is_empty() {
             continue;
         }
-        lines.push(LyricLine { start_ms, text });
+        lines.push(LyricLine::with_words(start_ms, text, parse_word_spans(body)));
     }
     lines
+}
+
+/// Parses `<span begin end>text</span>` runs inside a TTML paragraph body.
+fn parse_word_spans(body: &str) -> Vec<LyricWord> {
+    let mut words = Vec::new();
+    let mut cursor = body;
+    while let Some(start) = cursor.find("<span") {
+        let after = &cursor[start + 5..];
+        let Some(open_end) = after.find('>') else {
+            break;
+        };
+        let open_tag = &after[..open_end];
+        let rest = &after[open_end + 1..];
+        let Some(close) = rest.find("</span>") else {
+            break;
+        };
+        push_word(open_tag, &rest[..close], &mut words);
+        cursor = &rest[close + 7..];
+    }
+    words
+}
+
+fn push_word(open_tag: &str, raw: &str, words: &mut Vec<LyricWord>) {
+    let text = collapse_whitespace(&decode_entities(&strip_tags(raw)));
+    if text.is_empty() {
+        return;
+    }
+    let (Some(start_ms), Some(end_ms)) = (parse_begin_ms(open_tag), parse_end_ms(open_tag)) else {
+        return;
+    };
+    if end_ms > start_ms {
+        words.push(LyricWord { start_ms, end_ms, text });
+    }
 }
 
 fn is_valid_isrc(isrc: &str) -> bool {
@@ -480,14 +521,20 @@ mod tests {
     fn parse_ttml_parses_minute_clock_timestamps() {
         let xml = r#"<p begin="1:01.636" end="1:04.234"><span begin="1:01.636" end="1:01.900">Put</span> <span begin="1:01.900" end="1:04.234">a gun</span></p>"#;
         let lines = parse_ttml_lines(xml);
-        assert_eq!(lines, vec![LyricLine { start_ms: 61636, text: "Put a gun".to_owned() }]);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].start_ms, 61636);
+        assert_eq!(lines[0].text, "Put a gun");
+        assert_eq!(lines[0].words.len(), 2);
+        assert_eq!(lines[0].words[0].text, "Put");
+        assert_eq!(lines[0].words[0].end_ms, 61900);
+        assert_eq!(lines[0].words[1].text, "a gun");
     }
 
     #[test]
     fn parse_ttml_parses_hour_clock_timestamps() {
         let xml = r#"<p begin="1:02:03.500" end="1:02:04.000">Late</p>"#;
         let lines = parse_ttml_lines(xml);
-        assert_eq!(lines, vec![LyricLine { start_ms: 3723500, text: "Late".to_owned() }]);
+        assert_eq!(lines, vec![LyricLine::new(3723500, "Late".to_owned())]);
     }
 
     #[test]
@@ -501,7 +548,7 @@ mod tests {
     fn parse_ttml_decodes_entities() {
         let xml = r#"<p begin="1.5" end="2.0">Tom &amp; Jerry &lt;3 &#65;</p>"#;
         let lines = parse_ttml_lines(xml);
-        assert_eq!(lines, vec![LyricLine { start_ms: 1500, text: "Tom & Jerry <3 A".to_owned() }]);
+        assert_eq!(lines, vec![LyricLine::new(1500, "Tom & Jerry <3 A".to_owned())]);
     }
 
     #[test]
@@ -544,5 +591,32 @@ mod tests {
         let custom = LrcRedClient::with_endpoints("http://search", "http://release");
         assert_eq!(custom.search_url(), "http://search");
         assert_eq!(custom.release_base(), "http://release");
+    }
+
+    #[test]
+    fn test_parse_ttml_extracts_word_timings_from_fixture() {
+        let lines = parse_ttml_lines(FIXTURE_BOHEMIAN_TTML);
+        let first = &lines[0];
+        assert_eq!(first.text, "Is this the real life?");
+        assert_eq!(first.words.len(), 5);
+        assert_eq!(first.words[0].text, "Is");
+        assert_eq!(first.words[0].start_ms, 0);
+        assert_eq!(first.words[0].end_ms, 458);
+        assert_eq!(first.words[4].text, "life?");
+        assert_eq!(first.words[4].end_ms, 2906);
+    }
+
+    #[test]
+    fn test_parse_ttml_splits_syllable_spans() {
+        let lines = parse_ttml_lines(FIXTURE_BOHEMIAN_TTML);
+        let syllables: Vec<&str> = lines[1].words.iter().map(|word| word.text.as_str()).collect();
+        assert_eq!(syllables, vec!["Is", "this", "just", "fan", "ta", "sy?"]);
+    }
+
+    #[test]
+    fn test_parse_ttml_paragraph_without_spans_has_no_words() {
+        let lines = parse_ttml_lines(r#"<p begin="1.0" end="2.0">Plain line</p>"#);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].words.is_empty());
     }
 }
