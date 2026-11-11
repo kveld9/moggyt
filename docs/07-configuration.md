@@ -289,6 +289,21 @@ Settings are saved by writing to a temporary file in the configuration directory
 that unexpected termination never leaves a corrupt or truncated configuration file. If `settings.json` is missing,
 empty, or corrupted, `moggyt` automatically falls back to default settings without crashing.
 
+## Audio Version Overrides
+
+Audio version overrides allow mapping catalog tracks to alternative recordings. Overrides are persisted in
+`version_overrides.json` inside the configuration directory:
+
+```json
+{
+  "version": 1,
+  "overrides": { "dQw4w9WgXcQ": "alternativeVideoId" }
+}
+```
+
+The replacement affects only the audio stream while title, artist, artwork, lyrics and scrobbling keep the original
+track, and chained overrides are rejected.
+
 ## External Integrations
 
 - **Discord Rich Presence**: opt-in toggle in Settings > Integrations. Broadcasts a "Listening to moggyt" activity with

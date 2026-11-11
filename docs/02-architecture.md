@@ -42,6 +42,7 @@ src/
 │   ├── queue.rs       # Pure playback queue (add, next, previous, shuffle, repeat)
 │   ├── search.rs      # Search models (immutable query, track model)
 │   ├── shuffle.rs     # Smart shuffle ordering (artist adjacency, recency)
+│   ├── version_override.rs # Audio version overrides (catalog id to alternative recording)
 │   └── theme.rs       # Color palette data and ThemeId domain models
 └── infra/
     ├── mod.rs         # Re-exports adapters and port traits

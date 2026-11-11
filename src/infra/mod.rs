@@ -77,6 +77,7 @@ mod stream_window;
 mod tray;
 mod updater;
 mod updater_github;
+mod version_store;
 mod ytdlp;
 
 pub use atomic_file::{TEMP_FILE_MAX_AGE, sweep_stale_temp_files, write_atomic};
@@ -201,6 +202,10 @@ pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
 pub use updater_github::{
     GithubUpdater, UPDATE_OWNER_REPO, is_newer, latest_url, parse_release_payload,
+};
+pub use version_store::{
+    DiskVersionOverrideStore, MemoryVersionOverrideStore, VERSION_OVERRIDES_FILE,
+    VERSION_OVERRIDES_SCHEMA_VERSION, VersionOverrideFile, VersionOverrideStore,
 };
 pub use ytdlp::{
     YTDLP_AUDIO_FORMAT, YTDLP_UPDATE_INTERVAL_SECS, YtDlpResolver, format_args, is_valid_sidecar,

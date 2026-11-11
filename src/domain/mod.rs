@@ -17,6 +17,7 @@ mod segments;
 mod shuffle;
 mod sleep_timer;
 mod theme;
+mod version_override;
 
 pub use artist_match::{
     TOPIC_CHANNEL_SUFFIX, artist_score, split_source_artists, strip_topic_suffix,
@@ -52,3 +53,4 @@ pub use segments::{InvalidSegment, SkipRanges, SkipSegment};
 pub use shuffle::{RECENT_PLAY_WINDOW, smart_order};
 pub use sleep_timer::{SLEEP_FADE_WINDOW_SECS, SleepTimer, TimerPreset, faded_volume};
 pub use theme::{CustomPaletteError, Palette, PlayerBarMode, ThemeId, parse_hex_rgb};
+pub use version_override::{MAX_VERSION_OVERRIDES, VersionOverrideError, VersionOverrides};

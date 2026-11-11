@@ -28,11 +28,12 @@ impl SlintAppState {
             title: next.title.clone(),
             duration_secs: next.duration_secs,
         });
-        let prefetch_stream_id = next_track.map(|next| next.id.clone());
+        let prefetch_stream_id =
+            next_track.map(|next| self.version_overrides.resolve(&next.id).to_owned());
 
         Some(PlayTrackRequest {
             generation,
-            track_id: track.id,
+            track_id: self.version_overrides.resolve(&track.id).to_owned(),
             title: track.title,
             artist: track.artist,
             artwork_url: track.artwork,
@@ -158,5 +159,32 @@ mod tests {
         let req = state.begin_play_request();
         assert!(req.is_some());
         assert_eq!(state.play_generation, gen_after_play.wrapping_add(1));
+    }
+
+    #[test]
+    fn test_override_applies_to_track_and_prefetch_ids() {
+        let mut state = test_wired();
+        state.queue.clear();
+        state.queue.push(Track::new("original", "Song", "Artist"));
+        state.queue.push(Track::new("next-original", "Next", "Artist"));
+        state.version_overrides.set("original", "fixed").expect("override");
+        state.version_overrides.set("next-original", "next-fixed").expect("override");
+
+        let request = state.begin_play_request().expect("request built");
+
+        assert_eq!(request.track_id, "fixed");
+        assert_eq!(request.prefetch_stream_id.as_deref(), Some("next-fixed"));
+    }
+
+    #[test]
+    fn test_without_override_ids_are_unchanged() {
+        let mut state = test_wired();
+        state.queue.clear();
+        state.queue.push(Track::new("plain", "Song", "Artist"));
+
+        let request = state.begin_play_request().expect("request built");
+
+        assert_eq!(request.track_id, "plain");
+        assert_eq!(request.prefetch_stream_id, None);
     }
 }

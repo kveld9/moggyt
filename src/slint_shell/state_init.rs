@@ -58,6 +58,8 @@ impl SlintAppState {
             queue_store: Box::new(MemoryQueueStore::default()),
             skip_store: Box::new(MemorySkipStore::new()),
             play_log_store: Box::new(MemoryPlayLogStore::new()),
+            version_overrides: crate::domain::VersionOverrides::new(),
+            version_store: Box::new(crate::infra::MemoryVersionOverrideStore::new()),
             updater_rx: None,
             page: SlintPage::Search,
             queue_panel_open: false,
