@@ -52,3 +52,10 @@ Key log events to examine:
 When running on minimal window managers (e.g. i3, sway) without a desktop environment session manager, the Secret
 Service daemon may not launch automatically. Ensure `gnome-keyring-daemon --start` or equivalent runs at session startup
 if persistent cookie storage is required.
+
+## "moggyt is already running"
+
+On Linux, the single-instance lock is an abstract Unix socket released automatically by the kernel on process
+exit. Helper processes spawned by moggyt cannot keep the socket bound after the application closes because the
+socket is created close-on-exec (`SOCK_CLOEXEC`). If another launch reports that moggyt is already running, a
+leftover instance is still active in the background and can be terminated with `pkill -x moggyt`.
