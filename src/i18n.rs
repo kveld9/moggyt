@@ -217,8 +217,12 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Open settings", "Abrir ajustes"),
     ("Paste session cookies...", "Pegar cookies de sesión..."),
     (
-        "Place theme JSON files in ~/.config/moggyt/themes/ or ~/.config/moggyt/custom-theme.json",
-        "Coloca archivos JSON de tema en ~/.config/moggyt/themes/ o ~/.config/moggyt/custom-theme.json",
+        "Place theme JSON files in {path}/themes/ or {path}/custom-theme.json",
+        "Coloca archivos JSON de tema en {path}/themes/ o {path}/custom-theme.json",
+    ),
+    (
+        "Place theme JSON files in the themes directory or custom-theme.json inside the configuration directory",
+        "Coloca archivos JSON de tema en el directorio de temas o custom-theme.json dentro del directorio de configuración",
     ),
     ("Player bar", "Barra de reproducción"),
     ("Play", "Reproducir"),
