@@ -14,6 +14,7 @@ mod playlist_import;
 mod queue;
 mod search;
 mod segments;
+mod shuffle;
 mod sleep_timer;
 mod theme;
 
@@ -48,5 +49,6 @@ pub use search::{
     SearchFilter, SearchQuery, Track, retain_song_results, retain_songs,
 };
 pub use segments::{InvalidSegment, SkipRanges, SkipSegment};
+pub use shuffle::{RECENT_PLAY_WINDOW, smart_order};
 pub use sleep_timer::{SLEEP_FADE_WINDOW_SECS, SleepTimer, TimerPreset, faded_volume};
 pub use theme::{CustomPaletteError, Palette, PlayerBarMode, ThemeId, parse_hex_rgb};

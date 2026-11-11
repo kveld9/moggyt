@@ -1,7 +1,8 @@
 //! Slint playback state and view-model bridge.
 //!
 //! Hexagonal architecture invariant: this module operates purely in-memory
-//! with zero I/O, zero network, zero audio, zero rodio, and zero async runtimes.
+//! with zero network, zero audio, zero rodio, and zero async runtimes. Shuffle
+//! ordering reads recent plays through the `PlayLogStore` port only.
 //!
 //! Audio port boundary note:
 //! In future tranches, playback controls (play, pause, seek, volume) will delegate to the
@@ -11,8 +12,9 @@
 
 use std::collections::HashSet;
 
-use crate::domain::RepeatMode;
+use crate::domain::{RepeatMode, Track, smart_order};
 
+use super::play_log::recent_video_ids;
 use super::search::format_duration;
 use super::state::SlintAppState;
 
@@ -126,6 +128,17 @@ fn shuffle_slice(slice: &mut [usize]) {
     }
 }
 
+/// Builds a smart shuffle order for `tracks`, keeping `base[0]` at the front.
+pub(crate) fn build_shuffle_order(
+    tracks: &[Track],
+    recent_ids: &[String],
+    base: Vec<usize>,
+) -> Vec<usize> {
+    let artists: Vec<&str> = tracks.iter().map(|track| track.artist.as_str()).collect();
+    let is_recent: Vec<bool> = tracks.iter().map(|track| recent_ids.contains(&track.id)).collect();
+    smart_order(&artists, &is_recent, &base)
+}
+
 impl SlintAppState {
     /// Toggles queue shuffle state, permuting or restoring tracks accordingly.
     pub fn toggle_shuffle(&mut self) {
@@ -138,6 +151,9 @@ impl SlintAppState {
     }
 
     /// Shuffles the current queue, preserving the currently playing track at cursor 0.
+    ///
+    /// Recent plays (through the play log port) are pushed toward the end and
+    /// back-to-back tracks from the same artist are separated when possible.
     pub fn shuffle_current_queue(&mut self) {
         if self.queue.len() <= 1 {
             return;
@@ -145,7 +161,9 @@ impl SlintAppState {
         if self.unshuffled_tracks.is_none() {
             self.unshuffled_tracks = Some(self.queue.tracks().to_vec());
         }
-        let order = shuffle_permutation(self.queue.len(), Some(self.queue.cursor()));
+        let recent_ids = recent_video_ids(self.play_log_store.as_ref());
+        let base = shuffle_permutation(self.queue.len(), Some(self.queue.cursor()));
+        let order = build_shuffle_order(self.queue.tracks(), &recent_ids, base);
         self.queue.shuffle_with(&order);
     }
 
@@ -197,6 +215,39 @@ mod tests {
         assert_eq!(repeat_mode_from_int(1), RepeatMode::All);
         assert_eq!(repeat_mode_from_int(2), RepeatMode::One);
         assert_eq!(repeat_mode_from_int(99), RepeatMode::Off);
+    }
+
+    fn shuffle_tracks() -> Vec<Track> {
+        vec![
+            Track::new("a1", "Alpha One", "Alpha"),
+            Track::new("a2", "Alpha Two", "Alpha"),
+            Track::new("b1", "Beta One", "Beta"),
+            Track::new("c1", "Gamma One", "Gamma"),
+        ]
+    }
+
+    #[test]
+    fn test_build_shuffle_order_separates_same_artist_after_shuffle() {
+        let tracks = shuffle_tracks();
+        let order = build_shuffle_order(&tracks, &[], vec![0, 1, 2, 3]);
+        assert_eq!(order[0], 0, "active track stays first");
+        for pair in order.windows(2) {
+            assert_ne!(tracks[pair[0]].artist, tracks[pair[1]].artist, "order: {order:?}");
+        }
+    }
+
+    #[test]
+    fn test_build_shuffle_order_pushes_recent_tracks_last() {
+        let tracks = shuffle_tracks();
+        let recent = vec!["a1".to_string()];
+        let order = build_shuffle_order(&tracks, &recent, vec![2, 1, 0, 3]);
+        assert_eq!(order[0], 2, "active track stays first");
+        assert_eq!(order[order.len() - 1], 0, "recent track goes last");
+    }
+
+    #[test]
+    fn test_build_shuffle_order_empty_queue_is_empty() {
+        assert!(build_shuffle_order(&[], &[], Vec::new()).is_empty());
     }
 
     #[test]
