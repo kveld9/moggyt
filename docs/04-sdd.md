@@ -420,6 +420,9 @@ The review screen presents resolved matches before committing changes to the lib
 - **Matched Channel and Duration Delta**: The matched column displays the candidate title alongside its channel or
   artist attribution. A signed duration delta (e.g. `+3s`, `-2s`, `0s`) highlights playback length differences
   between the source track and the matched candidate, aiding visual verification before saving or swapping.
+- **Open in YouTube Music**: Compact Open action on each matched review row and each alternative candidate in the
+  picker. Launches `https://music.youtube.com/watch?v=<video_id>` in the system default browser via `open_url`
+  without changing the chosen match. Browser launch failures are reported directly in the import status text.
 - **Custom Video ID Override**: Users can override any row's match by entering an explicit 11-character YouTube video ID
   in the alternative picker. The manual override is applied as a high-confidence choice (`MatchConfidence::High`),
   replaces the row's chosen track, and clears any unresolved reason.

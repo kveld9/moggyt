@@ -12,6 +12,7 @@ export component ImportReviewView inherits VerticalLayout {
 
     callback row-selected(int);
     callback swap-requested(int);
+    callback open-requested(int);
     callback row-exclusion-toggled(int);
     callback save-requested();
     callback discard-requested();
@@ -138,7 +139,7 @@ export component ImportReviewView inherits VerticalLayout {
                 }
 
                 Rectangle {
-                    width: 200px;
+                    width: 276px;
                     background: transparent;
                 }
             }
@@ -253,6 +254,31 @@ export component ImportReviewView inherits VerticalLayout {
                                     horizontal-alignment: center;
                                     vertical-alignment: center;
                                     overflow: elide;
+                                }
+                            }
+
+                            Rectangle {
+                                width: 60px;
+                                height: 28px;
+                                border-radius: 6px;
+                                opacity: row.has-match ? 1.0 : 0.35;
+                                background: row.has-match
+                                    ? (open-touch.pressed ? Theme.overlay : (open-touch.has-hover ? Theme.hover : Theme.surface))
+                                    : Theme.surface;
+                                animate background { duration: 150ms; easing: ease-in-out; }
+
+                                open-touch := TouchArea {
+                                    enabled: row.has-match;
+                                    clicked => { root.open-requested(row.index); }
+                                }
+
+                                Text {
+                                    text: Labels.import-open-label;
+                                    color: (row.has-match && open-touch.has-hover) ? Theme.text : Theme.secondary;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
                                 }
                             }
 
