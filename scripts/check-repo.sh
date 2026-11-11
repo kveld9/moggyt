@@ -221,6 +221,20 @@ is_test_exempt() {
   esac
 }
 
+# Sibling test modules (`*_tests.rs`) hold the tests of the module that declares them with
+# `#[cfg(test)] #[path = "<file>"] mod ...;`. They satisfy the test policy when that reference
+# exists, so they do not need an inline `mod tests` marker of their own. An unreferenced
+# `*_tests.rs` file still fails: the reference is what proves the file is wired into the crate.
+is_sibling_test_module() {
+  local target="$1"
+  local repo="$2"
+  local base_name
+
+  [[ "${target}" == *_tests.rs ]] || return 1
+  base_name="${target##*/}"
+  git -C "${repo}" grep -q -F -e "#[path = \"${base_name}\"]" -- '*.rs'
+}
+
 while IFS= read -r file; do
   file="${file%$'\r'}"
   clean_file="${file#./}"
@@ -248,6 +262,9 @@ while IFS= read -r file; do
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
   elif grep -q 'mod tests' "${full_path}"; then
     echo -e "  [${GREEN}OK${RESET}] ${clean_file} (contains mod tests)"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+  elif is_sibling_test_module "${clean_file}" "${TARGET_DIR}"; then
+    echo -e "  [${GREEN}OK${RESET}] ${clean_file} (sibling test module referenced by #[path])"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
   else
     echo -e "  [${RED}FAIL${RESET}] ${clean_file} (missing mod tests: unit test module required)"
