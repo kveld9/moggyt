@@ -158,6 +158,11 @@ pub struct StaticLabels {
     pub local_remove_track_label: &'static str,
     pub local_move_up_label: &'static str,
     pub local_move_down_label: &'static str,
+    pub version_fix_open_label: &'static str,
+    pub version_fix_title_label: &'static str,
+    pub version_fix_search_label: &'static str,
+    pub version_fix_empty_label: &'static str,
+    pub version_fix_hint_label: &'static str,
 }
 
 impl StaticLabels {
@@ -330,6 +335,11 @@ impl StaticLabels {
             local_remove_track_label: tr(locale, "Remove"),
             local_move_up_label: tr(locale, "Up"),
             local_move_down_label: tr(locale, "Down"),
+            version_fix_open_label: tr(locale, "Fix version"),
+            version_fix_title_label: tr(locale, "Fix audio version"),
+            version_fix_search_label: tr(locale, "Search alternatives"),
+            version_fix_empty_label: tr(locale, "No alternatives found"),
+            version_fix_hint_label: tr(locale, "Search for a different recording"),
         }
     }
 
@@ -490,6 +500,11 @@ impl StaticLabels {
         labels.set_local_remove_track_label(self.local_remove_track_label.into());
         labels.set_local_move_up_label(self.local_move_up_label.into());
         labels.set_local_move_down_label(self.local_move_down_label.into());
+        labels.set_version_fix_open_label(self.version_fix_open_label.into());
+        labels.set_version_fix_title_label(self.version_fix_title_label.into());
+        labels.set_version_fix_search_label(self.version_fix_search_label.into());
+        labels.set_version_fix_empty_label(self.version_fix_empty_label.into());
+        labels.set_version_fix_hint_label(self.version_fix_hint_label.into());
     }
 }
 

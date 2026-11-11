@@ -127,6 +127,7 @@ pub(crate) fn wire_window_callbacks(
     super::lastfm_connect::wire_lastfm_callbacks(window, &state_rc);
     super::spotify_connect::wire_spotify_callbacks(window, &state_rc);
     super::stats::wire_stats_callbacks(window, &state_rc);
+    super::version_fix::wire(window, state_rc.clone());
 }
 
 fn handle_page_selected(
