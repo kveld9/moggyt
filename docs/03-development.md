@@ -88,6 +88,23 @@ chmod +x .githooks/pre-commit
 git config core.hooksPath .githooks
 ```
 
+## UI verification (Slint)
+
+A `.slint` change that alters text, geometry, or colors is verified against rendered output before
+the PR merges; a green test suite cannot see pixels. A running app instance holds the
+`moggyt-single-instance` lock, so a second build cannot be started to inspect a worktree while it
+is open; both routes below work in that situation.
+
+- Layout and spacing deltas: measure exact logical coordinates with the Slint testing backend
+  (`i-slint-backend-testing`) from a throwaway crate outside the repository. Compile the real entry
+  (`ui/shell.slint`), enable debug info (`CompilerConfiguration::new().with_debug_info(true)`, the
+  element-handle API requires it), initialize with `i_slint_backend_testing::init_no_event_loop()`,
+  then read `ElementHandle::absolute_position()` and `.size()` after `show()`.
+- Pixel changes: render the real component offscreen with `slint-viewer --screenshot` from a
+  temporary scene under `ui/` that imports the component by relative path. Set the `Theme` colors
+  explicitly (the globals have no defaults) and use `--backend software`. Delete the scene after
+  reading the image; it is scaffolding and is never committed.
+
 ## Slint lessons
 
 Distilled rules from Slint behavior that surprised us. Consult the linked source before
