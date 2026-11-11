@@ -295,6 +295,9 @@ Users can customize the player bar appearance and element visibility under **Set
     PulseAudio/PipeWire default sink is compared when `pactl` is available; otherwise
     the audio device name is used. Press `Play` to resume on the new device.
   - `Next`: skips to next track in the queue and starts playback.
+  - `Shuffle`: randomizes the queue while keeping tracks from the same artist apart
+    and moving tracks from your most recent listening sessions toward the end of the
+    queue. With only one artist in the queue it falls back to a plain shuffle.
 - **Seek Controls**:
   - `-10s`: rewinds current playback position by 10 seconds (clamped at 0).
   - `+10s`: advances playback position forward by 10 seconds.
