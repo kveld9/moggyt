@@ -44,10 +44,20 @@ fn col_runs(renderer: &Value, col_idx: usize) -> Option<&[Value]> {
         .map(Vec::as_slice)
 }
 
+/// Joins every run of a flex column into one string.
+fn column_text(renderer: &Value, col_idx: usize) -> Option<String> {
+    let runs = col_runs(renderer, col_idx)?;
+    let mut out = String::new();
+    for run in runs {
+        if let Some(text) = run.get("text").and_then(Value::as_str) {
+            out.push_str(text);
+        }
+    }
+    if out.trim().is_empty() { None } else { Some(out) }
+}
+
 fn badge_of(renderer: &Value) -> String {
-    let Some(runs) = col_runs(renderer, 1) else {
-        return "Song".to_owned();
-    };
+    let Some(runs) = col_runs(renderer, 1) else { return "Song".to_owned() };
     let Some(first) = runs.first().and_then(|r| r.get("text")).and_then(Value::as_str) else {
         return "Song".to_owned();
     };
@@ -159,9 +169,7 @@ pub fn shelf_category(title: &str) -> Option<SearchFilter> {
 }
 
 fn dispatch_two_row(category: SearchFilter, renderer: &Value, hits: &mut SearchHits) {
-    let Some((title, subtitle, browse_id)) = parse_two_row(renderer) else {
-        return;
-    };
+    let Some((title, subtitle, browse_id)) = parse_two_row(renderer) else { return };
     let id = browse_id.unwrap_or_default();
     let thumb_url = best_thumbnail(renderer);
     match category {
@@ -271,7 +279,7 @@ const TYPE_LABELS: &[&str] = &[
 /// The column is prefixed with the item type and suffixed with the duration, so both
 /// edges are removed while the separators inside the artist list stay untouched.
 fn track_artist(renderer: &Value) -> String {
-    let Some(raw) = flex_text(renderer, 1) else { return String::new() };
+    let Some(raw) = column_text(renderer, 1) else { return String::new() };
     let trimmed = strip_duration_suffix(strip_type_prefix(&raw)).trim();
     if is_clock_duration(trimmed) { String::new() } else { trimmed.to_owned() }
 }
@@ -357,14 +365,8 @@ fn dispatch_bare_track(renderer: &Value, title: String, artist: String, hits: &m
     let Some(video_id) = video_id_of(renderer) else { return };
     let thumb_url = best_thumbnail(renderer);
     let video_type = resolve_video_type(renderer);
-    hits.tracks.push(RawTrack {
-        video_id,
-        title,
-        artist,
-        duration_secs: search_duration(renderer),
-        thumb_url,
-        video_type,
-    });
+    let duration_secs = search_duration(renderer);
+    hits.tracks.push(RawTrack { video_id, title, artist, duration_secs, thumb_url, video_type });
 }
 
 fn dispatch_category(
@@ -375,8 +377,7 @@ fn dispatch_category(
     hits: &mut SearchHits,
 ) {
     let Some(browse_id) = browse_of(renderer) else {
-        dispatch_bare_track(renderer, title, artist, hits);
-        return;
+        return dispatch_bare_track(renderer, title, artist, hits);
     };
     let thumb_url = best_thumbnail(renderer);
     match cat {
@@ -512,10 +513,22 @@ mod tests {
     fn test_parse_search_tracks_resolves_artist_past_type_and_duration() {
         let (resp, w) = (test_responsive_item, test_watch);
         let items = vec![
-            resp("Bohemian Rhapsody", &["Cancion \u{2022} Queen"], w("vid-type-artist")),
-            resp("Tear It Up", &["Cancion \u{2022} 3:25"], w("vid-type-only")),
-            resp("Loser", &["Tame Impala \u{2022} Deadbeat \u{2022} 3:44"], w("vid-artist-first")),
-            resp("Bohemian Rhapsody (Live)", &["Canci\u{f3}n \u{2022} Queen"], w("vid-accented")),
+            resp(
+                "Bohemian Rhapsody",
+                &["Canci\u{f3}n", " \u{2022} ", "Queen"],
+                w("vid-type-artist"),
+            ),
+            resp("Tear It Up", &["Cancion", " \u{2022} ", "3:25"], w("vid-type-only")),
+            resp(
+                "Loser",
+                &["Tame Impala", " \u{2022} ", "Deadbeat", " \u{2022} ", "3:44"],
+                w("vid-artist-first"),
+            ),
+            resp(
+                "Bohemian Rhapsody (Live)",
+                &["Canci\u{f3}n", " \u{2022} ", "Queen"],
+                w("vid-accented"),
+            ),
         ];
         let shelf = serde_json::json!({"musicShelfRenderer": {"title": {"runs": [{"text": "Canciones"}]}, "contents": items}});
         let tracks = parse_search_tracks(&tabbed_sections(vec![shelf]));
@@ -689,11 +702,8 @@ mod tests {
         assert_eq!(first.artists.len(), 1);
         assert_eq!(first.playlists.len(), 1);
 
-        // Song item with multi-artist runs
         check_track(&first.tracks[0], "song-vid-1", "Bachata Rosa", "Juan Luis Guerra & 4.40");
         check_lh3(first.tracks[0].thumb_url.as_deref(), "test-thumb-large");
-
-        // Video item
         check_track(
             &first.tracks[1],
             "video-vid-2",
@@ -702,8 +712,6 @@ mod tests {
         );
         check_lh3(first.tracks[1].thumb_url.as_deref(), "video-thumb-large");
         assert_eq!(first.tracks[1].video_type, Some(crate::domain::MusicVideoType::Omv));
-
-        // Episode item
         check_track(
             &first.tracks[2],
             "ep-vid-6",
@@ -711,16 +719,10 @@ mod tests {
             "Latin Beats Podcast",
         );
         check_lh3(first.tracks[2].thumb_url.as_deref(), "episode-thumb");
-
-        // Single item classified as RawAlbum with browseId routed
         check_album(&first.albums[0], "MPREb_single_1", "Eres Mia", "Romeo Santos \u{2022} 2014");
         check_lh3(first.albums[0].thumb_url.as_deref(), "single-thumb");
-
-        // Artist item with browseId routed
         check_artist(&first.artists[0], "UC_romeo_1", "Romeo Santos");
         check_lh3(first.artists[0].thumb_url.as_deref(), "artist-thumb");
-
-        // Playlist item with browseId routed
         check_playlist(&first.playlists[0], "VL_playlist_1", "Bachata Essentials");
         check_lh3(first.playlists[0].thumb_url.as_deref(), "playlist-thumb");
     }
@@ -770,7 +772,7 @@ mod tests {
         for badge in VIDEO_BADGES {
             assert!(is_video_badge(badge), "expected video badge for {badge}");
         }
-        for badge in ["Video", "Vídeo", "VÍDEO", "Music Video", "Videoclip"] {
+        for badge in ["Video", "V\u{ed}deo", "V\u{cd}DEO", "Music Video", "Videoclip"] {
             assert!(is_video_badge(badge), "expected video badge for {badge}");
         }
         for badge in ["song", "Song", "album", "artist", "playlist", "podcast", ""] {
@@ -780,20 +782,18 @@ mod tests {
 
     #[test]
     fn parse_search_detects_video_badge_and_video_shelf() {
-        assert!(is_video_shelf("Videos") && is_video_shelf("Vídeos") && !is_video_shelf("Songs"));
+        assert!(
+            is_video_shelf("Videos") && is_video_shelf("V\u{ed}deos") && !is_video_shelf("Songs")
+        );
         let s_item = test_responsive_item("Shelf Video", &["Artist"], test_watch("v-shelf-1"));
         let b_item = test_responsive_item("Badge Video", &["Music video"], test_watch("v-badge-1"));
         let shelf = serde_json::json!({"musicShelfRenderer": {"title": {"runs": [{"text": "Videos"}]}, "contents": [s_item]}});
         let bare = serde_json::json!({"itemSectionRenderer": {"contents": [b_item]}});
         let hits = parse_search_all(&tabbed_sections(vec![shelf, bare]));
         assert_eq!(hits.tracks.len(), 2);
-        assert_eq!(
-            (hits.tracks[0].video_id.as_str(), hits.tracks[0].video_type),
-            ("v-shelf-1", Some(crate::domain::MusicVideoType::Omv))
-        );
-        assert_eq!(
-            (hits.tracks[1].video_id.as_str(), hits.tracks[1].video_type),
-            ("v-badge-1", Some(crate::domain::MusicVideoType::Omv))
-        );
+        assert_eq!(hits.tracks[0].video_id, "v-shelf-1");
+        assert_eq!(hits.tracks[0].video_type, Some(crate::domain::MusicVideoType::Omv));
+        assert_eq!(hits.tracks[1].video_id, "v-badge-1");
+        assert_eq!(hits.tracks[1].video_type, Some(crate::domain::MusicVideoType::Omv));
     }
 }
