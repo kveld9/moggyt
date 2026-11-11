@@ -45,6 +45,7 @@ Native YouTube Music client written in Rust (Slint)."""
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
+libc = "0.2"
 
 [profile.release]
 lto = "thin"

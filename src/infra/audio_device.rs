@@ -276,10 +276,35 @@ where
 }
 
 #[cfg(target_os = "linux")]
+fn configure_death_signal(command: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+
+    // SAFETY: the closure runs between fork and exec and only calls prctl(2), which is
+    // async-signal-safe and touches no allocator or Rust runtime state.
+    unsafe {
+        command.pre_exec(|| {
+            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM, 0, 0, 0) == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn spawn_subscription() -> Option<std::process::Child> {
+    let mut command = subscription_command();
+    configure_death_signal(&mut command);
+    command.spawn().ok()
+}
+
+#[cfg(target_os = "linux")]
+fn subscription_command() -> std::process::Command {
     use std::process::{Command, Stdio};
 
-    Command::new("pactl").arg("subscribe").stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()
+    let mut command = Command::new("pactl");
+    command.arg("subscribe").stdout(Stdio::piped()).stderr(Stdio::null());
+    command
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -481,5 +506,24 @@ mod tests {
         assert!(!is_device_event_line("Event 'new' on client #9"));
         assert!(!is_device_event_line("Event 'change' on source-output #21186"));
         assert!(!is_device_event_line("Event 'remove' on source #3"));
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn subscription_command_execs_with_death_signal_hook() {
+        use std::process::{Command, Stdio};
+
+        let base = subscription_command();
+        assert_eq!(base.get_program(), "pactl");
+
+        // The test proves the unsafe hook does not break fork/exec;
+        // it cannot prove the signal semantics.
+        let mut command = Command::new("/bin/true");
+        command.stdout(Stdio::piped()).stderr(Stdio::null());
+        configure_death_signal(&mut command);
+
+        let mut child = command.spawn().expect("failed to spawn /bin/true");
+        let status = child.wait().expect("failed to wait on child");
+        assert!(status.success());
     }
 }

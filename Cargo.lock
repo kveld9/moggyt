@@ -3481,6 +3481,7 @@ dependencies = [
  "gtk",
  "image",
  "keyring",
+ "libc",
  "md-5",
  "reqwest",
  "rfd",
