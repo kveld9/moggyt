@@ -7,6 +7,8 @@ import { ImportReviewView } from "./import_review.slint";
 export global ImportUi {
     in-out property <bool> connection-lost: false;
     callback retry-requested();
+    callback open-track-requested(int);
+    callback open-alternative-requested(int);
 }
 
 export component ImportOverlay inherits Rectangle {
@@ -98,6 +100,7 @@ export component ImportOverlay inherits Rectangle {
         row-selected(idx) => { root.row-selected(idx); }
         swap-requested(idx) => { root.swap-requested(idx); }
         row-exclusion-toggled(idx) => { root.row-exclusion-toggled(idx); }
+        open-requested(idx) => { ImportUi.open-track-requested(idx); }
         save-requested => { root.save-requested(); }
         discard-requested => { root.discard-requested(); }
         retry-requested => { ImportUi.retry-requested(); }
@@ -108,6 +111,7 @@ export component ImportOverlay inherits Rectangle {
         selected: root.alternative-selected;
         custom-id-text <=> root.custom-id-text;
         alternative-chosen(idx) => { root.alternative-chosen(idx); }
+        open-requested(idx) => { ImportUi.open-alternative-requested(idx); }
         custom-id-submitted(text) => { root.custom-id-submitted(text); }
         dismissed => { root.picker-dismissed(); }
     }

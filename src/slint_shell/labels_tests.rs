@@ -200,6 +200,7 @@ mod tests {
         assert_eq!(es.import_low_confidence_label, "Confianza baja");
         assert_eq!(es.import_no_match_label, "Sin coincidencia");
         assert_eq!(es.import_swap_label, "Cambiar");
+        assert_eq!(es.import_open_label, "Abrir");
         assert_eq!(es.import_choose_track_label, "Elegir una cancion");
         assert_eq!(es.import_save_label, "Guardar playlist");
         assert_eq!(es.import_discard_label, "Descartar");
@@ -354,6 +355,7 @@ mod tests {
         assert_eq!(en.import_low_confidence_label, "Low confidence");
         assert_eq!(en.import_no_match_label, "No match");
         assert_eq!(en.import_swap_label, "Swap");
+        assert_eq!(en.import_open_label, "Open");
         assert_eq!(en.import_choose_track_label, "Choose a track");
         assert_eq!(en.import_save_label, "Save playlist");
         assert_eq!(en.import_discard_label, "Discard");

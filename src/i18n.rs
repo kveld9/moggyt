@@ -145,6 +145,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Explore", "Explorar"),
     ("Failed to clear Spotify credentials", "No se pudieron borrar las credenciales de Spotify"),
     ("Failed to load search results", "No se pudieron cargar los resultados de busqueda"),
+    ("Failed to open browser", "No se pudo abrir el navegador"),
     ("Failed to play track", "Error al reproducir la canción"),
     ("Failed to save playlist", "No se pudo guardar la playlist"),
     ("Failed to save Spotify credentials", "No se pudieron guardar las credenciales de Spotify"),
@@ -200,6 +201,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Not connected", "No conectado"),
     ("Now Playing", "Sonando"),
     ("Off", "Desactivado"),
+    ("Open", "Abrir"),
     ("Open settings", "Abrir ajustes"),
     ("Paste session cookies...", "Pegar cookies de sesión..."),
     (
@@ -704,6 +706,20 @@ mod tests {
     fn test_custom_video_id_i18n_strings_exist_and_differ() {
         let keys_and_expected =
             [("YouTube video ID", "ID de video de YouTube"), ("Use ID", "Usar ID")];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_import_open_i18n_strings_exist_and_differ() {
+        let keys_and_expected =
+            [("Open", "Abrir"), ("Failed to open browser", "No se pudo abrir el navegador")];
 
         for (key, expected_es) in keys_and_expected {
             let en = tr(Locale::English, key);

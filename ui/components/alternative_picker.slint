@@ -9,6 +9,7 @@ export component AlternativePicker inherits Rectangle {
     in-out property <string> custom-id-text: "";
 
     callback alternative-chosen(int);
+    callback open-requested(int);
     callback dismissed();
     callback custom-id-submitted(string);
 
@@ -125,6 +126,27 @@ export component AlternativePicker inherits Rectangle {
                                 font-size: 11px;
                                 horizontal-alignment: right;
                                 vertical-alignment: center;
+                            }
+
+                            Rectangle {
+                                width: 60px;
+                                height: 28px;
+                                border-radius: 6px;
+                                background: open-touch.pressed ? Theme.overlay : (open-touch.has-hover ? Theme.hover : Theme.surface);
+                                animate background { duration: 150ms; easing: ease-in-out; }
+
+                                open-touch := TouchArea {
+                                    clicked => { root.open-requested(alt.index); }
+                                }
+
+                                Text {
+                                    text: Labels.import-open-label;
+                                    color: open-touch.has-hover ? Theme.text : Theme.secondary;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
                             }
                         }
                     }

@@ -12,8 +12,9 @@ use crate::domain::{SpotifyPlaylist, Track, parse_spotify_ref};
 use crate::i18n::{Locale, tr};
 use crate::infra::{
     FilePicker, KeyringSpotifyCredentialStore, PlaylistStore, RfdFilePicker,
-    SpotifyCredentialStore, load_playlist_file, load_spotify_link,
+    SpotifyCredentialStore, load_playlist_file, load_spotify_link, open_url,
 };
+use crate::slint_shell::import_open::{alternative_track_url, chosen_track_url};
 use crate::slint_shell::import_searcher::LiveTrackSearcher;
 use crate::slint_shell::import_session::{ImportDestination, ImportSession, ImportStage};
 use crate::slint_shell::import_state::{
@@ -314,6 +315,35 @@ fn toggle_session_exclusion(session: &mut ImportSession, row: usize) -> bool {
     session.review.as_mut().map(|r| r.toggle_exclusion(row)).unwrap_or(false)
 }
 
+fn open_review_track(window: &MoggytWindow, row: i32) {
+    let url = with_session(|s| {
+        let index = usize::try_from(row).ok()?;
+        let review = s.review.as_ref()?;
+        chosen_track_url(review.rows.get(index)?)
+    });
+    open_or_report(window, url);
+}
+
+fn open_review_alternative(window: &MoggytWindow, alternative: i32) {
+    let url = with_session(|s| {
+        let index = usize::try_from(alternative).ok()?;
+        let picker_row = s.picker_row?;
+        let review = s.review.as_ref()?;
+        alternative_track_url(review.rows.get(picker_row)?, index)
+    });
+    open_or_report(window, url);
+}
+
+fn open_or_report(window: &MoggytWindow, url: Option<String>) {
+    let Some(url) = url else { return };
+    if let Err(err) = open_url(&url) {
+        let locale =
+            crate::slint_shell::window::with_ui_state(|st| st.locale).unwrap_or(Locale::English);
+        with_session(|s| s.status = format!("{}: {err:#}", tr(locale, "Failed to open browser")));
+        sync_import(window);
+    }
+}
+
 /// Wires import interaction callbacks between MoggytWindow and the import session.
 pub fn install_import_callbacks(window: &MoggytWindow) {
     let w = window.as_weak();
@@ -461,6 +491,17 @@ pub fn install_import_callbacks(window: &MoggytWindow) {
             s.set_cancel(cancel);
         });
         sync_import(&win);
+    });
+
+    let w = window.as_weak();
+    window.global::<ImportUi>().on_open_track_requested(move |row| {
+        let Some(win) = w.upgrade() else { return };
+        open_review_track(&win, row);
+    });
+    let w = window.as_weak();
+    window.global::<ImportUi>().on_open_alternative_requested(move |alternative| {
+        let Some(win) = w.upgrade() else { return };
+        open_review_alternative(&win, alternative);
     });
 }
 

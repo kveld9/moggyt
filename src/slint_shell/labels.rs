@@ -127,6 +127,7 @@ pub struct StaticLabels {
     pub import_low_confidence_label: &'static str,
     pub import_no_match_label: &'static str,
     pub import_swap_label: &'static str,
+    pub import_open_label: &'static str,
     pub import_choose_track_label: &'static str,
     pub import_save_label: &'static str,
     pub import_discard_label: &'static str,
@@ -287,6 +288,7 @@ impl StaticLabels {
             import_low_confidence_label: tr(locale, "Low confidence"),
             import_no_match_label: tr(locale, "No match"),
             import_swap_label: tr(locale, "Swap"),
+            import_open_label: tr(locale, "Open"),
             import_choose_track_label: tr(locale, "Choose a track"),
             import_save_label: tr(locale, "Save playlist"),
             import_discard_label: tr(locale, "Discard"),
@@ -447,6 +449,7 @@ impl StaticLabels {
         labels.set_import_low_confidence_label(self.import_low_confidence_label.into());
         labels.set_import_no_match_label(self.import_no_match_label.into());
         labels.set_import_swap_label(self.import_swap_label.into());
+        labels.set_import_open_label(self.import_open_label.into());
         labels.set_import_choose_track_label(self.import_choose_track_label.into());
         labels.set_import_save_label(self.import_save_label.into());
         labels.set_import_discard_label(self.import_discard_label.into());

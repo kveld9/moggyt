@@ -202,6 +202,12 @@ If a matched track is incorrect or a better alternative exists:
 4. Alternatively, paste an explicit 11-character YouTube video ID into the custom ID field and click `Use ID` to
    force that track for the row. This applies to both matched and unresolved tracks.
 
+#### Auditioning Matches
+
+Click the `Open` button on any matched review row or alternative candidate to open its track on
+YouTube Music in the default web browser. Auditioning a track does not alter the selected match
+or row status. If the browser fails to open, an error message is reported in the status line.
+
 #### Saving and Persistence
 
 - Click `Save playlist` to persist the imported playlist, or `Discard` to cancel without saving.
