@@ -118,7 +118,14 @@ pub fn current_output_device_identity() -> Option<String> {
 /// Background sampling interval for the output device identity.
 pub const DEVICE_MONITOR_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
+const DEVICE_MONITOR_SAFETY_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+
 const MONITOR_STOP_SLICE: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// Returns true when a `pactl subscribe` line reports a server or sink event.
+fn is_device_event_line(line: &str) -> bool {
+    line.contains(" on server ") || line.contains(" on sink ")
+}
 
 /// Background monitor that keeps the latest output device identity.
 ///
@@ -127,15 +134,68 @@ const MONITOR_STOP_SLICE: std::time::Duration = std::time::Duration::from_millis
 pub struct DeviceIdentityMonitor {
     latest: Arc<Mutex<Option<String>>>,
     stop: Arc<AtomicBool>,
-    handle: Option<std::thread::JoinHandle<()>>,
+    child: Option<Arc<Mutex<std::process::Child>>>,
+    handles: Vec<std::thread::JoinHandle<()>>,
 }
 
 impl DeviceIdentityMonitor {
-    /// Starts the background monitor with the default interval and platform identity sampler.
+    /// Starts the background monitor with event subscription when available, falling back to polling.
     pub fn start() -> Self {
-        Self::spawn_with(DEVICE_MONITOR_INTERVAL, current_output_device_identity)
+        let initial = current_output_device_identity();
+        let latest = Arc::new(Mutex::new(initial));
+        let stop = Arc::new(AtomicBool::new(false));
+        if let Some(monitor) = Self::try_start_events(&latest, &stop) {
+            return monitor;
+        }
+        Self::start_fallback(latest, stop)
     }
 
+    fn try_start_events(
+        latest: &Arc<Mutex<Option<String>>>,
+        stop: &Arc<AtomicBool>,
+    ) -> Option<Self> {
+        let mut child = spawn_subscription()?;
+        let Some(stdout) = child.stdout.take() else {
+            let _ = child.kill();
+            let _ = child.wait();
+            return None;
+        };
+        let mut handles = Vec::new();
+        push_handle(&mut handles, spawn_event_worker_thread(stdout, stop, latest));
+        push_handle(
+            &mut handles,
+            spawn_poll_worker_thread(
+                "moggyt-device-poll",
+                stop,
+                latest,
+                DEVICE_MONITOR_SAFETY_INTERVAL,
+                current_output_device_identity,
+            ),
+        );
+        Some(Self {
+            latest: Arc::clone(latest),
+            stop: Arc::clone(stop),
+            child: Some(Arc::new(Mutex::new(child))),
+            handles,
+        })
+    }
+
+    fn start_fallback(latest: Arc<Mutex<Option<String>>>, stop: Arc<AtomicBool>) -> Self {
+        let mut handles = Vec::new();
+        push_handle(
+            &mut handles,
+            spawn_poll_worker_thread(
+                "moggyt-device-poll",
+                &stop,
+                &latest,
+                DEVICE_MONITOR_INTERVAL,
+                current_output_device_identity,
+            ),
+        );
+        Self { latest, stop, child: None, handles }
+    }
+
+    #[cfg(test)]
     pub(crate) fn spawn_with<F>(interval: std::time::Duration, sampler: F) -> Self
     where
         F: Fn() -> Option<String> + Send + 'static,
@@ -143,15 +203,12 @@ impl DeviceIdentityMonitor {
         let initial = sampler();
         let latest = Arc::new(Mutex::new(initial));
         let stop = Arc::new(AtomicBool::new(false));
-        let thread_latest = Arc::clone(&latest);
-        let thread_stop = Arc::clone(&stop);
-        let handle = std::thread::Builder::new()
-            .name("moggyt-device-monitor".to_string())
-            .spawn(move || {
-                run_monitor_worker(&thread_stop, &thread_latest, interval, sampler);
-            })
-            .ok();
-        Self { latest, stop, handle }
+        let mut handles = Vec::new();
+        push_handle(
+            &mut handles,
+            spawn_poll_worker_thread("moggyt-device-monitor", &stop, &latest, interval, sampler),
+        );
+        Self { latest, stop, child: None, handles }
     }
 
     /// Returns the latest sampled output device identity.
@@ -163,10 +220,71 @@ impl DeviceIdentityMonitor {
 impl Drop for DeviceIdentityMonitor {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.handle.take() {
+        if let Some(child) = &self.child {
+            let mut guard = child.lock().unwrap_or_else(PoisonError::into_inner);
+            let _ = guard.kill();
+            let _ = guard.wait();
+        }
+        for handle in self.handles.drain(..) {
             let _ = handle.join();
         }
     }
+}
+
+fn push_handle(
+    handles: &mut Vec<std::thread::JoinHandle<()>>,
+    handle: Option<std::thread::JoinHandle<()>>,
+) {
+    if let Some(handle) = handle {
+        handles.push(handle);
+    }
+}
+
+fn spawn_event_worker_thread(
+    stdout: std::process::ChildStdout,
+    stop: &Arc<AtomicBool>,
+    latest: &Arc<Mutex<Option<String>>>,
+) -> Option<std::thread::JoinHandle<()>> {
+    let thread_stop = Arc::clone(stop);
+    let thread_latest = Arc::clone(latest);
+    std::thread::Builder::new()
+        .name("moggyt-device-events".to_string())
+        .spawn(move || {
+            run_event_worker(stdout, &thread_stop, &thread_latest);
+        })
+        .ok()
+}
+
+fn spawn_poll_worker_thread<F>(
+    name: &str,
+    stop: &Arc<AtomicBool>,
+    latest: &Arc<Mutex<Option<String>>>,
+    interval: Duration,
+    sampler: F,
+) -> Option<std::thread::JoinHandle<()>>
+where
+    F: Fn() -> Option<String> + Send + 'static,
+{
+    let thread_stop = Arc::clone(stop);
+    let thread_latest = Arc::clone(latest);
+    std::thread::Builder::new()
+        .name(name.to_string())
+        .spawn(move || {
+            run_poll_worker(&thread_stop, &thread_latest, interval, sampler);
+        })
+        .ok()
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_subscription() -> Option<std::process::Child> {
+    use std::process::{Command, Stdio};
+
+    Command::new("pactl").arg("subscribe").stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn spawn_subscription() -> Option<std::process::Child> {
+    None
 }
 
 fn sleep_until_elapsed(stop: &AtomicBool, interval: Duration) -> bool {
@@ -179,7 +297,7 @@ fn sleep_until_elapsed(stop: &AtomicBool, interval: Duration) -> bool {
     !stop.load(Ordering::Relaxed)
 }
 
-fn run_monitor_worker<F>(
+fn run_poll_worker<F>(
     stop: &AtomicBool,
     latest: &Mutex<Option<String>>,
     interval: Duration,
@@ -190,6 +308,25 @@ fn run_monitor_worker<F>(
     while sleep_until_elapsed(stop, interval) {
         let sample = sampler();
         *latest.lock().unwrap_or_else(PoisonError::into_inner) = sample;
+    }
+}
+
+fn run_event_worker(
+    stdout: std::process::ChildStdout,
+    stop: &AtomicBool,
+    latest: &Mutex<Option<String>>,
+) {
+    use std::io::{BufRead, BufReader};
+
+    let reader = BufReader::new(stdout);
+    for line in reader.lines().map_while(Result::ok) {
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        if is_device_event_line(&line) {
+            let sample = current_output_device_identity();
+            *latest.lock().unwrap_or_else(PoisonError::into_inner) = sample;
+        }
     }
 }
 
@@ -334,5 +471,15 @@ mod tests {
         assert_eq!(monitor.latest(), Some("A".to_string()));
         assert_eq!(monitor.latest(), Some("A".to_string()));
         assert_eq!(monitor.latest(), Some("A".to_string()));
+    }
+
+    #[test]
+    fn device_event_line_detects_server_and_sink_events() {
+        assert!(is_device_event_line("Event 'change' on server #4294967295"));
+        assert!(is_device_event_line("Event 'change' on sink #58"));
+        assert!(is_device_event_line("Event 'new' on sink #59"));
+        assert!(!is_device_event_line("Event 'new' on client #9"));
+        assert!(!is_device_event_line("Event 'change' on source-output #21186"));
+        assert!(!is_device_event_line("Event 'remove' on source #3"));
     }
 }

@@ -290,10 +290,11 @@ Users can customize the player bar appearance and element visibility under **Set
   - `Previous`: skips to previous track in the queue and starts playback.
   - `Play` / `Pause`: toggles between playing and paused audio states.
   - **Device Change**: playback pauses automatically when the system default output
-    device changes (for example, unplugging headphones); the device is sampled every
-    second in the background, so the pause fires within about two seconds. On Linux the
-    PulseAudio/PipeWire default sink is compared when `pactl` is available; otherwise
-    the audio device name is used. Press `Play` to resume on the new device.
+    device changes (for example, unplugging headphones); the pause fires within about
+    one second. On Linux the PulseAudio/PipeWire default sink is tracked through the
+    audio server event stream when `pactl` is available, with a five-second safety
+    poll; otherwise the audio device name is polled every second. Press `Play` to
+    resume on the new device.
   - `Next`: skips to next track in the queue and starts playback.
   - `Shuffle`: randomizes the queue while keeping tracks from the same artist apart
     and moving tracks from your most recent listening sessions toward the end of the
