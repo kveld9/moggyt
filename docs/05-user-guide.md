@@ -61,6 +61,9 @@ The now playing view presents rich playback details for the track under the acti
   and automatically fetch recommendations when reaching the end of the queue.
 - **Cover Art**: displays artwork fetched from the track thumbnail URL and cached locally. If offline or pending,
   shows `Cover art unavailable (offline or pending fetch)`.
+- **Vinyl Stage**: the `Vinyl` / `Cover` toggle switches the artwork between the static
+  cover and a turntable stage. The record spins only while playback is running and the
+  tonearm swings onto the disc on play, parking on pause.
 - **Synced Lyrics**: displays timestamped lyrics fetched from LRCLIB for the active artist and title pair.
   - Offset controls: click `-250ms` or `+250ms` to adjust lyric synchronization dynamically.
   - Word-level highlight: when the provider supplies word timings (lrc.red Apple TTML),

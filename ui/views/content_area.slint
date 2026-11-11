@@ -33,6 +33,7 @@ export component ContentArea inherits Rectangle {
     in property <bool> has-cover: false;
     in property <[LyricLineData]> lyrics-lines: [];
     in property <int> active-lyric-index: -1;
+    in property <bool> is-playing: false;
     in property <[LibraryItemData]> library-playlists: [];
     in property <[LibraryItemData]> library-albums: [];
     in property <bool> detail-has-detail: false;
@@ -222,6 +223,7 @@ export component ContentArea inherits Rectangle {
                 has-cover: root.has-cover;
                 lyrics-lines: root.lyrics-lines;
                 active-lyric-index: root.active-lyric-index;
+                is-playing: root.is-playing;
             }
 
             if root.active-page == 2 : LibraryView {

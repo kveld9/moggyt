@@ -1,5 +1,7 @@
 import { Labels } from "../labels.slint";
 import { LyricsHighlight, Theme, LyricLineData } from "../theme.slint";
+import { SettingsModeButton } from "../components/settings_rows.slint";
+import { VinylDeck } from "../components/vinyl_deck.slint";
 
 export component NowPlayingView inherits VerticalLayout {
     in property <string> track-title: "No track playing";
@@ -11,12 +13,14 @@ export component NowPlayingView inherits VerticalLayout {
     in property <bool> has-cover: false;
     in property <[LyricLineData]> lyrics-lines: [];
     in property <int> active-lyric-index: -1;
+    in property <bool> is-playing: false;
+    property <bool> vinyl-mode: false;
 
     spacing: 16px; alignment: start;
 
     HorizontalLayout {
         spacing: 20px; alignment: start;
-        Rectangle {
+        if !root.vinyl-mode : Rectangle {
             width: 140px; height: 140px; border-radius: 8px; background: Theme.surface; clip: true;
             if root.has-cover : Image {
                 width: parent.width; height: parent.height;
@@ -28,8 +32,26 @@ export component NowPlayingView inherits VerticalLayout {
                 horizontal-alignment: center; vertical-alignment: center;
             }
         }
+        if root.vinyl-mode : VinylDeck {
+            cover: root.cover-image;
+            has-cover: root.has-cover;
+            is-playing: root.is-playing;
+        }
         VerticalLayout {
             spacing: 6px; alignment: center;
+            HorizontalLayout {
+                spacing: 6px;
+                SettingsModeButton {
+                    label: Labels.now-playing-cover-label;
+                    is-active: !root.vinyl-mode;
+                    clicked => { root.vinyl-mode = false; }
+                }
+                SettingsModeButton {
+                    label: Labels.now-playing-vinyl-label;
+                    is-active: root.vinyl-mode;
+                    clicked => { root.vinyl-mode = true; }
+                }
+            }
             Text { text: root.track-title; color: Theme.text; font-size: 20px; font-weight: 700; }
             Text { text: root.track-artist; color: Theme.secondary; font-size: 14px; }
             Rectangle { height: 6px; }
