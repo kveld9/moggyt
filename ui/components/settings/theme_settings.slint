@@ -1,15 +1,19 @@
 import { Labels } from "../../labels.slint";
 import { Theme } from "../../theme.slint";
 import { SettingsModeButton } from "../settings_rows.slint";
+import { AccentColorPicker } from "accent_picker.slint";
 
 export component ThemeSettings inherits VerticalLayout {
     in property <int> active-theme-index: 0;
+    in property <bool> accent-customized: false;
     in property <string> custom-theme-status-text: "";
     in property <[string]> custom-themes: [];
     in property <string> active-custom-theme: "";
 
     callback theme-selected(int);
     callback custom-theme-selected(string);
+    callback accent-picked(color);
+    callback accent-reset();
 
     spacing: 10px;
 
@@ -46,6 +50,15 @@ export component ThemeSettings inherits VerticalLayout {
             is-active: root.active-theme-index == 3;
             clicked => { root.theme-selected(3); }
         }
+    }
+
+    if root.active-theme-index <= 2 : AccentColorPicker {
+        accent: Theme.accent;
+        is-customized: root.accent-customized;
+        title-text: Labels.accent-color-label;
+        reset-text: Labels.accent-reset-label;
+        picked(color) => { root.accent-picked(color); }
+        reset-clicked => { root.accent-reset(); }
     }
 
     if root.active-theme-index == 3 && root.custom-themes.length > 0 : HorizontalLayout {

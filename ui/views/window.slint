@@ -30,6 +30,7 @@ export component MoggytWindow inherits Window {
     in-out property <string> header-title: "Search";
     in-out property <bool> show-settings: false;
     in-out property <int> active-theme-index: 0;
+    in-out property <bool> accent-customized: false;
     in-out property <string> custom-theme-status-text: "";
     in-out property <[string]> custom-theme-names: [];
     in-out property <string> active-custom-theme-name: "";
@@ -119,6 +120,8 @@ export component MoggytWindow inherits Window {
     callback back-pressed();
     callback theme-selected(int);
     callback custom-theme-selected(string);
+    callback accent-picked(color);
+    callback accent-reset();
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
@@ -216,6 +219,7 @@ export component MoggytWindow inherits Window {
                     category-loading: root.category-loading;
                     has-update: root.has-update;
                     active-theme-index: root.active-theme-index;
+                    accent-customized: root.accent-customized;
                     custom-theme-status-text: root.custom-theme-status-text;
                     custom-theme-names: root.custom-theme-names;
                     active-custom-theme-name: root.active-custom-theme-name;
@@ -260,6 +264,8 @@ export component MoggytWindow inherits Window {
                     sign-out() => { root.sign-out(); }
                     theme-selected(idx) => { root.theme-selected(idx); }
                     custom-theme-selected(name) => { root.custom-theme-selected(name); }
+                    accent-picked(color) => { root.accent-picked(color); }
+                    accent-reset => { root.accent-reset(); }
                     cycle-playback-speed => { root.cycle-playback-speed(); }
                     sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
                     audio-quality-selected(idx) => { root.audio-quality-selected(idx); }

@@ -110,6 +110,7 @@ impl SlintAppState {
             custom_theme: None,
             custom_palette: None,
             custom_theme_status: String::new(),
+            accent_override: None,
             locale: Locale::default(),
             player_bar: PlayerBarPrefs::default(),
             search_filter: SearchFilter::All,

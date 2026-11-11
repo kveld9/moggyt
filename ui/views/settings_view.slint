@@ -7,6 +7,7 @@ import { AboutSettings } from "../components/settings/about_settings.slint";
 
 export component SettingsView inherits VerticalLayout {
     in property <int> active-theme-index: 0;
+    in property <bool> accent-customized: false;
     in property <string> custom-theme-status-text: "";
     in property <[string]> custom-theme-names: [];
     in property <string> active-custom-theme-name: "";
@@ -33,6 +34,8 @@ export component SettingsView inherits VerticalLayout {
 
     callback theme-selected(int);
     callback custom-theme-selected(string);
+    callback accent-picked(color);
+    callback accent-reset();
     callback cycle-playback-speed();
     callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
@@ -49,11 +52,14 @@ export component SettingsView inherits VerticalLayout {
 
     theme-panel := ThemeSettings {
         active-theme-index: root.active-theme-index;
+        accent-customized: root.accent-customized;
         custom-theme-status-text: root.custom-theme-status-text;
         custom-themes: root.custom-theme-names;
         active-custom-theme: root.active-custom-theme-name;
         theme-selected(idx) => { root.theme-selected(idx); }
         custom-theme-selected(name) => { root.custom-theme-selected(name); }
+        accent-picked(color) => { root.accent-picked(color); }
+        accent-reset => { root.accent-reset(); }
     }
 
     playback-panel := PlaybackSettings {

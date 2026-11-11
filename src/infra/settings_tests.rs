@@ -478,4 +478,47 @@ mod tests {
         let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert!(omitted.sponsorblock_enabled);
     }
+
+    #[test]
+    fn test_accent_override_serde_defaults_and_explicit_deserialization() {
+        let omitted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(omitted.accent_override, None);
+
+        let explicit: Settings = serde_json::from_str(r##"{"accent_override": "#123456"}"##)
+            .expect("deserialize explicit");
+        assert_eq!(explicit.accent_override.as_deref(), Some("#123456"));
+    }
+
+    #[test]
+    fn test_accent_override_mixed_case_roundtrip_disk_normalized_lowercase() {
+        let temp = TempDir::new("test-accent-override-roundtrip");
+        let store = DiskSettingsStore::new(temp.path());
+
+        let settings =
+            Settings { accent_override: Some("#12ABcd".to_string()), ..Settings::default() };
+        store.save(&settings).expect("save succeeds");
+
+        let loaded = store.load();
+        assert_eq!(loaded.accent_override.as_deref(), Some("#12abcd"));
+    }
+
+    #[test]
+    fn test_accent_override_sanitize_drops_malformed_and_keeps_valid() {
+        let mut settings =
+            Settings { accent_override: Some("red".to_string()), ..Settings::default() };
+        settings.sanitize();
+        assert_eq!(settings.accent_override, None);
+
+        settings.accent_override = Some("#12345".to_string());
+        settings.sanitize();
+        assert_eq!(settings.accent_override, None);
+
+        settings.accent_override = Some("#GGGGGG".to_string());
+        settings.sanitize();
+        assert_eq!(settings.accent_override, None);
+
+        settings.accent_override = Some("#123456".to_string());
+        settings.sanitize();
+        assert_eq!(settings.accent_override.as_deref(), Some("#123456"));
+    }
 }

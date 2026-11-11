@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use slint::ComponentHandle;
 
-use crate::domain::ThemeId;
+use crate::domain::{ThemeId, parse_hex_rgb};
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CustomThemeFile, DeviceIdentityMonitor, DiscordPresence,
     LyricOverrideDir, LyricsSource, PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings,
@@ -127,6 +127,7 @@ pub fn run(
         state.discord = DiscordPresence::new();
     }
     state.theme = settings.theme;
+    state.accent_override = settings.accent_override.as_deref().and_then(parse_hex_rgb);
     state.locale = settings.locale;
     if let Some(ref name) = settings.custom_theme_name {
         if let Some(ref mut ct) = state.custom_theme {

@@ -78,6 +78,26 @@ pub(crate) fn wire_settings_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    window.on_accent_picked(move |color| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.set_accent_override(Some([color.red(), color.green(), color.blue()]));
+        apply_palette(&win, &st.active_palette());
+        win.set_accent_customized(true);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_accent_reset(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.set_accent_override(None);
+        apply_palette(&win, &st.active_palette());
+        win.set_accent_customized(false);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
     window.on_player_bar_mode_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();

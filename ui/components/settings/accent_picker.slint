@@ -1,0 +1,176 @@
+// Accent color picker: saturation/value board plus a hue slider.
+//
+// The droplet marks the selected saturation (horizontal) and value (vertical)
+// inside the board. Picking emits `picked` with the resulting color; the parent
+// persists and applies it. `changed accent` re-syncs the picker when the accent
+// changes from elsewhere (theme switch, reset) unless a drag is in progress.
+import { Theme } from "../../theme.slint";
+
+export component AccentColorPicker inherits VerticalLayout {
+    in property <color> accent: Theme.accent;
+    in property <bool> is-customized: false;
+    in property <string> title-text: "";
+    in property <string> reset-text: "";
+
+    callback picked(color);
+    callback reset-clicked();
+
+    spacing: 8px;
+
+    private property <float> hue: 0.0;
+    private property <float> saturation: 0.0;
+    private property <float> brightness: 1.0;
+    private property <bool> dragging: false;
+
+    property <color> hue-color: hsv(root.hue, 1.0, 1.0);
+    property <color> picked-color: hsv(root.hue, root.saturation, root.brightness);
+
+    function sync-from-accent() {
+        let current = root.accent.to-hsv();
+        root.hue = current.hue;
+        root.saturation = current.saturation;
+        root.brightness = current.value;
+    }
+
+    init => { self.sync-from-accent(); }
+
+    changed accent => {
+        if (!root.dragging) {
+            root.sync-from-accent();
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 10px;
+        alignment: space-between;
+
+        Text {
+            text: root.title-text;
+            color: Theme.text;
+            font-size: 13px;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+
+        Rectangle {
+            width: 28px;
+            height: 28px;
+            border-radius: 14px;
+            border-width: 1px;
+            border-color: Theme.border;
+            background: root.picked-color;
+        }
+
+        reset-btn := Rectangle {
+            width: 80px;
+            height: 30px;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: Theme.border;
+            background: !root.is-customized ? Theme.panel : (reset-touch.pressed ? Theme.overlay : (reset-touch.has-hover ? Theme.hover : Theme.surface));
+
+            Text {
+                text: root.reset-text;
+                color: root.is-customized ? Theme.text : Theme.secondary;
+                font-size: 12px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            reset-touch := TouchArea {
+                enabled: root.is-customized;
+                clicked => { root.reset-clicked(); }
+            }
+        }
+    }
+
+    board := Rectangle {
+        height: 140px;
+        border-radius: 8px;
+        background: @linear-gradient(90deg, #ffffff 0%, root.hue-color 100%);
+
+        Rectangle {
+            background: @linear-gradient(180deg, #ffffff00 0%, #000000 100%);
+        }
+
+        Rectangle {
+            x: clamp(root.saturation * board.width - 8px, 0px, board.width - 16px);
+            y: clamp((1.0 - root.brightness) * board.height - 8px, 0px, board.height - 16px);
+            width: 16px;
+            height: 16px;
+            border-radius: 8px;
+            background: transparent;
+            border-width: 2px;
+            border-color: #ffffff;
+        }
+
+        board-touch := TouchArea {
+            property <bool> active: false;
+
+            pointer-event(event) => {
+                if (event.button != PointerEventButton.left) {
+                    return;
+                }
+                if (event.kind == PointerEventKind.down) {
+                    self.active = true;
+                    root.dragging = true;
+                    root.saturation = clamp(self.mouse-x / self.width, 0.0, 1.0);
+                    root.brightness = 1.0 - clamp(self.mouse-y / self.height, 0.0, 1.0);
+                } else if (event.kind == PointerEventKind.up) {
+                    self.active = false;
+                    root.dragging = false;
+                    root.picked(root.picked-color);
+                }
+            }
+
+            moved => {
+                if (self.active) {
+                    root.saturation = clamp(self.mouse-x / self.width, 0.0, 1.0);
+                    root.brightness = 1.0 - clamp(self.mouse-y / self.height, 0.0, 1.0);
+                }
+            }
+        }
+    }
+
+    hue-bar := Rectangle {
+        height: 14px;
+        border-radius: 7px;
+        background: @linear-gradient(90deg, #ff0000 0%, #ffff00 16.66%, #00ff00 33.33%, #00ffff 50%, #0000ff 66.66%, #ff00ff 83.33%, #ff0000 100%);
+
+        Rectangle {
+            x: clamp(root.hue / 360.0 * hue-bar.width - 9px, 0px, hue-bar.width - 18px);
+            y: (parent.height - 18px) / 2;
+            width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            border-width: 2px;
+            border-color: #ffffff;
+            background: hsv(root.hue, 1.0, 1.0);
+        }
+
+        hue-touch := TouchArea {
+            property <bool> active: false;
+
+            pointer-event(event) => {
+                if (event.button != PointerEventButton.left) {
+                    return;
+                }
+                if (event.kind == PointerEventKind.down) {
+                    self.active = true;
+                    root.dragging = true;
+                    root.hue = clamp(self.mouse-x / self.width, 0.0, 1.0) * 360.0;
+                } else if (event.kind == PointerEventKind.up) {
+                    self.active = false;
+                    root.dragging = false;
+                    root.picked(root.picked-color);
+                }
+            }
+
+            moved => {
+                if (self.active) {
+                    root.hue = clamp(self.mouse-x / self.width, 0.0, 1.0) * 360.0;
+                }
+            }
+        }
+    }
+}

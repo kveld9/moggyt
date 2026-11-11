@@ -113,6 +113,7 @@ The configuration file uses JSON serialization with atomic replacement:
 {
   "theme": "white",
   "custom_theme_name": null,
+  "accent_override": null,
   "locale": "en",
   "volume": 100,
   "crossfade_seconds": 0,
@@ -149,6 +150,11 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Custom Theme Name (`custom_theme_name`)**:
   - Optional string (default `null`). Identifies the selected custom theme name corresponding to a
     `<config_dir>/themes/<name>.json` file or `"custom-theme"` for `<config_dir>/custom-theme.json`.
+- **Accent Override (`accent_override`)**: an optional `"#rrggbb"` string (default `null`)
+  that replaces the accent slot of the
+  `"white"`, `"black-oled"`, and `"mono"` themes; other slots stay untouched and the `"custom"` theme ignores
+  it. It is set from Settings > Theme with the color board and hue slider; Reset clears it. Malformed values
+  are discarded on load.
 - **Locales (`locale`)**:
   - `"en"`: English (fallback when system language is not Spanish or unparseable).
   - `"es"`: Spanish (`Español`).
