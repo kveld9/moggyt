@@ -120,6 +120,9 @@ export component ContentArea inherits Rectangle {
     }
 
     flick := Flickable {
+        // Settings hosts custom drag controls (accent picker); mouse drag-panning would steal their
+        // gestures after the Flickable's press-forwarding delay. Wheel and touch panning stay enabled.
+        mouse-drag-pan-enabled: root.active-page != 4;
         VerticalLayout {
             padding: 24px;
             spacing: 16px;
