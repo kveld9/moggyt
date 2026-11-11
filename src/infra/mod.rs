@@ -73,6 +73,7 @@ mod stream_reader;
 mod stream_reqwest;
 mod stream_stub;
 mod stream_url_cache;
+mod stream_window;
 mod tray;
 mod updater;
 mod updater_github;
@@ -185,16 +186,16 @@ pub use store_health::{HealthFlag, StoreHealth, quarantine};
 pub use stream::{AudioQuality, ResolvedStream, StreamResolver, StreamStub};
 pub use stream_chain::{PrefixFetcher, PrimaryStreamResolver, StreamChain};
 pub use stream_disk_cache::StreamDiskCache;
-pub use stream_pool::{
-    BlockPool, LARGE_STREAM_THRESHOLD_BYTES, STREAM_BLOCK_BYTES, STREAM_WINDOW_AHEAD_BLOCKS,
-    STREAM_WINDOW_BEHIND_BLOCKS, STREAM_WORKERS, block_index, block_is_in_window,
-    next_block_to_fetch,
-};
+pub use stream_pool::{BlockPool, STREAM_BLOCK_BYTES, STREAM_WORKERS};
 pub use stream_prefetch_cache::{
     PREFETCH_BLOCK_COUNT, PREFETCH_BYTES, PREFETCH_CAPACITY, StreamPrefetchCache,
 };
 pub use stream_url_cache::{
     ResolverSource, STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache,
+};
+pub use stream_window::{
+    STREAM_WINDOW_AHEAD_BLOCKS, STREAM_WINDOW_BEHIND_BLOCKS, block_index, block_is_in_window,
+    next_block_to_fetch,
 };
 pub use tray::{TrayAction, TrayHandle};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
