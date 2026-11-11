@@ -58,6 +58,8 @@ pub struct StaticLabels {
     pub theme_black_oled: &'static str,
     pub theme_mono: &'static str,
     pub theme_custom: &'static str,
+    pub accent_color: &'static str,
+    pub accent_reset: &'static str,
     pub custom_theme_empty_hint: &'static str,
     pub section_playback: &'static str,
     pub playback_speed: &'static str,
@@ -222,6 +224,8 @@ impl StaticLabels {
             theme_black_oled: tr(locale, "Black OLED"),
             theme_mono: tr(locale, "Mono"),
             theme_custom: tr(locale, "Custom"),
+            accent_color: tr(locale, "Accent color"),
+            accent_reset: tr(locale, "Reset"),
             custom_theme_empty_hint: tr(
                 locale,
                 "Place theme JSON files in ~/.config/moggyt/themes/ or ~/.config/moggyt/custom-theme.json",
@@ -404,6 +408,8 @@ impl StaticLabels {
         labels.set_theme_black_oled_label(self.theme_black_oled.into());
         labels.set_theme_mono_label(self.theme_mono.into());
         labels.set_theme_custom_label(self.theme_custom.into());
+        labels.set_accent_color_label(self.accent_color.into());
+        labels.set_accent_reset_label(self.accent_reset.into());
         labels.set_custom_theme_empty_hint_label(self.custom_theme_empty_hint.into());
         labels.set_section_playback_label(self.section_playback.into());
         labels.set_playback_speed_label(self.playback_speed.into());

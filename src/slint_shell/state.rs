@@ -130,6 +130,8 @@ pub struct SlintAppState {
     pub custom_theme: Option<CustomThemeFile>,
     pub custom_palette: Option<Palette>,
     pub custom_theme_status: String,
+    /// Optional accent override for the built-in preset themes.
+    pub accent_override: Option<[u8; 3]>,
     pub locale: Locale,
     pub player_bar: PlayerBarPrefs,
     pub search_filter: SearchFilter,
@@ -180,6 +182,14 @@ impl SlintAppState {
         self.theme = theme;
         let mut settings = self.settings_store.load();
         settings.theme = theme;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Sets or clears the preset accent override and persists it.
+    pub fn set_accent_override(&mut self, accent: Option<[u8; 3]>) {
+        self.accent_override = accent;
+        let mut settings = self.settings_store.load();
+        settings.accent_override = accent.map(crate::domain::format_hex_rgb);
         let _ = self.settings_store.save(&settings);
     }
 
@@ -763,5 +773,16 @@ mod tests {
         let cached =
             SlintAppState::cover_bytes_or_fetch(&state.covers, "https://example.com/art.jpg");
         assert_eq!(cached, Some(vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn test_accent_override_persists_to_store_and_state() {
+        let mut state = test_wired();
+        state.set_accent_override(Some([0x12, 0x34, 0x56]));
+        assert_eq!(state.accent_override, Some([0x12, 0x34, 0x56]));
+        assert_eq!(state.settings_store.load().accent_override.as_deref(), Some("#123456"));
+        state.set_accent_override(None);
+        assert_eq!(state.accent_override, None);
+        assert_eq!(state.settings_store.load().accent_override, None);
     }
 }

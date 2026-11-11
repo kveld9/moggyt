@@ -101,6 +101,12 @@ impl Palette {
         }
     }
 
+    /// Returns this palette with its accent slot replaced.
+    pub fn with_accent(mut self, accent: [u8; 3]) -> Self {
+        self.accent = accent;
+        self
+    }
+
     /// Dynamically sets a color slot by name with typo-safety.
     ///
     /// Returns true if the slot was recognized and updated; false if unknown.
@@ -194,6 +200,11 @@ pub fn parse_hex_rgb(value: &str) -> Option<[u8; 3]> {
     let g = u8::from_str_radix(&value[3..5], 16).ok()?;
     let b = u8::from_str_radix(&value[5..7], 16).ok()?;
     Some([r, g, b])
+}
+
+/// Formats a plain RGB array as a lowercase `#rrggbb` hex string.
+pub fn format_hex_rgb(rgb: [u8; 3]) -> String {
+    format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2])
 }
 
 fn resolve_mode(mode: Option<&str>) -> Result<Palette, CustomPaletteError> {
@@ -436,5 +447,30 @@ mod tests {
         assert_eq!(json, "\"custom\"");
         let deserialized: ThemeId = serde_json::from_str("\"custom\"").expect("deserialize custom");
         assert_eq!(deserialized, ThemeId::Custom);
+    }
+
+    #[test]
+    fn test_format_hex_rgb_and_roundtrip() {
+        let hex = format_hex_rgb([0x12, 0x34, 0x56]);
+        assert_eq!(hex, "#123456");
+        assert_eq!(hex, hex.to_lowercase());
+        assert_eq!(parse_hex_rgb(&hex), Some([0x12, 0x34, 0x56]));
+    }
+
+    #[test]
+    fn test_palette_with_accent_preserves_other_slots() {
+        let original = Palette::white();
+        let modified = original.clone().with_accent([1, 2, 3]);
+
+        assert_eq!(modified.accent, [1, 2, 3]);
+        assert_eq!(modified.window, original.window);
+        assert_eq!(modified.panel, original.panel);
+        assert_eq!(modified.surface, original.surface);
+        assert_eq!(modified.text, original.text);
+        assert_eq!(modified.secondary, original.secondary);
+        assert_eq!(modified.border, original.border);
+        assert_eq!(modified.hover, original.hover);
+        assert_eq!(modified.overlay, original.overlay);
+        assert_eq!(modified.dark, original.dark);
     }
 }

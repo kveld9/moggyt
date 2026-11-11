@@ -52,5 +52,7 @@ pub use search::{
 pub use segments::{InvalidSegment, SkipRanges, SkipSegment};
 pub use shuffle::{RECENT_PLAY_WINDOW, smart_order};
 pub use sleep_timer::{SLEEP_FADE_WINDOW_SECS, SleepTimer, TimerPreset, faded_volume};
-pub use theme::{CustomPaletteError, Palette, PlayerBarMode, ThemeId, parse_hex_rgb};
+pub use theme::{
+    CustomPaletteError, Palette, PlayerBarMode, ThemeId, format_hex_rgb, parse_hex_rgb,
+};
 pub use version_override::{MAX_VERSION_OVERRIDES, VersionOverrideError, VersionOverrides};

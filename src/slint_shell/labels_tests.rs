@@ -126,6 +126,8 @@ mod tests {
         assert_eq!(es.theme_black_oled, "Negro OLED");
         assert_eq!(es.theme_mono, "Monocromo");
         assert_eq!(es.theme_custom, "Personalizado");
+        assert_eq!(es.accent_color, "Color de acento");
+        assert_eq!(es.accent_reset, "Restablecer");
         assert_eq!(
             es.custom_theme_empty_hint,
             "Coloca archivos JSON de tema en ~/.config/moggyt/themes/ o ~/.config/moggyt/custom-theme.json"
@@ -285,6 +287,8 @@ mod tests {
         assert_eq!(en.theme_black_oled, "Black OLED");
         assert_eq!(en.theme_mono, "Mono");
         assert_eq!(en.theme_custom, "Custom");
+        assert_eq!(en.accent_color, "Accent color");
+        assert_eq!(en.accent_reset, "Reset");
         assert_eq!(
             en.custom_theme_empty_hint,
             "Place theme JSON files in ~/.config/moggyt/themes/ or ~/.config/moggyt/custom-theme.json"

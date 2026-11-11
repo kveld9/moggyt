@@ -61,6 +61,9 @@ pub struct Settings {
     /// Active custom theme name when Custom theme is selected.
     #[serde(default)]
     pub custom_theme_name: Option<String>,
+    /// Optional accent override ("#rrggbb") applied to the built-in preset themes.
+    #[serde(default)]
+    pub accent_override: Option<String>,
     /// Active interface locale.
     pub locale: Locale,
     /// Playback volume level (0..=100).
@@ -150,6 +153,7 @@ impl Default for Settings {
             version: SETTINGS_SCHEMA_VERSION,
             theme: ThemeId::White,
             custom_theme_name: None,
+            accent_override: None,
             locale: Locale::English,
             volume: 100,
             playback_speed: 1.0,
@@ -189,6 +193,11 @@ impl Settings {
 
     /// Sanitizes and clamps setting values to their valid operational bounds.
     pub fn sanitize(&mut self) {
+        self.accent_override = self
+            .accent_override
+            .as_deref()
+            .and_then(crate::domain::parse_hex_rgb)
+            .map(crate::domain::format_hex_rgb);
         self.volume = self.volume.min(100);
         self.playback_speed = clamp_speed(self.playback_speed);
         self.crossfade_seconds = clamp_crossfade_seconds(self.crossfade_seconds);

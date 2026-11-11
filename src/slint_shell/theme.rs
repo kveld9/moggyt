@@ -135,9 +135,12 @@ impl SlintAppState {
     /// Returns the active color palette, resolving custom overrides if Custom theme is selected.
     pub fn active_palette(&self) -> Palette {
         if self.theme == ThemeId::Custom {
-            self.custom_palette.clone().unwrap_or_else(|| palette_for(ThemeId::Custom))
-        } else {
-            palette_for(self.theme)
+            return self.custom_palette.clone().unwrap_or_else(|| palette_for(ThemeId::Custom));
+        }
+        let palette = palette_for(self.theme);
+        match self.accent_override {
+            Some(accent) => palette.with_accent(accent),
+            None => palette,
         }
     }
 
@@ -333,6 +336,25 @@ mod tests {
         let custom_pal = Palette::mono();
         state.custom_palette = Some(custom_pal.clone());
         assert_eq!(state.active_palette(), custom_pal);
+    }
+
+    #[test]
+    fn test_active_palette_accent_override_for_builtin_and_ignored_for_custom() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        state.theme = ThemeId::White;
+        state.accent_override = Some([0x12, 0x34, 0x56]);
+
+        let palette = state.active_palette();
+        assert_eq!(palette.accent, [0x12, 0x34, 0x56]);
+        assert_eq!(palette.window, Palette::white().window);
+
+        state.accent_override = None;
+        assert_eq!(state.active_palette().accent, Palette::white().accent);
+
+        state.theme = ThemeId::Custom;
+        state.custom_palette = Some(Palette::mono());
+        state.accent_override = Some([0x12, 0x34, 0x56]);
+        assert_eq!(state.active_palette().accent, Palette::mono().accent);
     }
 
     #[test]
