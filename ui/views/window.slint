@@ -52,19 +52,9 @@ export component MoggytWindow inherits Window {
     in-out property <int> queue-selected-index: -1;
     in-out property <string> active-track-title: "No track playing";
     in-out property <string> active-track-artist: "";
-    in-out property <bool> is-playing: false;
-    in-out property <int> volume: 100;
-    in-out property <string> position-text: "0:00";
-    in-out property <string> duration-text: "0:00";
-    in-out property <float> playback-progress: 0.0;
     in-out property <image> cover-image;
     in-out property <image> now-playing-cover;
     in-out property <bool> has-cover: false;
-    in-out property <bool> is-liked: false;
-    in-out property <bool> is-shuffle: false;
-    in-out property <int> repeat-mode: 0;
-    in-out property <int> position-secs: 0;
-    in-out property <int> duration-secs: 0;
     in-out property <int> queue-count: 0;
     in-out property <[LyricLineData]> lyrics-lines: [];
     in-out property <int> active-lyric-index: -1;
@@ -154,15 +144,6 @@ export component MoggytWindow inherits Window {
     callback detail-shuffle();
     callback sign-in-submitted(string);
     callback sign-out();
-    callback toggle-play();
-    callback prev-track();
-    callback next-track();
-    callback seek-by(int);
-    callback seek-to(int);
-    callback set-volume(int);
-    callback toggle-like();
-    callback toggle-shuffle();
-    callback cycle-repeat();
     callback toggle-queue-panel();
     callback close-queue-panel();
     callback player-bar-mode-selected(int);
@@ -212,14 +193,10 @@ export component MoggytWindow inherits Window {
                     signed-in: root.signed-in;
                     active-track-title: root.active-track-title;
                     active-track-artist: root.active-track-artist;
-                    position-text: root.position-text;
-                    duration-text: root.duration-text;
-                    playback-progress: root.playback-progress;
                     cover-image: root.cover-image;
                     has-cover: root.has-cover;
                     lyrics-lines: root.lyrics-lines;
                     active-lyric-index: root.active-lyric-index;
-                    is-playing: root.is-playing;
                     library-playlists: root.library-playlists;
                     library-albums: root.library-albums;
                     detail-has-detail: root.detail-has-detail;
@@ -326,29 +303,10 @@ export component MoggytWindow inherits Window {
                     y: root.player-bar-mode == 1 ? 8px : 0px;
                     active-track-title: root.active-track-title;
                     active-track-artist: root.active-track-artist;
-                    is-playing: root.is-playing;
-                    volume: root.volume;
-                    position-text: root.position-text;
-                    duration-text: root.duration-text;
                     cover: root.now-playing-cover;
-                    is-liked: root.is-liked;
-                    is-shuffle: root.is-shuffle;
-                    repeat-mode: root.repeat-mode;
-                    progress: root.playback-progress;
-                    position-secs: root.position-secs;
-                    duration-secs: root.duration-secs;
                     queue-count: root.queue-count;
                     queue-button-text: root.queue-button-text;
 
-                    toggle-play => { root.toggle-play(); }
-                    prev-track => { root.prev-track(); }
-                    next-track => { root.next-track(); }
-                    seek-by(delta) => { root.seek-by(delta); }
-                    seek-to(secs) => { root.seek-to(secs); }
-                    set-volume(vol) => { root.set-volume(vol); }
-                    toggle-like => { root.toggle-like(); }
-                    toggle-shuffle => { root.toggle-shuffle(); }
-                    cycle-repeat => { root.cycle-repeat(); }
                     is-queue-open: root.queue-panel-open;
                     toggle-queue-panel => { root.toggle-queue-panel(); }
                 }

@@ -49,6 +49,29 @@ export global PlaybackUi {
     callback queue-cleared();
 }
 
+export global PlayerUi {
+    in-out property <bool> is-playing: false;
+    in-out property <bool> is-shuffle: false;
+    in-out property <int> repeat-mode: 0;
+    in-out property <bool> is-liked: false;
+    in-out property <int> position-secs: 0;
+    in-out property <int> duration-secs: 0;
+    in-out property <string> position-text: "0:00";
+    in-out property <string> duration-text: "0:00";
+    in-out property <float> progress: 0.0;
+    in-out property <int> volume: 100;
+
+    callback toggle-play();
+    callback prev-track();
+    callback next-track();
+    callback seek-by(int);
+    callback seek-to(int);
+    callback set-volume(int);
+    callback toggle-like();
+    callback toggle-shuffle();
+    callback cycle-repeat();
+}
+
 export struct ImportRowData {
     index: int,
     source: string,

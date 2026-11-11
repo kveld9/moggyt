@@ -29,7 +29,7 @@ use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{
     LibraryItemData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow, PlaybackUi,
-    ShelfData, TrackRowData,
+    PlayerUi, ShelfData, TrackRowData,
 };
 
 fn derive_library_phase(state: &SlintAppState) -> ViewPhase {
@@ -163,10 +163,11 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_active_page(state.page.to_index());
     sync_header_title(window, state);
     window.set_queue_panel_open(state.queue_panel_open);
+    let player = window.global::<PlayerUi>();
     let is_playing = state.audio.try_lock().map(|a| a.is_playing()).unwrap_or(false);
-    window.set_is_playing(is_playing);
+    player.set_is_playing(is_playing);
     let volume = state.audio.try_lock().map(|a| a.volume()).unwrap_or(100);
-    window.set_volume(volume as i32);
+    player.set_volume(volume as i32);
     let speed = state.audio.try_lock().map(|a| a.speed()).unwrap_or(1.0);
     window.set_playback_speed_text(format_playback_speed(speed).into());
     let quality = state.audio.try_lock().map(|a| a.quality()).unwrap_or_default();
@@ -179,8 +180,8 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_app_version(GithubUpdater::current_version().into());
     sync_update_status(window, state);
 
-    window.set_is_shuffle(state.is_shuffle);
-    window.set_repeat_mode(repeat_mode_to_int(state.queue.repeat()));
+    player.set_is_shuffle(state.is_shuffle);
+    player.set_repeat_mode(repeat_mode_to_int(state.queue.repeat()));
     window.set_queue_count(state.queue.len() as i32);
     window.set_queue_button_text(format_queue_label(state.locale, state.queue.len()).into());
     window.set_player_bar_mode(mode_to_index(state.player_bar.mode));
@@ -194,7 +195,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     sync_static_labels(window, state.locale);
     let is_liked =
         state.queue.current().map(|t| is_track_liked(&state.liked_ids, &t.id)).unwrap_or(false);
-    window.set_is_liked(is_liked);
+    player.set_is_liked(is_liked);
 
     let (title, artist, dur_str, dur_secs) = match state.queue.current() {
         Some(t) => (
@@ -209,13 +210,13 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     };
     window.set_active_track_title(title.into());
     window.set_active_track_artist(artist.into());
-    window.set_duration_text(dur_str.into());
-    window.set_duration_secs(dur_secs as i32);
+    player.set_duration_text(dur_str.into());
+    player.set_duration_secs(dur_secs as i32);
 
     let pos_secs = state.audio.try_lock().map(|a| a.position_secs()).unwrap_or(0) as u32;
-    window.set_position_secs(pos_secs as i32);
-    window.set_position_text(format_position(pos_secs).into());
-    window.set_playback_progress(progress_fraction(pos_secs, dur_secs));
+    player.set_position_secs(pos_secs as i32);
+    player.set_position_text(format_position(pos_secs).into());
+    player.set_progress(progress_fraction(pos_secs, dur_secs));
 
     sync_cover_and_lyrics(window, state);
     sync_recent_searches(window, state);
@@ -457,14 +458,15 @@ pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppStat
     drop(audio);
 
     let dur_secs = state.queue.current().and_then(|t| t.duration_secs).unwrap_or(0);
-    window.set_position_secs(pos_secs as i32);
-    window.set_duration_secs(dur_secs as i32);
-    window.set_position_text(format_position(pos_secs).into());
-    window.set_playback_progress(progress_fraction(pos_secs, dur_secs));
+    let player = window.global::<PlayerUi>();
+    player.set_position_secs(pos_secs as i32);
+    player.set_duration_secs(dur_secs as i32);
+    player.set_position_text(format_position(pos_secs).into());
+    player.set_progress(progress_fraction(pos_secs, dur_secs));
     window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
     let (sung, rest) = state.active_lyric_text_split_at(u64::from(pos_secs) * 1000);
     set_lyrics_highlight(window, sung, rest);
-    window.set_is_playing(is_playing);
+    player.set_is_playing(is_playing);
     sync_sleep_timer(window, state);
 }
 

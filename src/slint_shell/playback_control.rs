@@ -5,7 +5,7 @@
 
 use std::time::{Duration, Instant};
 
-use slint::{ModelRc, VecModel};
+use slint::{ComponentHandle, ModelRc, VecModel};
 
 use super::sync::set_lyrics_highlight;
 use crate::domain::{PlaybackPhase, Track};
@@ -17,7 +17,7 @@ use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_worker::PlayTrackResult;
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::sync::observe_playback_phase;
-use crate::slint_shell::{LyricLineData, MoggytWindow};
+use crate::slint_shell::{LyricLineData, MoggytWindow, PlayerUi};
 
 /// Playback start record: when the track started and which track it was.
 #[derive(Debug, Clone)]
@@ -369,10 +369,10 @@ pub fn apply_play_track_completion(
 ) {
     if !res.success {
         window.set_active_track_title(tr(state.locale, "Failed to play track").into());
-        window.set_is_playing(false);
+        window.global::<PlayerUi>().set_is_playing(false);
         return;
     }
-    window.set_is_playing(true);
+    window.global::<PlayerUi>().set_is_playing(true);
     state.lyrics_lines = res.lyrics_lines;
     state.lyrics_key = Some((res.artist.clone(), res.title.clone()));
 
