@@ -76,6 +76,7 @@ mod sleep_fade;
 pub mod spotify_connect;
 pub mod state;
 pub mod state_init;
+pub mod state_lyrics;
 pub mod state_search;
 pub mod stats;
 pub mod stream_prefetch;
@@ -83,6 +84,7 @@ pub mod sync;
 #[cfg(test)]
 pub mod test_support;
 pub mod theme;
+pub mod version_fix;
 pub mod view_phase;
 pub mod window;
 pub mod worker_catalog;

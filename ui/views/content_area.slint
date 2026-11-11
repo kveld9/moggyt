@@ -15,6 +15,7 @@ import { DetailView } from "./detail_view.slint";
 import { SettingsView } from "./settings_view.slint";
 import { StatsView } from "./stats_view.slint";
 import { PersistenceBanner } from "../components/persistence_banner.slint";
+import { VersionFixModal, VersionFixUi } from "version_fix.slint";
 
 export component ContentArea inherits Rectangle {
     in property <int> active-page: 0;
@@ -303,5 +304,10 @@ export component ContentArea inherits Rectangle {
                 track-selected(idx) => { root.category-item-selected(idx); }
             }
         }
+    }
+
+    if VersionFixUi.active : VersionFixModal {
+        x: 0; y: 0;
+        width: parent.width; height: parent.height;
     }
 }

@@ -72,6 +72,10 @@ The now playing view presents rich playback details for the track under the acti
 - **Vinyl Stage**: the `Vinyl` / `Cover` toggle switches the artwork between the static
   cover and a turntable stage. The record spins only while playback is running and the
   tonearm swings onto the disc on play, parking on pause.
+- **Fix Audio Version**: the `Fix version` button opens a search panel for alternative
+  recordings of the current track. The chosen alternative is stored in
+  `version_overrides.json` and used for playback only; the title, artwork, lyrics and
+  scrobbling keep the original track.
 - **Synced Lyrics**: displays timestamped lyrics fetched from LRCLIB for the active artist and title pair.
   - Offset controls: click `-250ms` or `+250ms` to adjust lyric synchronization dynamically.
   - Word-level highlight: when the provider supplies word timings (lrc.red Apple TTML),

@@ -1,0 +1,141 @@
+import { Labels } from "../labels.slint";
+import { Theme, TrackRowData } from "../theme.slint";
+import { StyledInputField } from "../components/controls.slint";
+
+export global VersionFixUi {
+    in-out property <bool> active: false;
+    in-out property <string> query: "";
+    in-out property <string> status-text: "";
+    in-out property <[TrackRowData]> results: [];
+    callback search-requested(string);
+    callback pick-requested(int);
+    callback dismissed();
+}
+
+export component VersionFixModal inherits Rectangle {
+    background: Theme.overlay;
+
+    TouchArea {
+        // Absorbs backdrop clicks
+    }
+
+    Rectangle {
+        width: min(root.width - 48px, 620px);
+        max-height: min(root.height - 64px, 480px);
+        background: Theme.panel;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.border;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        clip: true;
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 14px;
+
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: Labels.version-fix-title-label;
+                    color: Theme.text;
+                    font-size: 17px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 64px;
+                    height: 28px;
+                    border-radius: 6px;
+                    background: close-btn.pressed ? Theme.overlay : (close-btn.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    close-btn := TouchArea {
+                        clicked => { VersionFixUi.dismissed(); }
+                    }
+                    Text {
+                        text: Labels.import-close-label;
+                        color: close-btn.has-hover ? Theme.text : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                height: 36px;
+
+                StyledInputField {
+                    horizontal-stretch: 1;
+                    text <=> VersionFixUi.query;
+                    placeholder-text: Labels.version-fix-hint-label;
+                    accepted => { VersionFixUi.search-requested(VersionFixUi.query); }
+                }
+
+                Rectangle {
+                    width: 80px;
+                    border-radius: 8px;
+                    background: search-btn.pressed ? Theme.overlay : (search-btn.has-hover ? Theme.hover : Theme.accent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+                    search-btn := TouchArea {
+                        clicked => { VersionFixUi.search-requested(VersionFixUi.query); }
+                    }
+                    Text {
+                        text: Labels.version-fix-search-label;
+                        color: search-btn.has-hover ? Theme.text : Theme.window;
+                        font-size: 13px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            if VersionFixUi.status-text != "" : Text {
+                text: VersionFixUi.status-text;
+                color: Theme.secondary;
+                font-size: 12px;
+            }
+
+            Flickable {
+                vertical-stretch: 1;
+                content-height: results-layout.min-height;
+
+                results-layout := VerticalLayout {
+                    spacing: 4px;
+
+                    for row in VersionFixUi.results : Rectangle {
+                        height: 44px;
+                        border-radius: 8px;
+                        background: touch.has-hover ? Theme.hover : transparent;
+                        touch := TouchArea {
+                            clicked => { VersionFixUi.pick-requested(row.index); }
+                        }
+                        VerticalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 2px;
+                            alignment: center;
+                            Text {
+                                text: row.title;
+                                color: Theme.text;
+                                font-size: 13px;
+                                font-weight: 600;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: row.artist + "  " + row.duration;
+                                color: Theme.secondary;
+                                font-size: 11px;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
