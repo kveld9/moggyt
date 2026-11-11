@@ -4,9 +4,9 @@ use std::collections::VecDeque;
 use std::sync::{Mutex, PoisonError};
 
 /// Number of blocks prefetched for the next track.
-pub const PREFETCH_BLOCK_COUNT: u64 = 2;
-/// Cached bytes per URL (two 256 KiB blocks).
-pub const PREFETCH_BYTES: usize = 2 * super::stream_pool::STREAM_BLOCK_BYTES;
+pub const PREFETCH_BLOCK_COUNT: u64 = 1;
+/// Cached bytes per URL (one 256 KiB block).
+pub const PREFETCH_BYTES: usize = super::stream_pool::STREAM_BLOCK_BYTES;
 /// Maximum number of prefetched tracks retained.
 pub const PREFETCH_CAPACITY: usize = 2;
 
