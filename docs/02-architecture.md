@@ -137,7 +137,7 @@ A seek re-targets the pool at the new block and discards results outside the
 window; `Read + Seek` semantics, the EOF boundary at the reported total length,
 and the sequential fallback for servers that ignore `Range` are unchanged.
 
-The next queued track prefetches its first two blocks (512 KiB) into a bounded
+The next queued track prefetches its first block (256 KiB) into a bounded
 in-memory cache (`stream_prefetch_cache.rs`). Starting that track seeds the block
 pool with those bytes, so the first read does not issue a cold range request; a
 skipped track keeps at most two prefetched prefixes resident.
@@ -147,7 +147,7 @@ so a stalled connection fails that block fetch instead of blocking the worker po
 and `BlockPool::drop` can join its workers within that bound.
 
 Next-track prefix prefetch is skipped when the track is already fully cached on
-disk, so a cached track never pays for a redundant 512 KiB download.
+disk, so a cached track never pays for a redundant 256 KiB download.
 
 ## Evolution rules
 
