@@ -249,6 +249,7 @@ export component PlayerBar inherits Rectangle {
                     minimum: 0;
                     maximum: 100;
                     value: root.volume;
+                    hit-slack: 14px;
                     changed(val) => {
                         root.set-volume(round(val));
                     }
