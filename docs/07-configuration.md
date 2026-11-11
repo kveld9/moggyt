@@ -194,6 +194,7 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Community Skip Segments (`sponsorblock_enabled`)**:
   - `sponsorblock_enabled` (boolean, default `true`):
     - `true`: Community SponsorBlock segments are fetched once per track and skipped automatically during playback.
+      A failed lookup is retried once per track; a lookup that finds no segments is final for the session.
       Only the first 4 hexadecimal characters of the SHA-256 digest of the video id are sent (k-anonymity).
       Locally persisted ranges stored in `skips.json` always take precedence over community ranges.
     - `false`: Community skip segment fetching and automatic skipping are disabled.

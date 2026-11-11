@@ -21,6 +21,7 @@ use crate::infra::{
     SessionStore, SettingsStore, SkipProvider, SkipStore, TrayAction, TrayHandle, decode_cover,
     decode_handoff, fetch_artwork, sanitize_cookie_input,
 };
+use crate::slint_shell::auto_skip::{SponsorFetchOutcome, SponsorRangeState};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
 use crate::slint_shell::page::SlintPage;
@@ -100,14 +101,12 @@ pub struct SlintAppState {
     pub started_at: Option<StartedPlay>,
     pub last_skip_target: Option<(String, u32)>,
     pub cached_skip_ranges: Option<(String, Option<SkipRanges>)>,
-    /// Community skip ranges fetched per video id.
-    pub sponsor_ranges: HashMap<String, SkipRanges>,
-    /// Video ids already requested from the community skip provider.
-    pub sponsor_requested: HashSet<String>,
+    /// Lifecycle of community skip-range fetches, keyed by video id.
+    pub(crate) sponsor_range_states: HashMap<String, SponsorRangeState>,
     /// Channel sender for completed community skip fetches.
-    pub sponsor_tx: Option<std::sync::mpsc::Sender<(String, SkipRanges)>>,
+    pub(crate) sponsor_tx: Option<std::sync::mpsc::Sender<(String, SponsorFetchOutcome)>>,
     /// Channel receiver drained by the app timer.
-    pub sponsor_rx: Option<std::sync::mpsc::Receiver<(String, SkipRanges)>>,
+    pub(crate) sponsor_rx: Option<std::sync::mpsc::Receiver<(String, SponsorFetchOutcome)>>,
     /// Community skip provider; `None` disables automatic community skipping.
     pub skip_provider: Option<Arc<dyn SkipProvider>>,
     /// Debounced watcher of the system default output device.
