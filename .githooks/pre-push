@@ -15,8 +15,14 @@ cargo fmt --all -- --check
 echo "Pre-push gate: clippy..."
 cargo clippy --all-targets --all-features -- -D warnings
 
+echo "Pre-push gate: cognitive complexity..."
+cargo clippy --lib --bins --all-features -- -D clippy::cognitive_complexity
+
 echo "Pre-push gate: tests..."
 cargo test --all-features
+
+echo "Pre-push gate: documentation..."
+RUSTDOCFLAGS='-D warnings' cargo doc --all-features --no-deps
 
 echo "Pre-push gate: repository standards..."
 if [ -x "./scripts/check-repo.sh" ]; then
