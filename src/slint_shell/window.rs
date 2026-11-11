@@ -10,6 +10,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
+use super::sync::set_lyrics_highlight;
 use crate::domain::{
     Detail, DetailKind, SearchFilter, SearchQuery, SearchResult, Shelf, is_local_playlist_id,
 };
@@ -121,7 +122,7 @@ pub(crate) fn trigger_playback(window: &MoggytWindow, state: &mut SlintAppState)
     window.set_has_cover(false);
     window.set_lyrics_lines(ModelRc::new(VecModel::default()));
     window.set_active_lyric_index(-1);
-
+    set_lyrics_highlight(window, String::new(), String::new());
     state.send_play_request(req);
 }
 
