@@ -218,7 +218,7 @@ impl SlintAppState {
         }
         if !self.cached_skip_ranges.as_ref().is_some_and(|(id, _)| id == &track.id) {
             let local = self.skip_store.load().remove(&track.id);
-            let ranges = local.or_else(|| self.sponsor_ranges.get(&track.id).cloned());
+            let ranges = local.or_else(|| self.available_sponsor_ranges(&track.id).cloned());
             self.cached_skip_ranges = Some((track.id.clone(), ranges));
         }
         let Some((_, Some(ranges))) = self.cached_skip_ranges.as_ref() else {
