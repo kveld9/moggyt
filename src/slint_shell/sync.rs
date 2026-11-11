@@ -152,6 +152,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_active_theme_index(theme_to_index(state.theme));
     window.set_accent_customized(state.accent_override.is_some());
     window.set_custom_theme_status_text(state.custom_theme_status.clone().into());
+    window.set_matugen_theme_status_text(state.matugen_theme_status.clone().into());
     let custom_names: Vec<slint::SharedString> = state
         .custom_theme
         .as_ref()

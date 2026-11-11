@@ -57,6 +57,7 @@ pub struct StaticLabels {
     pub theme_white: &'static str,
     pub theme_black_oled: &'static str,
     pub theme_mono: &'static str,
+    pub theme_matugen: &'static str,
     pub theme_custom: &'static str,
     pub accent_color: &'static str,
     pub accent_reset: &'static str,
@@ -223,6 +224,7 @@ impl StaticLabels {
             theme_white: tr(locale, "White"),
             theme_black_oled: tr(locale, "Black OLED"),
             theme_mono: tr(locale, "Mono"),
+            theme_matugen: tr(locale, "Matugen"),
             theme_custom: tr(locale, "Custom"),
             accent_color: tr(locale, "Accent color"),
             accent_reset: tr(locale, "Reset"),
@@ -407,6 +409,7 @@ impl StaticLabels {
         labels.set_theme_white_label(self.theme_white.into());
         labels.set_theme_black_oled_label(self.theme_black_oled.into());
         labels.set_theme_mono_label(self.theme_mono.into());
+        labels.set_theme_matugen_label(self.theme_matugen.into());
         labels.set_theme_custom_label(self.theme_custom.into());
         labels.set_accent_color_label(self.accent_color.into());
         labels.set_accent_reset_label(self.accent_reset.into());

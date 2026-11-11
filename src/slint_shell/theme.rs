@@ -20,27 +20,31 @@ pub fn palette_for(id: ThemeId) -> Palette {
         ThemeId::White => Palette::white(),
         ThemeId::BlackOled => Palette::black_oled(),
         ThemeId::Mono => Palette::mono(),
+        ThemeId::Matugen => Palette::black_oled(),
         ThemeId::Custom => Palette::black_oled(),
     }
 }
 
 /// Available themes with their domain identifier and human-readable display name.
-pub const ALL_THEMES: [(ThemeId, &str); 4] = [
+pub const ALL_THEMES: [(ThemeId, &str); 5] = [
     (ThemeId::White, "White"),
     (ThemeId::BlackOled, "Black OLED"),
     (ThemeId::Mono, "Monochrome"),
+    (ThemeId::Matugen, "Matugen"),
     (ThemeId::Custom, "Custom"),
 ];
 
 /// Maps a 0-based integer index to its corresponding [`ThemeId`].
 ///
 /// Returns [`ThemeId::White`] for 0 or unknown values,
-/// [`ThemeId::BlackOled`] for 1, [`ThemeId::Mono`] for 2, and [`ThemeId::Custom`] for 3.
+/// [`ThemeId::BlackOled`] for 1, [`ThemeId::Mono`] for 2, [`ThemeId::Matugen`] for 3,
+/// and [`ThemeId::Custom`] for 4.
 pub fn theme_from_index(index: i32) -> ThemeId {
     match index {
         1 => ThemeId::BlackOled,
         2 => ThemeId::Mono,
-        3 => ThemeId::Custom,
+        3 => ThemeId::Matugen,
+        4 => ThemeId::Custom,
         _ => ThemeId::White,
     }
 }
@@ -51,7 +55,8 @@ pub fn theme_to_index(id: ThemeId) -> i32 {
         ThemeId::White => 0,
         ThemeId::BlackOled => 1,
         ThemeId::Mono => 2,
-        ThemeId::Custom => 3,
+        ThemeId::Matugen => 3,
+        ThemeId::Custom => 4,
     }
 }
 
@@ -61,6 +66,7 @@ pub fn theme_display_name(id: ThemeId) -> &'static str {
         ThemeId::White => "White",
         ThemeId::BlackOled => "Black OLED",
         ThemeId::Mono => "Monochrome",
+        ThemeId::Matugen => "Matugen",
         ThemeId::Custom => "Custom",
     }
 }
@@ -134,13 +140,20 @@ pub fn apply_palette(window: &MoggytWindow, palette: &Palette) {
 impl SlintAppState {
     /// Returns the active color palette, resolving custom overrides if Custom theme is selected.
     pub fn active_palette(&self) -> Palette {
-        if self.theme == ThemeId::Custom {
-            return self.custom_palette.clone().unwrap_or_else(|| palette_for(ThemeId::Custom));
-        }
-        let palette = palette_for(self.theme);
-        match self.accent_override {
-            Some(accent) => palette.with_accent(accent),
-            None => palette,
+        match self.theme {
+            ThemeId::Custom => {
+                self.custom_palette.clone().unwrap_or_else(|| palette_for(ThemeId::Custom))
+            }
+            ThemeId::Matugen => {
+                self.matugen_palette.clone().unwrap_or_else(|| palette_for(ThemeId::Matugen))
+            }
+            theme => {
+                let palette = palette_for(theme);
+                match self.accent_override {
+                    Some(accent) => palette.with_accent(accent),
+                    None => palette,
+                }
+            }
         }
     }
 
@@ -181,6 +194,41 @@ impl SlintAppState {
         self.reload_custom_theme();
         true
     }
+
+    /// Reloads the matugen palette from disk and updates its status message.
+    // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
+    #[allow(clippy::cognitive_complexity)]
+    pub fn reload_matugen_theme(&mut self) {
+        let Some(ref mut matugen) = self.matugen_theme else {
+            return;
+        };
+        let path_display = matugen.path().display().to_string();
+        match matugen.load() {
+            Ok(palette) => {
+                self.matugen_palette = Some(palette);
+                self.matugen_theme_status = tr(self.locale, "Matugen theme loaded from {path}")
+                    .replace("{path}", &path_display);
+            }
+            Err(err) => {
+                tracing::warn!("failed to load matugen theme: {err:#}");
+                self.matugen_theme_status = tr(self.locale, "Matugen theme not loaded: {error}")
+                    .replace("{error}", &format!("{err:#}"));
+            }
+        }
+    }
+
+    /// Polls the matugen theme file and reloads the palette when it changes and Matugen is active.
+    pub fn poll_matugen_theme(&mut self) -> bool {
+        if self.theme != ThemeId::Matugen {
+            return false;
+        }
+        let has_changed = self.matugen_theme.as_ref().is_some_and(|m| m.has_changed());
+        if !has_changed {
+            return false;
+        }
+        self.reload_matugen_theme();
+        true
+    }
 }
 
 /// Checks for custom theme file modifications and applies colors to window if updated.
@@ -188,6 +236,10 @@ pub(crate) fn apply_custom_theme_if_changed(window: &MoggytWindow, state: &mut S
     if state.poll_custom_theme() {
         apply_palette(window, &state.active_palette());
         window.set_custom_theme_status_text(state.custom_theme_status.clone().into());
+    }
+    if state.poll_matugen_theme() {
+        apply_palette(window, &state.active_palette());
+        window.set_matugen_theme_status_text(state.matugen_theme_status.clone().into());
     }
 }
 
@@ -288,7 +340,8 @@ mod tests {
         assert_eq!(theme_from_index(0), ThemeId::White);
         assert_eq!(theme_from_index(1), ThemeId::BlackOled);
         assert_eq!(theme_from_index(2), ThemeId::Mono);
-        assert_eq!(theme_from_index(3), ThemeId::Custom);
+        assert_eq!(theme_from_index(3), ThemeId::Matugen);
+        assert_eq!(theme_from_index(4), ThemeId::Custom);
         assert_eq!(theme_from_index(-1), ThemeId::White);
         assert_eq!(theme_from_index(99), ThemeId::White);
     }
@@ -298,7 +351,8 @@ mod tests {
         assert_eq!(theme_to_index(ThemeId::White), 0);
         assert_eq!(theme_to_index(ThemeId::BlackOled), 1);
         assert_eq!(theme_to_index(ThemeId::Mono), 2);
-        assert_eq!(theme_to_index(ThemeId::Custom), 3);
+        assert_eq!(theme_to_index(ThemeId::Matugen), 3);
+        assert_eq!(theme_to_index(ThemeId::Custom), 4);
     }
 
     #[test]
@@ -306,6 +360,7 @@ mod tests {
         assert_eq!(theme_display_name(ThemeId::White), "White");
         assert_eq!(theme_display_name(ThemeId::BlackOled), "Black OLED");
         assert_eq!(theme_display_name(ThemeId::Mono), "Monochrome");
+        assert_eq!(theme_display_name(ThemeId::Matugen), "Matugen");
         assert_eq!(theme_display_name(ThemeId::Custom), "Custom");
     }
 
@@ -316,6 +371,11 @@ mod tests {
             assert_eq!(theme_from_index(idx), theme);
             assert_eq!(theme_display_name(theme), name);
         }
+    }
+
+    #[test]
+    fn test_matugen_theme_palette_for_returns_black_oled() {
+        assert_eq!(palette_for(ThemeId::Matugen), Palette::black_oled());
     }
 
     #[test]
@@ -336,6 +396,69 @@ mod tests {
         let custom_pal = Palette::mono();
         state.custom_palette = Some(custom_pal.clone());
         assert_eq!(state.active_palette(), custom_pal);
+    }
+
+    #[test]
+    fn test_active_palette_resolves_matugen() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        state.theme = ThemeId::Matugen;
+        state.matugen_palette = None;
+        assert_eq!(state.active_palette(), Palette::black_oled());
+
+        let matugen_pal = Palette::white();
+        state.matugen_palette = Some(matugen_pal.clone());
+        assert_eq!(state.active_palette(), matugen_pal);
+    }
+
+    #[test]
+    fn test_active_palette_accent_override_ignored_for_matugen() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        state.theme = ThemeId::Matugen;
+        state.matugen_palette = Some(Palette::mono());
+        state.accent_override = Some([0x12, 0x34, 0x56]);
+        assert_eq!(state.active_palette().accent, Palette::mono().accent);
+    }
+
+    #[test]
+    fn test_poll_matugen_theme_false_when_not_matugen() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        state.theme = ThemeId::White;
+        assert!(!state.poll_matugen_theme());
+    }
+
+    #[test]
+    fn test_reload_and_poll_matugen_theme_lifecycle() {
+        let mut state = crate::slint_shell::test_support::test_wired();
+        let temp_dir = std::env::temp_dir()
+            .join(format!("moggyt-test-shell-theme-matugen-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let matugen = crate::infra::CustomThemeFile::for_matugen(&temp_dir);
+        let path = matugen.path().to_path_buf();
+        std::fs::write(&path, r##"{"mode": "light", "window": "#112233"}"##).unwrap();
+
+        state.matugen_theme = Some(matugen);
+        state.theme = ThemeId::Matugen;
+        state.reload_matugen_theme();
+
+        assert!(state.matugen_palette.is_some());
+        let previous = state.matugen_palette.clone().unwrap();
+        assert_eq!(previous.window, [0x11, 0x22, 0x33]);
+        assert!(state.matugen_theme_status.contains("Matugen theme loaded from"));
+
+        // Malformed file keeps the previous palette and sets an error status
+        std::fs::write(&path, "invalid json").unwrap();
+        let file = std::fs::File::options().write(true).open(&path).unwrap();
+        let future_time = std::time::SystemTime::now() + std::time::Duration::from_secs(3600);
+        file.set_modified(future_time).unwrap();
+        drop(file);
+
+        assert!(state.poll_matugen_theme());
+        assert_eq!(state.matugen_palette, Some(previous));
+        assert!(state.matugen_theme_status.contains("Matugen theme not loaded:"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]

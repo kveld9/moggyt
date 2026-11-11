@@ -7,6 +7,7 @@ export component ThemeSettings inherits VerticalLayout {
     in property <int> active-theme-index: 0;
     in property <bool> accent-customized: false;
     in property <string> custom-theme-status-text: "";
+    in property <string> matugen-theme-status-text: "";
     in property <[string]> custom-themes: [];
     in property <string> active-custom-theme: "";
 
@@ -46,9 +47,15 @@ export component ThemeSettings inherits VerticalLayout {
         }
 
         SettingsModeButton {
-            label: Labels.theme-custom-label;
+            label: Labels.theme-matugen-label;
             is-active: root.active-theme-index == 3;
             clicked => { root.theme-selected(3); }
+        }
+
+        SettingsModeButton {
+            label: Labels.theme-custom-label;
+            is-active: root.active-theme-index == 4;
+            clicked => { root.theme-selected(4); }
         }
     }
 
@@ -61,7 +68,7 @@ export component ThemeSettings inherits VerticalLayout {
         reset-clicked => { root.accent-reset(); }
     }
 
-    if root.active-theme-index == 3 && root.custom-themes.length > 0 : HorizontalLayout {
+    if root.active-theme-index == 4 && root.custom-themes.length > 0 : HorizontalLayout {
         spacing: 8px;
         for theme-name in root.custom-themes : SettingsModeButton {
             label: theme-name;
@@ -70,15 +77,22 @@ export component ThemeSettings inherits VerticalLayout {
         }
     }
 
-    if root.active-theme-index == 3 && root.custom-themes.length == 0 : Text {
+    if root.active-theme-index == 4 && root.custom-themes.length == 0 : Text {
         text: Labels.custom-theme-empty-hint-label;
         color: Theme.secondary;
         font-size: 12px;
         wrap: word-wrap;
     }
 
-    if root.active-theme-index == 3 && root.custom-theme-status-text != "" : Text {
+    if root.active-theme-index == 4 && root.custom-theme-status-text != "" : Text {
         text: root.custom-theme-status-text;
+        color: Theme.secondary;
+        font-size: 12px;
+        wrap: word-wrap;
+    }
+
+    if root.active-theme-index == 3 && root.matugen-theme-status-text != "" : Text {
+        text: root.matugen-theme-status-text;
         color: Theme.secondary;
         font-size: 12px;
         wrap: word-wrap;

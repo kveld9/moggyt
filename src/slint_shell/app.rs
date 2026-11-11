@@ -59,6 +59,8 @@ pub struct AppDependencies<C, A, S, L, K> {
     pub tray: Option<TrayHandle>,
     /// Loaded custom theme file watcher for runtime reloading.
     pub custom_theme: CustomThemeFile,
+    /// Watcher for the matugen-generated palette file.
+    pub matugen_theme: CustomThemeFile,
 }
 
 /// Composition function launching the Slint desktop UI wired to injected platform adapters.
@@ -95,11 +97,13 @@ pub fn run(
         version_store,
         tray,
         custom_theme,
+        matugen_theme,
     } = deps;
 
     let mut state = SlintAppState::new(catalog, audio, session, lyrics, covers);
     state.device_monitor = Some(DeviceIdentityMonitor::start());
     state.custom_theme = Some(custom_theme);
+    state.matugen_theme = Some(matugen_theme);
     state.lyric_overrides = lyric_overrides;
     state.version_overrides = version_store.load();
     state.version_store = version_store;
@@ -136,6 +140,9 @@ pub fn run(
     }
     if state.theme == ThemeId::Custom {
         state.reload_custom_theme();
+    }
+    if state.theme == ThemeId::Matugen {
+        state.reload_matugen_theme();
     }
     state.player_bar = PlayerBarPrefs::from_settings(&settings);
     state.recent_searches = settings.recent_searches;

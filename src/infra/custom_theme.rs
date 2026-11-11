@@ -55,6 +55,13 @@ impl CustomThemeFile {
         }
     }
 
+    /// Creates a handle pinned to `custom-theme.json`, the output path used by the matugen template.
+    pub fn for_matugen(config_dir: &Path) -> Self {
+        let mut handle = Self::new(config_dir);
+        handle.active_path = handle.fallback_path.clone();
+        handle
+    }
+
     /// Discovers available custom themes from `<config_dir>/themes/*.json` and `custom-theme.json`.
     pub fn available_themes(&self) -> Vec<String> {
         let mut themes = Vec::new();
@@ -125,7 +132,7 @@ impl CustomThemeFile {
             std::fs::metadata(&self.active_path).ok().and_then(|m| m.modified().ok());
 
         let raw = std::fs::read_to_string(&self.active_path).with_context(|| {
-            format!("failed to read custom theme file at {}", self.active_path.display())
+            format!("failed to read theme file at {}", self.active_path.display())
         })?;
 
         let map: BTreeMap<String, String> = serde_json::from_str(&raw).with_context(|| {
@@ -146,6 +153,13 @@ mod tests {
 
     fn test_temp_dir(tag: &str) -> PathBuf {
         std::env::temp_dir().join(format!("moggyt-test-custom-theme-{tag}-{}", std::process::id()))
+    }
+
+    #[test]
+    fn test_for_matugen_pinned_to_fallback_path() {
+        let temp_dir = test_temp_dir("matugen");
+        let handle = CustomThemeFile::for_matugen(&temp_dir);
+        assert_eq!(handle.path(), temp_dir.join(CUSTOM_THEME_FILE_NAME));
     }
 
     #[test]

@@ -125,6 +125,7 @@ mod tests {
         assert_eq!(es.theme_white, "Blanco");
         assert_eq!(es.theme_black_oled, "Negro OLED");
         assert_eq!(es.theme_mono, "Monocromo");
+        assert_eq!(es.theme_matugen, "Matugen");
         assert_eq!(es.theme_custom, "Personalizado");
         assert_eq!(es.accent_color, "Color de acento");
         assert_eq!(es.accent_reset, "Restablecer");
@@ -286,6 +287,7 @@ mod tests {
         assert_eq!(en.theme_white, "White");
         assert_eq!(en.theme_black_oled, "Black OLED");
         assert_eq!(en.theme_mono, "Mono");
+        assert_eq!(en.theme_matugen, "Matugen");
         assert_eq!(en.theme_custom, "Custom");
         assert_eq!(en.accent_color, "Accent color");
         assert_eq!(en.accent_reset, "Reset");

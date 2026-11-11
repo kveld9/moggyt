@@ -145,6 +145,9 @@ The configuration file uses JSON serialization with atomic replacement:
   - `"white"`: Clean light palette (tranche 1 default).
   - `"black-oled"`: Pure black background (`#000000`) designed for OLED panels.
   - `"mono"`: High-contrast monochromatic palette with zero color saturation across all slots.
+  - `"matugen"`: Material You palette read from `<config_dir>/custom-theme.json` (the matugen template output).
+    Falls back to Black OLED until a valid file loads. The client polls the file while this theme is active and
+    reloads it automatically when matugen rewrites it.
   - `"custom"`: Palette loaded from the active custom theme JSON file, falling back to Black OLED until a valid
     file loads.
 - **Custom Theme Name (`custom_theme_name`)**:
@@ -280,6 +283,10 @@ matugen image <wallpaper>
 # or
 matugen color hex '#3366cc'
 ```
+
+Select Matugen in Settings > Theme to consume this file automatically. The theme reloads when the file
+changes and shows the load status or parse error in the theme panel. The Custom theme keeps its own JSON
+theme-file selector and is not affected.
 
 The template maps Material You color roles to moggyt slots as follows:
 
