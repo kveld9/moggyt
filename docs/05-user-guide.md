@@ -6,12 +6,18 @@ This guide covers the interface layout, playback controls, queue management, and
 
 The interface consists of three primary regions:
 
-1. **Top Bar**: displays application title, page navigation tabs (`Search`, `Now playing`, `Library`, `Detail`),
-   and an update badge when a newer release is detected.
-2. **Body Panel**: renders the active page selected in the top bar.
+1. **Sidebar**: fixed navigation rail on the left with the application wordmark and one item per page
+   (`Search`, `Explore`, `Library`, `Stats`, `Now playing`). The active item is highlighted.
+2. **Content Area**: header with the active page title, a settings button on the right that opens the
+   Settings page, and an update badge when a newer release is detected. Below the header, the active
+   page renders its content; contextual pages (`Detail`, `Import`) replace the current view.
 3. **Player Bar**: persistent bottom panel providing transport controls, volume slider, and track position.
 
 ## Navigation Pages
+
+Sidebar destinations are `Search`, `Explore`, `Library`, `Stats`, and `Now playing`. `Detail` and
+`Settings` are contextual: `Detail` opens from a track, album, artist, or playlist selection, and
+`Settings` opens from the settings button in the content header or from the Library sign-in prompt.
 
 ### Search Page
 
