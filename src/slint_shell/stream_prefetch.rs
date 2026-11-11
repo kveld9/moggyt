@@ -4,12 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use tracing::{debug, warn};
 
-use crate::infra::{AudioBackend, StreamChain};
-
-fn acquire_prefetcher<A: AudioBackend>(audio: &Arc<Mutex<A>>) -> Option<StreamChain> {
-    let guard = audio.lock().ok()?;
-    guard.stream_prefetcher()
-}
+use crate::infra::AudioBackend;
 
 /// Spawns a background thread to prefetch the stream URL for the next track into cache.
 ///
@@ -28,12 +23,19 @@ pub fn spawn_stream_prefetch<A: AudioBackend>(
     if trimmed.is_empty() {
         return None;
     }
-    let prefetcher = acquire_prefetcher(audio)?;
+    let (prefetcher, has_cached_stream) = {
+        let guard = audio.lock().ok()?;
+        (guard.stream_prefetcher()?, guard.has_cached_stream(trimmed))
+    };
     let target_id = trimmed.to_string();
 
     match std::thread::Builder::new().name("moggyt-stream-prefetch".into()).spawn(move || {
         if !prefetcher.prefetch(&target_id) {
             debug!(video_id = %target_id, "failed to prefetch stream URL");
+            return;
+        }
+        if !has_cached_stream {
+            prefetcher.prefetch_prefix(&target_id);
         }
     }) {
         Ok(handle) => Some(handle),
@@ -47,7 +49,7 @@ pub fn spawn_stream_prefetch<A: AudioBackend>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infra::{AudioError, AudioQuality, AudioStub, YtDlpResolver};
+    use crate::infra::{AudioError, AudioQuality, AudioStub, StreamChain, YtDlpResolver};
 
     #[test]
     fn spawn_stream_prefetch_none_id_returns_none() {
@@ -83,7 +85,8 @@ mod tests {
     }
 
     struct MockPrefetchBackend {
-        resolver: YtDlpResolver,
+        chain: StreamChain,
+        has_cached: bool,
     }
 
     impl AudioBackend for MockPrefetchBackend {
@@ -107,7 +110,10 @@ mod tests {
             None
         }
         fn stream_prefetcher(&self) -> Option<StreamChain> {
-            Some(StreamChain::from(self.resolver.clone()))
+            Some(self.chain.clone())
+        }
+        fn has_cached_stream(&self, _track_id: &str) -> bool {
+            self.has_cached
         }
     }
 
@@ -122,7 +128,8 @@ mod tests {
             std::time::Instant::now(),
         );
 
-        let backend = Arc::new(Mutex::new(MockPrefetchBackend { resolver: resolver.clone() }));
+        let chain = StreamChain::from_ytdlp(resolver.clone());
+        let backend = Arc::new(Mutex::new(MockPrefetchBackend { chain, has_cached: false }));
         let handle = spawn_stream_prefetch(Some(video_id.into()), &backend);
         let handle = handle.expect("prefetch thread spawned");
         handle.join().expect("prefetch thread join succeeds");
@@ -133,5 +140,67 @@ mod tests {
                 .get(video_id, AudioQuality::Standard, std::time::Instant::now())
                 .is_some()
         );
+    }
+
+    #[derive(Default)]
+    struct CountingPrefixFetcher {
+        calls: Mutex<usize>,
+    }
+
+    impl CountingPrefixFetcher {
+        fn call_count(&self) -> usize {
+            *self.calls.lock().unwrap()
+        }
+    }
+
+    impl crate::infra::PrefixFetcher for CountingPrefixFetcher {
+        fn fetch_prefix(&self, _url: &str, _max_bytes: usize) -> Option<Vec<u8>> {
+            *self.calls.lock().unwrap() += 1;
+            Some(vec![0xAA; 512])
+        }
+    }
+
+    #[test]
+    fn spawn_stream_prefetch_skips_prefix_when_track_is_cached() {
+        let resolver = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let video_id = "cached-track-id";
+        resolver.cache().insert(
+            video_id,
+            AudioQuality::Standard,
+            "https://googlevideo.test/cached-stream".into(),
+            std::time::Instant::now(),
+        );
+        let fetcher = Arc::new(CountingPrefixFetcher::default());
+        let chain = StreamChain::from_ytdlp(resolver)
+            .with_prefix_fetcher(Arc::clone(&fetcher) as Arc<dyn crate::infra::PrefixFetcher>);
+
+        let backend = Arc::new(Mutex::new(MockPrefetchBackend { chain, has_cached: true }));
+        let handle = spawn_stream_prefetch(Some(video_id.into()), &backend);
+        let handle = handle.expect("prefetch thread spawned");
+        handle.join().expect("prefetch thread join succeeds");
+
+        assert_eq!(fetcher.call_count(), 0);
+    }
+
+    #[test]
+    fn spawn_stream_prefetch_fetches_prefix_when_track_is_not_cached() {
+        let resolver = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let video_id = "uncached-track-id";
+        resolver.cache().insert(
+            video_id,
+            AudioQuality::Standard,
+            "https://googlevideo.test/uncached-stream".into(),
+            std::time::Instant::now(),
+        );
+        let fetcher = Arc::new(CountingPrefixFetcher::default());
+        let chain = StreamChain::from_ytdlp(resolver)
+            .with_prefix_fetcher(Arc::clone(&fetcher) as Arc<dyn crate::infra::PrefixFetcher>);
+
+        let backend = Arc::new(Mutex::new(MockPrefetchBackend { chain, has_cached: false }));
+        let handle = spawn_stream_prefetch(Some(video_id.into()), &backend);
+        let handle = handle.expect("prefetch thread spawned");
+        handle.join().expect("prefetch thread join succeeds");
+
+        assert_eq!(fetcher.call_count(), 1);
     }
 }

@@ -390,6 +390,10 @@ impl AudioBackend for RodioBackend {
         Some((*self.resolver).clone())
     }
 
+    fn has_cached_stream(&self, track_id: &str) -> bool {
+        self.stream_cache.as_ref().is_some_and(|cache| cache.get(track_id).is_some())
+    }
+
     fn pause(&mut self) {
         self.sink.pause();
         self.freeze_anchor();
@@ -656,6 +660,7 @@ mod tests {
             std::env::temp_dir().join(format!("moggyt-test-backend-cache-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);
         let cache = Arc::new(StreamDiskCache::new(&temp_dir, 1024 * 1024).expect("cache init"));
+        cache.put("cached-track-1", &MINIMAL_WAV_HEADER).expect("put wav in cache");
 
         let Some(mut backend) = test_backend() else {
             let _ = std::fs::remove_dir_all(&temp_dir);
@@ -663,10 +668,14 @@ mod tests {
         };
 
         assert!(backend.stream_cache().is_none());
+        assert!(!backend.has_cached_stream("cached-track-1"));
         backend.set_stream_cache(Some(Arc::clone(&cache)));
         assert!(backend.stream_cache().is_some());
+        assert!(backend.has_cached_stream("cached-track-1"));
+        assert!(!backend.has_cached_stream("other-track"));
         backend.set_stream_cache(None);
         assert!(backend.stream_cache().is_none());
+        assert!(!backend.has_cached_stream("cached-track-1"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

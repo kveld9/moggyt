@@ -183,7 +183,7 @@ pub use spotify_search::{
 pub use spotify_source::load_spotify_link;
 pub use store_health::{HealthFlag, StoreHealth, quarantine};
 pub use stream::{AudioQuality, ResolvedStream, StreamResolver, StreamStub};
-pub use stream_chain::{PrimaryStreamResolver, StreamChain};
+pub use stream_chain::{PrefixFetcher, PrimaryStreamResolver, StreamChain};
 pub use stream_disk_cache::StreamDiskCache;
 pub use stream_pool::{
     BlockPool, LARGE_STREAM_THRESHOLD_BYTES, STREAM_BLOCK_BYTES, STREAM_WINDOW_AHEAD_BLOCKS,
