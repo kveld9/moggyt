@@ -1,114 +1,328 @@
 import { Labels } from "../labels.slint";
-import { LyricsHighlight, Theme, LyricLineData } from "../theme.slint";
+import { LyricLineData, LyricsHighlight, PlayerUi, Theme, TrackRowData } from "../theme.slint";
+import { ThemedSlider } from "../components/controls.slint";
 import { SettingsModeButton } from "../components/settings_rows.slint";
 import { VinylDeck } from "../components/vinyl_deck.slint";
+import { PlayerCenterControls } from "../components/player_controls.slint";
+import { TrackRow } from "../components/rows.slint";
+import { IconHeart, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
 import { VersionFixUi } from "version_fix.slint";
 
-export component NowPlayingView inherits VerticalLayout {
+export component NowPlayingView inherits HorizontalLayout {
     in property <string> track-title: "No track playing";
     in property <string> track-artist: "";
-    in property <string> position-text: "0:00";
-    in property <string> duration-text: "0:00";
-    in property <float> progress: 0.0;
     in property <image> cover-image;
     in property <bool> has-cover: false;
     in property <[LyricLineData]> lyrics-lines: [];
     in property <int> active-lyric-index: -1;
-    in property <bool> is-playing: false;
+    in property <[TrackRowData]> queue-tracks: [];
+    in property <int> queue-selected-index: -1;
+    callback queue-track-selected(int);
+
     property <bool> vinyl-mode: false;
+    property <int> active-tab: 0;
+    property <int> last-audible-volume: 100;
 
-    spacing: 16px; alignment: start;
+    spacing: 24px;
+    cross-axis-alignment: start;
 
-    HorizontalLayout {
-        spacing: 20px; alignment: start;
-        if !root.vinyl-mode : Rectangle {
-            width: 140px; height: 140px; border-radius: 8px; background: Theme.surface; clip: true;
-            if root.has-cover : Image {
-                width: parent.width; height: parent.height;
+    // LEFT COLUMN (fixed width 340px, VerticalLayout, spacing 14px)
+    VerticalLayout {
+        width: 340px;
+        spacing: 14px;
+        alignment: start;
+
+        // Artwork block: 220x220, border-radius 12px, Theme.surface background, clip true
+        Rectangle {
+            width: 220px;
+            height: 220px;
+            border-radius: 12px;
+            background: Theme.surface;
+            clip: true;
+
+            if !root.vinyl-mode && root.has-cover : Image {
+                width: parent.width;
+                height: parent.height;
                 source: root.cover-image;
                 image-fit: cover;
             }
-            if !root.has-cover : Text {
-                text: Labels.no-cover-text; color: Theme.secondary; font-size: 12px;
-                horizontal-alignment: center; vertical-alignment: center;
+            if !root.vinyl-mode && !root.has-cover : Text {
+                width: parent.width;
+                height: parent.height;
+                text: Labels.no-cover-text;
+                color: Theme.secondary;
+                font-size: 12px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            if root.vinyl-mode : VinylDeck {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                cover: root.cover-image;
+                has-cover: root.has-cover;
+                is-playing: PlayerUi.is-playing;
             }
         }
-        if root.vinyl-mode : VinylDeck {
-            cover: root.cover-image;
-            has-cover: root.has-cover;
-            is-playing: root.is-playing;
-        }
-        VerticalLayout {
-            spacing: 6px; alignment: center;
-            HorizontalLayout {
-                spacing: 6px;
-                SettingsModeButton {
-                    label: Labels.now-playing-cover-label;
-                    is-active: !root.vinyl-mode;
-                    clicked => { root.vinyl-mode = false; }
-                }
-                SettingsModeButton {
-                    label: Labels.now-playing-vinyl-label;
-                    is-active: root.vinyl-mode;
-                    clicked => { root.vinyl-mode = true; }
-                }
-                SettingsModeButton {
-                    label: Labels.version-fix-open-label;
-                    is-active: false;
-                    clicked => { VersionFixUi.active = true; }
-                }
+
+        // Cover / Vinyl mode buttons
+        HorizontalLayout {
+            spacing: 6px;
+
+            SettingsModeButton {
+                label: Labels.now-playing-cover-label;
+                is-active: !root.vinyl-mode;
+                clicked => { root.vinyl-mode = false; }
             }
-            Text { text: root.track-title; color: Theme.text; font-size: 20px; font-weight: 700; }
-            Text { text: root.track-artist; color: Theme.secondary; font-size: 14px; }
-            Rectangle { height: 6px; }
-            // Progress bar
+            SettingsModeButton {
+                label: Labels.now-playing-vinyl-label;
+                is-active: root.vinyl-mode;
+                clicked => { root.vinyl-mode = true; }
+            }
+            SettingsModeButton {
+                label: Labels.version-fix-open-label;
+                is-active: false;
+                clicked => { VersionFixUi.active = true; }
+            }
+        }
+
+        // Track title
+        Text {
+            text: root.track-title;
+            color: Theme.text;
+            font-size: 22px;
+            font-weight: 700;
+            overflow: elide;
+        }
+
+        // Track artist
+        Text {
+            text: root.track-artist;
+            color: Theme.secondary;
+            font-size: 14px;
+            overflow: elide;
+        }
+
+        // Like row
+        HorizontalLayout {
+            alignment: start;
+
             Rectangle {
-                height: 6px; border-radius: 3px; background: Theme.surface; clip: true;
-                Rectangle { x: 0; width: parent.width * root.progress; height: parent.height; background: Theme.accent; border-radius: 3px; }
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (PlayerUi.is-liked ? Theme.surface : transparent));
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                like-touch := TouchArea {
+                    clicked => { PlayerUi.toggle-like(); }
+                }
+
+                IconHeart {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    size: 16px;
+                    tint: PlayerUi.is-liked ? Theme.accent : Theme.secondary;
+                    is-filled: PlayerUi.is-liked;
+                }
             }
+        }
+
+        // Center controls
+        PlayerCenterControls {
+            is-playing: PlayerUi.is-playing;
+            is-shuffle: PlayerUi.is-shuffle;
+            repeat-mode: PlayerUi.repeat-mode;
+            position-secs: PlayerUi.position-secs;
+            duration-secs: PlayerUi.duration-secs;
+            position-text: PlayerUi.position-text;
+            duration-text: PlayerUi.duration-text;
+            show-skip-seconds: true;
+
+            toggle-play => { PlayerUi.toggle-play(); }
+            prev-track => { PlayerUi.prev-track(); }
+            next-track => { PlayerUi.next-track(); }
+            seek-by(delta) => { PlayerUi.seek-by(delta); }
+            seek-to(secs) => { PlayerUi.seek-to(secs); }
+            toggle-shuffle => { PlayerUi.toggle-shuffle(); }
+            cycle-repeat => { PlayerUi.cycle-repeat(); }
+        }
+
+        // Volume row
+        Rectangle {
+            border-radius: 10px;
+            background: Theme.panel;
+
             HorizontalLayout {
-                Text { text: root.position-text; color: Theme.secondary; font-size: 11px; }
-                Rectangle {}
-                Text { text: root.duration-text != "" ? root.duration-text : "--:--"; color: Theme.secondary; font-size: 11px; }
+                padding: 8px;
+                spacing: 8px;
+
+                VerticalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        width: 28px;
+                        height: 28px;
+                        border-radius: 14px;
+                        background: vol-touch.pressed ? Theme.overlay : (vol-touch.has-hover ? Theme.hover : transparent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        vol-touch := TouchArea {
+                            clicked => {
+                                if (PlayerUi.volume > 0) {
+                                    root.last-audible-volume = PlayerUi.volume;
+                                    PlayerUi.set-volume(0);
+                                } else {
+                                    PlayerUi.set-volume(root.last-audible-volume > 0 ? root.last-audible-volume : 50);
+                                }
+                            }
+                        }
+
+                        if PlayerUi.volume == 0 : IconSpeakerMuted {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            size: 16px;
+                            tint: Theme.accent;
+                        }
+
+                        if PlayerUi.volume != 0 : IconSpeaker {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            size: 16px;
+                            tint: Theme.secondary;
+                        }
+                    }
+                }
+
+                ThemedSlider {
+                    horizontal-stretch: 1;
+                    minimum: 0;
+                    maximum: 100;
+                    value: PlayerUi.volume;
+                    hit-slack: 14px;
+                    changed(val) => {
+                        PlayerUi.set-volume(round(val));
+                    }
+                }
             }
         }
     }
 
-    if root.lyrics-lines.length == 0 : Rectangle {
-        height: 140px; border-radius: 8px; background: Theme.panel;
-        VerticalLayout {
-            alignment: center; spacing: 4px;
-            Text { text: Labels.lyrics-unavailable-text; color: Theme.secondary; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
-            Text { text: Labels.lyrics-hint-text; color: Theme.secondary; font-size: 11px; horizontal-alignment: center; }
-        }
-    }
+    // RIGHT CARD (horizontal-stretch 1, Rectangle, Theme.panel background, border-radius 12px, VerticalLayout with padding 16px, spacing 12px)
+    Rectangle {
+        horizontal-stretch: 1;
+        vertical-stretch: 1;
+        background: Theme.panel;
+        border-radius: 12px;
 
-    if root.lyrics-lines.length > 0 : Rectangle {
-        border-radius: 8px; background: Theme.panel; clip: true;
         VerticalLayout {
-            padding: 12px; spacing: 8px; alignment: start;
-            // Slint 1.18: Text does not wrap unless `wrap` is set, and a no-wrap Text
-            // keeps its full single-line preferred width. The sung/rest split therefore
-            // renders as one continuous line that clips instead of wrapping.
-            // https://docs.slint.dev/docs/slint/reference/elements/text/
-            for line in root.lyrics-lines : HorizontalLayout {
-                if line.index != root.active-lyric-index : Text {
-                    text: line.text;
-                    color: Theme.secondary;
-                    font-size: 13px;
-                    font-weight: 400;
+            padding: 16px;
+            spacing: 12px;
+            alignment: start;
+
+            // Tab row
+            HorizontalLayout {
+                spacing: 8px;
+
+                SettingsModeButton {
+                    label: Labels.lyrics-tab-label;
+                    is-active: root.active-tab == 0;
+                    clicked => { root.active-tab = 0; }
                 }
-                if line.index == root.active-lyric-index && LyricsHighlight.sung-text != "" : Text {
-                    text: LyricsHighlight.sung-text;
-                    color: Theme.accent;
-                    font-size: 15px;
-                    font-weight: 700;
+
+                SettingsModeButton {
+                    label: Labels.up-next-tab-label;
+                    is-active: root.active-tab == 1;
+                    clicked => { root.active-tab = 1; }
                 }
-                if line.index == root.active-lyric-index : Text {
-                    text: LyricsHighlight.rest-text;
-                    color: LyricsHighlight.sung-text == "" ? Theme.accent : Theme.secondary;
-                    font-size: 15px;
-                    font-weight: 700;
+            }
+
+            // Tab 0 (Lyrics)
+            if root.active-tab == 0 && root.lyrics-lines.length == 0 : Rectangle {
+                min-height: 160px;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 4px;
+                    Text {
+                        text: Labels.lyrics-unavailable-text;
+                        color: Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: Labels.lyrics-hint-text;
+                        color: Theme.secondary;
+                        font-size: 11px;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            if root.active-tab == 0 && root.lyrics-lines.length > 0 : Flickable {
+                vertical-stretch: 1;
+
+                VerticalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    // Slint 1.18: Text does not wrap unless `wrap` is set, and a no-wrap Text
+                    // keeps its full single-line preferred width. The sung/rest split therefore
+                    // renders as one continuous line that clips instead of wrapping.
+                    // https://docs.slint.dev/docs/slint/reference/elements/text/
+                    for line in root.lyrics-lines : HorizontalLayout {
+                        if line.index != root.active-lyric-index : Text {
+                            text: line.text;
+                            color: Theme.secondary;
+                            font-size: 13px;
+                            font-weight: 400;
+                        }
+                        if line.index == root.active-lyric-index && LyricsHighlight.sung-text != "" : Text {
+                            text: LyricsHighlight.sung-text;
+                            color: Theme.accent;
+                            font-size: 15px;
+                            font-weight: 700;
+                        }
+                        if line.index == root.active-lyric-index : Text {
+                            text: LyricsHighlight.rest-text;
+                            color: LyricsHighlight.sung-text == "" ? Theme.accent : Theme.secondary;
+                            font-size: 15px;
+                            font-weight: 700;
+                        }
+                    }
+                }
+            }
+
+            // Tab 1 (Up next)
+            if root.active-tab == 1 && root.queue-tracks.length == 0 : Rectangle {
+                min-height: 160px;
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: Labels.queue-empty-text;
+                        color: Theme.secondary;
+                        font-size: 14px;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            if root.active-tab == 1 && root.queue-tracks.length > 0 : Flickable {
+                vertical-stretch: 1;
+
+                VerticalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    for track in root.queue-tracks : TrackRow {
+                        title: track.title;
+                        artist: track.artist;
+                        album: track.album;
+                        duration: track.duration;
+                        kind: track.kind;
+                        cover: track.cover;
+                        is-active: track.index == root.queue-selected-index;
+                        clicked => { root.queue-track-selected(track.index); }
+                    }
                 }
             }
         }

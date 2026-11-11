@@ -64,27 +64,26 @@ The collapsible right-side queue panel manages the ordered list of upcoming trac
 
 ### Now Playing Page
 
-The now playing view presents rich playback details for the track under the active cursor:
+The Now Playing view presents a full two-column playback dashboard:
 
-- Displays track title, artist name, and the stream identifier requested from the audio backend.
-- **Start Radio**: click `Start radio` to seed an autoplay continuation queue with the active track
-  and automatically fetch recommendations when reaching the end of the queue.
-- **Cover Art**: displays artwork fetched from the track thumbnail URL and cached locally. If offline or pending,
-  shows `Cover art unavailable (offline or pending fetch)`.
-- **Vinyl Stage**: the `Vinyl` / `Cover` toggle switches the artwork between the static
-  cover and a turntable stage. The record spins only while playback is running and the
-  tonearm swings onto the disc on play, parking on pause.
-- **Fix Audio Version**: the `Fix version` button opens a search panel for alternative
-  recordings of the current track. The chosen alternative is stored in
-  `version_overrides.json` and used for playback only; the title, artwork, lyrics and
-  scrobbling keep the original track.
-- **Synced Lyrics**: displays timestamped lyrics fetched from LRCLIB for the active artist and title pair.
-  - Offset controls: click `-250ms` or `+250ms` to adjust lyric synchronization dynamically.
-  - Word-level highlight: when the provider supplies word timings (lrc.red Apple TTML),
-    the active line fills word by word. LRCLIB lines keep the line-level highlight.
-  - Formatted timestamps (`m:ss`) precede each line of text.
-  - Shows `No synced lyrics for this track.` when no matching lyrics exist on LRCLIB.
-- If the queue is empty, displays `Queue is empty. Search and enqueue a track first.`.
+- **Left Column**: a fixed 340px column featuring a prominent 220x220 artwork block, track details,
+  transport controls, and volume adjustment.
+  - **Cover & Vinyl Deck**: toggled with `Cover` and `Vinyl` buttons. Cover mode displays album
+    artwork (or a placeholder when unavailable); Vinyl mode renders an animated turntable stage whose record
+    spins and tonearm swings into place during active playback.
+  - **Fix Audio Version**: the `Fix version` button opens a search panel for alternative recordings
+    of the current track. The chosen alternative is stored in `version_overrides.json` and used for
+    playback only; the title, artwork, lyrics and scrobbling keep the original track.
+  - **Track Details**: large track title and artist name with text elision.
+  - **Favorites**: circular like button toggling favorite status through `PlayerUi`.
+  - **Transport Controls**: playback center controls featuring play/pause, previous/next, shuffle,
+    repeat, track position timeline, and +/-10s seek buttons.
+  - **Volume Row**: speaker icon with one-click mute/unmute and volume slider (`0-100`).
+- **Right Card**: a rounded surface card equipped with `Lyrics` and `Up next` tabs.
+  - **Lyrics Tab**: displays synchronized lyrics with active-line accenting and word-level sung/rest
+    highlighting when available, or an empty state hint when lyrics are missing.
+  - **Up Next Tab**: lists all queued tracks with active track highlighting; clicking a row jumps
+    directly to that queue position. Displays an empty state message when the queue has no tracks.
 
 ### Library Page
 
