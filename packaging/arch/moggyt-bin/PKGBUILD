@@ -6,7 +6,7 @@
 # AUR submission deferred until release stabilization.
 
 pkgname=moggyt-bin
-pkgver=1.0.0
+pkgver=1.3.0
 pkgrel=1
 pkgdesc="Native YouTube Music client (Slint)"
 arch=('x86_64')
@@ -18,13 +18,17 @@ conflicts=('moggyt')
 source=(
   "https://github.com/kveld9/moggyt/releases/download/v${pkgver}/moggyt-${pkgver}-linux.tar.gz"
   "moggyt.desktop"
+  "moggyt-theme.json::https://raw.githubusercontent.com/kveld9/moggyt/v${pkgver}/packaging/matugen/moggyt-theme.json"
 )
 sha256sums=(
-  '082064a43164c00473c0ae693c6d3e3eb0fd8a9e73d6e864f766d7f909db0948'
+  'e245274e5c5c2364248c94d4d61988df63d89a21472860fc528196b878a76611'
   '3bada013e5a76268ff9f1f60face3240dfa14e57de1509b0230cc71615de28db'
+  '0e9ed656921ad7dccedd817b63c2458767806ddbe128bb61fa543ab0b1079336'
 )
 
 package() {
   install -Dm755 "${srcdir}/moggyt" "${pkgdir}/usr/bin/moggyt"
   install -Dm644 "${srcdir}/moggyt.desktop" "${pkgdir}/usr/share/applications/moggyt.desktop"
+  install -Dm644 "${srcdir}/moggyt-theme.json" \
+    "${pkgdir}/usr/share/moggyt/matugen/moggyt-theme.json"
 }

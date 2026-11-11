@@ -41,8 +41,9 @@ Release assets by shipment status:
 ### Arch Linux Packaging
 
 The repository maintains an Arch Linux package specification in `packaging/arch/moggyt-bin/PKGBUILD`. It downloads and
-repackages the official pre-compiled Linux release tarball into `/usr/bin/moggyt` and provides a standard desktop
-entry. Submission to the Arch User Repository (AUR) is scheduled following public release stabilization.
+repackages the official pre-compiled Linux release tarball into `/usr/bin/moggyt`, provides a standard desktop
+entry, and installs the Matugen theme template at `/usr/share/moggyt/matugen/moggyt-theme.json`. Submission to
+the Arch User Repository (AUR) is scheduled following public release stabilization.
 
 ## Code Signing Policy
 
