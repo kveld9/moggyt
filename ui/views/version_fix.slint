@@ -21,7 +21,7 @@ export component VersionFixModal inherits Rectangle {
 
     Rectangle {
         width: min(root.width - 48px, 620px);
-        max-height: min(root.height - 64px, 480px);
+        height: min(root.height - 96px, 460px);
         background: Theme.panel;
         border-radius: 12px;
         border-width: 1px;
@@ -76,7 +76,7 @@ export component VersionFixModal inherits Rectangle {
                 }
 
                 Rectangle {
-                    width: 80px;
+                    width: 148px;
                     border-radius: 8px;
                     background: search-btn.pressed ? Theme.overlay : (search-btn.has-hover ? Theme.hover : Theme.accent);
                     animate background { duration: 150ms; easing: ease-in-out; }
@@ -88,6 +88,7 @@ export component VersionFixModal inherits Rectangle {
                         color: search-btn.has-hover ? Theme.text : Theme.window;
                         font-size: 13px;
                         font-weight: 700;
+                        overflow: elide;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
