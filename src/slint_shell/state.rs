@@ -171,6 +171,8 @@ pub struct SlintAppState {
 
     pub worker_tx: Option<std::sync::mpsc::Sender<PlaybackWorkerCommand>>,
     pub persistence_error: Option<PersistenceError>,
+    /// Last observed audio backend state, reused while the backend is busy.
+    pub audio_snapshot: crate::slint_shell::audio_snapshot::AudioSnapshot,
 }
 
 /// Shared reference-counted wrapper for [`SlintAppState`].
