@@ -1,0 +1,78 @@
+import { Theme } from "../theme.slint";
+
+// Slint 1.18: transform-rotation rotates the element and its children around
+// transform-origin (center by default).
+// https://docs.slint.dev/docs/slint/reference/common/
+export component VinylDeck inherits Rectangle {
+    in property <image> cover;
+    in property <bool> has-cover: false;
+    in property <bool> is-playing: false;
+
+    property <angle> rotation: 0deg;
+
+    width: 140px;
+    height: 140px;
+    background: transparent;
+
+    Timer {
+        interval: 50ms;
+        running: root.is-playing;
+        triggered => {
+            root.rotation += 1.8deg;
+            if root.rotation >= 360deg {
+                root.rotation -= 360deg;
+            }
+        }
+    }
+
+    Rectangle {
+        x: 0; y: 0;
+        width: 140px; height: 140px;
+        border-radius: 70px;
+        background: #101010;
+        transform-origin: { x: 70px, y: 70px };
+        transform-rotation: root.rotation;
+        animate transform-rotation { duration: 120ms; easing: linear; }
+
+        Rectangle {
+            x: 8px; y: 8px; width: 124px; height: 124px; border-radius: 62px;
+            background: transparent; border-width: 1px; border-color: #262626;
+        }
+        Rectangle {
+            x: 20px; y: 20px; width: 100px; height: 100px; border-radius: 50px;
+            background: transparent; border-width: 1px; border-color: #1e1e1e;
+        }
+
+        Rectangle {
+            x: 44px; y: 44px; width: 52px; height: 52px; border-radius: 26px;
+            background: #1c1c1c; clip: true;
+            if root.has-cover : Image {
+                width: parent.width; height: parent.height;
+                source: root.cover;
+                image-fit: ImageFit.cover;
+            }
+        }
+
+        Rectangle {
+            x: 67px; y: 67px; width: 6px; height: 6px; border-radius: 3px;
+            background: #000000;
+        }
+    }
+
+    Rectangle {
+        x: 112px; y: 12px;
+        width: 4px; height: 58px;
+        border-radius: 2px;
+        background: Theme.secondary;
+        transform-origin: { x: 2px, y: 4px };
+        transform-rotation: root.is-playing ? 24deg : 0deg;
+        animate transform-rotation { duration: 450ms; easing: ease-out; }
+    }
+
+    Rectangle {
+        x: 108px; y: 8px;
+        width: 12px; height: 12px;
+        border-radius: 6px;
+        background: Theme.border;
+    }
+}

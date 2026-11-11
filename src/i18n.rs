@@ -200,6 +200,8 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No tracks available.", "No hay canciones disponibles."),
     ("Not connected", "No conectado"),
     ("Now Playing", "Sonando"),
+    ("Cover", "Portada"),
+    ("Vinyl", "Vinilo"),
     ("Off", "Desactivado"),
     ("Open", "Abrir"),
     ("Open settings", "Abrir ajustes"),
