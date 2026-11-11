@@ -9,10 +9,7 @@ use super::stream_reader::{
     DEFAULT_STREAM_CHUNK_SIZE, RangeReader, SyncReader, parse_content_range_total,
 };
 
-/// Maximum time to establish the TCP/TLS connection for a range request.
-pub const STREAM_CONNECT_TIMEOUT_SECS: u64 = 10;
-
-/// Maximum total time for one range request, including body transfer.
+/// Maximum total time for one range request, covering connection and transfer.
 ///
 /// A 256 KiB block needs at most ~51 s even at 5 KiB/s, so 60 s bounds a
 /// stalled connection without aborting slow but progressing transfers.
@@ -20,7 +17,6 @@ pub const STREAM_REQUEST_TIMEOUT_SECS: u64 = 60;
 
 fn streaming_client() -> anyhow::Result<reqwest::blocking::Client> {
     reqwest::blocking::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(STREAM_CONNECT_TIMEOUT_SECS))
         .timeout(std::time::Duration::from_secs(STREAM_REQUEST_TIMEOUT_SECS))
         .build()
         .context("failed to build reqwest client for audio streaming")
