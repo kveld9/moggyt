@@ -2,6 +2,8 @@
 //!
 //! Hexagonal invariant: pure in-memory label resolution and Slint window property dispatch.
 
+use std::path::Path;
+
 use slint::ComponentHandle;
 
 use crate::i18n::{Locale, tr};
@@ -61,7 +63,7 @@ pub struct StaticLabels {
     pub theme_custom: &'static str,
     pub accent_color: &'static str,
     pub accent_reset: &'static str,
-    pub custom_theme_empty_hint: &'static str,
+    pub custom_theme_empty_hint: String,
     pub section_playback: &'static str,
     pub playback_speed: &'static str,
     pub sleep_timer_label: &'static str,
@@ -172,7 +174,19 @@ pub struct StaticLabels {
 
 impl StaticLabels {
     /// Resolves all static labels for the given locale.
-    pub fn resolve(locale: Locale) -> Self {
+    pub fn resolve(locale: Locale, config_dir: Option<&Path>) -> Self {
+        let custom_theme_empty_hint = match config_dir {
+            Some(dir) => tr(
+                locale,
+                "Place theme JSON files in {path}/themes/ or {path}/custom-theme.json",
+            )
+            .replace("{path}", &dir.display().to_string()),
+            None => tr(
+                locale,
+                "Place theme JSON files in the themes directory or custom-theme.json inside the configuration directory",
+            )
+            .to_string(),
+        };
         Self {
             nav_search: tr(locale, "Search"),
             nav_explore: tr(locale, "Explore"),
@@ -228,10 +242,7 @@ impl StaticLabels {
             theme_custom: tr(locale, "Custom"),
             accent_color: tr(locale, "Accent color"),
             accent_reset: tr(locale, "Reset"),
-            custom_theme_empty_hint: tr(
-                locale,
-                "Place theme JSON files in ~/.config/moggyt/themes/ or ~/.config/moggyt/custom-theme.json",
-            ),
+            custom_theme_empty_hint,
             section_playback: tr(locale, "Playback"),
             playback_speed: tr(locale, "Playback speed"),
             sleep_timer_label: tr(locale, "Sleep timer"),
@@ -413,7 +424,7 @@ impl StaticLabels {
         labels.set_theme_custom_label(self.theme_custom.into());
         labels.set_accent_color_label(self.accent_color.into());
         labels.set_accent_reset_label(self.accent_reset.into());
-        labels.set_custom_theme_empty_hint_label(self.custom_theme_empty_hint.into());
+        labels.set_custom_theme_empty_hint_label((&self.custom_theme_empty_hint).into());
         labels.set_section_playback_label(self.section_playback.into());
         labels.set_playback_speed_label(self.playback_speed.into());
         labels.set_sleep_timer_label(self.sleep_timer_label.into());
@@ -524,8 +535,8 @@ impl StaticLabels {
 }
 
 /// Synchronizes static user interface labels into Slint window properties based on locale.
-pub fn sync_static_labels(window: &MoggytWindow, locale: Locale) {
-    StaticLabels::resolve(locale).apply(window);
+pub fn sync_static_labels(window: &MoggytWindow, locale: Locale, config_dir: Option<&Path>) {
+    StaticLabels::resolve(locale, config_dir).apply(window);
 }
 
 #[cfg(test)]

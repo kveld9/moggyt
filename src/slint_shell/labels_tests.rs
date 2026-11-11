@@ -6,10 +6,10 @@ mod tests {
 
     #[test]
     fn test_static_labels_resolution_and_sync() {
-        let en_labels = StaticLabels::resolve(crate::i18n::Locale::English);
+        let en_labels = StaticLabels::resolve(crate::i18n::Locale::English, None);
         assert_eq!(en_labels.search_loading, "Searching...");
         assert_eq!(en_labels.search_error, "Failed to load search results");
-        let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
+        let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish, None);
         assert_eq!(es_labels.search_loading, "Buscando...");
         assert_eq!(es_labels.search_error, "No se pudieron cargar los resultados de busqueda");
         assert_eq!(en_labels.nav_explore, "Explore");
@@ -42,7 +42,7 @@ mod tests {
         assert_eq!(en_labels.lyrics_tab_label, "Lyrics");
         assert_eq!(en_labels.up_next_tab_label, "Up next");
 
-        let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
+        let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish, None);
         assert_eq!(es_labels.nav_explore, "Explorar");
         assert_eq!(es_labels.explore_loading, "Cargando exploracion...");
         assert_eq!(es_labels.explore_empty, "No se encontraron secciones en Explorar.");
@@ -76,7 +76,8 @@ mod tests {
 
     #[test]
     fn test_static_labels_resolution_spanish_and_english() {
-        let es = StaticLabels::resolve(Locale::Spanish);
+        let test_config_dir = std::path::Path::new("/home/test/.config/moggyt");
+        let es = StaticLabels::resolve(Locale::Spanish, Some(test_config_dir));
         assert_eq!(es.nav_search, "Buscar");
         assert_eq!(es.nav_explore, "Explorar");
         assert_eq!(es.nav_library, "Biblioteca");
@@ -131,7 +132,7 @@ mod tests {
         assert_eq!(es.accent_reset, "Restablecer");
         assert_eq!(
             es.custom_theme_empty_hint,
-            "Coloca archivos JSON de tema en ~/.config/moggyt/themes/ o ~/.config/moggyt/custom-theme.json"
+            "Coloca archivos JSON de tema en /home/test/.config/moggyt/themes/ o /home/test/.config/moggyt/custom-theme.json"
         );
         assert_eq!(es.section_playback, "Reproducción");
         assert_eq!(es.playback_speed, "Velocidad de reproducción");
@@ -244,7 +245,7 @@ mod tests {
         assert_eq!(es.local_move_up_label, "Subir");
         assert_eq!(es.local_move_down_label, "Bajar");
 
-        let en = StaticLabels::resolve(Locale::English);
+        let en = StaticLabels::resolve(Locale::English, Some(test_config_dir));
         assert_eq!(en.nav_search, "Search");
         assert_eq!(en.nav_explore, "Explore");
         assert_eq!(en.nav_library, "Library");
@@ -293,7 +294,7 @@ mod tests {
         assert_eq!(en.accent_reset, "Reset");
         assert_eq!(
             en.custom_theme_empty_hint,
-            "Place theme JSON files in ~/.config/moggyt/themes/ or ~/.config/moggyt/custom-theme.json"
+            "Place theme JSON files in /home/test/.config/moggyt/themes/ or /home/test/.config/moggyt/custom-theme.json"
         );
         assert_eq!(en.section_playback, "Playback");
         assert_eq!(en.playback_speed, "Playback speed");
@@ -405,5 +406,20 @@ mod tests {
         assert_eq!(en.local_remove_track_label, "Remove");
         assert_eq!(en.local_move_up_label, "Up");
         assert_eq!(en.local_move_down_label, "Down");
+    }
+
+    #[test]
+    fn test_static_labels_custom_theme_empty_hint_fallback() {
+        let en = StaticLabels::resolve(Locale::English, None);
+        assert_eq!(
+            en.custom_theme_empty_hint,
+            "Place theme JSON files in the themes directory or custom-theme.json inside the configuration directory"
+        );
+
+        let es = StaticLabels::resolve(Locale::Spanish, None);
+        assert_eq!(
+            es.custom_theme_empty_hint,
+            "Coloca archivos JSON de tema en el directorio de temas o custom-theme.json dentro del directorio de configuración"
+        );
     }
 }
