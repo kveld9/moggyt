@@ -76,7 +76,7 @@ fn is_video_shelf(title: &str) -> bool {
 fn parse_item(renderer: &Value) -> Option<RawTrack> {
     let video_id = watch_video_id(renderer)?;
     let title = flex_text(renderer, 0)?;
-    let artist = flex_text(renderer, 1).unwrap_or_default();
+    let artist = track_artist(renderer);
     let duration_secs = search_duration(renderer);
     let thumb_url = best_thumbnail(renderer);
     let video_type = resolve_video_type(renderer);
@@ -245,6 +245,63 @@ fn artist_of(renderer: &Value) -> String {
     stripped.trim_end().to_owned()
 }
 
+/// Item-type labels the catalog prepends to the metadata column.
+const TYPE_LABELS: &[&str] = &[
+    "album",
+    "artist",
+    "artista",
+    "cancion",
+    "canci\u{f3}n",
+    "episode",
+    "episodio",
+    "lista de reproduccion",
+    "lista de reproducci\u{f3}n",
+    "perfil",
+    "playlist",
+    "podcast",
+    "p\u{f3}dcast",
+    "profile",
+    "song",
+    "video",
+    "v\u{ed}deo",
+];
+
+/// Resolves a track row artist from the metadata column.
+///
+/// The column is prefixed with the item type and suffixed with the duration, so both
+/// edges are removed while the separators inside the artist list stay untouched.
+fn track_artist(renderer: &Value) -> String {
+    let Some(raw) = flex_text(renderer, 1) else { return String::new() };
+    let trimmed = strip_duration_suffix(strip_type_prefix(&raw)).trim();
+    if is_clock_duration(trimmed) { String::new() } else { trimmed.to_owned() }
+}
+
+fn strip_type_prefix(raw: &str) -> &str {
+    let Some((head, tail)) = raw.split_once('\u{2022}') else { return raw };
+    if is_type_label(head) { tail.trim() } else { raw }
+}
+
+fn strip_duration_suffix(raw: &str) -> &str {
+    let Some((head, tail)) = raw.rsplit_once('\u{2022}') else { return raw };
+    if is_clock_duration(tail.trim()) { head.trim() } else { raw }
+}
+
+fn is_type_label(raw: &str) -> bool {
+    let lowered = raw.trim().to_lowercase();
+    TYPE_LABELS.contains(&lowered.as_str())
+}
+
+fn is_clock_duration(raw: &str) -> bool {
+    let mut parts = raw.split(':');
+    let (Some(minutes), Some(seconds), None) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    !minutes.is_empty()
+        && seconds.len() == 2
+        && minutes.chars().all(|c| c.is_ascii_digit())
+        && seconds.chars().all(|c| c.is_ascii_digit())
+}
+
 fn is_skipped_badge(badge: &str) -> bool {
     matches!(badge, "profile" | "perfil" | "podcast")
 }
@@ -405,14 +462,11 @@ mod tests {
     }
 
     fn check_track(t: &RawTrack, id: &str, title: &str, artist: &str) {
-        assert_eq!((t.video_id.as_str(), t.title.as_str(), t.artist.as_str()), (id, title, artist));
+        assert_eq!((t.video_id.as_str(), &t.title[..], &t.artist[..]), (id, title, artist));
     }
 
     fn check_album(a: &RawAlbum, id: &str, title: &str, artist: &str) {
-        assert_eq!(
-            (a.browse_id.as_str(), a.title.as_str(), a.artist.as_str()),
-            (id, title, artist)
-        );
+        assert_eq!((a.browse_id.as_str(), &a.title[..], &a.artist[..]), (id, title, artist));
     }
 
     fn check_artist(a: &RawArtist, id: &str, name: &str) {
@@ -423,16 +477,16 @@ mod tests {
         assert_eq!((p.browse_id.as_str(), p.title.as_str()), (id, title));
     }
 
+    fn check_lh3(url: Option<&str>, path: &str) {
+        assert_eq!(url, Some(format!("https://lh3.googleusercontent.com/{path}").as_str()));
+    }
+
     #[test]
     fn parse_search_tracks_tolerates_empty_and_malformed() {
         assert!(parse_search_tracks(&serde_json::json!({})).is_empty());
         assert!(parse_search_tracks(&serde_json::json!({"contents": null})).is_empty());
-        assert!(
-            parse_search_tracks(&serde_json::json!({
-                "contents": { "tabbedSearchResultsRenderer": { "tabs": [] } }
-            }))
-            .is_empty()
-        );
+        let tabs = serde_json::json!({"contents": {"tabbedSearchResultsRenderer": {"tabs": []}}});
+        assert!(parse_search_tracks(&tabs).is_empty());
     }
 
     #[test]
@@ -440,10 +494,7 @@ mod tests {
         let tracks = parse_search_tracks(&fixture_json("catalog_search.json"));
         assert_eq!(tracks.len(), 2);
         check_track(&tracks[0], "vid-1", "Midnight City", "M83");
-        assert_eq!(
-            tracks[0].thumb_url.as_deref(),
-            Some("https://lh3.googleusercontent.com/test-thumb-large")
-        );
+        check_lh3(tracks[0].thumb_url.as_deref(), "test-thumb-large");
         check_track(&tracks[1], "vid-2", "Starboy", "The Weeknd");
         assert_eq!(tracks[1].thumb_url, None);
     }
@@ -458,22 +509,39 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_search_tracks_resolves_artist_past_type_and_duration() {
+        let (resp, w) = (test_responsive_item, test_watch);
+        let items = vec![
+            resp("Bohemian Rhapsody", &["Cancion \u{2022} Queen"], w("vid-type-artist")),
+            resp("Tear It Up", &["Cancion \u{2022} 3:25"], w("vid-type-only")),
+            resp("Loser", &["Tame Impala \u{2022} Deadbeat \u{2022} 3:44"], w("vid-artist-first")),
+            resp("Bohemian Rhapsody (Live)", &["Canci\u{f3}n \u{2022} Queen"], w("vid-accented")),
+        ];
+        let shelf = serde_json::json!({"musicShelfRenderer": {"title": {"runs": [{"text": "Canciones"}]}, "contents": items}});
+        let tracks = parse_search_tracks(&tabbed_sections(vec![shelf]));
+        assert_eq!(tracks.len(), 4);
+        assert_eq!(tracks[0].artist, "Queen");
+        assert_eq!(tracks[1].artist, "", "a row with only a type and a duration has no artist");
+        assert_eq!(
+            tracks[2].artist, "Tame Impala \u{2022} Deadbeat",
+            "artist-first rows keep their artist"
+        );
+        assert_eq!(tracks[3].artist, "Queen", "accented Spanish type labels are stripped too");
+    }
+
+    #[test]
     fn search_duration_extracts_from_fixed_length_and_flex_columns() {
+        let fixed_r = |t| serde_json::json!({"fixedColumns": [{"musicResponsiveListItemFixedColumnRenderer": {"text": {"runs": [{"text": t}]}}}]});
+        let fixed_s = |t| serde_json::json!({"fixedColumns": [{"musicResponsiveListItemFixedColumnRenderer": {"text": {"simpleText": t}}}]});
+        let len_r = |t| serde_json::json!({"lengthText": {"runs": [{"text": t}]}});
+        let len_s = |t| serde_json::json!({"lengthText": {"simpleText": t}});
+        let flex_r = serde_json::json!({"flexColumns": [{"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Artist"}, {"text": "3:44"}]}}}]});
         let cases = [
-            (
-                serde_json::json!({"fixedColumns": [{"musicResponsiveListItemFixedColumnRenderer": {"text": {"runs": [{"text": "3:45"}]}}}]}),
-                Some(225),
-            ),
-            (
-                serde_json::json!({"fixedColumns": [{"musicResponsiveListItemFixedColumnRenderer": {"text": {"simpleText": "1:20"}}}]}),
-                Some(80),
-            ),
-            (serde_json::json!({"lengthText": {"runs": [{"text": "2:30"}]}}), Some(150)),
-            (serde_json::json!({"lengthText": {"simpleText": "4:00"}}), Some(240)),
-            (
-                serde_json::json!({"flexColumns": [{"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Artist"}, {"text": "3:44"}]}}}]}),
-                Some(224),
-            ),
+            (fixed_r("3:45"), Some(225)),
+            (fixed_s("1:20"), Some(80)),
+            (len_r("2:30"), Some(150)),
+            (len_s("4:00"), Some(240)),
+            (flex_r, Some(224)),
             (serde_json::json!({}), None),
         ];
         for (renderer, expected) in cases {
@@ -482,11 +550,7 @@ mod tests {
     }
 
     fn tabbed_sections(sections: Vec<Value>) -> Value {
-        serde_json::json!({
-            "contents": { "tabbedSearchResultsRenderer": { "tabs": [{
-                "tabRenderer": { "content": { "sectionListRenderer": { "contents": sections } } }
-            }] } }
-        })
+        serde_json::json!({"contents": {"tabbedSearchResultsRenderer": {"tabs": [{"tabRenderer": {"content": {"sectionListRenderer": {"contents": sections}}}}]}}})
     }
 
     fn test_responsive_item(title: &str, badge_runs: &[&str], endpoint: Value) -> Value {
@@ -504,11 +568,9 @@ mod tests {
 
     #[test]
     fn parse_search_tracks_skips_item_without_title() {
-        let item = serde_json::json!({
-            "musicResponsiveListItemRenderer": {
-                "navigationEndpoint": { "watchEndpoint": { "videoId": "v1" } }
-            }
-        });
+        let item = serde_json::json!({"musicResponsiveListItemRenderer": {
+            "navigationEndpoint": { "watchEndpoint": { "videoId": "v1" } }
+        }});
         let payload = tabbed_sections(vec![serde_json::json!({
             "musicShelfRenderer": { "contents": [item] }
         })]);
@@ -517,8 +579,7 @@ mod tests {
 
     #[test]
     fn shelf_category_routing_table() {
-        let tracks = ["Songs", "Top result", "Top songs", "Videos", "Vídeos", "Music videos"];
-        for title in tracks {
+        for title in ["Songs", "Top result", "Top songs", "Videos", "V\u{ed}deos", "Music videos"] {
             assert_eq!(shelf_category(title), Some(SearchFilter::Tracks));
         }
         assert_eq!(shelf_category("Albums"), Some(SearchFilter::Albums));
@@ -555,10 +616,7 @@ mod tests {
             "Test Album Title",
             "Test Artist \u{2022} 2024",
         );
-        assert_eq!(
-            hits.albums[0].thumb_url.as_deref(),
-            Some("https://lh3.googleusercontent.com/test-album-thumb")
-        );
+        check_lh3(hits.albums[0].thumb_url.as_deref(), "test-album-thumb");
     }
 
     fn test_endpoint(id: &str, page_type: &str) -> Value {
@@ -571,30 +629,19 @@ mod tests {
 
     #[test]
     fn parse_search_spanish_badges_and_page_types() {
-        let artist = test_browse_item(
-            "Artista Destacado",
-            "Artista",
-            "UC_es_artist",
-            "MUSIC_PAGE_TYPE_ARTIST",
-        );
-        let playlist = test_browse_item(
+        let browse = test_browse_item;
+        let artist =
+            browse("Artista Destacado", "Artista", "UC_es_artist", "MUSIC_PAGE_TYPE_ARTIST");
+        let playlist = browse(
             "Exitos Espanol",
             "Lista de reproduccion",
             "VL_es_playlist",
             "MUSIC_PAGE_TYPE_PLAYLIST",
         );
-        let single = test_browse_item(
-            "Sencillo Nuevo",
-            "Sencillo",
-            "MPREb_es_single",
-            "MUSIC_PAGE_TYPE_ALBUM",
-        );
-        let profile = test_browse_item(
-            "Perfil Usuario",
-            "Perfil",
-            "UC_profile",
-            "MUSIC_PAGE_TYPE_USER_CHANNEL",
-        );
+        let single =
+            browse("Sencillo Nuevo", "Sencillo", "MPREb_es_single", "MUSIC_PAGE_TYPE_ALBUM");
+        let profile =
+            browse("Perfil Usuario", "Perfil", "UC_profile", "MUSIC_PAGE_TYPE_USER_CHANNEL");
         let payload = tabbed_sections(vec![serde_json::json!({
             "itemSectionRenderer": { "contents": [artist, playlist, single, profile] }
         })]);
@@ -607,14 +654,12 @@ mod tests {
     #[test]
     fn parse_search_all_ignores_unknown_shelves_and_tolerates_empty() {
         assert!(parse_search_all(&serde_json::json!({})).is_empty());
-
-        let payload = tabbed_sections(vec![serde_json::json!({
-            "musicShelfRenderer": {
-                "title": { "runs": [{ "text": "Podcasts" }] },
-                "contents": [{ "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Item" }] } } }]
-            }
-        })]);
-        assert!(parse_search_all(&payload).is_empty());
+        let item =
+            serde_json::json!({"musicTwoRowItemRenderer": {"title": {"runs": [{"text": "Item"}]}}});
+        let shelf = serde_json::json!({"musicShelfRenderer": {
+            "title": {"runs": [{"text": "Podcasts"}]}, "contents": [item]
+        }});
+        assert!(parse_search_all(&tabbed_sections(vec![shelf])).is_empty());
     }
 
     #[test]
@@ -646,10 +691,7 @@ mod tests {
 
         // Song item with multi-artist runs
         check_track(&first.tracks[0], "song-vid-1", "Bachata Rosa", "Juan Luis Guerra & 4.40");
-        assert_eq!(
-            first.tracks[0].thumb_url.as_deref(),
-            Some("https://lh3.googleusercontent.com/test-thumb-large")
-        );
+        check_lh3(first.tracks[0].thumb_url.as_deref(), "test-thumb-large");
 
         // Video item
         check_track(
@@ -658,10 +700,7 @@ mod tests {
             "Propuesta Indecente (Official Video)",
             "Romeo Santos",
         );
-        assert_eq!(
-            first.tracks[1].thumb_url.as_deref(),
-            Some("https://lh3.googleusercontent.com/video-thumb-large")
-        );
+        check_lh3(first.tracks[1].thumb_url.as_deref(), "video-thumb-large");
         assert_eq!(first.tracks[1].video_type, Some(crate::domain::MusicVideoType::Omv));
 
         // Episode item
@@ -671,48 +710,28 @@ mod tests {
             "Episode 42: Latin Music History",
             "Latin Beats Podcast",
         );
-        assert_eq!(
-            first.tracks[2].thumb_url.as_deref(),
-            Some("https://lh3.googleusercontent.com/episode-thumb")
-        );
+        check_lh3(first.tracks[2].thumb_url.as_deref(), "episode-thumb");
 
         // Single item classified as RawAlbum with browseId routed
         check_album(&first.albums[0], "MPREb_single_1", "Eres Mia", "Romeo Santos \u{2022} 2014");
-        assert_eq!(
-            first.albums[0].thumb_url.as_deref(),
-            Some("https://lh3.googleusercontent.com/single-thumb")
-        );
+        check_lh3(first.albums[0].thumb_url.as_deref(), "single-thumb");
 
         // Artist item with browseId routed
         check_artist(&first.artists[0], "UC_romeo_1", "Romeo Santos");
-        assert_eq!(
-            first.artists[0].thumb_url.as_deref(),
-            Some("https://lh3.googleusercontent.com/artist-thumb")
-        );
+        check_lh3(first.artists[0].thumb_url.as_deref(), "artist-thumb");
 
         // Playlist item with browseId routed
         check_playlist(&first.playlists[0], "VL_playlist_1", "Bachata Essentials");
-        assert_eq!(
-            first.playlists[0].thumb_url.as_deref(),
-            Some("https://lh3.googleusercontent.com/playlist-thumb")
-        );
+        check_lh3(first.playlists[0].thumb_url.as_deref(), "playlist-thumb");
     }
 
     fn test_track_item(title: &str, vid: &str, badge: Option<&str>) -> Value {
-        let mut cols = vec![serde_json::json!({
-            "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": title }] } }
-        })];
+        let run_col = |t| serde_json::json!({"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": t}]}}});
+        let mut cols = vec![run_col(title)];
         if let Some(b) = badge {
-            cols.push(serde_json::json!({
-                "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": b }] } }
-            }));
+            cols.push(run_col(b));
         }
-        serde_json::json!({
-            "musicResponsiveListItemRenderer": {
-                "flexColumns": cols,
-                "playlistItemData": { "videoId": vid }
-            }
-        })
+        serde_json::json!({"musicResponsiveListItemRenderer": {"flexColumns": cols, "playlistItemData": {"videoId": vid}}})
     }
 
     fn test_watch(vid: &str) -> Value {
@@ -721,25 +740,25 @@ mod tests {
 
     #[test]
     fn parse_search_all_badges_skips_profile_and_podcast() {
-        let profile = test_browse_item("User", "Profile", "UC_1", "MUSIC_PAGE_TYPE_USER_CHANNEL");
-        let podcast = test_browse_item("Pod", "Podcast", "MPSP_1", "MUSIC_PAGE_TYPE_PODCAST_SHOW");
-        let unknown = test_responsive_item("Unknown", &["MysteryKind"], Value::Null);
-        let payload = tabbed_sections(vec![serde_json::json!({
-            "itemSectionRenderer": { "contents": [profile, podcast, unknown] }
-        })]);
-
-        let hits = parse_search_all(&payload);
-        assert!(hits.is_empty(), "profile and podcast must be skipped");
+        let (browse, resp) = (test_browse_item, test_responsive_item);
+        let items = [
+            browse("User", "Profile", "UC_1", "MUSIC_PAGE_TYPE_USER_CHANNEL"),
+            browse("Pod", "Podcast", "MPSP_1", "MUSIC_PAGE_TYPE_PODCAST_SHOW"),
+            resp("Unknown", &["MysteryKind"], Value::Null),
+        ];
+        let payload =
+            tabbed_sections(vec![serde_json::json!({"itemSectionRenderer": {"contents": items}})]);
+        assert!(parse_search_all(&payload).is_empty(), "profile and podcast must be skipped");
     }
 
     #[test]
     fn parse_search_all_badges_empty_artist_and_defaults() {
-        let solo = test_track_item("Solo Track", "solo-vid-1", Some("Song"));
-        let no_badge = test_track_item("No Badge Track", "no-badge-vid-2", None);
-        let payload = tabbed_sections(vec![
-            serde_json::json!({ "itemSectionRenderer": { "contents": [solo, no_badge] } }),
-        ]);
-
+        let items = [
+            test_track_item("Solo Track", "solo-vid-1", Some("Song")),
+            test_track_item("No Badge Track", "no-badge-vid-2", None),
+        ];
+        let payload =
+            tabbed_sections(vec![serde_json::json!({"itemSectionRenderer": {"contents": items}})]);
         let hits = parse_search_all(&payload);
         assert_eq!(hits.tracks.len(), 2);
         check_track(&hits.tracks[0], "solo-vid-1", "Solo Track", "");
@@ -762,23 +781,19 @@ mod tests {
     #[test]
     fn parse_search_detects_video_badge_and_video_shelf() {
         assert!(is_video_shelf("Videos") && is_video_shelf("Vídeos") && !is_video_shelf("Songs"));
-        let shelf = serde_json::json!({
-            "musicShelfRenderer": {
-                "title": { "runs": [{ "text": "Videos" }] },
-                "contents": [test_responsive_item("Shelf Video", &["Artist"], test_watch("v-shelf-1"))]
-            }
-        });
-        let bare = serde_json::json!({
-            "itemSectionRenderer": {
-                "contents": [test_responsive_item("Badge Video", &["Music video"], test_watch("v-badge-1"))]
-            }
-        });
-        let payload = tabbed_sections(vec![shelf, bare]);
-        let hits = parse_search_all(&payload);
+        let s_item = test_responsive_item("Shelf Video", &["Artist"], test_watch("v-shelf-1"));
+        let b_item = test_responsive_item("Badge Video", &["Music video"], test_watch("v-badge-1"));
+        let shelf = serde_json::json!({"musicShelfRenderer": {"title": {"runs": [{"text": "Videos"}]}, "contents": [s_item]}});
+        let bare = serde_json::json!({"itemSectionRenderer": {"contents": [b_item]}});
+        let hits = parse_search_all(&tabbed_sections(vec![shelf, bare]));
         assert_eq!(hits.tracks.len(), 2);
-        assert_eq!(hits.tracks[0].video_id, "v-shelf-1");
-        assert_eq!(hits.tracks[0].video_type, Some(crate::domain::MusicVideoType::Omv));
-        assert_eq!(hits.tracks[1].video_id, "v-badge-1");
-        assert_eq!(hits.tracks[1].video_type, Some(crate::domain::MusicVideoType::Omv));
+        assert_eq!(
+            (hits.tracks[0].video_id.as_str(), hits.tracks[0].video_type),
+            ("v-shelf-1", Some(crate::domain::MusicVideoType::Omv))
+        );
+        assert_eq!(
+            (hits.tracks[1].video_id.as_str(), hits.tracks[1].video_type),
+            ("v-badge-1", Some(crate::domain::MusicVideoType::Omv))
+        );
     }
 }
