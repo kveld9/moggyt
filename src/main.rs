@@ -9,9 +9,9 @@ use std::sync::Arc;
 
 use moggyt::infra::{
     CachedLyrics, CustomThemeFile, DiskPlayLogStore, DiskQueueStore, DiskSettingsStore,
-    DiskSkipStore, KeyringSessionStore, LastFmClient, LiveCatalog, LrcRedClient, LrclibClient,
-    LyricOverrideDir, LyricsCascade, Scrobbler, SettingsStore, SingleInstanceGuard,
-    StreamDiskCache, TrayHandle, default_config_dir,
+    DiskSkipStore, DiskVersionOverrideStore, KeyringSessionStore, LastFmClient, LiveCatalog,
+    LrcRedClient, LrclibClient, LyricOverrideDir, LyricsCascade, Scrobbler, SettingsStore,
+    SingleInstanceGuard, StreamDiskCache, TrayHandle, default_config_dir,
 };
 use moggyt::slint_shell::app::AppDependencies;
 use moggyt::slint_shell::init::{
@@ -82,6 +82,7 @@ fn main() -> anyhow::Result<()> {
     let play_log_store = DiskPlayLogStore::new(data_dir.clone());
 
     let lyric_overrides = Some(LyricOverrideDir::new(config_dir.join("lyrics")));
+    let version_store = DiskVersionOverrideStore::new(config_dir.clone());
     let tray = init_tray();
 
     let custom_theme = CustomThemeFile::new(&config_dir);
@@ -110,6 +111,7 @@ fn main() -> anyhow::Result<()> {
         scrobbler: Box::new(scrobbler),
         secondary_scrobbler: secondary_scrobbler.map(|c| Box::new(c) as Box<dyn Scrobbler>),
         lyric_overrides,
+        version_store: Box::new(version_store),
         tray,
         custom_theme,
     })

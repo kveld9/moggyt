@@ -66,6 +66,10 @@ pub struct SlintAppState {
     pub queue_store: Box<dyn QueueStore>,
     pub skip_store: Box<dyn SkipStore>,
     pub play_log_store: Box<dyn PlayLogStore>,
+    /// In-memory audio version override table applied to playback resolution.
+    pub version_overrides: crate::domain::VersionOverrides,
+    /// Persistence adapter for the override table.
+    pub version_store: Box<dyn crate::infra::VersionOverrideStore>,
     pub updater_rx: Option<std::sync::mpsc::Receiver<Option<ReleaseInfo>>>,
 
     pub page: SlintPage,

@@ -13,6 +13,7 @@ use crate::infra::{
     AudioBackend, Catalog, CoverCache, CustomThemeFile, DeviceIdentityMonitor, DiscordPresence,
     LyricOverrideDir, LyricsSource, PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings,
     SettingsStore, SingleInstanceGuard, SkipStore, SponsorBlockClient, TrayHandle,
+    VersionOverrideStore,
 };
 
 pub use crate::slint_shell::covers::{
@@ -54,6 +55,7 @@ pub struct AppDependencies<C, A, S, L, K> {
     pub scrobbler: Box<dyn Scrobbler>,
     pub secondary_scrobbler: Option<Box<dyn Scrobbler>>,
     pub lyric_overrides: Option<LyricOverrideDir>,
+    pub version_store: Box<dyn VersionOverrideStore>,
     pub tray: Option<TrayHandle>,
     /// Loaded custom theme file watcher for runtime reloading.
     pub custom_theme: CustomThemeFile,
@@ -90,6 +92,7 @@ pub fn run(
         scrobbler,
         secondary_scrobbler,
         lyric_overrides,
+        version_store,
         tray,
         custom_theme,
     } = deps;
@@ -98,6 +101,8 @@ pub fn run(
     state.device_monitor = Some(DeviceIdentityMonitor::start());
     state.custom_theme = Some(custom_theme);
     state.lyric_overrides = lyric_overrides;
+    state.version_overrides = version_store.load();
+    state.version_store = version_store;
     state.tray = tray;
 
     if let Ok(mut a) = state.audio.lock() {
