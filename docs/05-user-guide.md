@@ -337,7 +337,10 @@ Users can customize the player bar appearance and element visibility under **Set
   - `+10s`: advances playback position forward by 10 seconds.
 - **Volume Slider**: interactive slider setting audio volume from 0 to 100. The speaker icon switches to a muted icon
   at volume 0, and clicking the icon mutes playback or restores the previous level (falling back to 50 when zero).
-- **Position Display**: shows elapsed seconds against total duration (`<elapsed>s / <duration>s` or `<elapsed>s`).
+- **Position Display**: shows the elapsed time on the left of the timeline and the track duration on the right, both
+  formatted as `m:ss`. Clicking the duration label toggles it between the total duration and the time remaining
+  (rendered with a leading minus, e.g. `-2:13`). The label shows `--:--` until the track duration is known from
+  catalog metadata or the decoded audio stream.
 
 ## Keyboard Shortcuts
 

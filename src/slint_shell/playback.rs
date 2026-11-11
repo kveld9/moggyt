@@ -13,6 +13,7 @@
 use std::collections::HashSet;
 
 use crate::domain::{RepeatMode, Track, smart_order};
+use crate::slint_shell::PlayerUi;
 
 use super::play_log::recent_video_ids;
 use super::search::format_duration;
@@ -96,6 +97,33 @@ pub fn format_position(position_secs: u32) -> String {
 /// Formats optional track duration in seconds using standard mm:ss display text.
 pub fn format_track_duration(duration_secs: Option<u32>) -> String {
     format_duration(duration_secs)
+}
+
+/// Formats the playback time left as a negative mm:ss label (`-4:03`).
+///
+/// Returns an empty string when the duration is unknown, so the UI keeps its
+/// `--:--` placeholder instead of rendering a bogus negative remainder.
+pub fn format_remaining(position_secs: u32, duration_secs: Option<u32>) -> String {
+    let Some(duration) = duration_secs else {
+        return String::new();
+    };
+    format!("-{}", format_duration(Some(duration.saturating_sub(position_secs))))
+}
+
+/// Resolves the duration shown in the player: catalog metadata first, decoded stream fallback.
+pub fn resolve_display_duration(catalog_secs: Option<u32>, decoded_secs: u64) -> Option<u32> {
+    catalog_secs
+        .filter(|secs| *secs > 0)
+        .or_else(|| u32::try_from(decoded_secs).ok().filter(|secs| *secs > 0))
+}
+
+/// Pushes elapsed, total, remaining labels and the seek range into the player global.
+pub fn push_time_labels(player: &PlayerUi, position_secs: u32, duration_secs: Option<u32>) {
+    player.set_position_secs(position_secs as i32);
+    player.set_position_text(format_position(position_secs).into());
+    player.set_duration_secs(duration_secs.unwrap_or(0) as i32);
+    player.set_duration_text(format_track_duration(duration_secs).into());
+    player.set_remaining_text(format_remaining(position_secs, duration_secs).into());
 }
 
 /// Generates a randomized permutation of indices `0..len` using Fisher-Yates with a system-clock PRNG.
@@ -199,6 +227,50 @@ mod tests {
         assert_eq!(format_track_duration(None), "");
         assert_eq!(format_track_duration(Some(0)), "0:00");
         assert_eq!(format_track_duration(Some(243)), "4:03");
+    }
+
+    #[test]
+    fn test_format_remaining_variants() {
+        assert_eq!(format_remaining(0, None), "");
+        assert_eq!(format_remaining(0, Some(243)), "-4:03");
+        assert_eq!(format_remaining(123, Some(243)), "-2:00");
+        assert_eq!(format_remaining(243, Some(243)), "-0:00");
+        assert_eq!(format_remaining(300, Some(243)), "-0:00");
+    }
+
+    #[test]
+    fn test_resolve_display_duration_prefers_catalog_then_decoded() {
+        assert_eq!(resolve_display_duration(Some(200), 180), Some(200));
+        assert_eq!(resolve_display_duration(None, 180), Some(180));
+        assert_eq!(resolve_display_duration(Some(0), 180), Some(180));
+        assert_eq!(resolve_display_duration(Some(0), 0), None);
+        assert_eq!(resolve_display_duration(None, 0), None);
+    }
+
+    #[test]
+    fn test_sync_playback_tick_reports_decoded_duration_when_catalog_is_missing() {
+        use crate::domain::Track;
+        use crate::infra::AudioBackend;
+        use crate::slint_shell::sync::sync_playback_tick;
+        use crate::slint_shell::test_support::{EndedAudio, test_wired};
+        use crate::slint_shell::{MoggytWindow, PlayerUi};
+        use slint::ComponentHandle;
+        use std::sync::{Arc, Mutex};
+
+        let mut state = test_wired();
+        state.queue.push(Track::new("v1", "Title", "Artist"));
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("v1", 243))));
+        state.audio.lock().unwrap().seek(123);
+
+        let Ok(window) = MoggytWindow::new() else {
+            return;
+        };
+        sync_playback_tick(&window, &mut state);
+
+        let player = window.global::<PlayerUi>();
+        assert_eq!(player.get_duration_secs(), 243);
+        assert_eq!(player.get_duration_text().as_str(), "4:03");
+        assert_eq!(player.get_remaining_text().as_str(), "-2:00");
     }
 
     #[test]
