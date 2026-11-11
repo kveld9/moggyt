@@ -1,0 +1,474 @@
+#[cfg(test)]
+#[allow(clippy::module_inception)]
+mod tests {
+    use super::super::*;
+
+    #[test]
+    fn test_6_given_locale_spanish_when_tr_called_then_returns_spanish_and_fallbacks_to_english() {
+        // 1. Spanish translations match expected strings
+        for &(key, expected_es) in SPANISH_TRANSLATIONS {
+            assert_eq!(
+                tr(Locale::Spanish, key),
+                expected_es,
+                "expected Spanish translation for '{key}'"
+            );
+        }
+
+        // 2. Unknown key in Spanish falls back to English source key
+        assert_eq!(tr(Locale::Spanish, "nonexistent_key"), "nonexistent_key");
+
+        // 3. English locale returns English source key as-is
+        for &(key, _) in SPANISH_TRANSLATIONS {
+            assert_eq!(tr(Locale::English, key), key);
+        }
+        assert_eq!(tr(Locale::English, "nonexistent_key"), "nonexistent_key");
+    }
+
+    #[test]
+    fn test_ui_chrome_keys_and_parameterized_pattern() {
+        // Page titles
+        assert_eq!(tr(Locale::Spanish, "Search"), "Buscar");
+        assert_eq!(tr(Locale::Spanish, "Queue"), "Cola");
+        assert_eq!(tr(Locale::Spanish, "Now Playing"), "Sonando");
+        assert_eq!(tr(Locale::Spanish, "Library"), "Biblioteca");
+        assert_eq!(tr(Locale::Spanish, "History"), "Historial");
+        assert_eq!(tr(Locale::Spanish, "Detail"), "Detalle");
+        assert_eq!(tr(Locale::Spanish, "Settings"), "Ajustes");
+        assert_eq!(tr(Locale::Spanish, "Explore"), "Explorar");
+        assert_eq!(tr(Locale::Spanish, "Stats"), "Estadísticas");
+
+        // Sentinels
+        assert_eq!(tr(Locale::Spanish, "No track playing"), "Sin reproducción");
+        assert_eq!(tr(Locale::Spanish, "Search Results"), "Resultados de búsqueda");
+        assert_eq!(tr(Locale::Spanish, "Recent searches"), "Búsquedas recientes");
+        assert_eq!(tr(Locale::Spanish, "No recent searches."), "Aún no hay búsquedas recientes.");
+        assert_eq!(tr(Locale::Spanish, "Clear history"), "Borrar todo el historial");
+        assert_eq!(
+            tr(Locale::Spanish, "No sections found in Explore."),
+            "No se encontraron secciones en Explorar."
+        );
+
+        // Update status & parameterized pattern
+        assert_eq!(tr(Locale::Spanish, "Up to date"), "Actualizado");
+        assert_eq!(tr(Locale::Spanish, "Update available"), "Actualización disponible");
+        assert_eq!(
+            tr(Locale::Spanish, "Update available: {ver}").replace("{ver}", "v1.2.3"),
+            "Actualización disponible: v1.2.3"
+        );
+        assert_eq!(
+            tr(Locale::English, "Update available: {ver}").replace("{ver}", "v1.2.3"),
+            "Update available: v1.2.3"
+        );
+
+        // Custom theme status & parameterized pattern
+        assert_eq!(tr(Locale::Spanish, "Custom"), "Personalizado");
+        assert_eq!(tr(Locale::English, "Custom"), "Custom");
+        assert_eq!(
+            tr(Locale::Spanish, "Custom theme loaded from {path}")
+                .replace("{path}", "/tmp/theme.json"),
+            "Tema personalizado cargado desde /tmp/theme.json"
+        );
+        assert_eq!(
+            tr(Locale::English, "Custom theme loaded from {path}")
+                .replace("{path}", "/tmp/theme.json"),
+            "Custom theme loaded from /tmp/theme.json"
+        );
+        assert_eq!(
+            tr(Locale::Spanish, "Custom theme not loaded: {error}")
+                .replace("{error}", "file not found"),
+            "Tema personalizado no cargado: file not found"
+        );
+        assert_eq!(
+            tr(Locale::English, "Custom theme not loaded: {error}")
+                .replace("{error}", "file not found"),
+            "Custom theme not loaded: file not found"
+        );
+
+        // Kind labels
+        assert_eq!(tr(Locale::Spanish, "Album"), "ÁLBUM");
+        assert_eq!(tr(Locale::Spanish, "Artist"), "ARTISTA");
+        assert_eq!(tr(Locale::Spanish, "Playlist"), "LISTA");
+
+        // Dynamic labels & transient status
+        assert_eq!(tr(Locale::Spanish, "Queue ({count})").replace("{count}", "3"), "Cola (3)");
+        assert_eq!(tr(Locale::English, "Queue ({count})").replace("{count}", "3"), "Queue (3)");
+        assert_eq!(tr(Locale::Spanish, "Searching..."), "Buscando...");
+        assert_eq!(tr(Locale::English, "Searching..."), "Searching...");
+        assert_eq!(
+            tr(Locale::English, "Failed to load search results"),
+            "Failed to load search results"
+        );
+        assert_eq!(
+            tr(Locale::Spanish, "Failed to load search results"),
+            "No se pudieron cargar los resultados de busqueda"
+        );
+        assert_eq!(tr(Locale::Spanish, "Loading..."), "Cargando...");
+        assert_eq!(tr(Locale::English, "Loading..."), "Loading...");
+        assert_eq!(tr(Locale::Spanish, "Loading explore..."), "Cargando exploracion...");
+        assert_eq!(tr(Locale::English, "Loading explore..."), "Loading explore...");
+
+        // Player bar chrome keys
+        assert_eq!(tr(Locale::Spanish, "Player bar"), "Barra de reproducción");
+        assert_eq!(tr(Locale::Spanish, "Classic"), "Clásica");
+        assert_eq!(tr(Locale::Spanish, "Floating"), "Flotante");
+        assert_eq!(tr(Locale::Spanish, "Show artwork"), "Mostrar portada");
+        assert_eq!(tr(Locale::Spanish, "Show like button"), "Mostrar botón Me gusta");
+        assert_eq!(tr(Locale::Spanish, "Show shuffle button"), "Mostrar botón Aleatorio");
+        assert_eq!(tr(Locale::Spanish, "Show repeat button"), "Mostrar botón Repetir");
+        assert_eq!(tr(Locale::Spanish, "Show skip 10s buttons"), "Mostrar botones +/-10s");
+        assert_eq!(tr(Locale::Spanish, "Show queue button"), "Mostrar botón de cola");
+        assert_eq!(tr(Locale::Spanish, "Show volume slider"), "Mostrar control de volumen");
+        assert_eq!(
+            tr(Locale::Spanish, "Prefer songs over music videos"),
+            "Preferir canciones a videoclips"
+        );
+
+        // Stats page labels
+        assert_eq!(tr(Locale::Spanish, "Last 4 weeks"), "Últimas 4 semanas");
+        assert_eq!(tr(Locale::Spanish, "Last 6 months"), "Últimos 6 meses");
+        assert_eq!(tr(Locale::Spanish, "All time"), "Todo el tiempo");
+        assert_eq!(tr(Locale::Spanish, "Plays"), "Reproducciones");
+        assert_eq!(tr(Locale::Spanish, "Listening time"), "Tiempo escuchado");
+        assert_eq!(tr(Locale::Spanish, "Tracks"), "Temas");
+        assert_eq!(tr(Locale::Spanish, "Artists"), "Artistas");
+        assert_eq!(tr(Locale::Spanish, "Top artists"), "Artistas más escuchados");
+        assert_eq!(tr(Locale::Spanish, "Top tracks"), "Temas más escuchados");
+        assert_eq!(tr(Locale::Spanish, "plays"), "reproducciones");
+        assert_eq!(
+            tr(
+                Locale::Spanish,
+                "No plays recorded yet. Songs you listen to for at least 30 seconds show up here."
+            ),
+            "Todavía no hay reproducciones. Los temas que escuches al menos 30 segundos aparecen acá."
+        );
+    }
+
+    #[test]
+    fn test_7_given_stored_tag_when_from_tag_parses_then_round_trips_via_tag_and_unknown_returns_none()
+     {
+        // 1. Valid tags parse correctly
+        assert_eq!(Locale::from_tag("en"), Some(Locale::English));
+        assert_eq!(Locale::from_tag("es"), Some(Locale::Spanish));
+
+        // 2. Round-trip via tag()
+        assert_eq!(Locale::from_tag(Locale::English.tag()), Some(Locale::English));
+        assert_eq!(Locale::from_tag(Locale::Spanish.tag()), Some(Locale::Spanish));
+
+        // 3. Native names
+        assert_eq!(Locale::English.native_name(), "English");
+        assert_eq!(Locale::Spanish.native_name(), "Español");
+
+        // 4. Unknown/invalid tags return None
+        assert_eq!(Locale::from_tag("fr"), None);
+        assert_eq!(Locale::from_tag("de"), None);
+        assert_eq!(Locale::from_tag(""), None);
+        assert_eq!(Locale::from_tag("unknown"), None);
+    }
+
+    #[test]
+    fn test_8_given_env_lang_strings_when_parse_env_lang_called_then_maps_expected_locales() {
+        let cases = [
+            ("es", Some(Locale::Spanish)),
+            ("es_AR.UTF-8", Some(Locale::Spanish)),
+            ("es-ES", Some(Locale::Spanish)),
+            ("en", Some(Locale::English)),
+            ("en_US.UTF-8", Some(Locale::English)),
+            ("fr_FR", None),
+            ("C", None),
+            ("POSIX", None),
+            ("", None),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(parse_env_lang(input), expected, "failed for input: {input}");
+        }
+    }
+
+    #[test]
+    fn test_sleep_timer_i18n_strings_exist_and_differ() {
+        let keys = [
+            "Sleep timer",
+            "Off",
+            "15m",
+            "30m",
+            "45m",
+            "60m",
+            "End of track",
+            "Timer:",
+            "Timer: Off",
+            "Timer: End of track",
+            "Timer: {time}",
+        ];
+        for key in keys {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_audio_quality_i18n_strings_exist_and_differ() {
+        let keys = [
+            "Audio quality",
+            "Applies from the next track",
+            "Low (<=64 kbps)",
+            "Standard (~128 kbps)",
+            "High (AAC max ~130 kbps)",
+        ];
+        for key in keys {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_import_options_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Playlist name (optional)", "Nombre de la playlist (opcional)"),
+            ("Load directly to queue", "Cargar directamente en la cola"),
+            ("Valid Spotify link", "Enlace de Spotify valido"),
+            ("Invalid Spotify link", "Enlace de Spotify no valido"),
+            ("No matched tracks to import", "No hay canciones coincidentes para importar"),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_spotify_import_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Import from Spotify", "Importar desde Spotify"),
+            ("Import", "Importar"),
+            ("Import cancelled", "Importacion cancelada"),
+            ("From link", "Desde enlace"),
+            ("From file", "Desde archivo"),
+            ("Spotify playlist or album link", "Enlace de playlist o album de Spotify"),
+            ("CSV file path", "Ruta del archivo CSV"),
+            ("Start import", "Iniciar importacion"),
+            ("Cancel", "Cancelar"),
+            ("Importing matches...", "Importando coincidencias..."),
+            ("Matched", "Coincidencias"),
+            ("Needs review", "Requieren revision"),
+            ("Unresolved", "Sin resolver"),
+            ("Import progress", "Progreso de importacion"),
+            (
+                "Embed imports are capped at 100 tracks. Export a CSV for longer playlists.",
+                "Las importaciones por enlace se limitan a 100 canciones. Exporta un CSV para playlists mas largas.",
+            ),
+            ("Close", "Cerrar"),
+            ("All matched", "Todo coincidio"),
+            ("Choose a track", "Elegir una cancion"),
+            ("Discard", "Descartar"),
+            ("High confidence", "Confianza alta"),
+            ("Low confidence", "Confianza baja"),
+            ("Matched track", "Cancion encontrada"),
+            ("Medium confidence", "Confianza media"),
+            ("No match", "Sin coincidencia"),
+            ("No playlist store installed", "No hay almacen de playlists instalado"),
+            ("Review matches", "Revisar coincidencias"),
+            ("Save playlist", "Guardar playlist"),
+            ("Saved playlist", "Playlist guardada"),
+            ("Failed to save playlist", "No se pudo guardar la playlist"),
+            ("Select a playlist file", "Selecciona un archivo de playlist"),
+            ("Source", "Origen"),
+            ("Swap", "Cambiar"),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_lastfm_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Connect with Last.fm", "Conectar con Last.fm"),
+            ("Connected as", "Conectado como"),
+            ("Disconnect", "Desconectar"),
+            ("Last.fm connection failed", "Falló la conexión con Last.fm"),
+            (
+                "Last.fm is not available in this build",
+                "Last.fm no está disponible en esta compilación",
+            ),
+            ("Not connected", "No conectado"),
+            (
+                "Waiting for authorization in your browser",
+                "Esperando la autorización en tu navegador",
+            ),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_spotify_web_api_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Both Spotify credentials are required", "Se requieren ambas credenciales de Spotify"),
+            ("Clear credentials", "Borrar credenciales"),
+            (
+                "Failed to clear Spotify credentials",
+                "No se pudieron borrar las credenciales de Spotify",
+            ),
+            (
+                "Failed to save Spotify credentials",
+                "No se pudieron guardar las credenciales de Spotify",
+            ),
+            ("Save credentials", "Guardar credenciales"),
+            ("Spotify Client ID", "ID de cliente de Spotify"),
+            ("Spotify Client Secret", "Secreto de cliente de Spotify"),
+            ("Spotify Web API", "API web de Spotify"),
+            ("Spotify Web API: configured", "API web de Spotify: configurada"),
+            ("Spotify Web API: not configured", "API web de Spotify: no configurada"),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_crossfade_and_stream_cache_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Crossfade", "Fundido cruzado"),
+            ("Smooth transition between tracks", "Transición suave entre temas"),
+            ("Stream Cache Limit", "Límite de caché de streams"),
+            (
+                "Disk space quota for offline stream cache",
+                "Espacio en disco para la caché de audio",
+            ),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_library_view_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Open settings", "Abrir ajustes"),
+            (
+                "Sign in from Settings to load your library.",
+                "Inicia sesión desde Ajustes para cargar tu biblioteca.",
+            ),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_custom_video_id_i18n_strings_exist_and_differ() {
+        let keys_and_expected =
+            [("YouTube video ID", "ID de video de YouTube"), ("Use ID", "Usar ID")];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_import_open_i18n_strings_exist_and_differ() {
+        let keys_and_expected =
+            [("Open", "Abrir"), ("Failed to open browser", "No se pudo abrir el navegador")];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
+    fn test_tr_spanish_translations_exhaustive() {
+        let key = "Place theme JSON files in ~/.config/moggyt/themes/ or ~/.config/moggyt/custom-theme.json";
+        let expected = "Coloca archivos JSON de tema en ~/.config/moggyt/themes/ o ~/.config/moggyt/custom-theme.json";
+        assert_eq!(tr(Locale::English, key), key);
+        assert_eq!(tr(Locale::Spanish, key), expected);
+    }
+
+    #[test]
+    fn test_import_connection_loss_retry_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            (
+                "Connection lost. Retry or save the matched tracks.",
+                "Se perdió la conexión. Reintenta o guarda las canciones coincidentes.",
+            ),
+            ("Retry", "Reintentar"),
+        ];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key);
+            assert_eq!(es, expected_es);
+            assert_ne!(en, es);
+        }
+    }
+
+    #[test]
+    fn test_local_playlist_edit_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Delete playlist", "Borrar playlist"),
+            ("New playlist name", "Nuevo nombre de playlist"),
+            ("Remove", "Quitar"),
+            ("Rename", "Renombrar"),
+        ];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key);
+            assert_eq!(es, expected_es);
+            assert_ne!(en, es);
+        }
+    }
+
+    #[test]
+    fn test_local_playlist_reorder_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [("Down", "Bajar"), ("Up", "Subir")];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key);
+            assert_eq!(es, expected_es);
+            assert_ne!(en, es);
+        }
+    }
+}
