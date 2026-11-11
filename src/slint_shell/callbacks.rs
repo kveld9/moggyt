@@ -459,6 +459,15 @@ fn wire_playback_callbacks(
             sync_window(win, st);
         });
     });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.global::<PlaybackUi>().on_queue_cleared(move || {
+        with_window_state(&w, &s, |win, st| {
+            st.clear_queue();
+            sync_window(win, st);
+        });
+    });
 }
 
 fn handle_prev_track(win: &MoggytWindow, st: &mut SlintAppState) {

@@ -29,6 +29,7 @@ pub struct StaticLabels {
     pub clear_history: &'static str,
     pub queue_title: &'static str,
     pub queue_empty: &'static str,
+    pub clear_queue_label: &'static str,
     pub no_cover: &'static str,
     pub lyrics_unavailable: &'static str,
     pub lyrics_hint: &'static str,
@@ -181,6 +182,7 @@ impl StaticLabels {
             clear_history: tr(locale, "Clear history"),
             queue_title: tr(locale, "Queue"),
             queue_empty: tr(locale, "The queue is empty."),
+            clear_queue_label: tr(locale, "Clear queue"),
             no_cover: tr(locale, "No cover"),
             lyrics_unavailable: tr(locale, "Lyrics unavailable"),
             lyrics_hint: tr(locale, "Synchronized lyrics will appear during playback"),
@@ -353,6 +355,7 @@ impl StaticLabels {
 
         labels.set_queue_title_label(self.queue_title.into());
         labels.set_queue_empty_text(self.queue_empty.into());
+        labels.set_clear_queue_label(self.clear_queue_label.into());
 
         labels.set_no_cover_text(self.no_cover.into());
         labels.set_lyrics_unavailable_text(self.lyrics_unavailable.into());

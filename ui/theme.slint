@@ -46,6 +46,7 @@ export struct LyricLineData {
 export global PlaybackUi {
     in-out property <bool> autoplay-enabled: false;
     callback autoplay-toggled();
+    callback queue-cleared();
 }
 
 export struct ImportRowData {

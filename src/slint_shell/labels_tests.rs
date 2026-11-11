@@ -90,6 +90,7 @@ mod tests {
         assert_eq!(es.clear_history, "Borrar todo el historial");
         assert_eq!(es.queue_title, "Cola");
         assert_eq!(es.queue_empty, "La cola está vacía.");
+        assert_eq!(es.clear_queue_label, "Vaciar cola");
         assert_eq!(es.no_cover, "Sin portada");
         assert_eq!(es.lyrics_unavailable, "Letras no disponibles");
         assert_eq!(es.lyrics_hint, "Las letras sincronizadas aparecerán durante la reproducción");
@@ -138,7 +139,7 @@ mod tests {
         assert_eq!(es.audio_quality_standard_label, "Estándar (~128 kbps)");
         assert_eq!(es.audio_quality_high_label, "Alta (AAC máx ~130 kbps)");
         assert_eq!(es.songs_only_label, "Preferir canciones a videoclips");
-        assert_eq!(es.autoplay_label, "Reproduccion automatica de similares");
+        assert_eq!(es.autoplay_label, "Reproducción automática de similares");
         assert_eq!(es.crossfade, "Fundido cruzado");
         assert_eq!(es.crossfade_hint, "Transición suave entre temas");
         assert_eq!(es.stream_cache, "Límite de caché de streams");
@@ -252,6 +253,7 @@ mod tests {
         assert_eq!(en.clear_history, "Clear history");
         assert_eq!(en.queue_title, "Queue");
         assert_eq!(en.queue_empty, "The queue is empty.");
+        assert_eq!(en.clear_queue_label, "Clear queue");
         assert_eq!(en.no_cover, "No cover");
         assert_eq!(en.lyrics_unavailable, "Lyrics unavailable");
         assert_eq!(en.lyrics_hint, "Synchronized lyrics will appear during playback");
