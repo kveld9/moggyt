@@ -368,6 +368,23 @@ impl LrcRedClient {
         &self.release_base
     }
 
+    /// Runs a free-text lyrics search and returns the matching releases.
+    ///
+    /// Returns `None` when the provider is unreachable or the payload is invalid.
+    pub fn lookup_hits(&self, fragment: &str) -> Option<Vec<LrcRedHit>> {
+        let query = fragment.trim();
+        if query.is_empty() {
+            return None;
+        }
+        let response = self.client.get(&self.search_url).query(&[("q", query)]).send().ok()?;
+        if !response.status().is_success() {
+            return None;
+        }
+        let payload: Value = response.json().ok()?;
+        let hits = parse_hits(&payload);
+        if hits.is_empty() { None } else { Some(hits) }
+    }
+
     fn fetch_search_payload(&self, title: &str, artist: &str) -> Option<Value> {
         let query = build_search_query(title, artist);
         let response = self.client.get(&self.search_url).query(&[("q", query)]).send().ok()?;
@@ -580,6 +597,8 @@ mod tests {
         assert_eq!(client.lookup("", "x", None), None);
         assert_eq!(client.lookup("Artist", "  ", None), None);
         assert_eq!(client.lookup("   ", "   ", None), None);
+        assert_eq!(client.lookup_hits(""), None);
+        assert_eq!(client.lookup_hits("   "), None);
     }
 
     #[test]

@@ -290,6 +290,7 @@ fn wire_search_callbacks(
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         let filter = filter_from_index(filter_idx);
+        st.lyrics_search = filter_idx == 5;
         st.search_filter = filter;
         win.set_search_filter(filter_idx);
         if st.search_active && !st.search_query.trim().is_empty() {
@@ -307,6 +308,7 @@ fn filter_from_index(filter_idx: i32) -> SearchFilter {
         2 => SearchFilter::Albums,
         3 => SearchFilter::Artists,
         4 => SearchFilter::Playlists,
+        5 => SearchFilter::Tracks,
         _ => SearchFilter::All,
     }
 }
@@ -576,5 +578,16 @@ mod tests {
         state.toggle_shuffle();
         assert!(!state.is_shuffle);
         assert!(state.unshuffled_tracks.is_none());
+    }
+
+    #[test]
+    fn test_filter_from_index_mapping() {
+        assert_eq!(filter_from_index(0), SearchFilter::All);
+        assert_eq!(filter_from_index(1), SearchFilter::Tracks);
+        assert_eq!(filter_from_index(2), SearchFilter::Albums);
+        assert_eq!(filter_from_index(3), SearchFilter::Artists);
+        assert_eq!(filter_from_index(4), SearchFilter::Playlists);
+        assert_eq!(filter_from_index(5), SearchFilter::Tracks);
+        assert_eq!(filter_from_index(99), SearchFilter::All);
     }
 }

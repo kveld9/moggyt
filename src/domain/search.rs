@@ -25,6 +25,7 @@ pub enum SearchFilter {
 pub struct SearchQuery {
     text: String,
     filter: SearchFilter,
+    lyrics: bool,
 }
 
 impl SearchQuery {
@@ -34,7 +35,7 @@ impl SearchQuery {
         if text.is_empty() {
             return None;
         }
-        Some(Self { text, filter: SearchFilter::All })
+        Some(Self { text, filter: SearchFilter::All, lyrics: false })
     }
 
     /// Query text (already trimmed).
@@ -50,6 +51,17 @@ impl SearchQuery {
     /// Sets the category filter, consuming self.
     pub fn with_filter(mut self, filter: SearchFilter) -> Self {
         self.filter = filter;
+        self
+    }
+
+    /// Returns true when the query text is a lyric fragment, not catalog text.
+    pub fn is_lyrics(&self) -> bool {
+        self.lyrics
+    }
+
+    /// Marks the query as a lyric fragment search, consuming self.
+    pub fn with_lyrics(mut self, lyrics: bool) -> Self {
+        self.lyrics = lyrics;
         self
     }
 }
@@ -371,6 +383,16 @@ mod tests {
         let filtered = query.with_filter(SearchFilter::Albums);
         assert_eq!(filtered.filter(), SearchFilter::Albums);
         assert_eq!(filtered.text(), "rock");
+    }
+
+    #[test]
+    fn test_lyrics_flag_defaults_to_false_and_survives_filter_change() {
+        let query = SearchQuery::parse("city lights").expect("valid query");
+        assert!(!query.is_lyrics());
+        let lyrics = query.clone().with_lyrics(true).with_filter(SearchFilter::Tracks);
+        assert!(lyrics.is_lyrics());
+        assert_eq!(lyrics.filter(), SearchFilter::Tracks);
+        assert_eq!(lyrics.text(), "city lights");
     }
 
     #[test]

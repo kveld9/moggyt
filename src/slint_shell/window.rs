@@ -11,9 +11,7 @@ use anyhow::Context;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use super::sync::set_lyrics_highlight;
-use crate::domain::{
-    Detail, DetailKind, SearchFilter, SearchQuery, SearchResult, Shelf, is_local_playlist_id,
-};
+use crate::domain::{Detail, DetailKind, SearchResult, Shelf, is_local_playlist_id};
 use crate::i18n::tr;
 use crate::infra::{
     AudioBackend, CatalogError, CoverCache, DiskPlaylistStore, LyricsSource, PlaylistStore,
@@ -37,15 +35,13 @@ use crate::slint_shell::playback::{format_track_duration, is_track_liked};
 use crate::slint_shell::playback_control::apply_play_track_completion;
 use crate::slint_shell::playback_worker::{
     PlaybackWorkerAdapters, PlaybackWorkerCommand, execute_detail, execute_play_track,
-    execute_refresh_library, execute_search, execute_seek, spawn_lyrics_prefetch,
-    thumbnail_variant_for_row,
+    execute_refresh_library, execute_seek, spawn_lyrics_prefetch, thumbnail_variant_for_row,
 };
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::stream_prefetch::spawn_stream_prefetch;
 use crate::slint_shell::sync::{
-    observe_view_phases, persist_recent_searches, sync_header_title, sync_library_and_detail,
-    sync_playback_tick, sync_recent_searches, sync_shelves_and_queue, sync_update_status,
-    sync_view_phase, sync_window,
+    observe_view_phases, sync_header_title, sync_library_and_detail, sync_playback_tick,
+    sync_recent_searches, sync_shelves_and_queue, sync_update_status, sync_view_phase, sync_window,
 };
 use crate::slint_shell::theme::apply_custom_theme_if_changed;
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
@@ -126,81 +122,7 @@ pub(crate) fn trigger_playback(window: &MoggytWindow, state: &mut SlintAppState)
     state.send_play_request(req);
 }
 
-fn search_filter_index(filter: SearchFilter) -> i32 {
-    match filter {
-        SearchFilter::All => 0,
-        SearchFilter::Tracks => 1,
-        SearchFilter::Albums => 2,
-        SearchFilter::Artists => 3,
-        SearchFilter::Playlists => 4,
-    }
-}
-
-/// Dispatches asynchronous search query with a category filter off the UI thread.
-pub(crate) fn submit_search_with_filter_async(
-    window: &MoggytWindow,
-    state: &mut SlintAppState,
-    query: &str,
-    filter: SearchFilter,
-    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
-) {
-    let trimmed = query.trim();
-    if trimmed.is_empty() {
-        return;
-    }
-    state.search_active = true;
-    state.recent_searches.record(trimmed);
-    persist_recent_searches(state);
-    sync_recent_searches(window, state);
-
-    state.search_query = query.to_string();
-    state.search_filter = filter;
-    state.search_phase = ViewPhase::Loading;
-    state.search_generation = state.search_generation.wrapping_add(1);
-    let generation = state.search_generation;
-
-    window.set_query(query.into());
-    window.set_search_filter(search_filter_index(filter));
-    sync_shelves_and_queue(window, state);
-    sync_view_phase(window, ViewId::Search, state.search_phase);
-
-    let Some(parsed_query) = SearchQuery::parse(trimmed).map(|q| q.with_filter(filter)) else {
-        state.search_phase = ViewPhase::Empty;
-        sync_view_phase(window, ViewId::Search, state.search_phase);
-        return;
-    };
-    let cat = Arc::clone(&state.catalog);
-    let weak = window.as_weak();
-    let tx = worker_tx.clone();
-    let loc = state.locale;
-    let songs_only = state.songs_only;
-
-    std::thread::spawn(move || {
-        let (g, q_res, shelves) = execute_search(generation, &parsed_query, &cat, loc, songs_only);
-        let _ = dispatch_to_ui(move || {
-            let Some(win) = weak.upgrade() else { return };
-            with_ui_state(|st| {
-                if apply_async_search_outcome(st, g, q_res, shelves) {
-                    request_shelf_covers(st, &tx);
-                }
-                win.set_query(st.search_query.as_str().into());
-                observe_view_phases(st);
-                sync_shelves_and_queue(&win, st);
-                sync_view_phase(&win, ViewId::Search, st.search_phase);
-            });
-        });
-    });
-}
-
-/// Dispatches asynchronous search query off the UI thread (defaults to All filter).
-pub(crate) fn submit_search_async(
-    window: &MoggytWindow,
-    state: &mut SlintAppState,
-    query: &str,
-    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
-) {
-    submit_search_with_filter_async(window, state, query, SearchFilter::All, worker_tx);
-}
+pub(crate) use super::search_submit::{submit_search_async, submit_search_with_filter_async};
 
 /// Exits search mode from the UI and resyncs the search view.
 pub(crate) fn clear_search_and_sync(window: &MoggytWindow, state: &mut SlintAppState) {
@@ -245,7 +167,7 @@ fn begin_detail_load(state: &mut SlintAppState, browse_id: &str, kind: DetailKin
     Some(state.detail_generation)
 }
 
-fn apply_async_search_outcome(
+pub(crate) fn apply_async_search_outcome(
     state: &mut SlintAppState,
     generation: u64,
     query: String,

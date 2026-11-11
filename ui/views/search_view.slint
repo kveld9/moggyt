@@ -173,6 +173,11 @@ export component SearchView inherits VerticalLayout {
             is-active: root.active-filter == 4;
             clicked => { root.filter-selected(4); }
         }
+        FilterChip {
+            text: Labels.filter-lyrics-label;
+            is-active: root.active-filter == 5;
+            clicked => { root.filter-selected(5); }
+        }
     }
 
     if root.search-phase == 1 : VerticalLayout {

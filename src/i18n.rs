@@ -174,6 +174,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Loading explore...", "Cargando exploracion..."),
     ("Low (<=64 kbps)", "Baja (<=64 kbps)"),
     ("Low confidence", "Confianza baja"),
+    ("Lyrics", "Letra"),
     ("Lyrics unavailable", "Letras no disponibles"),
     ("Matched", "Coincidencias"),
     ("Matched track", "Cancion encontrada"),
