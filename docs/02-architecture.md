@@ -114,9 +114,14 @@ its format selector instead of requesting an unreachable `abr>=192` floor.
 `loudness_normalization` selects exactly one normalization stage per track:
 
 1. When the resolver reports a provider `loudnessDb` (InnerTube VISIONOS path),
-   the track is scaled by the static ReplayGain factor `10^(-db/20)`; tracks at or
-   below 0 dB use unity gain. The dynamic `LoudnessNormalizer` is not chained in
-   this case.
+   the raw value is shifted by +7 dB (`PROVIDER_LOUDNESS_OFFSET_DB`, matching
+   ViMusic's `loudnessDb + 7`) because YouTube's reference loudness sits ~7 dB
+   below the -14 LUFS target. The track is then scaled by the static ReplayGain
+   factor `10^(-effective_db/20)`; tracks with effective loudness at or below
+   0 dB (raw loudness <= -7 dB) use unity gain. For example, a measured live
+   `loudnessDb` of +0.99 dB shifts to +7.99 dB and yields a real attenuation of
+   ~0.40 linear gain (-7.99 dB) instead of near-unity gain. The dynamic
+   `LoudnessNormalizer` is not chained in this case.
 2. When no `loudnessDb` is available (yt-dlp fallback path), the dynamic
    `LoudnessNormalizer` keeps its existing behavior.
 

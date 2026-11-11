@@ -419,14 +419,27 @@ impl<I: Source<Item = f32>> Source for LoudnessNormalizer<I> {
     }
 }
 
+/// Provider loudness offset in dB applied to YouTube's reported `loudnessDb`.
+///
+/// YouTube's InnerTube `loudnessDb` metric is calibrated relative to a reference
+/// level that sits ~7 dB below the standard -14 LUFS normalization target.
+/// Matching reference FOSS clients (such as ViMusic, which computes
+/// `normalizedLoudnessDb = loudnessDb + 7`), this offset shifts the reported
+/// loudness before deriving the static attenuation gain.
+pub const PROVIDER_LOUDNESS_OFFSET_DB: f32 = 7.0;
+
 /// Computes the static ReplayGain attenuation linear factor relative to YouTube's reference loudness.
 ///
-/// Positive `loudness_db` values represent tracks louder than reference and are attenuated
-/// by `10^(-db/20)` (`db_to_linear(-db)`). Non-positive, non-finite, or absent values yield
-/// unity gain (`1.0`).
+/// Shifts incoming `loudness_db` by [`PROVIDER_LOUDNESS_OFFSET_DB`] (+7.0 dB) to align with
+/// the -14 LUFS normalization target. Positive effective values represent tracks louder than
+/// target and are attenuated by `10^(-effective_db / 20)`. Non-positive effective values,
+/// non-finite values, or absent values yield unity gain (`1.0`).
 pub fn replaygain_linear(loudness_db: Option<f32>) -> f32 {
     match loudness_db {
-        Some(db) if db.is_finite() && db > 0.0 => 10.0_f32.powf(-db / 20.0),
+        Some(db) if db.is_finite() => {
+            let effective_db = db + PROVIDER_LOUDNESS_OFFSET_DB;
+            if effective_db > 0.0 { 10.0_f32.powf(-effective_db / 20.0) } else { 1.0 }
+        }
         _ => 1.0,
     }
 }
@@ -443,6 +456,9 @@ pub enum NormalizationStage {
 
 /// Selects the normalization stage for a track based on setting and provider loudness.
 ///
+/// When `enabled` and `loudness_db` is present, selects [`NormalizationStage::Static`]
+/// with gain computed via [`replaygain_linear`] (applying the +7.0 dB provider offset).
+/// When `enabled` without `loudness_db`, falls back to [`NormalizationStage::Dynamic`].
 /// Exactly one stage is selected per track; the static and dynamic stages are never chained.
 pub fn normalization_stage(enabled: bool, loudness_db: Option<f32>) -> NormalizationStage {
     if !enabled {
@@ -698,12 +714,14 @@ mod tests {
 
     #[test]
     fn replaygain_linear_matches_static_gain() {
-        assert!((replaygain_linear(Some(6.0)) - 0.5011872).abs() < 1e-5);
-        assert!((replaygain_linear(Some(3.0)) - 0.70794576).abs() < 1e-5);
-        let expected_point_99 = 10.0_f32.powf(-0.99 / 20.0);
+        assert!((replaygain_linear(Some(6.0)) - 0.22387211).abs() < 1e-5);
+        assert!((replaygain_linear(Some(3.0)) - 0.31622776).abs() < 1e-5);
+        let expected_point_99 = 10.0_f32.powf(-(0.99 + 7.0) / 20.0);
         assert!((replaygain_linear(Some(0.99)) - expected_point_99).abs() < 1e-5);
-        assert_eq!(replaygain_linear(Some(0.0)), 1.0);
-        assert_eq!(replaygain_linear(Some(-3.0)), 1.0);
+        assert!((replaygain_linear(Some(0.0)) - 0.4466836).abs() < 1e-5);
+        assert!((replaygain_linear(Some(-3.0)) - 0.63095737).abs() < 1e-5);
+        assert_eq!(replaygain_linear(Some(-7.0)), 1.0);
+        assert_eq!(replaygain_linear(Some(-8.0)), 1.0);
         assert_eq!(replaygain_linear(Some(f32::NAN)), 1.0);
         assert_eq!(replaygain_linear(None), 1.0);
     }
@@ -722,11 +740,17 @@ mod tests {
         assert_eq!(normalization_stage(false, None), NormalizationStage::Off);
         match normalization_stage(true, Some(3.0)) {
             NormalizationStage::Static(gain) => {
-                assert!((gain - 0.70794576).abs() < 1e-4);
+                assert!((gain - 0.31622776).abs() < 1e-4);
             }
             other => panic!("expected Static stage, got {other:?}"),
         }
-        assert_eq!(normalization_stage(true, Some(-1.0)), NormalizationStage::Static(1.0));
+        match normalization_stage(true, Some(-1.0)) {
+            NormalizationStage::Static(gain) => {
+                assert!((gain - 0.5011872).abs() < 1e-4);
+            }
+            other => panic!("expected Static stage, got {other:?}"),
+        }
+        assert_eq!(normalization_stage(true, Some(-8.0)), NormalizationStage::Static(1.0));
         assert_eq!(normalization_stage(true, None), NormalizationStage::Dynamic);
     }
 
@@ -735,7 +759,17 @@ mod tests {
         use crate::infra::volume_to_amplitude;
 
         let combined = replaygain_linear(Some(6.0)) * volume_to_amplitude(50);
-        let expected = 0.5011872 * 0.125;
+        let expected = 0.22387211 * 0.125;
         assert!((combined - expected).abs() < 1e-6, "expected {expected}, got {combined}");
+    }
+
+    #[test]
+    fn replaygain_linear_applies_provider_offset() {
+        let live_gain = replaygain_linear(Some(0.99));
+        let expected = 10.0_f32.powf(-(0.99 + 7.0) / 20.0);
+        assert!((live_gain - expected).abs() < 1e-5);
+        assert!(live_gain < 0.4, "expected meaningful attenuation, got {live_gain}");
+        assert_eq!(replaygain_linear(Some(-7.0)), 1.0);
+        assert_eq!(replaygain_linear(Some(-7.0001)), 1.0);
     }
 }
