@@ -144,6 +144,9 @@ Range requests use a 10 s connect timeout and a 60 s total request timeout, so a
 stalled connection fails that block fetch instead of blocking the worker pool, and
 `BlockPool::drop` can join its workers within that bound.
 
+Next-track prefix prefetch is skipped when the track is already fully cached on
+disk, so a cached track never pays for a redundant 512 KiB download.
+
 ## Evolution rules
 
 1. One concept, one owner: each domain type lives in a single module (single source of truth).

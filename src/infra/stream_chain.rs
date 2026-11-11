@@ -338,20 +338,15 @@ impl StreamChain {
         self.prefetch_primary(primary.as_ref(), id, now)
     }
 
-    /// Prefetches and caches stream resolution and leading audio blocks for `video_id`.
+    /// Prefetches and caches stream resolution for `video_id`.
     ///
-    /// Returns `true` if resolution succeeds or if the entry is already cached.
+    /// Returns `true` if resolution succeeds or if the URL is already cached.
     pub fn prefetch(&self, video_id: &str) -> bool {
         let id = video_id.trim();
         if id.is_empty() {
             return false;
         }
-
-        let resolved = self.prefetch_url(id);
-        if resolved {
-            self.prefetch_prefix(id);
-        }
-        resolved
+        self.prefetch_url(id)
     }
 }
 

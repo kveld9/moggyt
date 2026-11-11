@@ -119,6 +119,10 @@ impl AudioBackend for LiveAudio {
     fn stream_prefetcher(&self) -> Option<StreamChain> {
         delegate_audio!(self, stream_prefetcher)
     }
+
+    fn has_cached_stream(&self, track_id: &str) -> bool {
+        delegate_audio!(self, has_cached_stream, track_id)
+    }
 }
 
 #[cfg(test)]
@@ -166,6 +170,7 @@ mod tests {
         audio.set_skip_silence(true);
         audio.set_loudness_normalization(true);
         assert!(audio.stream_prefetcher().is_none());
+        assert!(!audio.has_cached_stream("track-muted-1"));
     }
 
     #[test]

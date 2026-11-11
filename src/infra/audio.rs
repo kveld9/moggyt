@@ -91,6 +91,10 @@ pub trait AudioBackend {
     fn stream_prefetcher(&self) -> Option<StreamChain> {
         None
     }
+    /// Returns whether the backend already holds the complete stream for `track_id` on disk.
+    fn has_cached_stream(&self, _track_id: &str) -> bool {
+        false
+    }
 }
 
 /// In-memory no-op audio stub alias.
@@ -325,6 +329,7 @@ mod tests {
     fn audio_stub_stream_prefetcher_default_is_none() {
         let audio = AudioStub::new();
         assert!(audio.stream_prefetcher().is_none());
+        assert!(!audio.has_cached_stream("track-any"));
     }
 
     #[test]
