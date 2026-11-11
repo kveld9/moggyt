@@ -131,13 +131,21 @@ pub fn detail_header_description(value: &Value) -> Option<String> {
     description_from_runs(header).or_else(|| description_from_simple(header))
 }
 
-fn detail_microformat_title(value: &Value) -> Option<String> {
-    let text = value.pointer("/microformat/microformatDataRenderer/title")?.as_str()?.trim();
-    if text.is_empty() { None } else { Some(text.to_owned()) }
+/// Extracts the artist biography from the immersive artist header.
+///
+/// The immersive header is intentionally absent from [`detail_header_node`]: it
+/// carries a long biography instead of the short subtitle/description pair, so
+/// reading it there would leak the biography into the subtitle. Line breaks are
+/// collapsed because the detail header renders the description on one elided line.
+fn artist_header_description(value: &Value) -> Option<String> {
+    let header = value.pointer("/header/musicImmersiveHeaderRenderer")?;
+    let text = description_from_runs(header).or_else(|| description_from_simple(header))?;
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() { None } else { Some(collapsed) }
 }
 
-fn detail_microformat_description(value: &Value) -> Option<String> {
-    let text = value.pointer("/microformat/microformatDataRenderer/description")?.as_str()?.trim();
+fn detail_microformat_title(value: &Value) -> Option<String> {
+    let text = value.pointer("/microformat/microformatDataRenderer/title")?.as_str()?.trim();
     if text.is_empty() { None } else { Some(text.to_owned()) }
 }
 
@@ -269,7 +277,7 @@ fn resolve_detail_title(value: &Value) -> String {
 }
 
 fn with_optional_detail_fields(mut detail: Detail, value: &Value) -> Detail {
-    let desc = detail_header_description(value).or_else(|| detail_microformat_description(value));
+    let desc = detail_header_description(value).or_else(|| artist_header_description(value));
     if let Some(desc) = desc {
         detail = detail.with_description(desc);
     }
@@ -408,7 +416,7 @@ mod tests {
         assert_eq!(detail.kind, DetailKind::Playlist);
         assert_eq!(detail.title, "Clásicos de la Cumbia Argentina");
         assert_eq!(detail.subtitle, "");
-        assert_eq!(detail.description.as_deref(), Some("Lista de reproducción • YouTube Music"));
+        assert_eq!(detail.description, None, "microformat metadata is not a description");
         assert_eq!(
             detail.artwork.as_deref(),
             Some(
@@ -628,5 +636,53 @@ mod tests {
             detail.tracks[2],
             Track::new("hist-track-3", "Track 3", "Artist 3").with_duration(165)
         );
+    }
+
+    #[test]
+    fn parse_detail_all_ignores_microformat_seo_description() {
+        let payload = serde_json::json!({
+            "microformat": {
+                "microformatDataRenderer": {
+                    "title": "Los angeles de Santa Fe",
+                    "description": "Listen to music from Los angeles de Santa Fe on YouTube Music"
+                }
+            }
+        });
+
+        let detail = parse_detail_all(&payload, DetailKind::Artist).expect("parsed detail");
+        assert_eq!(detail.title, "Los angeles de Santa Fe");
+        assert_eq!(detail.description, None);
+    }
+
+    #[test]
+    fn parse_detail_all_reads_artist_bio_from_immersive_header() {
+        let payload = serde_json::json!({
+            "header": {
+                "musicImmersiveHeaderRenderer": {
+                    "title": { "runs": [{ "text": "Los Angeles Azules" }] },
+                    "description": {
+                        "runs": [
+                            { "text": "Grupo musical mexicano.\n\nFuente: " },
+                            { "text": "Wikipedia" },
+                            { "text": "." }
+                        ]
+                    }
+                }
+            },
+            "microformat": {
+                "microformatDataRenderer": {
+                    "title": "Los Angeles Azules",
+                    "description": "Artist - 43,9 M monthly listeners"
+                }
+            }
+        });
+
+        let detail = parse_detail_all(&payload, DetailKind::Artist).expect("parsed detail");
+        assert_eq!(
+            detail.description.as_deref(),
+            Some("Grupo musical mexicano. Fuente: Wikipedia.")
+        );
+        assert_eq!(detail.subtitle, "", "the biography must not leak into the subtitle");
+        assert_eq!(detail.title, "Los Angeles Azules");
     }
 }
