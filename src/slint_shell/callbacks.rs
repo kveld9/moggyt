@@ -30,7 +30,7 @@ use crate::slint_shell::window::{
     clear_search_and_sync, open_detail_async, refresh_library_async, submit_search_async,
     submit_search_with_filter_async, trigger_playback,
 };
-use crate::slint_shell::{MoggytWindow, PlaybackUi};
+use crate::slint_shell::{MoggytWindow, PlaybackUi, PlayerUi};
 
 /// Maps a clicked search result item to playback or container detail view.
 pub(crate) fn handle_filtered_item_click(
@@ -94,7 +94,7 @@ pub(crate) fn handle_toggle_play(window: &MoggytWindow, state: &mut SlintAppStat
         state.pause_play_ledger();
         state.set_playback_phase(PlaybackPhase::Paused);
         state.sync_presence_playing(false);
-        window.set_is_playing(false);
+        window.global::<PlayerUi>().set_is_playing(false);
         return;
     }
     if audio.last_requested().is_some() {
@@ -103,7 +103,7 @@ pub(crate) fn handle_toggle_play(window: &MoggytWindow, state: &mut SlintAppStat
         state.resume_play_ledger();
         state.set_playback_phase(PlaybackPhase::Resolving);
         state.sync_presence_playing(true);
-        window.set_is_playing(true);
+        window.global::<PlayerUi>().set_is_playing(true);
         return;
     }
     drop(audio);
@@ -371,25 +371,25 @@ fn wire_playback_callbacks(
 ) {
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_toggle_play(move || {
+    window.global::<PlayerUi>().on_toggle_play(move || {
         with_window_state(&w, &s, handle_toggle_play);
     });
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_prev_track(move || {
+    window.global::<PlayerUi>().on_prev_track(move || {
         with_window_state(&w, &s, handle_prev_track);
     });
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_next_track(move || {
+    window.global::<PlayerUi>().on_next_track(move || {
         with_window_state(&w, &s, handle_next_track);
     });
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_seek_by(move |delta| {
+    window.global::<PlayerUi>().on_seek_by(move |delta| {
         with_window_state(&w, &s, |win, st| {
             st.seek_by(delta as i64);
             sync_window(win, st);
@@ -399,13 +399,13 @@ fn wire_playback_callbacks(
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
-    window.on_seek_to(move |secs| {
+    window.global::<PlayerUi>().on_seek_to(move |secs| {
         with_window_state(&w, &s, |win, st| handle_seek_to(win, st, &tx, secs));
     });
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_set_volume(move |vol| {
+    window.global::<PlayerUi>().on_set_volume(move |vol| {
         with_window_state(&w, &s, |win, st| {
             st.set_volume(vol.clamp(0, 100) as u8);
             sync_window(win, st);
@@ -414,13 +414,13 @@ fn wire_playback_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_toggle_like(move || {
+    window.global::<PlayerUi>().on_toggle_like(move || {
         with_window_state(&w, &s, handle_toggle_like);
     });
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_toggle_shuffle(move || {
+    window.global::<PlayerUi>().on_toggle_shuffle(move || {
         with_window_state(&w, &s, |win, st| {
             st.toggle_shuffle();
             sync_window(win, st);
@@ -429,7 +429,7 @@ fn wire_playback_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_cycle_repeat(move || {
+    window.global::<PlayerUi>().on_cycle_repeat(move || {
         with_window_state(&w, &s, handle_cycle_repeat);
     });
 
@@ -498,24 +498,25 @@ fn handle_seek_to(
         }
     }
     let _ = tx.send(PlaybackWorkerCommand::Seek { position_secs: target });
-    win.set_position_secs(target as i32);
-    win.set_position_text(format_position(target as u32).into());
+    let player = win.global::<PlayerUi>();
+    player.set_position_secs(target as i32);
+    player.set_position_text(format_position(target as u32).into());
     let dur = st.queue.current().and_then(|t| t.duration_secs).unwrap_or(0);
-    win.set_playback_progress(progress_fraction(target as u32, dur));
+    player.set_progress(progress_fraction(target as u32, dur));
 }
 
 fn handle_toggle_like(win: &MoggytWindow, st: &mut SlintAppState) {
     if let Some(track) = st.queue.current() {
         let id = track.id.clone();
         let is_liked = toggle_like(&mut st.liked_ids, &id);
-        win.set_is_liked(is_liked);
+        win.global::<PlayerUi>().set_is_liked(is_liked);
     }
 }
 
 fn handle_cycle_repeat(win: &MoggytWindow, st: &mut SlintAppState) {
     let next = cycle_repeat_mode(st.queue.repeat());
     st.queue.set_repeat(next);
-    win.set_repeat_mode(repeat_mode_to_int(next));
+    win.global::<PlayerUi>().set_repeat_mode(repeat_mode_to_int(next));
 }
 
 fn handle_cycle_playback_speed(win: &MoggytWindow, st: &mut SlintAppState) {

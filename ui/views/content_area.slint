@@ -1,5 +1,6 @@
 import {
     Theme,
+    PlayerUi,
     ShelfData,
     TrackRowData,
     LyricLineData,
@@ -27,14 +28,10 @@ export component ContentArea inherits Rectangle {
     in property <int> search-filter: 0;
     in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
-    in property <string> position-text: "0:00";
-    in property <string> duration-text: "0:00";
-    in property <float> playback-progress: 0.0;
     in property <image> cover-image;
     in property <bool> has-cover: false;
     in property <[LyricLineData]> lyrics-lines: [];
     in property <int> active-lyric-index: -1;
-    in property <bool> is-playing: false;
     in property <[LibraryItemData]> library-playlists: [];
     in property <[LibraryItemData]> library-albums: [];
     in property <bool> detail-has-detail: false;
@@ -217,14 +214,14 @@ export component ContentArea inherits Rectangle {
             if root.active-page == 1 : NowPlayingView {
                 track-title: root.active-track-title;
                 track-artist: root.active-track-artist;
-                position-text: root.position-text;
-                duration-text: root.duration-text;
-                progress: root.playback-progress;
+                position-text: PlayerUi.position-text;
+                duration-text: PlayerUi.duration-text;
+                progress: PlayerUi.progress;
                 cover-image: root.cover-image;
                 has-cover: root.has-cover;
                 lyrics-lines: root.lyrics-lines;
                 active-lyric-index: root.active-lyric-index;
-                is-playing: root.is-playing;
+                is-playing: PlayerUi.is-playing;
             }
 
             if root.active-page == 2 : LibraryView {

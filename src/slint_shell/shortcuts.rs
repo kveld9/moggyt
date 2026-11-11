@@ -6,7 +6,7 @@
 use slint::ComponentHandle;
 use slint::platform::Key;
 
-use crate::slint_shell::MoggytWindow;
+use crate::slint_shell::{MoggytWindow, PlayerUi};
 
 /// Actions triggered by global keyboard shortcuts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,11 +70,12 @@ pub fn stepped_volume(current: i32, delta: i32) -> i32 {
 }
 
 fn dispatch_transport_shortcut(window: &MoggytWindow, action: ShortcutAction) -> bool {
+    let player = window.global::<PlayerUi>();
     match action {
-        ShortcutAction::TogglePlay => window.invoke_toggle_play(),
-        ShortcutAction::SeekBackward => window.invoke_seek_by(-SHORTCUT_SEEK_SECS),
-        ShortcutAction::SeekForward => window.invoke_seek_by(SHORTCUT_SEEK_SECS),
-        ShortcutAction::NextTrack => window.invoke_next_track(),
+        ShortcutAction::TogglePlay => player.invoke_toggle_play(),
+        ShortcutAction::SeekBackward => player.invoke_seek_by(-SHORTCUT_SEEK_SECS),
+        ShortcutAction::SeekForward => player.invoke_seek_by(SHORTCUT_SEEK_SECS),
+        ShortcutAction::NextTrack => player.invoke_next_track(),
         _ => return false,
     }
     true
@@ -84,15 +85,16 @@ fn dispatch_shortcut(window: &MoggytWindow, action: ShortcutAction) {
     if dispatch_transport_shortcut(window, action) {
         return;
     }
+    let player = window.global::<PlayerUi>();
     match action {
         ShortcutAction::VolumeUp => {
-            window.invoke_set_volume(stepped_volume(window.get_volume(), SHORTCUT_VOLUME_STEP));
+            player.invoke_set_volume(stepped_volume(player.get_volume(), SHORTCUT_VOLUME_STEP));
         }
         ShortcutAction::VolumeDown => {
-            window.invoke_set_volume(stepped_volume(window.get_volume(), -SHORTCUT_VOLUME_STEP));
+            player.invoke_set_volume(stepped_volume(player.get_volume(), -SHORTCUT_VOLUME_STEP));
         }
-        ShortcutAction::PreviousTrack => window.invoke_prev_track(),
-        ShortcutAction::ToggleLike => window.invoke_toggle_like(),
+        ShortcutAction::PreviousTrack => player.invoke_prev_track(),
+        ShortcutAction::ToggleLike => player.invoke_toggle_like(),
         _ => {}
     }
 }

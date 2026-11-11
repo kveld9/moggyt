@@ -1,4 +1,4 @@
-import { Theme } from "../theme.slint";
+import { PlayerUi, Theme } from "../theme.slint";
 import { ThemedSlider } from "./controls.slint";
 import { PlayerCenterControls } from "./player_controls.slint";
 import { IconHeart, IconQueue, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
@@ -15,32 +15,13 @@ export component PlayerBar inherits Rectangle {
 
     in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
-    in property <bool> is-playing: false;
-    in property <int> volume: 100;
-    in property <string> position-text: "0:00";
-    in property <string> duration-text: "0:00";
     in property <image> cover;
-    in property <bool> is-liked: false;
-    in property <bool> is-shuffle: false;
-    in property <int> repeat-mode: 0;
-    in property <float> progress: 0.0;
-    in property <int> position-secs: 0;
-    in property <int> duration-secs: 0;
     in property <int> queue-count: 0;
     in property <string> queue-button-text: "Queue";
     in property <bool> is-queue-open: false;
 
     property <int> last-audible-volume: 100;
 
-    callback toggle-play();
-    callback prev-track();
-    callback next-track();
-    callback seek-by(int);
-    callback seek-to(int);
-    callback set-volume(int);
-    callback toggle-like();
-    callback toggle-shuffle();
-    callback cycle-repeat();
     callback toggle-queue-panel();
 
     border-radius: root.mode == 1 ? 20px : 0px;
@@ -131,19 +112,19 @@ export component PlayerBar inherits Rectangle {
                         width: 28px;
                         height: 28px;
                         border-radius: 14px;
-                        background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (root.is-liked ? Theme.surface : transparent));
+                        background: like-touch.pressed ? Theme.overlay : (like-touch.has-hover ? Theme.hover : (PlayerUi.is-liked ? Theme.surface : transparent));
                         animate background { duration: 150ms; easing: ease-in-out; }
 
                         like-touch := TouchArea {
-                            clicked => { root.toggle-like(); }
+                            clicked => { PlayerUi.toggle-like(); }
                         }
 
                         IconHeart {
                             x: (parent.width - self.width) / 2;
                             y: (parent.height - self.height) / 2;
-                            tint: root.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
+                            tint: PlayerUi.is-liked ? Theme.accent : (like-touch.has-hover ? Theme.text : Theme.secondary);
                             size: 14px;
-                            is-filled: root.is-liked;
+                            is-filled: PlayerUi.is-liked;
                         }
                     }
                 }
@@ -153,24 +134,24 @@ export component PlayerBar inherits Rectangle {
         // CENTER ZONE: Reused center controls
         PlayerCenterControls {
             horizontal-stretch: 1;
-            is-playing: root.is-playing;
-            is-shuffle: root.is-shuffle;
-            repeat-mode: root.repeat-mode;
-            position-secs: root.position-secs;
-            duration-secs: root.duration-secs;
-            position-text: root.position-text;
-            duration-text: root.duration-text;
+            is-playing: PlayerUi.is-playing;
+            is-shuffle: PlayerUi.is-shuffle;
+            repeat-mode: PlayerUi.repeat-mode;
+            position-secs: PlayerUi.position-secs;
+            duration-secs: PlayerUi.duration-secs;
+            position-text: PlayerUi.position-text;
+            duration-text: PlayerUi.duration-text;
             show-shuffle: root.show-shuffle;
             show-repeat: root.show-repeat;
             show-skip-seconds: root.show-skip-seconds;
 
-            toggle-play => { root.toggle-play(); }
-            prev-track => { root.prev-track(); }
-            next-track => { root.next-track(); }
-            seek-by(delta) => { root.seek-by(delta); }
-            seek-to(secs) => { root.seek-to(secs); }
-            toggle-shuffle => { root.toggle-shuffle(); }
-            cycle-repeat => { root.cycle-repeat(); }
+            toggle-play => { PlayerUi.toggle-play(); }
+            prev-track => { PlayerUi.prev-track(); }
+            next-track => { PlayerUi.next-track(); }
+            seek-by(delta) => { PlayerUi.seek-by(delta); }
+            seek-to(secs) => { PlayerUi.seek-to(secs); }
+            toggle-shuffle => { PlayerUi.toggle-shuffle(); }
+            cycle-repeat => { PlayerUi.cycle-repeat(); }
         }
 
         // RIGHT ZONE: Queue button, Volume Slider
@@ -219,23 +200,23 @@ export component PlayerBar inherits Rectangle {
 
                         vol-touch := TouchArea {
                             clicked => {
-                                if (root.volume > 0) {
-                                    root.last-audible-volume = root.volume;
-                                    root.set-volume(0);
+                                if (PlayerUi.volume > 0) {
+                                    root.last-audible-volume = PlayerUi.volume;
+                                    PlayerUi.set-volume(0);
                                 } else {
-                                    root.set-volume(root.last-audible-volume > 0 ? root.last-audible-volume : 50);
+                                    PlayerUi.set-volume(root.last-audible-volume > 0 ? root.last-audible-volume : 50);
                                 }
                             }
                         }
 
-                        if root.volume == 0 : IconSpeakerMuted {
+                        if PlayerUi.volume == 0 : IconSpeakerMuted {
                             x: (parent.width - self.width) / 2;
                             y: (parent.height - self.height) / 2;
                             size: 16px;
                             tint: Theme.accent;
                         }
 
-                        if root.volume != 0 : IconSpeaker {
+                        if PlayerUi.volume != 0 : IconSpeaker {
                             x: (parent.width - self.width) / 2;
                             y: (parent.height - self.height) / 2;
                             size: 16px;
@@ -248,10 +229,10 @@ export component PlayerBar inherits Rectangle {
                     width: 90px;
                     minimum: 0;
                     maximum: 100;
-                    value: root.volume;
+                    value: PlayerUi.volume;
                     hit-slack: 14px;
                     changed(val) => {
-                        root.set-volume(round(val));
+                        PlayerUi.set-volume(round(val));
                     }
                 }
             }

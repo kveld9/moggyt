@@ -17,7 +17,6 @@ use crate::infra::{
     AudioBackend, CatalogError, CoverCache, DiskPlaylistStore, LyricsSource, PlaylistStore,
     default_config_dir,
 };
-use crate::slint_shell::MoggytWindow;
 use crate::slint_shell::callbacks::wire_window_callbacks;
 use crate::slint_shell::covers::{
     request_detail_covers, request_library_covers, request_shelf_covers, resolve_row_cover_image,
@@ -45,6 +44,7 @@ use crate::slint_shell::sync::{
 };
 use crate::slint_shell::theme::apply_custom_theme_if_changed;
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
+use crate::slint_shell::{MoggytWindow, PlayerUi};
 
 thread_local! {
     static ACTIVE_STATE: RefCell<Option<SharedState>> = const { RefCell::new(None) };
@@ -103,16 +103,17 @@ pub(crate) fn trigger_playback(window: &MoggytWindow, state: &mut SlintAppState)
     state.lyrics_lines.clear();
     state.lyrics_key = None;
 
-    window.set_is_playing(true);
+    let player = window.global::<PlayerUi>();
+    player.set_is_playing(true);
     window.set_active_track_title(track.title.clone().into());
     window.set_active_track_artist(track.artist.clone().into());
     let dur_secs = track.duration_secs.unwrap_or(0);
-    window.set_duration_text(format_track_duration(track.duration_secs).into());
-    window.set_duration_secs(dur_secs as i32);
-    window.set_position_text("0:00".into());
-    window.set_position_secs(0);
-    window.set_playback_progress(0.0);
-    window.set_is_liked(is_track_liked(&state.liked_ids, &track.id));
+    player.set_duration_text(format_track_duration(track.duration_secs).into());
+    player.set_duration_secs(dur_secs as i32);
+    player.set_position_text("0:00".into());
+    player.set_position_secs(0);
+    player.set_progress(0.0);
+    player.set_is_liked(is_track_liked(&state.liked_ids, &track.id));
     window.set_queue_count(state.queue.len() as i32);
     window.set_queue_button_text(format_queue_label(state.locale, state.queue.len()).into());
     window.set_has_cover(false);
