@@ -39,6 +39,8 @@ mod tests {
         assert_eq!(en_labels.local_remove_track_label, "Remove");
         assert_eq!(en_labels.local_move_up_label, "Up");
         assert_eq!(en_labels.local_move_down_label, "Down");
+        assert_eq!(en_labels.lyrics_tab_label, "Lyrics");
+        assert_eq!(en_labels.up_next_tab_label, "Up next");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -68,6 +70,8 @@ mod tests {
         assert_eq!(es_labels.local_remove_track_label, "Quitar");
         assert_eq!(es_labels.local_move_up_label, "Subir");
         assert_eq!(es_labels.local_move_down_label, "Bajar");
+        assert_eq!(es_labels.lyrics_tab_label, "Letras");
+        assert_eq!(es_labels.up_next_tab_label, "A continuacion");
     }
 
     #[test]
@@ -94,6 +98,8 @@ mod tests {
         assert_eq!(es.no_cover, "Sin portada");
         assert_eq!(es.lyrics_unavailable, "Letras no disponibles");
         assert_eq!(es.lyrics_hint, "Las letras sincronizadas aparecerán durante la reproducción");
+        assert_eq!(es.lyrics_tab_label, "Letras");
+        assert_eq!(es.up_next_tab_label, "A continuacion");
         assert_eq!(
             es.session_anonymous_hint,
             "Sesión anónima: pegar cookies para desbloquear la biblioteca"
@@ -257,6 +263,8 @@ mod tests {
         assert_eq!(en.no_cover, "No cover");
         assert_eq!(en.lyrics_unavailable, "Lyrics unavailable");
         assert_eq!(en.lyrics_hint, "Synchronized lyrics will appear during playback");
+        assert_eq!(en.lyrics_tab_label, "Lyrics");
+        assert_eq!(en.up_next_tab_label, "Up next");
         assert_eq!(en.session_anonymous_hint, "Anonymous session: paste cookies to unlock library");
         assert_eq!(en.session_cookie_placeholder, "Paste session cookies...");
         assert_eq!(en.sign_in, "Sign in");

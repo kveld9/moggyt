@@ -34,6 +34,8 @@ pub struct StaticLabels {
     pub no_cover: &'static str,
     pub lyrics_unavailable: &'static str,
     pub lyrics_hint: &'static str,
+    pub lyrics_tab_label: &'static str,
+    pub up_next_tab_label: &'static str,
     pub now_playing_cover_label: &'static str,
     pub now_playing_vinyl_label: &'static str,
     pub session_anonymous_hint: &'static str,
@@ -193,6 +195,8 @@ impl StaticLabels {
             no_cover: tr(locale, "No cover"),
             lyrics_unavailable: tr(locale, "Lyrics unavailable"),
             lyrics_hint: tr(locale, "Synchronized lyrics will appear during playback"),
+            lyrics_tab_label: tr(locale, "Lyrics"),
+            up_next_tab_label: tr(locale, "Up next"),
             now_playing_cover_label: tr(locale, "Cover"),
             now_playing_vinyl_label: tr(locale, "Vinyl"),
             session_anonymous_hint: tr(
@@ -373,6 +377,8 @@ impl StaticLabels {
         labels.set_no_cover_text(self.no_cover.into());
         labels.set_lyrics_unavailable_text(self.lyrics_unavailable.into());
         labels.set_lyrics_hint_text(self.lyrics_hint.into());
+        labels.set_lyrics_tab_label(self.lyrics_tab_label.into());
+        labels.set_up_next_tab_label(self.up_next_tab_label.into());
         labels.set_now_playing_cover_label(self.now_playing_cover_label.into());
         labels.set_now_playing_vinyl_label(self.now_playing_vinyl_label.into());
 

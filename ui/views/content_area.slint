@@ -26,6 +26,8 @@ export component ContentArea inherits Rectangle {
     in property <bool> signed-in: false;
     in property <[ShelfData]> shelves: [];
     in property <int> search-filter: 0;
+    in property <[TrackRowData]> queue-tracks: [];
+    in property <int> queue-selected-index: -1;
     in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
     in property <image> cover-image;
@@ -75,6 +77,7 @@ export component ContentArea inherits Rectangle {
     callback query-submitted(string);
     callback query-cleared();
     callback track-selected(int);
+    callback queue-track-selected(int);
     callback filter-selected(int);
     callback recent-search-selected(string);
     callback recent-search-removed(string);
@@ -214,14 +217,13 @@ export component ContentArea inherits Rectangle {
             if root.active-page == 1 : NowPlayingView {
                 track-title: root.active-track-title;
                 track-artist: root.active-track-artist;
-                position-text: PlayerUi.position-text;
-                duration-text: PlayerUi.duration-text;
-                progress: PlayerUi.progress;
                 cover-image: root.cover-image;
                 has-cover: root.has-cover;
                 lyrics-lines: root.lyrics-lines;
                 active-lyric-index: root.active-lyric-index;
-                is-playing: PlayerUi.is-playing;
+                queue-tracks: root.queue-tracks;
+                queue-selected-index: root.queue-selected-index;
+                queue-track-selected(idx) => { root.queue-track-selected(idx); }
             }
 
             if root.active-page == 2 : LibraryView {

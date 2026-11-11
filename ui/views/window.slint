@@ -207,6 +207,9 @@ export component MoggytWindow inherits Window {
                     detail-kind-label: root.detail-kind-label;
                     detail-cover: root.detail-cover;
                     detail-tracks: root.detail-tracks;
+                    queue-tracks: root.queue-tracks;
+                    queue-selected-index: root.queue-selected-index;
+                    queue-track-selected(idx) => { root.queue-track-selected(idx); }
                     explore-shelves: root.explore-shelves;
                     explore-loading: root.explore-loading;
                     category-shelves: root.category-shelves;
