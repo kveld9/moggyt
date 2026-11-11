@@ -89,9 +89,9 @@ pub use audio_device::{
 };
 pub use audio_dsp::{
     DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, LoudnessNormalizer,
-    NormalizationStage, SkipSilence, StaticGain, TARGET_LUFS_DB, append_normalized, calculate_rms,
-    compute_target_gain, db_to_linear, is_silent_frame, is_silent_sample, linear_to_db,
-    normalization_stage, replaygain_linear, rms_to_db,
+    NormalizationStage, PROVIDER_LOUDNESS_OFFSET_DB, SkipSilence, StaticGain, TARGET_LUFS_DB,
+    append_normalized, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
+    is_silent_sample, linear_to_db, normalization_stage, replaygain_linear, rms_to_db,
 };
 pub use audio_live::LiveAudio;
 pub use audio_rodio::{RodioBackend, volume_to_amplitude};
