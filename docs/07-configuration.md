@@ -119,6 +119,7 @@ The configuration file uses JSON serialization with atomic replacement:
   "stream_cache_limit_mb": 512,
   "quality": "standard",
   "songs_only": false,
+  "autoplay_enabled": false,
   "sponsorblock_enabled": true,
   "discord_presence_enabled": false,
   "discord_app_id": null,
@@ -178,6 +179,9 @@ The configuration file uses JSON serialization with atomic replacement:
   - `true`: Search results and autoplay radio drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks
     (`ATV`) and unknown types. If dropping music videos would remove every track from a result list, the fallback
     preserves the original list unfiltered so playback and autoplay do not stall.
+- **Autoplay Continuation (`autoplay_enabled`)**:
+  - `false`: Playback ends when the current queue reaches the end (default).
+  - `true`: When enabled, the queue keeps going with catalog radio recommendations after the last track.
 - **Community Skip Segments (`sponsorblock_enabled`)**:
   - `sponsorblock_enabled` (boolean, default `true`):
     - `true`: Community SponsorBlock segments are fetched once per track and skipped automatically during playback.

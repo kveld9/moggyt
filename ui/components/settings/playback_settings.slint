@@ -1,5 +1,5 @@
 import { Labels } from "../../labels.slint";
-import { Theme } from "../../theme.slint";
+import { PlaybackUi, Theme } from "../../theme.slint";
 import { ThemedSlider } from "../controls.slint";
 import { SettingsModeButton, SettingsToggleRow } from "../settings_rows.slint";
 
@@ -309,6 +309,12 @@ export component PlaybackSettings inherits VerticalLayout {
                 label: Labels.songs-only-label;
                 checked: root.songs-only;
                 toggled => { root.songs-only-toggled(); }
+            }
+
+            SettingsToggleRow {
+                label: Labels.autoplay-label;
+                checked: PlaybackUi.autoplay-enabled;
+                toggled => { PlaybackUi.autoplay-toggled(); }
             }
         }
     }

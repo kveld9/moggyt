@@ -177,6 +177,26 @@ impl SlintAppState {
         let _ = self.settings_store.save(&settings);
     }
 
+    /// Toggles autoplay continuation and persists the preference to disk.
+    pub fn toggle_autoplay(&mut self) {
+        self.autoplay = !self.autoplay;
+        let mut settings = self.settings_store.load();
+        settings.autoplay_enabled = self.autoplay;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Empties the queue, stops playback, and persists the empty queue.
+    pub fn clear_queue(&mut self) {
+        if let Ok(mut audio) = self.audio.lock() {
+            audio.pause();
+        }
+        self.pause_play_ledger();
+        self.queue.clear();
+        self.set_playback_phase(PlaybackPhase::Empty);
+        self.sync_presence_playing(false);
+        let _ = self.queue_store.save(&self.queue);
+    }
+
     /// Evaluates auto-skip intervals for active track, seeking past matched range.
     pub fn check_auto_skip(&mut self) {
         let Some(track) = self.queue.current().cloned() else {
@@ -478,6 +498,36 @@ mod tests {
         state.toggle_songs_only();
         assert!(!state.songs_only);
         assert!(!state.settings_store.load().songs_only);
+    }
+
+    #[test]
+    fn test_toggle_autoplay_flips_and_persists() {
+        let mut state = test_wired();
+        assert!(!state.autoplay);
+        assert!(!state.settings_store.load().autoplay_enabled);
+
+        state.toggle_autoplay();
+        assert!(state.autoplay);
+        assert!(state.settings_store.load().autoplay_enabled);
+
+        state.toggle_autoplay();
+        assert!(!state.autoplay);
+        assert!(!state.settings_store.load().autoplay_enabled);
+    }
+
+    #[test]
+    fn test_clear_queue_empties_stops_and_persists() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        state.request_current_play();
+        assert!(state.audio.lock().unwrap().is_playing());
+
+        state.clear_queue();
+        assert!(state.queue.is_empty());
+        assert!(!state.audio.lock().unwrap().is_playing());
+        assert!(state.queue_store.load().is_empty());
+        assert_eq!(state.playback_phase, PlaybackPhase::Empty);
     }
 
     #[test]

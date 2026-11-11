@@ -59,6 +59,8 @@ The collapsible right-side queue panel manages the ordered list of upcoming trac
 - Displays the queued track count badge on the queue icon in the player bar.
 - Shows an empty-state text (`The queue is empty.`) when nothing is queued.
 - Clicking a track row plays that track immediately and leaves the queue panel open.
+- **Clear Queue**: click the `Clear queue` button in the header row to empty the queue and stop
+  playback; the empty queue is persisted across restarts.
 
 ### Now Playing Page
 
@@ -272,6 +274,15 @@ In headless mode:
 - Matching progress is streamed to `stderr`.
 - A summary report is printed to `stdout` upon completion (JSON format with `--json`, plain text otherwise).
 - Successfully imported playlists are saved directly to `playlists.json` in the configuration directory.
+
+### Playback Settings
+
+Playback options can be configured under **Settings -> Playback**:
+
+- **Prefer songs over music videos**: When enabled, filters catalog search results and autoplay recommendations
+  to prefer audio tracks over music videos.
+- **Autoplay similar tracks**: Appends similar tracks when the queue ends. It is off by default; when enabled,
+  playback continues with catalog radio recommendations after the last track.
 
 ## Persistent Player Bar
 

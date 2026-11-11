@@ -102,6 +102,9 @@ pub struct Settings {
     /// Whether only songs (dropping music videos) are preferred.
     #[serde(default = "default_false")]
     pub songs_only: bool,
+    /// Whether playback continues with similar tracks when the queue ends.
+    #[serde(default = "default_false")]
+    pub autoplay_enabled: bool,
     /// Whether leading/trailing silence should be skipped during playback.
     #[serde(default = "default_false")]
     pub skip_silence: bool,
@@ -161,6 +164,7 @@ impl Default for Settings {
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
             songs_only: false,
+            autoplay_enabled: false,
             skip_silence: false,
             loudness_normalization: false,
             sponsorblock_enabled: true,

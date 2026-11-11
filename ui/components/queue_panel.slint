@@ -1,5 +1,5 @@
 import { Labels } from "../labels.slint";
-import { Theme, TrackRowData } from "../theme.slint";
+import { PlaybackUi, Theme, TrackRowData } from "../theme.slint";
 import { TrackRow } from "./rows.slint";
 import { IconClose } from "../icons.slint";
 
@@ -35,22 +35,54 @@ export component QueuePanel inherits Rectangle {
                 vertical-alignment: center;
             }
 
-            Rectangle {
-                width: 28px;
-                height: 28px;
-                border-radius: 14px;
-                background: close-touch.pressed ? Theme.overlay : (close-touch.has-hover ? Theme.hover : transparent);
-                animate background { duration: 150ms; easing: ease-in-out; }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                vertical-stretch: 0;
 
-                close-touch := TouchArea {
-                    clicked => { root.close-panel(); }
+                if root.tracks.length > 0 : Rectangle {
+                    min-width: 84px;
+                    height: 28px;
+                    border-radius: 14px;
+                    background: clear-touch.pressed ? Theme.overlay : (clear-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    clear-touch := TouchArea {
+                        clicked => { PlaybackUi.queue-cleared(); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        alignment: center;
+
+                        Text {
+                            text: Labels.clear-queue-label;
+                            color: Theme.accent;
+                            font-size: 11px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                    }
                 }
 
-                IconClose {
-                    x: (parent.width - self.width) / 2;
-                    y: (parent.height - self.height) / 2;
-                    size: 16px;
-                    tint: close-touch.has-hover ? Theme.text : Theme.secondary;
+                Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 14px;
+                    background: close-touch.pressed ? Theme.overlay : (close-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    close-touch := TouchArea {
+                        clicked => { root.close-panel(); }
+                    }
+
+                    IconClose {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 16px;
+                        tint: close-touch.has-hover ? Theme.text : Theme.secondary;
+                    }
                 }
             }
         }
