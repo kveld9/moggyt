@@ -104,6 +104,13 @@ is open; both routes below work in that situation.
   temporary scene under `ui/` that imports the component by relative path. Set the `Theme` colors
   explicitly (the globals have no defaults) and use `--backend software`. Delete the scene after
   reading the image; it is scaffolding and is never committed.
+- Antialiasing-sensitive pixels (glyphs, icons, borders) must be read in the renderer the app
+  ships, not the software rasterizer: `--screenshot` renders with the software backend, which
+  hides seams that femtovg produces. A fill plus a stroke of the same closed path leaves a
+  one-pixel background hole at the path start in femtovg and renders clean in software, so a
+  software-only screenshot can certify a defective glyph. Render those with
+  `slint-viewer --backend winit-femtovg` on a headless output (or launch the app) and read that
+  capture; keep `--screenshot` for layout, spacing, and color.
 
 ## Slint lessons
 
