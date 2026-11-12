@@ -378,8 +378,9 @@ the pointer:
 
 Context actions confirm their result with a transient toast in the bottom-right corner, above the
 player bar: link copied, copy failure, added to the queue, playing next, and favorite added or
-removed. Each toast hugs its message, stacks up to three, and disappears after three seconds while a
-thin accent line along its bottom edge shrinks to zero.
+removed. Each toast shows the action's icon, fades and slides in, hugs its message, stacks up to
+three, and disappears after three seconds while a thin accent line along its bottom edge shrinks to
+zero.
 
 ## Keyboard Shortcuts
 

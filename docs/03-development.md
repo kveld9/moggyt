@@ -255,3 +255,9 @@ guessing; every rule here was verified against a build or the official documenta
   therefore cannot dismiss itself when the application loses OS focus without a backend hook;
   document the limitation instead of chasing it in Slint.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/window/window/>.
+- `parent` is not reachable from a component root: `component Slot inherits Rectangle { x: parent.width
+  - self.width; }` fails to compile in Slint 1.18 with `Cannot access id 'parent'`, because the root
+  element has no parent inside the component's own scope. Pass the container size as properties from
+  the instantiating component, or position the instances from the parent, instead of reaching for
+  `parent`.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/language/geometry/>.

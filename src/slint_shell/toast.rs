@@ -2,10 +2,10 @@
 //!
 //! Hexagonal invariant: pure in-memory message buffer; the window layer only mirrors it.
 
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::ComponentHandle;
 
 use crate::slint_shell::state::SlintAppState;
-use crate::slint_shell::{MoggytWindow, ToastData, ToastsUi};
+use crate::slint_shell::{ContextIcon, MoggytWindow, ToastData, ToastsUi};
 
 /// Lifetime of one toast, measured in 500 ms application timer ticks.
 pub const TOAST_LIFETIME_TICKS: u32 = 6;
@@ -14,10 +14,12 @@ pub const TOAST_LIFETIME_TICKS: u32 = 6;
 pub const MAX_TOASTS: usize = 3;
 
 /// One queued informational message.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Toast {
     /// Message text already localized.
     pub text: String,
+    /// Icon of the action that produced the message.
+    pub icon: ContextIcon,
     remaining_ticks: u32,
 }
 
@@ -35,12 +37,12 @@ pub struct ToastState {
 }
 
 impl ToastState {
-    /// Queues a message, dropping the oldest when the buffer is full.
-    pub fn push(&mut self, text: impl Into<String>) {
+    /// Queues a message with its action icon, dropping the oldest when the buffer is full.
+    pub fn push(&mut self, text: impl Into<String>, icon: ContextIcon) {
         if self.toasts.len() >= MAX_TOASTS {
             self.toasts.remove(0);
         }
-        self.toasts.push(Toast { text: text.into(), remaining_ticks: TOAST_LIFETIME_TICKS });
+        self.toasts.push(Toast { text: text.into(), icon, remaining_ticks: TOAST_LIFETIME_TICKS });
     }
 
     /// Advances one timer tick; returns true when a toast is visible or just expired.
@@ -66,20 +68,35 @@ impl ToastState {
     }
 }
 
-/// Mirrors the visible toasts into the Slint global.
-pub(crate) fn sync_toasts(window: &MoggytWindow, state: &SlintAppState) {
-    let items: Vec<ToastData> = state
-        .toasts
-        .visible()
-        .iter()
-        .map(|toast| ToastData { text: toast.text.clone().into(), progress: toast.progress() })
-        .collect();
-    window.global::<ToastsUi>().set_items(ModelRc::new(VecModel::from(items)));
+/// Builds the toast rendered in the slot `back` positions behind the newest message.
+fn slot_data(visible: &[Toast], back: usize) -> ToastData {
+    visible.iter().rev().nth(back).map_or_else(
+        || ToastData { text: "".into(), icon: ContextIcon::Next, progress: 0.0 },
+        |toast| ToastData {
+            text: toast.text.clone().into(),
+            icon: toast.icon,
+            progress: toast.progress(),
+        },
+    )
 }
 
-/// Queues a localized message and mirrors it immediately.
-pub(crate) fn notify(window: &MoggytWindow, state: &mut SlintAppState, text: &str) {
-    state.toasts.push(text.to_owned());
+/// Mirrors the visible toasts into the Slint slots.
+pub(crate) fn sync_toasts(window: &MoggytWindow, state: &SlintAppState) {
+    let visible = state.toasts.visible();
+    let ui = window.global::<ToastsUi>();
+    ui.set_toast2(slot_data(visible, 0));
+    ui.set_toast1(slot_data(visible, 1));
+    ui.set_toast0(slot_data(visible, 2));
+}
+
+/// Queues a localized message with its action icon and mirrors it immediately.
+pub(crate) fn notify(
+    window: &MoggytWindow,
+    state: &mut SlintAppState,
+    text: &str,
+    icon: ContextIcon,
+) {
+    state.toasts.push(text.to_owned(), icon);
     sync_toasts(window, state);
 }
 
@@ -98,16 +115,17 @@ mod tests {
     fn push_keeps_only_the_newest_toasts() {
         let mut state = ToastState::default();
         for index in 0..(MAX_TOASTS + 2) {
-            state.push(format!("t{index}"));
+            state.push(format!("t{index}"), ContextIcon::Queue);
         }
         let texts: Vec<&str> = state.visible().iter().map(|toast| toast.text.as_str()).collect();
         assert_eq!(texts, ["t2", "t3", "t4"]);
+        assert_eq!(state.visible().last().map(|toast| toast.icon), Some(ContextIcon::Queue));
     }
 
     #[test]
     fn tick_expires_toasts_after_the_configured_lifetime() {
         let mut state = ToastState::default();
-        state.push("message");
+        state.push("message", ContextIcon::Queue);
 
         for elapsed in 1..TOAST_LIFETIME_TICKS {
             assert!(state.tick());
@@ -129,8 +147,8 @@ mod tests {
     #[test]
     fn clear_drops_every_message() {
         let mut state = ToastState::default();
-        state.push("a");
-        state.push("b");
+        state.push("a", ContextIcon::Queue);
+        state.push("b", ContextIcon::Queue);
         state.clear();
         assert!(state.visible().is_empty());
     }

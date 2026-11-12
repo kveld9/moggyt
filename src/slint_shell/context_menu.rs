@@ -379,14 +379,14 @@ fn finish_track(
             None
         }
         FollowUp::CopyLink(url) => Some(if copy_track_link(&url) {
-            tr(state.locale, "Link copied")
+            (tr(state.locale, "Link copied"), ContextIcon::Copy)
         } else {
-            tr(state.locale, "Could not copy the link")
+            (tr(state.locale, "Could not copy the link"), ContextIcon::Close)
         }),
         FollowUp::None => action_message(state, action, &track_id),
     };
-    if let Some(text) = message {
-        notify(window, state, text);
+    if let Some((text, icon)) = message {
+        notify(window, state, text, icon);
     }
     sync_window(window, state);
 }
@@ -395,14 +395,16 @@ fn action_message(
     state: &SlintAppState,
     action: ContextAction,
     track_id: &str,
-) -> Option<&'static str> {
+) -> Option<(&'static str, ContextIcon)> {
     match action {
-        ContextAction::PlayNext => Some(tr(state.locale, "Playing next")),
-        ContextAction::AddToQueue => Some(tr(state.locale, "Added to queue")),
+        ContextAction::PlayNext => Some((tr(state.locale, "Playing next"), ContextIcon::Next)),
+        ContextAction::AddToQueue => Some((tr(state.locale, "Added to queue"), ContextIcon::Queue)),
         ContextAction::ToggleLike if is_track_liked(&state.liked_ids, track_id) => {
-            Some(tr(state.locale, "Added to favorites"))
+            Some((tr(state.locale, "Added to favorites"), ContextIcon::HeartFilled))
         }
-        ContextAction::ToggleLike => Some(tr(state.locale, "Removed from favorites")),
+        ContextAction::ToggleLike => {
+            Some((tr(state.locale, "Removed from favorites"), ContextIcon::Heart))
+        }
         _ => None,
     }
 }
