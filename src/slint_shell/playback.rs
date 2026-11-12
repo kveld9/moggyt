@@ -117,13 +117,22 @@ pub fn resolve_display_duration(catalog_secs: Option<u32>, decoded_secs: u64) ->
         .or_else(|| u32::try_from(decoded_secs).ok().filter(|secs| *secs > 0))
 }
 
+/// Clamps the elapsed playback position to the displayed duration.
+pub fn clamp_elapsed_secs(position_secs: u32, duration_secs: Option<u32>) -> u32 {
+    duration_secs.map_or(position_secs, |duration| position_secs.min(duration))
+}
+
 /// Pushes elapsed, total, remaining labels and the seek range into the player global.
+///
+/// The elapsed label is clamped to the displayed duration so it never renders a
+/// position longer than the track.
 pub fn push_time_labels(player: &PlayerUi, position_secs: u32, duration_secs: Option<u32>) {
-    player.set_position_secs(position_secs as i32);
-    player.set_position_text(format_position(position_secs).into());
+    let elapsed = clamp_elapsed_secs(position_secs, duration_secs);
+    player.set_position_secs(elapsed as i32);
+    player.set_position_text(format_position(elapsed).into());
     player.set_duration_secs(duration_secs.unwrap_or(0) as i32);
     player.set_duration_text(format_track_duration(duration_secs).into());
-    player.set_remaining_text(format_remaining(position_secs, duration_secs).into());
+    player.set_remaining_text(format_remaining(elapsed, duration_secs).into());
 }
 
 /// Generates a randomized permutation of indices `0..len` using Fisher-Yates with a system-clock PRNG.
@@ -461,5 +470,36 @@ mod tests {
         assert_eq!(state.queue.len(), 1);
         state.toggle_shuffle();
         assert!(!state.is_shuffle);
+    }
+
+    #[test]
+    fn test_push_time_labels_clamps_elapsed_to_duration() {
+        use crate::slint_shell::{MoggytWindow, PlayerUi};
+        use slint::ComponentHandle;
+
+        let Ok(window) = MoggytWindow::new() else {
+            return;
+        };
+        let player = window.global::<PlayerUi>();
+
+        push_time_labels(&player, 100, Some(243));
+        assert_eq!(player.get_position_secs(), 100);
+        assert_eq!(player.get_position_text().as_str(), "1:40");
+
+        push_time_labels(&player, 300, Some(243));
+        assert_eq!(player.get_position_secs(), 243);
+        assert_eq!(player.get_position_text().as_str(), "4:03");
+        assert_eq!(player.get_remaining_text().as_str(), "-0:00");
+
+        push_time_labels(&player, 300, None);
+        assert_eq!(player.get_position_secs(), 300);
+    }
+
+    #[test]
+    fn test_clamp_elapsed_secs_bounds_position() {
+        assert_eq!(clamp_elapsed_secs(100, Some(243)), 100);
+        assert_eq!(clamp_elapsed_secs(300, Some(243)), 243);
+        assert_eq!(clamp_elapsed_secs(300, None), 300);
+        assert_eq!(clamp_elapsed_secs(0, Some(0)), 0);
     }
 }
