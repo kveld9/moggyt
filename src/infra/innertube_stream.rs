@@ -3,7 +3,9 @@
 //! Provides direct playback stream extraction via the YouTube InnerTube player endpoint
 //! using the VISIONOS client profile.
 
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use sha1::{Digest, Sha1};
 
 use crate::i18n::Locale;
 use serde_json::Value;
@@ -187,21 +189,43 @@ fn classify_request_error(err: reqwest::Error) -> FallbackReason {
     if err.is_timeout() { FallbackReason::Timeout } else { FallbackReason::Http }
 }
 
+/// Computes the SAPISIDHASH Authorization header value for an authenticated session.
+///
+/// Returns None when the cookie string does not contain a non-empty `SAPISID` cookie.
+pub fn sapisidhash_authorization(cookies: &str, now_unix_secs: u64) -> Option<String> {
+    let sapisid = cookies.split(';').find_map(|part| {
+        let trimmed = part.trim();
+        trimmed.strip_prefix("SAPISID=").map(str::trim).filter(|s| !s.is_empty())
+    })?;
+    let mut hasher = Sha1::new();
+    hasher.update(format!("{now_unix_secs} {sapisid} https://music.youtube.com").as_bytes());
+    let hash = format!("{:x}", hasher.finalize());
+    Some(format!("SAPISIDHASH {now_unix_secs}_{hash}"))
+}
+
 fn execute_player_http(
     client: &reqwest::blocking::Client,
     endpoint: &str,
     body: &Value,
+    cookies: Option<&str>,
+    now_unix_secs: u64,
 ) -> Result<Value, FallbackReason> {
-    let response = client
+    let mut request = client
         .post(endpoint)
         .header("Content-Type", "application/json")
         .header("X-YouTube-Client-Name", CLIENT_ID)
         .header("X-YouTube-Client-Version", CLIENT_VERSION)
         .header("Origin", ORIGIN)
-        .header("User-Agent", USER_AGENT)
-        .json(body)
-        .send()
-        .map_err(classify_request_error)?;
+        .header("User-Agent", USER_AGENT);
+
+    if let Some(cookie_val) = cookies {
+        request = request.header("Cookie", cookie_val);
+        if let Some(auth_val) = sapisidhash_authorization(cookie_val, now_unix_secs) {
+            request = request.header("Authorization", auth_val);
+        }
+    }
+
+    let response = request.json(body).send().map_err(classify_request_error)?;
 
     if !response.status().is_success() {
         return Err(FallbackReason::Http);
@@ -216,6 +240,7 @@ pub struct InnertubeResolver {
     client: reqwest::blocking::Client,
     endpoint: String,
     quality: AudioQuality,
+    cookies: Option<String>,
 }
 
 impl InnertubeResolver {
@@ -230,7 +255,7 @@ impl InnertubeResolver {
             .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
-        Self { client, endpoint: endpoint.into(), quality: AudioQuality::Standard }
+        Self { client, endpoint: endpoint.into(), quality: AudioQuality::Standard, cookies: None }
     }
 
     /// Returns the configured player endpoint URL.
@@ -248,6 +273,16 @@ impl InnertubeResolver {
         self.quality = quality;
     }
 
+    /// Returns the currently configured session cookies, if any.
+    pub fn session_cookies(&self) -> Option<&str> {
+        self.cookies.as_deref()
+    }
+
+    /// Sets or clears the session cookies used for player requests.
+    pub fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        self.cookies = cookies.map(str::trim).filter(|s| !s.is_empty()).map(ToString::to_string);
+    }
+
     fn fetch_stream_pipeline(&self, video_id: &str) -> Result<ResolvedStream, FallbackReason> {
         let trimmed_id = video_id.trim();
         if trimmed_id.is_empty() {
@@ -255,7 +290,15 @@ impl InnertubeResolver {
         }
 
         let body = player_body(trimmed_id);
-        let payload = execute_player_http(&self.client, &self.endpoint, &body)?;
+        let now_unix_secs =
+            SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let payload = execute_player_http(
+            &self.client,
+            &self.endpoint,
+            &body,
+            self.cookies.as_deref(),
+            now_unix_secs,
+        )?;
         select_stream(&payload, self.quality)
     }
 
@@ -565,5 +608,55 @@ mod tests {
             InnertubeResolver::new().fetch_stream_with("  ", AudioQuality::High),
             Err(FallbackReason::InvalidPayload)
         );
+    }
+
+    #[test]
+    fn sapisidhash_authorization_known_vector() {
+        let cookies = "SAPISID=abc";
+        let auth = sapisidhash_authorization(cookies, 1_000_000_000);
+        assert_eq!(
+            auth,
+            Some("SAPISIDHASH 1000000000_a408d72b6d376bb0bd79a76729bf8b4a3199efef".to_string())
+        );
+    }
+
+    #[test]
+    fn sapisidhash_authorization_parses_sapisid_from_cookie_string() {
+        let cookies = "SID=session_1; HSID=h_2; SAPISID=abc; SSID=s_3";
+        let auth = sapisidhash_authorization(cookies, 1_000_000_000);
+        assert_eq!(
+            auth,
+            Some("SAPISIDHASH 1000000000_a408d72b6d376bb0bd79a76729bf8b4a3199efef".to_string())
+        );
+    }
+
+    #[test]
+    fn sapisidhash_authorization_missing_or_blank_sapisid_yields_none() {
+        assert_eq!(sapisidhash_authorization("SID=session_1; HSID=h_2", 1_000_000_000), None);
+        assert_eq!(sapisidhash_authorization("SAPISID=", 1_000_000_000), None);
+        assert_eq!(sapisidhash_authorization("SAPISID=   ", 1_000_000_000), None);
+        assert_eq!(sapisidhash_authorization("", 1_000_000_000), None);
+    }
+
+    #[test]
+    fn resolver_default_has_no_cookies() {
+        let resolver = InnertubeResolver::new();
+        assert_eq!(resolver.session_cookies(), None);
+    }
+
+    #[test]
+    fn resolver_set_session_cookies_trims_and_blank_yields_none() {
+        let mut resolver = InnertubeResolver::new();
+        resolver.set_session_cookies(Some("  SAPISID=xyz; SID=123  "));
+        assert_eq!(resolver.session_cookies(), Some("SAPISID=xyz; SID=123"));
+
+        resolver.set_session_cookies(Some("   "));
+        assert_eq!(resolver.session_cookies(), None);
+
+        resolver.set_session_cookies(Some(""));
+        assert_eq!(resolver.session_cookies(), None);
+
+        resolver.set_session_cookies(None);
+        assert_eq!(resolver.session_cookies(), None);
     }
 }

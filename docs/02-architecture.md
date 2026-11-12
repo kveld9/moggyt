@@ -109,6 +109,11 @@ adaptive format served, while itag 141 (~256 kbps) requires Premium authenticati
 `High` quality preference therefore resolves to the same itag as `Standard` and shares
 its format selector instead of requesting an unreachable `abr>=192` floor.
 
+Player requests include the `Cookie` header and, when `SAPISID` is present in the cookies,
+an `Authorization: SAPISIDHASH <unix-seconds>_<sha1>` header from the stored user session,
+enabling Premium formats (such as itag 141 AAC ~256 kbps) and age-restricted content;
+requests remain anonymous when no session is present.
+
 ## Loudness normalization
 
 `loudness_normalization` selects exactly one normalization stage per track:
