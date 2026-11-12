@@ -1,10 +1,12 @@
 import { Labels } from "../labels.slint";
 import { Theme, ExploreShelfData } from "../theme.slint";
 import { MediaCard } from "../components/cards.slint";
+import { ContextSurface } from "../components/context_menu.slint";
 
 export component ExploreView inherits VerticalLayout {
     in property <[ExploreShelfData]> shelves: [];
     in property <bool> is-loading: false;
+    in property <ContextSurface> surface: ContextSurface.explore;
     callback track-selected(int);
 
     spacing: 16px;
@@ -51,6 +53,7 @@ export component ExploreView inherits VerticalLayout {
 
             for card in row.cards : MediaCard {
                 index: card.index;
+                surface: root.surface;
                 title: card.title;
                 subtitle: card.subtitle;
                 has-cover: card.has_cover;

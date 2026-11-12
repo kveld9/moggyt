@@ -1,4 +1,5 @@
-//! Right-click context menu for track rows: target resolution and action dispatch.
+//! Right-click context menu for track rows and container cards: target resolution and action
+//! dispatch.
 //!
 //! Hexagonal invariant: pure in-memory target resolution and queue mutations; this module
 //! performs no I/O, no network access, and never reads clocks.
@@ -7,15 +8,17 @@ use std::rc::Rc;
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::{SearchResult, Track};
+use crate::domain::{DetailCardKind, DetailKind, SearchResult, Track};
 use crate::i18n::{Locale, tr};
 use crate::slint_shell::covers::request_queue_track_cover;
+use crate::slint_shell::explore::explore_item_at;
 use crate::slint_shell::page::SlintPage;
+use crate::slint_shell::playback::is_track_liked;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::iter_shelf_items;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::sync_window;
-use crate::slint_shell::window::trigger_playback;
+use crate::slint_shell::window::{open_detail_async, trigger_playback};
 use crate::slint_shell::{ContextMenuItemData, ContextSurface, ContextUi, MoggytWindow};
 
 /// Track actions offered by the context menu, in rendering order.
@@ -27,7 +30,34 @@ pub const TRACK_ACTIONS: [ContextAction; 5] = [
     ContextAction::CopyLink,
 ];
 
-/// Action a track-row context menu entry performs.
+/// Actions offered for container rows, in rendering order.
+pub const CONTAINER_ACTIONS: [ContextAction; 1] = [ContextAction::Open];
+
+/// Subject addressed by an open context menu.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContextSubject {
+    /// A single playable track.
+    Track(Track),
+    /// A browsable album, artist, or playlist.
+    Container { id: String, kind: DetailKind },
+}
+
+impl ContextSubject {
+    /// Actions offered for this subject, in rendering order.
+    pub fn actions(&self) -> &'static [ContextAction] {
+        match self {
+            Self::Track(_) => &TRACK_ACTIONS,
+            Self::Container { .. } => &CONTAINER_ACTIONS,
+        }
+    }
+
+    /// Maps a rendered menu index back to an action for this subject.
+    pub fn action_at(&self, index: i32) -> Option<ContextAction> {
+        usize::try_from(index).ok().and_then(|i| self.actions().get(i)).copied()
+    }
+}
+
+/// Action a context menu entry performs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContextAction {
     /// Queue the track and start playback on it.
@@ -40,6 +70,8 @@ pub enum ContextAction {
     ToggleLike,
     /// Copy the YouTube Music watch URL for the track.
     CopyLink,
+    /// Open the container detail page.
+    Open,
 }
 
 impl ContextAction {
@@ -52,12 +84,8 @@ impl ContextAction {
             Self::ToggleLike if liked => tr(locale, "Unlike"),
             Self::ToggleLike => tr(locale, "Like"),
             Self::CopyLink => tr(locale, "Copy link"),
+            Self::Open => tr(locale, "Open"),
         }
-    }
-
-    /// Maps a rendered menu index back to its action.
-    pub fn from_index(index: i32) -> Option<Self> {
-        usize::try_from(index).ok().and_then(|i| TRACK_ACTIONS.get(i)).copied()
     }
 }
 
@@ -104,23 +132,99 @@ pub enum FollowUp {
     CopyLink(String),
 }
 
-/// Resolves the track a context target points at, when the row is a track.
-pub fn resolve_track(state: &SlintAppState, target: ContextTarget) -> Option<Track> {
+/// Resolves the subject a context target points at.
+pub fn resolve_subject(state: &SlintAppState, target: ContextTarget) -> Option<ContextSubject> {
     match target.surface {
-        ContextSurface::Search => {
-            match iter_shelf_items(&state.home_shelves, state.search_filter).nth(target.index)? {
-                SearchResult::Track(track) => Some(track.clone()),
-                _ => None,
-            }
+        ContextSurface::Search | ContextSurface::Explore | ContextSurface::Category => {
+            item_subject(state, target)
         }
-        ContextSurface::Detail => state.detail.as_ref()?.tracks.get(target.index).cloned(),
-        ContextSurface::Queue => state.queue.tracks().get(target.index).cloned(),
+        ContextSurface::Detail | ContextSurface::Queue => track_subject(state, target),
+        ContextSurface::DetailCard => detail_card_subject(state, target.index),
+        ContextSurface::LibraryPlaylist | ContextSurface::LibraryAlbum => {
+            library_subject(state, target)
+        }
     }
 }
 
-/// Builds the Slint menu model for a track row.
-pub fn menu_items(locale: Locale, liked: bool) -> Vec<ContextMenuItemData> {
-    TRACK_ACTIONS
+fn item_subject(state: &SlintAppState, target: ContextTarget) -> Option<ContextSubject> {
+    let item = match target.surface {
+        ContextSurface::Search => {
+            iter_shelf_items(&state.home_shelves, state.search_filter).nth(target.index)?
+        }
+        ContextSurface::Explore => explore_item_at(&state.explore_shelves, target.index)?,
+        ContextSurface::Category => explore_item_at(&state.category_shelves, target.index)?,
+        _ => return None,
+    };
+    subject_from_item(item)
+}
+
+fn track_subject(state: &SlintAppState, target: ContextTarget) -> Option<ContextSubject> {
+    let track = match target.surface {
+        ContextSurface::Detail => state.detail.as_ref()?.tracks.get(target.index)?,
+        ContextSurface::Queue => state.queue.tracks().get(target.index)?,
+        _ => return None,
+    };
+    Some(ContextSubject::Track(track.clone()))
+}
+
+fn library_subject(state: &SlintAppState, target: ContextTarget) -> Option<ContextSubject> {
+    match target.surface {
+        ContextSurface::LibraryPlaylist => {
+            let playlist = state.library_playlists.get(target.index)?;
+            Some(container_subject(&playlist.id, DetailKind::Playlist))
+        }
+        ContextSurface::LibraryAlbum => {
+            let album = state.library_albums.get(target.index)?;
+            Some(container_subject(&album.id, DetailKind::Album))
+        }
+        _ => None,
+    }
+}
+
+fn detail_card_subject(state: &SlintAppState, index: usize) -> Option<ContextSubject> {
+    let page = state.detail.as_ref()?.artist.as_ref()?;
+    let mut flat = 0usize;
+    for section in &page.sections {
+        for card in &section.cards {
+            if flat == index {
+                return Some(container_subject(&card.id, card_detail_kind(card.kind)));
+            }
+            flat += 1;
+        }
+    }
+    None
+}
+
+fn card_detail_kind(kind: DetailCardKind) -> DetailKind {
+    match kind {
+        DetailCardKind::Album => DetailKind::Album,
+        DetailCardKind::Artist => DetailKind::Artist,
+    }
+}
+
+fn container_subject(id: &str, kind: DetailKind) -> ContextSubject {
+    ContextSubject::Container { id: id.to_owned(), kind }
+}
+
+fn subject_from_item(item: &SearchResult) -> Option<ContextSubject> {
+    match item {
+        SearchResult::Track(track) => Some(ContextSubject::Track(track.clone())),
+        SearchResult::Album(album) => Some(container_subject(&album.id, DetailKind::Album)),
+        SearchResult::Artist(artist) => Some(container_subject(&artist.id, DetailKind::Artist)),
+        SearchResult::Playlist(playlist) => {
+            Some(container_subject(&playlist.id, DetailKind::Playlist))
+        }
+    }
+}
+
+/// Builds the Slint menu model for a resolved subject.
+pub fn menu_items(
+    locale: Locale,
+    subject: &ContextSubject,
+    liked: bool,
+) -> Vec<ContextMenuItemData> {
+    subject
+        .actions()
         .iter()
         .enumerate()
         .map(|(index, action)| ContextMenuItemData {
@@ -157,6 +261,7 @@ pub fn apply_action(
                 None => FollowUp::None,
             }
         }
+        ContextAction::Open => FollowUp::None,
     }
 }
 
@@ -187,14 +292,17 @@ fn open_menu(window: &MoggytWindow, state: &mut SlintAppState, request: MenuRequ
         return;
     };
     let target = ContextTarget { surface: request.surface, index };
-    let Some(track) = resolve_track(state, target) else {
+    let Some(subject) = resolve_subject(state, target) else {
         close_menu(window, state);
         return;
     };
-    let liked = crate::slint_shell::playback::is_track_liked(&state.liked_ids, &track.id);
+    let liked = match &subject {
+        ContextSubject::Track(track) => is_track_liked(&state.liked_ids, &track.id),
+        ContextSubject::Container { .. } => false,
+    };
     state.context_menu.open(target);
     let ui = window.global::<ContextUi>();
-    ui.set_items(ModelRc::new(VecModel::from(menu_items(state.locale, liked))));
+    ui.set_items(ModelRc::new(VecModel::from(menu_items(state.locale, &subject, liked))));
     ui.set_x(request.x);
     ui.set_y(request.y);
     ui.set_is_open(true);
@@ -215,17 +323,37 @@ fn activate(
         return;
     };
     close_menu(window, state);
-    let (Some(action), Some(track)) =
-        (ContextAction::from_index(item), resolve_track(state, target))
-    else {
+    let Some(subject) = resolve_subject(state, target) else {
         return;
     };
-    request_queue_track_cover(
-        track.artwork.as_deref(),
-        state.play_generation,
-        &state.search_covers,
-        worker_tx,
-    );
+    let Some(action) = subject.action_at(item) else {
+        return;
+    };
+    match subject {
+        ContextSubject::Track(track) => {
+            request_queue_track_cover(
+                track.artwork.as_deref(),
+                state.play_generation,
+                &state.search_covers,
+                worker_tx,
+            );
+            finish_track(window, state, target, action, track);
+        }
+        ContextSubject::Container { id, kind } => {
+            if action == ContextAction::Open {
+                open_detail_async(window, state, &id, kind, worker_tx);
+            }
+        }
+    }
+}
+
+fn finish_track(
+    window: &MoggytWindow,
+    state: &mut SlintAppState,
+    target: ContextTarget,
+    action: ContextAction,
+    track: Track,
+) {
     match apply_action(state, target, action, track) {
         FollowUp::StartPlayback => trigger_playback(window, state),
         FollowUp::CopyLink(url) => copy_track_link(&url),
@@ -281,12 +409,16 @@ pub(crate) fn wire(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Album, Detail, DetailKind, Shelf};
+    use crate::domain::{
+        Album, Artist, ArtistPage, Detail, DetailCard, DetailCardKind, DetailKind, DetailSection,
+        Playlist, Shelf,
+    };
     use crate::slint_shell::test_support::test_wired;
 
     #[test]
     fn menu_items_follow_track_action_order() {
-        let items = menu_items(Locale::English, false);
+        let subject = ContextSubject::Track(Track::new("t1", "Title", "Artist"));
+        let items = menu_items(Locale::English, &subject, false);
         assert_eq!(items.len(), 5);
         assert_eq!(items[0].index, 0);
         assert_eq!(items[0].label, "Play");
@@ -302,7 +434,8 @@ mod tests {
 
     #[test]
     fn menu_items_are_localized() {
-        let items = menu_items(Locale::Spanish, false);
+        let subject = ContextSubject::Track(Track::new("t1", "Title", "Artist"));
+        let items = menu_items(Locale::Spanish, &subject, false);
         let labels: Vec<&str> = items.iter().map(|item| item.label.as_str()).collect();
         assert_eq!(
             labels,
@@ -318,26 +451,42 @@ mod tests {
 
     #[test]
     fn menu_items_switch_like_label_when_liked() {
-        let en_items = menu_items(Locale::English, true);
+        let subject = ContextSubject::Track(Track::new("t1", "Title", "Artist"));
+        let en_items = menu_items(Locale::English, &subject, true);
         assert_eq!(en_items.get(3).map(|item| item.label.as_str()), Some("Unlike"));
 
-        let es_items = menu_items(Locale::Spanish, true);
+        let es_items = menu_items(Locale::Spanish, &subject, true);
         assert_eq!(es_items.get(3).map(|item| item.label.as_str()), Some("Quitar me gusta"));
     }
 
     #[test]
     fn action_index_mapping_rejects_out_of_range() {
-        assert_eq!(ContextAction::from_index(0), Some(ContextAction::PlayNow));
-        assert_eq!(ContextAction::from_index(1), Some(ContextAction::PlayNext));
-        assert_eq!(ContextAction::from_index(2), Some(ContextAction::AddToQueue));
-        assert_eq!(ContextAction::from_index(3), Some(ContextAction::ToggleLike));
-        assert_eq!(ContextAction::from_index(4), Some(ContextAction::CopyLink));
-        assert_eq!(ContextAction::from_index(-1), None);
-        assert_eq!(ContextAction::from_index(5), None);
+        let subject = ContextSubject::Track(Track::new("t1", "Title", "Artist"));
+        assert_eq!(subject.action_at(0), Some(ContextAction::PlayNow));
+        assert_eq!(subject.action_at(1), Some(ContextAction::PlayNext));
+        assert_eq!(subject.action_at(2), Some(ContextAction::AddToQueue));
+        assert_eq!(subject.action_at(3), Some(ContextAction::ToggleLike));
+        assert_eq!(subject.action_at(4), Some(ContextAction::CopyLink));
+        assert_eq!(subject.action_at(-1), None);
+        assert_eq!(subject.action_at(5), None);
     }
 
     #[test]
-    fn resolve_track_reads_search_shelves() {
+    fn container_menu_offers_only_open() {
+        let container = ContextSubject::Container { id: "a1".to_owned(), kind: DetailKind::Album };
+        let en_items = menu_items(Locale::English, &container, false);
+        assert_eq!(en_items.len(), 1);
+        assert_eq!(en_items[0].index, 0);
+        assert_eq!(en_items[0].label, "Open");
+
+        let es_items = menu_items(Locale::Spanish, &container, false);
+        assert_eq!(es_items.len(), 1);
+        assert_eq!(es_items[0].index, 0);
+        assert_eq!(es_items[0].label, "Abrir");
+    }
+
+    #[test]
+    fn resolve_subject_reads_search_items() {
         let mut state = test_wired();
         let track = Track::new("t1", "Track 1", "Artist 1");
         let album = Album::new("a1", "Album 1", "Artist 1", None);
@@ -347,20 +496,107 @@ mod tests {
         state.home_shelves = vec![shelf];
 
         let target_track = ContextTarget { surface: ContextSurface::Search, index: 0 };
-        assert_eq!(resolve_track(&state, target_track), Some(track));
+        assert_eq!(resolve_subject(&state, target_track), Some(ContextSubject::Track(track)));
 
         let target_album = ContextTarget { surface: ContextSurface::Search, index: 1 };
-        assert_eq!(resolve_track(&state, target_album), None);
+        assert_eq!(
+            resolve_subject(&state, target_album),
+            Some(ContextSubject::Container { id: "a1".to_owned(), kind: DetailKind::Album })
+        );
     }
 
     #[test]
-    fn resolve_track_reads_detail_tracks() {
+    fn resolve_subject_reads_detail_tracks() {
         let mut state = test_wired();
         let track = Track::new("t1", "Track 1", "Artist 1");
         state.detail = Some(Detail::new(DetailKind::Album, "album", "artist", vec![track.clone()]));
 
         let target = ContextTarget { surface: ContextSurface::Detail, index: 0 };
-        assert_eq!(resolve_track(&state, target), Some(track));
+        assert_eq!(resolve_subject(&state, target), Some(ContextSubject::Track(track)));
+    }
+
+    #[test]
+    fn resolve_subject_reads_explore_and_category_shelves() {
+        let mut state = test_wired();
+        let artist = Artist::new("art1", "Artist 1", None);
+        let playlist = Playlist::new("pl1", "Playlist 1", 10, None);
+
+        let mut explore_shelf = Shelf::new("Explore");
+        explore_shelf.items.push(SearchResult::Artist(artist));
+        state.explore_shelves = vec![explore_shelf];
+
+        let mut category_shelf = Shelf::new("Category");
+        category_shelf.items.push(SearchResult::Playlist(playlist));
+        state.category_shelves = vec![category_shelf];
+
+        let target_explore = ContextTarget { surface: ContextSurface::Explore, index: 0 };
+        assert_eq!(
+            resolve_subject(&state, target_explore),
+            Some(ContextSubject::Container { id: "art1".to_owned(), kind: DetailKind::Artist })
+        );
+
+        let target_category = ContextTarget { surface: ContextSurface::Category, index: 0 };
+        assert_eq!(
+            resolve_subject(&state, target_category),
+            Some(ContextSubject::Container { id: "pl1".to_owned(), kind: DetailKind::Playlist })
+        );
+    }
+
+    #[test]
+    fn resolve_subject_reads_library_items() {
+        let mut state = test_wired();
+        state.library_playlists = vec![Playlist::new("pl1", "Playlist 1", 5, None)];
+        state.library_albums = vec![Album::new("al1", "Album 1", "Artist 1", None)];
+
+        let target_playlist = ContextTarget { surface: ContextSurface::LibraryPlaylist, index: 0 };
+        assert_eq!(
+            resolve_subject(&state, target_playlist),
+            Some(ContextSubject::Container { id: "pl1".to_owned(), kind: DetailKind::Playlist })
+        );
+
+        let target_album = ContextTarget { surface: ContextSurface::LibraryAlbum, index: 0 };
+        assert_eq!(
+            resolve_subject(&state, target_album),
+            Some(ContextSubject::Container { id: "al1".to_owned(), kind: DetailKind::Album })
+        );
+    }
+
+    #[test]
+    fn resolve_subject_reads_detail_section_cards() {
+        let mut state = test_wired();
+        let card_album =
+            DetailCard::new("c-album", "Album Title", "Sub", None, DetailCardKind::Album);
+        let card_artist =
+            DetailCard::new("c-artist", "Artist Title", "Sub", None, DetailCardKind::Artist);
+
+        let section_1 = DetailSection { title: "Albums".to_owned(), cards: vec![card_album] };
+        let section_2 =
+            DetailSection { title: "Related Artists".to_owned(), cards: vec![card_artist] };
+
+        let artist_page = ArtistPage {
+            songs_title: "Top Songs".to_owned(),
+            songs_more_id: None,
+            sections: vec![section_1, section_2],
+        };
+
+        let mut detail = Detail::new(DetailKind::Artist, "Artist Name", "Description", vec![]);
+        detail = detail.with_artist_page(artist_page);
+        state.detail = Some(detail);
+
+        let target_0 = ContextTarget { surface: ContextSurface::DetailCard, index: 0 };
+        assert_eq!(
+            resolve_subject(&state, target_0),
+            Some(ContextSubject::Container { id: "c-album".to_owned(), kind: DetailKind::Album })
+        );
+
+        let target_1 = ContextTarget { surface: ContextSurface::DetailCard, index: 1 };
+        assert_eq!(
+            resolve_subject(&state, target_1),
+            Some(ContextSubject::Container { id: "c-artist".to_owned(), kind: DetailKind::Artist })
+        );
+
+        let target_2 = ContextTarget { surface: ContextSurface::DetailCard, index: 2 };
+        assert_eq!(resolve_subject(&state, target_2), None);
     }
 
     #[test]
