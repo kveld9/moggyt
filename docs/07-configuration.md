@@ -66,7 +66,7 @@ Local listening history is recorded to an append-only JSON Lines file in the app
 
 ## Authentication and Credential Storage
 
-User authentication for library access (playlists, liked tracks, saved albums) relies on importing session cookies from
+User authentication for library access (playlists and saved albums) relies on importing session cookies from
 an active `music.youtube.com` browser session:
 
 - **Keyring Storage**: imported cookies are stored exclusively in the operating system credential store using the
@@ -75,8 +75,9 @@ an active `music.youtube.com` browser session:
   - Windows: Windows Credential Manager.
 - **Zero Disk Exposure**: raw session cookies and access tokens are never written to plain text configuration files,
   caches, or log outputs.
-- **Anonymous Streaming Invariant**: audio streaming requests and `yt-dlp` sidecar queries remain anonymous and never
-  transmit account cookies. Account credentials are used strictly for catalog library endpoints.
+- **Scope of Account Credentials**: session cookies authenticate catalog library requests and
+  authenticated `InnerTube` player requests (signed with `SAPISIDHASH`). The `yt-dlp` sidecar stays
+  anonymous and never receives account cookies.
 
 ## Logging and Diagnostics
 

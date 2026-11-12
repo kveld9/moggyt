@@ -364,7 +364,8 @@ the pointer:
   current playback untouched.
 - **Add to queue**: appends the track to the end of the queue.
 - **Like**: adds the track to your local favorites and switches the entry to `Unlike` while the
-  track is already liked. Favorites are stored in `settings.json` and survive restarts.
+  track is already liked. Favorites are stored in `settings.json` and survive restarts; they are
+  device-local and are never synced with your YouTube Music account.
 - **Copy link**: copies the track's YouTube Music URL (`https://music.youtube.com/watch?v=<id>`) to
   the system clipboard.
 - **Cards**: album, artist, and playlist rows and cards (search results, `Explore` and category
@@ -372,6 +373,8 @@ the pointer:
   their detail page.
 - The menu closes when an entry is chosen, when you press anywhere outside the popup, or when you
   press `Esc`. Left-clicking a card still opens its detail page directly.
+- Switching to another application leaves the popup open. It closes on the first click after you
+  return, or with `Esc`.
 
 ## Keyboard Shortcuts
 
