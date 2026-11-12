@@ -17,21 +17,31 @@ while IFS= read -r file; do
   fi
 done < <(find src -type f -name "*.rs" ! -name "i18n.rs" | sort)
 
-# 2. Language-branch equality checks in every Slint module under ui/
+# 2. Spanish prose in source comments (all modules, including test modules).
+# The scan above skips test modules, so a non-English comment there escapes it. Comment
+# lines must stay English; Spanish string literals in tests remain allowed, because the
+# i18n tests assert translated output.
+COMMENT_HITS=$(grep -rnP '^[[:space:]]*//.*[áéíóúñÁÉÍÓÚÑ¿¡üÜ]' src ui --include='*.rs' --include='*.slint' || true)
+if [[ -n "${COMMENT_HITS}" ]]; then
+  echo "${COMMENT_HITS}"
+  ERRORS=$((ERRORS + 1))
+fi
+
+# 3. Language-branch equality checks in every Slint module under ui/
 BRANCH_HITS=$(grep -H -En '==\s*"[A-Z][a-zA-Z]+"' $(find ui -type f -name '*.slint' | sort) || true)
 if [[ -n "${BRANCH_HITS}" ]]; then
   echo "${BRANCH_HITS}"
   ERRORS=$((ERRORS + 1))
 fi
 
-# 3. Hardcoded API locale literals in src/
+# 4. Hardcoded API locale literals in src/
 LOCALE_HITS=$(grep -rnE '"hl":\s*"en"|"gl":\s*"US"' src/ || true)
 if [[ -n "${LOCALE_HITS}" ]]; then
   echo "${LOCALE_HITS}"
   ERRORS=$((ERRORS + 1))
 fi
 
-# 4. Disallowed static text/placeholder literals in every Slint module under ui/
+# 5. Disallowed static text/placeholder literals in every Slint module under ui/
 DISALLOWED=$(grep -H -nE '^[[:space:]]*(text|placeholder-text): "' $(find ui -type f -name '*.slint' | sort) \
   | grep -vE 'text: "(Moggyt|0:00|-10s|\+10s|1\.00x|)"' \
   | grep -vE 'text: "\\\{' || true)
