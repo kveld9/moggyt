@@ -122,17 +122,10 @@ pub fn run(
             Err(err) => tracing::warn!(error = %err, "failed to build community skip client"),
         }
     }
-    state.crossfade_seconds = settings.crossfade_seconds;
-    state.stream_cache_limit_mb = settings.stream_cache_limit_mb;
-    state.hi_res_covers = settings.hi_res_covers;
-    state.songs_only = settings.songs_only;
-    state.autoplay = settings.autoplay_enabled;
+    apply_persisted_settings(&mut state, &settings);
     if settings.discord_presence_enabled {
         state.discord = DiscordPresence::new();
     }
-    state.theme = settings.theme;
-    state.accent_override = settings.accent_override.as_deref().and_then(parse_hex_rgb);
-    state.locale = settings.locale;
     if let Some(ref name) = settings.custom_theme_name {
         if let Some(ref mut ct) = state.custom_theme {
             ct.select_theme(Some(name));
@@ -144,9 +137,6 @@ pub fn run(
     if state.theme == ThemeId::Matugen {
         state.reload_matugen_theme();
     }
-    state.player_bar = PlayerBarPrefs::from_settings(&settings);
-    state.recent_searches = settings.recent_searches.clone();
-    state.liked_ids = crate::slint_shell::likes::load_liked_ids(&settings);
     if let Ok(mut c) = state.catalog.lock() {
         c.set_locale(settings.locale);
     }
@@ -182,6 +172,25 @@ pub fn run(
 pub fn persist_state_on_exit(state: &mut SlintAppState) -> anyhow::Result<()> {
     state.maybe_scrobble_current();
     state.queue_store.save(&state.queue)
+}
+
+/// Applies persisted settings that shape in-memory UI state.
+///
+/// Called once after the disk settings store is installed. Settings that need I/O or platform side
+/// effects (audio backend, Discord presence, custom theme reload, catalog locale) stay in `run`.
+/// New persisted fields must be applied here so they are covered by the unit test below.
+pub(crate) fn apply_persisted_settings(state: &mut SlintAppState, settings: &Settings) {
+    state.crossfade_seconds = settings.crossfade_seconds;
+    state.stream_cache_limit_mb = settings.stream_cache_limit_mb;
+    state.hi_res_covers = settings.hi_res_covers;
+    state.songs_only = settings.songs_only;
+    state.autoplay = settings.autoplay_enabled;
+    state.theme = settings.theme;
+    state.accent_override = settings.accent_override.as_deref().and_then(parse_hex_rgb);
+    state.locale = settings.locale;
+    state.player_bar = PlayerBarPrefs::from_settings(settings);
+    state.recent_searches = settings.recent_searches.clone();
+    state.liked_ids = crate::slint_shell::likes::load_liked_ids(settings);
 }
 
 fn detect_persistence_error(
@@ -300,5 +309,31 @@ mod tests {
 
         state.dismiss_persistence_error();
         assert_eq!(state.persistence_error, None);
+    }
+
+    #[test]
+    fn apply_persisted_settings_restores_favorites_and_preferences() {
+        let mut state = test_wired();
+        let settings = Settings {
+            liked_ids: vec!["a".to_owned(), "b".to_owned()],
+            songs_only: true,
+            crossfade_seconds: 4,
+            stream_cache_limit_mb: 64,
+            player_bar_show_volume: false,
+            theme: crate::domain::ThemeId::Matugen,
+            locale: crate::i18n::Locale::Spanish,
+            ..Settings::default()
+        };
+
+        apply_persisted_settings(&mut state, &settings);
+
+        assert!(state.liked_ids.contains("a"));
+        assert!(state.liked_ids.contains("b"));
+        assert!(state.songs_only);
+        assert_eq!(state.crossfade_seconds, 4);
+        assert_eq!(state.stream_cache_limit_mb, 64);
+        assert!(!state.player_bar.show_volume);
+        assert_eq!(state.theme, crate::domain::ThemeId::Matugen);
+        assert_eq!(state.locale, crate::i18n::Locale::Spanish);
     }
 }

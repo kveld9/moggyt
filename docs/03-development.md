@@ -114,6 +114,17 @@ is open; both routes below work in that situation.
   `slint-viewer --backend winit-femtovg` on a headless output (or launch the app) and read that
   capture; keep `--screenshot` for layout, spacing, and color.
 
+## Persisted settings
+
+Persisted values are applied once in `src/slint_shell/app.rs`, after the disk stores are installed,
+inside `apply_persisted_settings`. `SlintAppState::new` only seeds defaults from an in-memory
+settings store, so reading a persisted field there silently returns the default value.
+
+- Register a new persisted field in `Settings`, in `apply_persisted_settings`, and in the unit test
+  that asserts the applied values.
+- Confirm the field survives an application restart as well as a unit test: the in-memory store used
+  by tests never exercises the disk load path.
+
 ## Slint lessons
 
 Distilled rules from Slint behavior that surprised us. Consult the linked source before
