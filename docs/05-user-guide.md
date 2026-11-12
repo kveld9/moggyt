@@ -346,6 +346,8 @@ Users can customize the player bar appearance and element visibility under **Set
   formatted as `m:ss`. Clicking the duration label toggles it between the total duration and the time remaining
   (rendered with a leading minus, e.g. `-2:13`). The label shows `--:--` until the track duration is known from
   catalog metadata or the decoded audio stream.
+  The elapsed label tracks audible playback, so it stays frozen while playback is
+  paused and never shows a position longer than the displayed duration.
 
 ## Keyboard Shortcuts
 
