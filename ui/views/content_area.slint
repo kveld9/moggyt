@@ -168,7 +168,9 @@ export component ContentArea inherits Rectangle {
                         }
                     }
 
-                    Text {
+                    // Detail pages own the container title next to the artwork in their own header,
+                    // so repeating it here would render the same name twice on one screen.
+                    if root.active-page != 3 : Text {
                         text: root.header-title;
                         color: Theme.text;
                         font-size: 24px;

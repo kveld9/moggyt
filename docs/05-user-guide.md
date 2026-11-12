@@ -9,8 +9,10 @@ The interface consists of three primary regions:
 1. **Sidebar**: fixed navigation rail on the left with the application wordmark and one item per page
    (`Search`, `Explore`, `Library`, `Stats`, `Now playing`). The active item is highlighted.
 2. **Content Area**: header with the active page title, a settings button on the right that opens the
-   Settings page, and an update badge when a newer release is detected. Below the header, the active
-   page renders its content; contextual pages (`Detail`, `Import`) replace the current view.
+   Settings page, and an update badge when a newer release is detected. Detail pages show only the back
+   control in the header, because the container title lives in the detail view header next to the
+   artwork. Below the header, the active page renders its content; contextual pages (`Detail`, `Import`)
+   replace the current view.
 3. **Player Bar**: persistent bottom panel providing transport controls, volume slider, and track position.
 
 ## Navigation Pages
