@@ -1,4 +1,4 @@
-import { Theme, TrackRowData, ShelfData, ExploreShelfData, LibraryItemData, LyricLineData, ImportRowData, ImportAlternativeData } from "../theme.slint";
+import { Theme, TrackRowData, ShelfData, ExploreShelfData, LibraryItemData, LyricLineData, ImportRowData, ImportAlternativeData, DetailSectionData } from "../theme.slint";
 import { Sidebar } from "../components/sidebar.slint";
 import { PlayerBar } from "../components/player_bar.slint";
 import { QueuePanel } from "../components/queue_panel.slint";
@@ -69,6 +69,10 @@ export component MoggytWindow inherits Window {
     in-out property <string> detail-description: "";
     in-out property <string> detail-kind-label: "";
     in-out property <[TrackRowData]> detail-tracks: [];
+    in-out property <bool> detail-is-artist: false;
+    in-out property <string> detail-songs-title: "";
+    in-out property <bool> detail-has-songs-more: false;
+    in-out property <[DetailSectionData]> detail-sections: [];
     in-out property <image> detail-cover;
     in-out property <[ExploreShelfData]> explore-shelves: [];
     in-out property <bool> explore-loading: false;
@@ -146,6 +150,8 @@ export component MoggytWindow inherits Window {
     callback detail-track-selected(int);
     callback detail-play();
     callback detail-shuffle();
+    callback detail-card-selected(int);
+    callback detail-show-all-songs();
     callback sign-in-submitted(string);
     callback sign-out();
     callback toggle-queue-panel();
@@ -211,6 +217,10 @@ export component MoggytWindow inherits Window {
                     detail-kind-label: root.detail-kind-label;
                     detail-cover: root.detail-cover;
                     detail-tracks: root.detail-tracks;
+                    detail-is-artist: root.detail-is-artist;
+                    detail-songs-title: root.detail-songs-title;
+                    detail-has-songs-more: root.detail-has-songs-more;
+                    detail-sections: root.detail-sections;
                     queue-tracks: root.queue-tracks;
                     queue-selected-index: root.queue-selected-index;
                     queue-track-selected(idx) => { root.queue-track-selected(idx); }
@@ -262,6 +272,8 @@ export component MoggytWindow inherits Window {
                     detail-track-selected(idx) => { root.detail-track-selected(idx); }
                     detail-play => { root.detail-play(); }
                     detail-shuffle => { root.detail-shuffle(); }
+                    detail-card-selected(idx) => { root.detail-card-selected(idx); }
+                    detail-show-all-songs => { root.detail-show-all-songs(); }
                     sign-in-submitted(t) => { root.sign-in-submitted(t); }
                     sign-out() => { root.sign-out(); }
                     theme-selected(idx) => { root.theme-selected(idx); }

@@ -22,6 +22,7 @@ use crate::slint_shell::covers::{
     request_detail_covers, request_library_covers, request_shelf_covers, resolve_row_cover_image,
     spawn_cover_fetch_pool,
 };
+use crate::slint_shell::detail::detail_is_empty;
 use crate::slint_shell::format::format_queue_label;
 use crate::slint_shell::history::{is_history_id, label_history_detail, with_history_entry};
 use crate::slint_shell::import_callbacks::{
@@ -208,7 +209,7 @@ fn apply_detail_outcome(
     }
     match detail {
         Ok(Some(detail)) => {
-            let is_empty = detail.tracks.is_empty();
+            let is_empty = detail_is_empty(&detail);
             state.detail = apply_detail_result(Some(detail), id, state.locale);
             state.detail_error = None;
             state.detail_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };

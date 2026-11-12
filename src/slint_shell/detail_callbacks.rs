@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::domain::is_local_playlist_id;
+use crate::domain::{DetailCardKind, DetailKind, is_local_playlist_id};
 use crate::slint_shell::callbacks::with_window_state;
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::import_callbacks::{current_store, reload_local_library};
@@ -13,7 +13,7 @@ use crate::slint_shell::local_edit;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::sync_window;
-use crate::slint_shell::window::trigger_playback;
+use crate::slint_shell::window::{open_detail_async, trigger_playback};
 use crate::slint_shell::{LocalEditUi, MoggytWindow};
 
 /// Wires detail view track selection and playback action callbacks.
@@ -41,6 +41,20 @@ pub(crate) fn wire_detail_callbacks(
     let tx = worker_tx.clone();
     window.on_detail_shuffle(move || {
         with_window_state(&w, &s, |win, st| handle_detail_shuffle(win, st, &tx));
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
+    window.on_detail_card_selected(move |idx| {
+        with_window_state(&w, &s, |win, st| handle_detail_card_selected(win, st, &tx, idx));
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
+    window.on_detail_show_all_songs(move || {
+        with_window_state(&w, &s, |win, st| handle_detail_show_all_songs(win, st, &tx));
     });
 
     let local_ui = window.global::<LocalEditUi>();
@@ -226,6 +240,43 @@ fn handle_detail_shuffle(
         trigger_playback(win, st);
     }
     sync_window(win, st);
+}
+
+fn handle_detail_card_selected(
+    win: &MoggytWindow,
+    st: &mut SlintAppState,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+    idx: i32,
+) {
+    let Some(card) = st
+        .detail
+        .as_ref()
+        .and_then(|detail| crate::slint_shell::detail::detail_card_at(detail, idx))
+    else {
+        return;
+    };
+    let id = card.id.clone();
+    let kind = match card.kind {
+        DetailCardKind::Album => DetailKind::Album,
+        DetailCardKind::Artist => DetailKind::Artist,
+    };
+    open_detail_async(win, st, &id, kind, tx);
+}
+
+fn handle_detail_show_all_songs(
+    win: &MoggytWindow,
+    st: &mut SlintAppState,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    let Some(id) = st
+        .detail
+        .as_ref()
+        .and_then(|detail| detail.artist.as_ref())
+        .and_then(|page| page.songs_more_id.clone())
+    else {
+        return;
+    };
+    open_detail_async(win, st, &id, DetailKind::Playlist, tx);
 }
 
 /// Enqueues the open detail and shuffles it, rebuilding the linear queue first so the

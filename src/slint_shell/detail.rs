@@ -1,7 +1,7 @@
 //! Slint detail page state and view-model bridge.
 //! Hexagonal invariant: pure in-memory with zero I/O, network, audio, or async.
 
-use crate::domain::{Detail, DetailKind};
+use crate::domain::{Detail, DetailCard, DetailKind};
 
 pub fn detail_kind_label(kind: DetailKind) -> &'static str {
     match kind {
@@ -28,6 +28,28 @@ pub fn resolve_detail_cover_url(detail: &Detail) -> Option<&str> {
             .and_then(|t| t.artwork.as_deref())
             .filter(|url| !url.trim().is_empty())
     })
+}
+
+/// Returns `true` when the detail has neither tracks nor artist-page sections.
+pub fn detail_is_empty(detail: &Detail) -> bool {
+    detail.tracks.is_empty() && detail.artist.as_ref().is_none_or(|page| page.sections.is_empty())
+}
+
+/// Resolves a flattened artist-page card index to its card.
+///
+/// Card indices are assigned section by section, in server order, by the UI projection.
+pub fn detail_card_at(detail: &Detail, index: i32) -> Option<&DetailCard> {
+    if index < 0 {
+        return None;
+    }
+    let mut remaining = index as usize;
+    for section in &detail.artist.as_ref()?.sections {
+        if remaining < section.cards.len() {
+            return section.cards.get(remaining);
+        }
+        remaining -= section.cards.len();
+    }
+    None
 }
 
 #[cfg(test)]
@@ -93,5 +115,56 @@ mod tests {
         let with_blank = Detail::new(DetailKind::Playlist, "Title", "Sub", vec![empty_track])
             .with_artwork("   ");
         assert!(!detail_has_artwork(&with_blank));
+    }
+
+    #[test]
+    fn detail_is_empty_considers_artist_sections() {
+        use crate::domain::{ArtistPage, DetailSection};
+
+        let album = Detail::new(DetailKind::Album, "Album", "", Vec::new());
+        assert!(detail_is_empty(&album));
+
+        let with_sections = Detail::new(DetailKind::Artist, "Artist", "", Vec::new())
+            .with_artist_page(ArtistPage {
+                songs_title: "Popular songs".to_owned(),
+                songs_more_id: None,
+                sections: vec![DetailSection { title: "Albums".to_owned(), cards: Vec::new() }],
+            });
+        assert!(!detail_is_empty(&with_sections));
+    }
+
+    #[test]
+    fn detail_card_at_flattens_sections_in_order() {
+        use crate::domain::{ArtistPage, DetailCard, DetailCardKind, DetailSection};
+
+        let card = |id: &str, kind| DetailCard::new(id, id, "", None, kind);
+        let detail = Detail::new(DetailKind::Artist, "Artist", "", Vec::new()).with_artist_page(
+            ArtistPage {
+                songs_title: String::new(),
+                songs_more_id: None,
+                sections: vec![
+                    DetailSection {
+                        title: "Albums".to_owned(),
+                        cards: vec![card("album-1", DetailCardKind::Album)],
+                    },
+                    DetailSection {
+                        title: "Fans".to_owned(),
+                        cards: vec![
+                            card("artist-1", DetailCardKind::Artist),
+                            card("artist-2", DetailCardKind::Artist),
+                        ],
+                    },
+                ],
+            },
+        );
+
+        assert_eq!(detail_card_at(&detail, 0).map(|c| c.id.as_str()), Some("album-1"));
+        assert_eq!(detail_card_at(&detail, 1).map(|c| c.id.as_str()), Some("artist-1"));
+        assert_eq!(detail_card_at(&detail, 2).map(|c| c.id.as_str()), Some("artist-2"));
+        assert!(detail_card_at(&detail, 3).is_none());
+        assert!(detail_card_at(&detail, -1).is_none());
+
+        let plain = Detail::new(DetailKind::Album, "Album", "", Vec::new());
+        assert!(detail_card_at(&plain, 0).is_none());
     }
 }
