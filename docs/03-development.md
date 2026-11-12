@@ -186,3 +186,11 @@ guessing; every rule here was verified against a build or the official documenta
   `HorizontalLayout { alignment: center; ... }`: the wrapper takes the full width and the
   icon centers inside it.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/verticallayout/>.
+
+- Solid icon glyphs must be drawn as a single filled `Path`, never as a fill plus a stroke of
+  the same closed outline: the two antialiased passes composite at the path start and leave a
+  one-pixel background hole at the closing join. On the 20px `IconPlay` glyph this rendered as
+  a chipped top-left corner on the player bar button, and it reproduced only in the femtovg
+  backend (the software renderer hid it). Removing the stroke keeps the silhouette: the glyph
+  measured 12.20 x 14.20 viewbox units without it and 12.25 x 14.30 with it.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/elements/path/>.
