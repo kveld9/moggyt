@@ -62,6 +62,7 @@ pub mod labels;
 pub mod lastfm_connect;
 pub mod likes;
 pub mod local_edit;
+pub mod navigate;
 mod output_device;
 pub mod page;
 pub mod platform;

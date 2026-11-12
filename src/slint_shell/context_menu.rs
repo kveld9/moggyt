@@ -24,14 +24,18 @@ use crate::slint_shell::{
     ContextIcon, ContextMenuItemData, ContextSurface, ContextUi, MoggytWindow,
 };
 
-/// Track actions offered by the context menu, in rendering order.
-pub const TRACK_ACTIONS: [ContextAction; 5] = [
-    ContextAction::PlayNow,
-    ContextAction::PlayNext,
-    ContextAction::AddToQueue,
-    ContextAction::ToggleLike,
-    ContextAction::CopyLink,
-];
+/// Actions offered for a track row, honoring the metadata the track carries.
+pub fn track_actions(track: &Track) -> Vec<ContextAction> {
+    let mut actions =
+        vec![ContextAction::PlayNow, ContextAction::PlayNext, ContextAction::AddToQueue];
+    if !track.artist.trim().is_empty() {
+        actions.push(ContextAction::GoToArtist);
+        actions.push(ContextAction::GoToAlbum);
+    }
+    actions.push(ContextAction::ToggleLike);
+    actions.push(ContextAction::CopyLink);
+    actions
+}
 
 /// Actions offered for container rows, in rendering order.
 pub const CONTAINER_ACTIONS: [ContextAction; 1] = [ContextAction::Open];
@@ -47,16 +51,17 @@ pub enum ContextSubject {
 
 impl ContextSubject {
     /// Actions offered for this subject, in rendering order.
-    pub fn actions(&self) -> &'static [ContextAction] {
+    pub fn actions(&self) -> Vec<ContextAction> {
         match self {
-            Self::Track(_) => &TRACK_ACTIONS,
-            Self::Container { .. } => &CONTAINER_ACTIONS,
+            Self::Track(track) => track_actions(track),
+            Self::Container { .. } => CONTAINER_ACTIONS.to_vec(),
         }
     }
 
     /// Maps a rendered menu index back to an action for this subject.
     pub fn action_at(&self, index: i32) -> Option<ContextAction> {
-        usize::try_from(index).ok().and_then(|i| self.actions().get(i)).copied()
+        let i = usize::try_from(index).ok()?;
+        self.actions().get(i).copied()
     }
 }
 
@@ -69,6 +74,10 @@ pub enum ContextAction {
     PlayNext,
     /// Append the track to the end of the queue.
     AddToQueue,
+    /// Open the artist page for the track's artist.
+    GoToArtist,
+    /// Open the album page for the track's album.
+    GoToAlbum,
     /// Toggle the local favorite flag for the track.
     ToggleLike,
     /// Copy the YouTube Music watch URL for the track.
@@ -84,6 +93,8 @@ impl ContextAction {
             Self::PlayNow => tr(locale, "Play"),
             Self::PlayNext => tr(locale, "Play next"),
             Self::AddToQueue => tr(locale, "Add to queue"),
+            Self::GoToArtist => tr(locale, "Go to artist"),
+            Self::GoToAlbum => tr(locale, "Go to album"),
             Self::ToggleLike if liked => tr(locale, "Unlike"),
             Self::ToggleLike => tr(locale, "Like"),
             Self::CopyLink => tr(locale, "Copy link"),
@@ -97,6 +108,8 @@ impl ContextAction {
             Self::PlayNow => ContextIcon::Play,
             Self::PlayNext => ContextIcon::Next,
             Self::AddToQueue => ContextIcon::Queue,
+            Self::GoToArtist => ContextIcon::Artist,
+            Self::GoToAlbum => ContextIcon::Album,
             Self::ToggleLike if liked => ContextIcon::HeartFilled,
             Self::ToggleLike => ContextIcon::Heart,
             Self::CopyLink => ContextIcon::Copy,
@@ -146,6 +159,10 @@ pub enum FollowUp {
     StartPlayback,
     /// The derived watch URL must be written to the system clipboard.
     CopyLink(String),
+    /// The resolved artist name must be looked up and opened.
+    GoToArtist(String),
+    /// The album query must be looked up and opened.
+    GoToAlbum(String),
 }
 
 /// Resolves the subject a context target points at.
@@ -278,7 +295,18 @@ pub fn apply_action(
                 None => FollowUp::None,
             }
         }
+        ContextAction::GoToArtist => FollowUp::GoToArtist(track.artist.trim().to_owned()),
+        ContextAction::GoToAlbum => FollowUp::GoToAlbum(album_query(&track)),
         ContextAction::Open => FollowUp::None,
+    }
+}
+
+/// Catalog query that targets the album a track belongs to.
+fn album_query(track: &Track) -> String {
+    let album = track.album.as_deref().map(str::trim).filter(|album| !album.is_empty());
+    match album {
+        Some(album) => format!("{} {}", track.artist.trim(), album).trim().to_owned(),
+        None => format!("{} {}", track.artist.trim(), track.title.trim()).trim().to_owned(),
     }
 }
 
@@ -383,6 +411,14 @@ fn finish_track(
         } else {
             (tr(state.locale, "Could not copy the link"), ContextIcon::Close)
         }),
+        FollowUp::GoToArtist(query) => {
+            super::navigate::open_named_detail_async(window, state, &query, DetailKind::Artist);
+            None
+        }
+        FollowUp::GoToAlbum(query) => {
+            super::navigate::open_named_detail_async(window, state, &query, DetailKind::Album);
+            None
+        }
         FollowUp::None => action_message(state, action, &track_id),
     };
     if let Some((text, icon)) = message {
