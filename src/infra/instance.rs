@@ -148,9 +148,9 @@ mod tests {
 
     #[test]
     fn single_instance_guard_lifecycle_acquire_conflict_and_reacquire() {
-        // Usamos un nombre de lock único por proceso de test para no colisionar
-        // con otras instancias de moggyt (u otros procesos) que puedan tener el
-        // lock del SO tomado bajo el nombre por defecto.
+        // Use a unique lock name per test process so this guard cannot collide
+        // with another moggyt instance (or any other process) that may already
+        // hold the OS-level lock under the default name.
         let lock_name = format!("moggyt-single-instance-test-{}", id());
 
         let first = SingleInstanceGuard::try_acquire_named(&lock_name);
