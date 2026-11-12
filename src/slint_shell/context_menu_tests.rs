@@ -6,13 +6,13 @@ mod tests {
         Playlist, SearchResult, Shelf, Track,
     };
     use crate::i18n::Locale;
-    use crate::slint_shell::ContextSurface;
     use crate::slint_shell::context_menu::{
         ContextAction, ContextSubject, ContextTarget, FollowUp, apply_action, menu_items,
         resolve_subject,
     };
     use crate::slint_shell::page::SlintPage;
     use crate::slint_shell::test_support::test_wired;
+    use crate::slint_shell::{ContextIcon, ContextSurface};
 
     #[test]
     fn menu_items_follow_track_action_order() {
@@ -21,14 +21,19 @@ mod tests {
         assert_eq!(items.len(), 5);
         assert_eq!(items[0].index, 0);
         assert_eq!(items[0].label, "Play");
+        assert_eq!(items[0].icon, ContextIcon::Play);
         assert_eq!(items[1].index, 1);
         assert_eq!(items[1].label, "Play next");
+        assert_eq!(items[1].icon, ContextIcon::Next);
         assert_eq!(items[2].index, 2);
         assert_eq!(items[2].label, "Add to queue");
+        assert_eq!(items[2].icon, ContextIcon::Queue);
         assert_eq!(items[3].index, 3);
         assert_eq!(items[3].label, "Like");
+        assert_eq!(items[3].icon, ContextIcon::Heart);
         assert_eq!(items[4].index, 4);
         assert_eq!(items[4].label, "Copy link");
+        assert_eq!(items[4].icon, ContextIcon::Copy);
     }
 
     #[test]
@@ -53,6 +58,10 @@ mod tests {
         let subject = ContextSubject::Track(Track::new("t1", "Title", "Artist"));
         let en_items = menu_items(Locale::English, &subject, true);
         assert_eq!(en_items.get(3).map(|item| item.label.as_str()), Some("Unlike"));
+        assert_eq!(en_items.get(3).map(|item| item.icon), Some(ContextIcon::HeartFilled));
+
+        let unliked_items = menu_items(Locale::English, &subject, false);
+        assert_eq!(unliked_items.get(3).map(|item| item.icon), Some(ContextIcon::Heart));
 
         let es_items = menu_items(Locale::Spanish, &subject, true);
         assert_eq!(es_items.get(3).map(|item| item.label.as_str()), Some("Quitar me gusta"));
@@ -77,6 +86,7 @@ mod tests {
         assert_eq!(en_items.len(), 1);
         assert_eq!(en_items[0].index, 0);
         assert_eq!(en_items[0].label, "Open");
+        assert_eq!(en_items[0].icon, ContextIcon::Open);
 
         let es_items = menu_items(Locale::Spanish, &container, false);
         assert_eq!(es_items.len(), 1);
