@@ -18,6 +18,7 @@ use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::iter_shelf_items;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::sync_window;
+use crate::slint_shell::toast::notify;
 use crate::slint_shell::window::{open_detail_async, trigger_playback};
 use crate::slint_shell::{ContextMenuItemData, ContextSurface, ContextUi, MoggytWindow};
 
@@ -354,17 +355,49 @@ fn finish_track(
     action: ContextAction,
     track: Track,
 ) {
-    match apply_action(state, target, action, track) {
-        FollowUp::StartPlayback => trigger_playback(window, state),
-        FollowUp::CopyLink(url) => copy_track_link(&url),
-        FollowUp::None => {}
+    let track_id = track.id.clone();
+    let follow_up = apply_action(state, target, action, track);
+    let message = match follow_up {
+        FollowUp::StartPlayback => {
+            trigger_playback(window, state);
+            None
+        }
+        FollowUp::CopyLink(url) => Some(if copy_track_link(&url) {
+            tr(state.locale, "Link copied")
+        } else {
+            tr(state.locale, "Could not copy the link")
+        }),
+        FollowUp::None => action_message(state, action, &track_id),
+    };
+    if let Some(text) = message {
+        notify(window, state, text);
     }
     sync_window(window, state);
 }
 
-fn copy_track_link(url: &str) {
-    if let Err(err) = crate::infra::copy_text(url) {
-        tracing::warn!("failed to copy track link: {err}");
+fn action_message(
+    state: &SlintAppState,
+    action: ContextAction,
+    track_id: &str,
+) -> Option<&'static str> {
+    match action {
+        ContextAction::PlayNext => Some(tr(state.locale, "Playing next")),
+        ContextAction::AddToQueue => Some(tr(state.locale, "Added to queue")),
+        ContextAction::ToggleLike if is_track_liked(&state.liked_ids, track_id) => {
+            Some(tr(state.locale, "Added to favorites"))
+        }
+        ContextAction::ToggleLike => Some(tr(state.locale, "Removed from favorites")),
+        _ => None,
+    }
+}
+
+fn copy_track_link(url: &str) -> bool {
+    match crate::infra::copy_text(url) {
+        Ok(()) => true,
+        Err(err) => {
+            tracing::warn!("failed to copy track link: {err}");
+            false
+        }
     }
 }
 

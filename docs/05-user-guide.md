@@ -376,6 +376,10 @@ the pointer:
 - Switching to another application leaves the popup open. It closes on the first click after you
   return, or with `Esc`.
 
+Context actions confirm their result with a transient toast above the player bar: link copied, copy
+failure, added to the queue, playing next, and favorite added or removed. Toasts stack up to three and
+disappear on their own after about two seconds.
+
 ## Keyboard Shortcuts
 
 Keyboard shortcuts are always enabled and cannot be disabled. They provide transport and playback control whenever a
