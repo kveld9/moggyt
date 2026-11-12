@@ -123,12 +123,19 @@ export component ContentArea inherits Rectangle {
     in property <string> persistence-error-text: "";
     in property <string> persistence-dismiss-text: "Dismiss";
     callback persistence-error-dismissed();
+    // Width actually available to this content column. It shrinks when the queue panel opens
+    // while the window width stays unchanged, so card grids reflow from this value.
+    callback content-width-changed(int);
 
     background: Theme.window;
     clip: true;
 
     changed active-page => {
         flick.content-y = 0px;
+    }
+
+    changed width => {
+        root.content-width-changed(self.width / 1px);
     }
 
     flick := Flickable {

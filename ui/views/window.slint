@@ -147,7 +147,7 @@ export component MoggytWindow inherits Window {
     callback top-result-selected();
     callback explore-track-selected(int);
     callback category-item-selected(int);
-    callback width-changed(int);
+    callback content-width-changed(int);
     callback queue-track-selected(int);
     callback playlist-selected(int);
     callback album-selected(int);
@@ -178,7 +178,6 @@ export component MoggytWindow inherits Window {
     callback import-custom-id-submitted(string);
     callback library-import-requested();
     library-import-requested => { root.show-import-modal = true; }
-    changed width => { root.width-changed(self.width / 1px); }
     shortcuts := ShortcutScope {
         shortcut-pressed(text, modified) => { return root.shortcut-pressed(text, modified); }
         VerticalLayout {
@@ -200,6 +199,7 @@ export component MoggytWindow inherits Window {
 
                 ContentArea {
                     horizontal-stretch: 1;
+                    content-width-changed(w) => { root.content-width-changed(w); }
                     active-page: root.active-page;
                     header-title: root.header-title;
                     query <=> root.query;
