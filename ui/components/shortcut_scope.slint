@@ -1,8 +1,13 @@
+import { ContextUi } from "./context_menu.slint";
+
 export component ShortcutScope inherits FocusScope {
     callback shortcut-pressed(string, bool) -> bool;
 
     key-pressed(event) => {
         if (event.text == Key.Escape) {
+            if (ContextUi.is-open) {
+                ContextUi.dismissed();
+            }
             self.focus();
             return accept;
         }

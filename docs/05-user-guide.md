@@ -370,8 +370,8 @@ the pointer:
 - **Cards**: album, artist, and playlist rows and cards (search results, `Explore` and category
   grids, artist-page sections, and the `Library` lists) open a menu with `Open`, which navigates to
   their detail page.
-- The menu closes when an entry is chosen or when you press anywhere outside the popup.
-  Left-clicking a card still opens its detail page directly.
+- The menu closes when an entry is chosen, when you press anywhere outside the popup, or when you
+  press `Esc`. Left-clicking a card still opens its detail page directly.
 
 ## Keyboard Shortcuts
 
