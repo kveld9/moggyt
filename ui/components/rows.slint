@@ -185,6 +185,8 @@ export component LibraryItemCard inherits Rectangle {
     in property <string> title;
     in property <string> subtitle;
     in property <image> cover;
+    in property <int> index: -1;
+    in property <ContextSurface> surface: ContextSurface.library-playlist;
     callback clicked();
 
     height: 48px;
@@ -192,7 +194,19 @@ export component LibraryItemCard inherits Rectangle {
     background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent);
     animate background { duration: 150ms; easing: ease-in-out; }
 
-    touch := TouchArea { clicked => { root.clicked(); } }
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                ContextUi.opened(
+                    root.surface,
+                    root.index,
+                    self.absolute-position.x + self.mouse-x,
+                    self.absolute-position.y + self.mouse-y,
+                );
+            }
+        }
+    }
 
     HorizontalLayout {
         padding-left: 8px;

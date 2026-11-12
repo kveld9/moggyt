@@ -367,9 +367,11 @@ the pointer:
   track is already liked. Favorites are stored in `settings.json` and survive restarts.
 - **Copy link**: copies the track's YouTube Music URL (`https://music.youtube.com/watch?v=<id>`) to
   the system clipboard.
-- The menu closes when an entry is chosen or when you press anywhere outside the popup. Albums,
-  artists, and playlists in the `Search` results do not open a context menu; left-click them to
-  open their detail page.
+- **Cards**: album, artist, and playlist rows and cards (search results, `Explore` and category
+  grids, artist-page sections, and the `Library` lists) open a menu with `Open`, which navigates to
+  their detail page.
+- The menu closes when an entry is chosen or when you press anywhere outside the popup.
+  Left-clicking a card still opens its detail page directly.
 
 ## Keyboard Shortcuts
 

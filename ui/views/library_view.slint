@@ -1,6 +1,7 @@
 import { Labels } from "../labels.slint";
 import { Theme, LibraryItemData } from "../theme.slint";
 import { LibraryItemCard } from "../components/rows.slint";
+import { ContextSurface } from "../components/context_menu.slint";
 import { IconLibrary } from "../icons.slint";
 
 export component LibraryView inherits VerticalLayout {
@@ -96,13 +97,27 @@ export component LibraryView inherits VerticalLayout {
         spacing: 6px;
         Text { text: Labels.section-playlists-label; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.playlists.length == 0 : Text { text: Labels.empty-playlists-text; color: Theme.secondary; font-size: 13px; }
-        for item in root.playlists : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.playlist-selected(item.index); } }
+        for item in root.playlists : LibraryItemCard {
+            index: item.index;
+            surface: ContextSurface.library-playlist;
+            title: item.title;
+            subtitle: item.subtitle;
+            cover: item.cover;
+            clicked => { root.playlist-selected(item.index); }
+        }
     }
 
     if root.signed-in : VerticalLayout {
         spacing: 6px;
         Text { text: Labels.section-albums-label; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.albums.length == 0 : Text { text: Labels.empty-albums-text; color: Theme.secondary; font-size: 13px; }
-        for item in root.albums : LibraryItemCard { title: item.title; subtitle: item.subtitle; cover: item.cover; clicked => { root.album-selected(item.index); } }
+        for item in root.albums : LibraryItemCard {
+            index: item.index;
+            surface: ContextSurface.library-album;
+            title: item.title;
+            subtitle: item.subtitle;
+            cover: item.cover;
+            clicked => { root.album-selected(item.index); }
+        }
     }
 }
