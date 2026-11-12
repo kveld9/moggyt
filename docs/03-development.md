@@ -249,3 +249,9 @@ guessing; every rule here was verified against a build or the official documenta
   backend (the software renderer hid it). Removing the stroke keeps the silhouette: the glyph
   measured 12.20 x 14.20 viewbox units without it and 12.25 x 14.30 with it.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/elements/path/>.
+- Window activation is not observable from Slint: the `Window` element exposes geometry,
+  visibility, and presentation properties but no `active`/focus state and no window-focus callback,
+  and `FocusScope.focus-lost` only reports internal keyboard focus changes. An in-window popup
+  therefore cannot dismiss itself when the application loses OS focus without a backend hook;
+  document the limitation instead of chasing it in Slint.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/window/window/>.
