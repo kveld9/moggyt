@@ -2,11 +2,12 @@ import { Labels } from "../labels.slint";
 import { PlaybackUi, Theme, TrackRowData } from "../theme.slint";
 import { TrackRow } from "./rows.slint";
 import { ContextSurface } from "./context_menu.slint";
-import { IconClose } from "../icons.slint";
+import { IconClose, IconTrash } from "../icons.slint";
 
 export component QueuePanel inherits Rectangle {
     in property <[TrackRowData]> tracks: [];
     in property <int> selected-index: -1;
+    property <bool> clear-confirm-open: false;
     callback track-selected(int);
     callback close-panel();
 
@@ -42,28 +43,25 @@ export component QueuePanel inherits Rectangle {
                 vertical-stretch: 0;
 
                 if root.tracks.length > 0 : Rectangle {
-                    min-width: 84px;
+                    width: 28px;
                     height: 28px;
                     border-radius: 14px;
                     background: clear-touch.pressed ? Theme.overlay : (clear-touch.has-hover ? Theme.hover : transparent);
                     animate background { duration: 150ms; easing: ease-in-out; }
 
                     clear-touch := TouchArea {
-                        clicked => { PlaybackUi.queue-cleared(); }
+                        clicked => { root.clear-confirm-open = true; }
                     }
 
-                    HorizontalLayout {
-                        padding-left: 12px;
-                        padding-right: 12px;
-                        alignment: center;
+                    Tooltip {
+                        text: @markdown("\{Labels.clear-queue-label}");
+                    }
 
-                        Text {
-                            text: Labels.clear-queue-label;
-                            color: Theme.accent;
-                            font-size: 11px;
-                            font-weight: 700;
-                            vertical-alignment: center;
-                        }
+                    IconTrash {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 16px;
+                        tint: clear-touch.has-hover ? Theme.accent : Theme.secondary;
                     }
                 }
 
@@ -76,6 +74,10 @@ export component QueuePanel inherits Rectangle {
 
                     close-touch := TouchArea {
                         clicked => { root.close-panel(); }
+                    }
+
+                    Tooltip {
+                        text: @markdown("\{Labels.close-tooltip}");
                     }
 
                     IconClose {
@@ -119,6 +121,108 @@ export component QueuePanel inherits Rectangle {
                     cover: track.cover;
                     is-active: track.index == root.selected-index;
                     clicked => { root.track-selected(track.index); }
+                }
+            }
+        }
+    }
+
+    if root.clear-confirm-open : Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: Theme.overlay;
+
+        confirm-dismiss := TouchArea {
+            clicked => { root.clear-confirm-open = false; }
+        }
+
+        Rectangle {
+            width: min(parent.width - 48px, 280px);
+            height: 140px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: Theme.panel;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.border;
+            drop-shadow-blur: 18px;
+            drop-shadow-offset-y: 4px;
+            drop-shadow-color: #00000066;
+
+            card-touch := TouchArea {}
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 8px;
+                alignment: start;
+
+                Text {
+                    text: Labels.clear-queue-confirm-title;
+                    color: Theme.text;
+                    font-size: 15px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: Labels.clear-queue-confirm-hint;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+
+                    Rectangle {
+                        width: 88px;
+                        height: 28px;
+                        border-radius: 6px;
+                        background: cancel-touch.pressed ? Theme.overlay : (cancel-touch.has-hover ? Theme.hover : Theme.surface);
+
+                        cancel-touch := TouchArea {
+                            clicked => { root.clear-confirm-open = false; }
+                        }
+
+                        Text {
+                            x: 0;
+                            y: 0;
+                            width: parent.width;
+                            height: parent.height;
+                            text: Labels.cancel-label;
+                            color: cancel-touch.has-hover ? Theme.text : Theme.secondary;
+                            font-size: 12px;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 88px;
+                        height: 28px;
+                        border-radius: 6px;
+                        background: confirm-touch.pressed ? Theme.overlay : (confirm-touch.has-hover ? Theme.hover : Theme.accent);
+
+                        confirm-touch := TouchArea {
+                            clicked => {
+                                root.clear-confirm-open = false;
+                                PlaybackUi.queue-cleared();
+                            }
+                        }
+
+                        Text {
+                            x: 0;
+                            y: 0;
+                            width: parent.width;
+                            height: parent.height;
+                            text: Labels.clear-confirm-label;
+                            color: confirm-touch.has-hover ? Theme.text : Theme.window;
+                            font-size: 12px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
                 }
             }
         }

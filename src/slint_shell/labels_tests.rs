@@ -248,6 +248,27 @@ mod tests {
         assert_eq!(es.local_remove_track_label, "Quitar");
         assert_eq!(es.local_move_up_label, "Subir");
         assert_eq!(es.local_move_down_label, "Bajar");
+        assert_eq!(es.close_tooltip, "Cerrar");
+        assert_eq!(es.like_tooltip, "Me gusta");
+        assert_eq!(es.unlike_tooltip, "Quitar me gusta");
+        assert_eq!(es.queue_tooltip, "Cola");
+        assert_eq!(es.shuffle_tooltip, "Aleatorio");
+        assert_eq!(es.play_tooltip, "Reproducir");
+        assert_eq!(es.pause_tooltip, "Pausar");
+        assert_eq!(es.previous_track_tooltip, "Canción anterior");
+        assert_eq!(es.next_track_tooltip, "Siguiente canción");
+        assert_eq!(es.repeat_tooltip, "Repetir");
+        assert_eq!(es.mute_tooltip, "Silenciar");
+        assert_eq!(es.unmute_tooltip, "Activar sonido");
+        assert_eq!(es.back_tooltip, "Volver");
+        assert_eq!(es.clear_search_tooltip, "Borrar búsqueda");
+        assert_eq!(es.remove_recent_search_tooltip, "Quitar búsqueda reciente");
+        assert_eq!(es.exclude_track_tooltip, "Excluir de la importación");
+        assert_eq!(es.include_track_tooltip, "Incluir en la importación");
+        assert_eq!(es.clear_queue_confirm_title, "¿Vaciar cola?");
+        assert_eq!(es.clear_queue_confirm_hint, "Esto quita todas las canciones de la cola.");
+        assert_eq!(es.clear_confirm_label, "Vaciar");
+        assert_eq!(es.cancel_label, "Cancelar");
 
         let en = StaticLabels::resolve(Locale::English, Some(test_config_dir));
         assert_eq!(en.nav_search, "Search");
@@ -412,6 +433,27 @@ mod tests {
         assert_eq!(en.local_remove_track_label, "Remove");
         assert_eq!(en.local_move_up_label, "Up");
         assert_eq!(en.local_move_down_label, "Down");
+        assert_eq!(en.close_tooltip, "Close");
+        assert_eq!(en.like_tooltip, "Like");
+        assert_eq!(en.unlike_tooltip, "Unlike");
+        assert_eq!(en.queue_tooltip, "Queue");
+        assert_eq!(en.shuffle_tooltip, "Shuffle");
+        assert_eq!(en.play_tooltip, "Play");
+        assert_eq!(en.pause_tooltip, "Pause");
+        assert_eq!(en.previous_track_tooltip, "Previous track");
+        assert_eq!(en.next_track_tooltip, "Next track");
+        assert_eq!(en.repeat_tooltip, "Repeat");
+        assert_eq!(en.mute_tooltip, "Mute");
+        assert_eq!(en.unmute_tooltip, "Unmute");
+        assert_eq!(en.back_tooltip, "Back");
+        assert_eq!(en.clear_search_tooltip, "Clear search");
+        assert_eq!(en.remove_recent_search_tooltip, "Remove recent search");
+        assert_eq!(en.exclude_track_tooltip, "Exclude from import");
+        assert_eq!(en.include_track_tooltip, "Include in import");
+        assert_eq!(en.clear_queue_confirm_title, "Clear queue?");
+        assert_eq!(en.clear_queue_confirm_hint, "This removes all tracks from the queue.");
+        assert_eq!(en.clear_confirm_label, "Clear");
+        assert_eq!(en.cancel_label, "Cancel");
     }
 
     #[test]

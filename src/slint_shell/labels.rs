@@ -173,6 +173,27 @@ pub struct StaticLabels {
     pub version_fix_search_label: &'static str,
     pub version_fix_empty_label: &'static str,
     pub version_fix_hint_label: &'static str,
+    pub close_tooltip: &'static str,
+    pub like_tooltip: &'static str,
+    pub unlike_tooltip: &'static str,
+    pub queue_tooltip: &'static str,
+    pub shuffle_tooltip: &'static str,
+    pub play_tooltip: &'static str,
+    pub pause_tooltip: &'static str,
+    pub previous_track_tooltip: &'static str,
+    pub next_track_tooltip: &'static str,
+    pub repeat_tooltip: &'static str,
+    pub mute_tooltip: &'static str,
+    pub unmute_tooltip: &'static str,
+    pub back_tooltip: &'static str,
+    pub clear_search_tooltip: &'static str,
+    pub remove_recent_search_tooltip: &'static str,
+    pub exclude_track_tooltip: &'static str,
+    pub include_track_tooltip: &'static str,
+    pub clear_queue_confirm_title: &'static str,
+    pub clear_queue_confirm_hint: &'static str,
+    pub clear_confirm_label: &'static str,
+    pub cancel_label: &'static str,
 }
 
 impl StaticLabels {
@@ -367,6 +388,27 @@ impl StaticLabels {
             version_fix_search_label: tr(locale, "Search alternatives"),
             version_fix_empty_label: tr(locale, "No alternatives found"),
             version_fix_hint_label: tr(locale, "Search for a different recording"),
+            close_tooltip: tr(locale, "Close"),
+            like_tooltip: tr(locale, "Like"),
+            unlike_tooltip: tr(locale, "Unlike"),
+            queue_tooltip: tr(locale, "Queue"),
+            shuffle_tooltip: tr(locale, "Shuffle"),
+            play_tooltip: tr(locale, "Play"),
+            pause_tooltip: tr(locale, "Pause"),
+            previous_track_tooltip: tr(locale, "Previous track"),
+            next_track_tooltip: tr(locale, "Next track"),
+            repeat_tooltip: tr(locale, "Repeat"),
+            mute_tooltip: tr(locale, "Mute"),
+            unmute_tooltip: tr(locale, "Unmute"),
+            back_tooltip: tr(locale, "Back"),
+            clear_search_tooltip: tr(locale, "Clear search"),
+            remove_recent_search_tooltip: tr(locale, "Remove recent search"),
+            exclude_track_tooltip: tr(locale, "Exclude from import"),
+            include_track_tooltip: tr(locale, "Include in import"),
+            clear_queue_confirm_title: tr(locale, "Clear queue?"),
+            clear_queue_confirm_hint: tr(locale, "This removes all tracks from the queue."),
+            clear_confirm_label: tr(locale, "Clear"),
+            cancel_label: tr(locale, "Cancel"),
         }
     }
 
@@ -540,6 +582,27 @@ impl StaticLabels {
         labels.set_version_fix_search_label(self.version_fix_search_label.into());
         labels.set_version_fix_empty_label(self.version_fix_empty_label.into());
         labels.set_version_fix_hint_label(self.version_fix_hint_label.into());
+        labels.set_close_tooltip(self.close_tooltip.into());
+        labels.set_like_tooltip(self.like_tooltip.into());
+        labels.set_unlike_tooltip(self.unlike_tooltip.into());
+        labels.set_queue_tooltip(self.queue_tooltip.into());
+        labels.set_shuffle_tooltip(self.shuffle_tooltip.into());
+        labels.set_play_tooltip(self.play_tooltip.into());
+        labels.set_pause_tooltip(self.pause_tooltip.into());
+        labels.set_previous_track_tooltip(self.previous_track_tooltip.into());
+        labels.set_next_track_tooltip(self.next_track_tooltip.into());
+        labels.set_repeat_tooltip(self.repeat_tooltip.into());
+        labels.set_mute_tooltip(self.mute_tooltip.into());
+        labels.set_unmute_tooltip(self.unmute_tooltip.into());
+        labels.set_back_tooltip(self.back_tooltip.into());
+        labels.set_clear_search_tooltip(self.clear_search_tooltip.into());
+        labels.set_remove_recent_search_tooltip(self.remove_recent_search_tooltip.into());
+        labels.set_exclude_track_tooltip(self.exclude_track_tooltip.into());
+        labels.set_include_track_tooltip(self.include_track_tooltip.into());
+        labels.set_clear_queue_confirm_title(self.clear_queue_confirm_title.into());
+        labels.set_clear_queue_confirm_hint(self.clear_queue_confirm_hint.into());
+        labels.set_clear_confirm_label(self.clear_confirm_label.into());
+        labels.set_cancel_label(self.cancel_label.into());
     }
 }
 

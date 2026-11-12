@@ -1,4 +1,5 @@
 import { PlayerUi, Theme } from "../theme.slint";
+import { Labels } from "../labels.slint";
 import { ThemedSlider } from "./controls.slint";
 import { PlayerCenterControls } from "./player_controls.slint";
 import { IconHeart, IconQueue, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
@@ -120,6 +121,10 @@ export component PlayerBar inherits Rectangle {
                             clicked => { PlayerUi.toggle-like(); }
                         }
 
+                        Tooltip {
+                            text: @markdown("\{PlayerUi.is-liked ? Labels.unlike-tooltip : Labels.like-tooltip}");
+                        }
+
                         IconHeart {
                             x: (parent.width - self.width) / 2;
                             y: (parent.height - self.height) / 2;
@@ -179,6 +184,10 @@ export component PlayerBar inherits Rectangle {
                         clicked => { root.toggle-queue-panel(); }
                     }
 
+                    Tooltip {
+                        text: @markdown("\{Labels.queue-tooltip}");
+                    }
+
                     IconQueue {
                         x: (parent.width - self.width) / 2;
                         y: (parent.height - self.height) / 2;
@@ -211,6 +220,10 @@ export component PlayerBar inherits Rectangle {
                                     PlayerUi.set-volume(root.last-audible-volume > 0 ? root.last-audible-volume : 50);
                                 }
                             }
+                        }
+
+                        Tooltip {
+                            text: @markdown("\{PlayerUi.volume == 0 ? Labels.unmute-tooltip : Labels.mute-tooltip}");
                         }
 
                         if PlayerUi.volume == 0 : IconSpeakerMuted {

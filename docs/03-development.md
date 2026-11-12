@@ -264,3 +264,12 @@ guessing; every rule here was verified against a build or the official documenta
   the instantiating component, or position the instances from the parent, instead of reaching for
   `parent`.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/language/geometry/>.
+- `Tooltip` is a built-in Slint 1.18 element that renders an input-transparent popup after a short
+  hover delay; it cannot be a direct child of a layout (`HorizontalLayout`, `VerticalLayout`,
+  `GridLayout`, `FlexboxLayout`), so place it inside the `Rectangle` that owns the control's
+  geometry. `for ... : Tooltip` is rejected, while `if cond : Tooltip` is allowed. `Tooltip.text`
+  is `styled-text`, so binding a `string` (a `Labels` property or a conditional expression) requires
+  wrapping it as `@markdown("\{expression}")`; the interpolation escapes the inserted text, so
+  translated labels render literally. Use it for icon-only actions whose meaning is not carried by
+  a visible label.
+  Source: <https://docs.slint.dev/docs/slint/reference/window/tooltip/>.

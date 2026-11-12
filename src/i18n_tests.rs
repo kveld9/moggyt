@@ -471,4 +471,34 @@ mod tests {
             assert_ne!(en, es);
         }
     }
+
+    #[test]
+    fn test_tooltip_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Back", "Volver"),
+            ("Clear", "Vaciar"),
+            ("Clear queue?", "¿Vaciar cola?"),
+            ("Clear search", "Borrar búsqueda"),
+            ("Exclude from import", "Excluir de la importación"),
+            ("Include in import", "Incluir en la importación"),
+            ("Mute", "Silenciar"),
+            ("Next track", "Siguiente canción"),
+            ("Pause", "Pausar"),
+            ("Previous track", "Canción anterior"),
+            ("Remove recent search", "Quitar búsqueda reciente"),
+            ("Repeat", "Repetir"),
+            (
+                "This removes all tracks from the queue.",
+                "Esto quita todas las canciones de la cola.",
+            ),
+            ("Unmute", "Activar sonido"),
+        ];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key);
+            assert_eq!(es, expected_es);
+            assert_ne!(en, es);
+        }
+    }
 }

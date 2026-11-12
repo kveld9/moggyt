@@ -221,3 +221,20 @@ export component IconAlbum inherits Rectangle {
     }
 }
 
+export component IconTrash inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 5 7 L 19 7 M 9.5 7 L 9.5 5.5 C 9.5 4.9 10 4.5 10.6 4.5 L 13.4 4.5 C 14 4.5 14.5 4.9 14.5 5.5 L 14.5 7 M 7 7 L 7.9 19.4 C 7.95 20.3 8.7 21 9.6 21 L 14.4 21 C 15.3 21 16.05 20.3 16.1 19.4 L 17 7 M 10.5 10.5 L 10.5 17.5 M 13.5 10.5 L 13.5 17.5";
+    }
+}
+

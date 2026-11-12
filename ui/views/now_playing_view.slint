@@ -118,6 +118,10 @@ export component NowPlayingView inherits HorizontalLayout {
                     clicked => { PlayerUi.toggle-like(); }
                 }
 
+                Tooltip {
+                    text: @markdown("\{PlayerUi.is-liked ? Labels.unlike-tooltip : Labels.like-tooltip}");
+                }
+
                 IconHeart {
                     x: (parent.width - self.width) / 2;
                     y: (parent.height - self.height) / 2;
@@ -179,6 +183,10 @@ export component NowPlayingView inherits HorizontalLayout {
                                     PlayerUi.set-volume(root.last-audible-volume > 0 ? root.last-audible-volume : 50);
                                 }
                             }
+                        }
+
+                        Tooltip {
+                            text: @markdown("\{PlayerUi.volume == 0 ? Labels.unmute-tooltip : Labels.mute-tooltip}");
                         }
 
                         if PlayerUi.volume == 0 : IconSpeakerMuted {

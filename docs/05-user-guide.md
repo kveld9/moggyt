@@ -76,8 +76,10 @@ The collapsible right-side queue panel manages the ordered list of upcoming trac
 - Displays the queued track count badge on the queue icon in the player bar.
 - Shows an empty-state text (`The queue is empty.`) when nothing is queued.
 - Clicking a track row plays that track immediately and leaves the queue panel open.
-- **Clear Queue**: click the `Clear queue` button in the header row to empty the queue and stop
-  playback; the empty queue is persisted across restarts.
+- **Clear Queue**: click the trash icon in the header row; a confirmation card asks before the queue
+  is emptied and playback stops. The empty queue is persisted across restarts.
+- Icon-only controls (transport buttons, like, queue, volume, back, settings, and clear/remove
+  actions) show a tooltip describing the action while the pointer hovers over them.
 
 ### Now Playing Page
 
