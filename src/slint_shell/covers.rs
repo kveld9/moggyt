@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::domain::{SearchResult, Shelf};
+use crate::domain::{Detail, SearchResult, Shelf};
 pub(crate) use crate::slint_shell::cover_pool::spawn_cover_fetch_pool;
 use crate::slint_shell::playback_worker::{PlaybackWorkerCommand, thumbnail_variant_for_row};
 use crate::slint_shell::state::SlintAppState;
@@ -101,6 +101,31 @@ pub fn request_detail_covers(
                 worker_tx,
                 &mut seen,
             );
+        }
+    }
+    dispatch_artist_section_covers(detail, state, worker_tx, &mut seen);
+}
+
+fn dispatch_artist_section_covers(
+    detail: &Detail,
+    state: &SlintAppState,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+    seen: &mut HashSet<String>,
+) {
+    let Some(page) = &detail.artist else {
+        return;
+    };
+    for section in &page.sections {
+        for card in &section.cards {
+            if let Some(url) = card.artwork.as_deref() {
+                dispatch_cover_with_generation_if_needed(
+                    url,
+                    state.detail_generation,
+                    &state.search_covers,
+                    worker_tx,
+                    seen,
+                );
+            }
         }
     }
 }
@@ -520,5 +545,44 @@ mod tests {
         }
         assert_eq!(received.len(), 1);
         assert_eq!(received[0], "https://lh3.googleusercontent.com/test-thumb");
+    }
+
+    #[test]
+    fn test_request_detail_covers_includes_artist_section_cards() {
+        use crate::domain::{ArtistPage, DetailCard, DetailCardKind, DetailSection};
+
+        let mut state = test_wired();
+        state.detail_generation = 9;
+        let detail = Detail::new(DetailKind::Artist, "Artist", "", Vec::new()).with_artist_page(
+            ArtistPage {
+                songs_title: String::new(),
+                songs_more_id: None,
+                sections: vec![DetailSection {
+                    title: "Albums".to_owned(),
+                    cards: vec![DetailCard::new(
+                        "a1",
+                        "Album",
+                        "2026",
+                        Some("https://lh3.googleusercontent.com/section-card-large".to_owned()),
+                        DetailCardKind::Album,
+                    )],
+                }],
+            },
+        );
+        state.detail = Some(detail);
+
+        let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
+        request_detail_covers(&state, &tx);
+
+        let mut received = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            if let PlaybackWorkerCommand::FetchCover { url, generation } = cmd {
+                received.push((url, generation));
+            }
+        }
+        assert_eq!(
+            received,
+            vec![("https://lh3.googleusercontent.com/section-card-small".to_string(), 9)]
+        );
     }
 }

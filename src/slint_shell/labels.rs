@@ -55,6 +55,7 @@ pub struct StaticLabels {
     pub play_button: &'static str,
     pub shuffle_button: &'static str,
     pub empty_songs: &'static str,
+    pub show_all: &'static str,
     pub section_theme: &'static str,
     pub theme_white: &'static str,
     pub theme_black_oled: &'static str,
@@ -234,6 +235,7 @@ impl StaticLabels {
             play_button: tr(locale, "Play"),
             shuffle_button: tr(locale, "Shuffle"),
             empty_songs: tr(locale, "No songs available."),
+            show_all: tr(locale, "Show all"),
             section_theme: tr(locale, "Theme"),
             theme_white: tr(locale, "White"),
             theme_black_oled: tr(locale, "Black OLED"),
@@ -415,6 +417,7 @@ impl StaticLabels {
         labels.set_play_button_label(self.play_button.into());
         labels.set_shuffle_button_label(self.shuffle_button.into());
         labels.set_empty_songs_text(self.empty_songs.into());
+        labels.set_show_all_label(self.show_all.into());
 
         labels.set_section_theme_label(self.section_theme.into());
         labels.set_theme_white_label(self.theme_white.into());

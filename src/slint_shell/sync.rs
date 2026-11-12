@@ -375,6 +375,7 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
         window.set_detail_cover(slint::Image::default());
     }
     sync_local_edit_ui(window, state);
+    super::detail_sections::sync_detail_extras(window, state);
 }
 
 fn sync_local_edit_ui(window: &MoggytWindow, state: &SlintAppState) {

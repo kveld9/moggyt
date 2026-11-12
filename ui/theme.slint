@@ -38,6 +38,24 @@ export struct LibraryItemData {
     cover: image,
 }
 
+export struct DetailCardData {
+    index: int,
+    title: string,
+    subtitle: string,
+    has-cover: bool,
+    cover: image,
+    circular: bool,
+}
+
+export struct DetailCardRow {
+    cards: [DetailCardData],
+}
+
+export struct DetailSectionData {
+    title: string,
+    rows: [DetailCardRow],
+}
+
 export struct LyricLineData {
     index: int,
     text: string,

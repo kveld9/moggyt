@@ -41,6 +41,7 @@ mod tests {
         assert_eq!(en_labels.local_move_down_label, "Down");
         assert_eq!(en_labels.lyrics_tab_label, "Lyrics");
         assert_eq!(en_labels.up_next_tab_label, "Up next");
+        assert_eq!(en_labels.show_all, "Show all");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish, None);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -72,6 +73,7 @@ mod tests {
         assert_eq!(es_labels.local_move_down_label, "Bajar");
         assert_eq!(es_labels.lyrics_tab_label, "Letras");
         assert_eq!(es_labels.up_next_tab_label, "A continuacion");
+        assert_eq!(es_labels.show_all, "Mostrar todo");
     }
 
     #[test]

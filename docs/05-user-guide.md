@@ -52,6 +52,9 @@ The detail view displays full tracklistings for an album, artist, or playlist:
 
 - **Header**: displays container title and subtitle (such as artist, release year, or item count).
 - **Track List**: lists all tracks in the collection with title, artist, and duration.
+- **Artist sections**: artist pages show the popular-songs heading and its top tracks, a `Show all` action
+  that opens the complete songs list, and the server-provided `Albums`, `Singles and EPs`, and similar-artist
+  rows. Album and single cards open the album page; similar-artist cards open that artist's page.
 - **Playback**: click `Play` next to any track to push it to the playback queue and start playback immediately.
 - **Navigation**: click `Back` to close the detail view and return to the previous page.
 - Home shelf items in the `Search` page provide an `Open` button to navigate directly to their detail view.

@@ -1,6 +1,7 @@
 import { Labels } from "../labels.slint";
-import { Theme, TrackRowData } from "../theme.slint";
+import { Theme, TrackRowData, DetailSectionData } from "../theme.slint";
 import { TrackRow } from "../components/rows.slint";
+import { DetailTile } from "../components/cards.slint";
 import { StyledInputField } from "../components/controls.slint";
 import { IconPlay, IconShuffle } from "../icons.slint";
 
@@ -22,9 +23,15 @@ export component DetailView inherits VerticalLayout {
     in property <string> kind-label: "";
     in property <image> cover;
     in property <[TrackRowData]> tracks: [];
+    in property <bool> is-artist: false;
+    in property <string> songs-title: "";
+    in property <bool> has-songs-more: false;
+    in property <[DetailSectionData]> sections: [];
     callback track-selected(int);
     callback play();
     callback shuffle();
+    callback card-selected(int);
+    callback show-all-songs();
     spacing: 16px;
     alignment: start;
 
@@ -252,6 +259,13 @@ export component DetailView inherits VerticalLayout {
             background: Theme.border;
         }
 
+        if root.is-artist && root.songs-title != "" : Text {
+            text: root.songs-title;
+            color: Theme.text;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
         if root.tracks.length == 0 : VerticalLayout {
             padding-top: 16px;
             alignment: center;
@@ -275,6 +289,58 @@ export component DetailView inherits VerticalLayout {
             remove-requested => { LocalEditUi.remove-track-requested(track.index); }
             move-up-requested => { LocalEditUi.move-track-requested(track.index, track.index - 1); }
             move-down-requested => { LocalEditUi.move-track-requested(track.index, track.index + 1); }
+        }
+
+        if root.is-artist && root.has-songs-more : HorizontalLayout {
+            alignment: start;
+
+            Rectangle {
+                width: 132px;
+                height: 34px;
+                border-radius: 17px;
+                background: more-touch.pressed ? Theme.overlay : (more-touch.has-hover ? Theme.hover : Theme.surface);
+                animate background { duration: 150ms; easing: ease-in-out; }
+
+                more-touch := TouchArea {
+                    clicked => { root.show-all-songs(); }
+                }
+
+                Text {
+                    text: Labels.show-all-label;
+                    color: more-touch.has-hover ? Theme.accent : Theme.text;
+                    font-size: 12px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        for section in root.sections : VerticalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            if section.title != "" : Text {
+                text: section.title;
+                color: Theme.text;
+                font-size: 20px;
+                font-weight: 700;
+            }
+
+            for row in section.rows : HorizontalLayout {
+                spacing: 12px;
+                alignment: start;
+
+                for card in row.cards : DetailTile {
+                    index: card.index;
+                    circular: card.circular;
+                    title: card.title;
+                    subtitle: card.subtitle;
+                    has-cover: card.has_cover;
+                    cover: card.cover;
+                    clicked => { root.card-selected(card.index); }
+                }
+            }
         }
     }
 }

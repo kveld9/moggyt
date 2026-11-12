@@ -6,6 +6,7 @@ import {
     LyricLineData,
     LibraryItemData,
     ExploreShelfData,
+    DetailSectionData,
 } from "../theme.slint";
 import { IconBack, IconSettings } from "../icons.slint";
 import { SearchView } from "./search_view.slint";
@@ -43,6 +44,10 @@ export component ContentArea inherits Rectangle {
     in property <string> detail-description: "";
     in property <string> detail-kind-label: "";
     in property <[TrackRowData]> detail-tracks: [];
+    in property <bool> detail-is-artist: false;
+    in property <string> detail-songs-title: "";
+    in property <bool> detail-has-songs-more: false;
+    in property <[DetailSectionData]> detail-sections: [];
     in property <image> detail-cover;
     in property <int> active-theme-index: 0;
     in-out property <bool> accent-customized: false;
@@ -91,6 +96,8 @@ export component ContentArea inherits Rectangle {
     callback detail-track-selected(int);
     callback detail-play();
     callback detail-shuffle();
+    callback detail-card-selected(int);
+    callback detail-show-all-songs();
     callback sign-in-submitted(string);
     callback sign-out();
     callback open-settings();
@@ -252,9 +259,15 @@ export component ContentArea inherits Rectangle {
                 kind-label: root.detail-kind-label;
                 cover: root.detail-cover;
                 tracks: root.detail-tracks;
+                is-artist: root.detail-is-artist;
+                songs-title: root.detail-songs-title;
+                has-songs-more: root.detail-has-songs-more;
+                sections: root.detail-sections;
                 track-selected(idx) => { root.detail-track-selected(idx); }
                 play => { root.detail-play(); }
                 shuffle => { root.detail-shuffle(); }
+                card-selected(idx) => { root.detail-card-selected(idx); }
+                show-all-songs => { root.detail-show-all-songs(); }
             }
 
             if root.active-page == 4 : SettingsView {
