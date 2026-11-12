@@ -24,6 +24,7 @@ Fast, lightweight desktop audio player with no web engine or Electron overhead.
 - Rust 1.85+ (`cargo`, `rustc`, `rustfmt`, `clippy`)
 - Git
 - ALSA development libraries (`libasound2-dev` on Debian/Ubuntu, `alsa-lib` on Fedora/Arch)
+- CMake and a C toolchain (the bundled Opus decoder compiles from vendored sources)
 - Recommended: `deno` (for `yt-dlp` JavaScript extraction)
 
 ### Build and Run

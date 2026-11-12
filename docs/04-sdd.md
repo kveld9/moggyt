@@ -223,8 +223,9 @@ as a chain so additional lyrics providers can be appended in v1.1. Rationale: on
 no API keys covers synced lyrics for the popular catalog; the other sources add rate limits,
 scraping fragility, and mostly unsynchronized text.
 
-Audio stack: `rodio` with `symphonia` decoding (single binary; WASAPI on Windows,
-ALSA/PulseAudio on Linux). No GStreamer dependency in v1.
+Audio stack: `rodio` with `symphonia` decoding and Opus decoding via the bundled libopus, with
+non-native-rate resampling via `rubato` (single binary; WASAPI on Windows, ALSA/PulseAudio on Linux).
+No GStreamer dependency in v1.
 
 ### 6.1 Spotify import subsystem
 
