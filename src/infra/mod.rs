@@ -43,6 +43,7 @@ mod lyrics_cache;
 mod lyrics_lrclib;
 mod lyrics_lrcred;
 mod lyrics_search;
+pub mod opus_source;
 mod play_log_store;
 mod playlist_store;
 mod playlist_store_disk;
@@ -117,8 +118,9 @@ pub use handoff::{
 };
 pub use innertube_stream::{
     AudioFormat, CLIENT_ID, CLIENT_NAME, CLIENT_VERSION, DEVICE_MAKE, DEVICE_MODEL, FallbackReason,
-    ITAG_AAC_COMPACT, ITAG_AAC_STANDARD, InnertubeResolver, OS_NAME, OS_VERSION, PLAYER_ENDPOINT,
-    REQUEST_TIMEOUT_SECS, USER_AGENT, parse_audio_formats, player_body, select_itag, select_stream,
+    ITAG_AAC_COMPACT, ITAG_AAC_STANDARD, ITAG_OPUS_HIGH, InnertubeResolver, OS_NAME, OS_VERSION,
+    PLAYER_ENDPOINT, REQUEST_TIMEOUT_SECS, USER_AGENT, parse_audio_formats, player_body,
+    select_itag, select_stream,
 };
 pub use instance::{SingleInstanceGuard, instance_lock_name};
 pub use lastfm_auth::{
@@ -145,6 +147,7 @@ pub use lyrics_search::{
     LYRICS_HIT_LIMIT, LYRICS_MATCH_THRESHOLD, LYRICS_RESULT_LIMIT, lyrics_match_score,
     rank_lyrics_candidates,
 };
+pub use opus_source::{OpusWebmSource, is_opus_webm};
 pub use play_log_store::{DiskPlayLogStore, MemoryPlayLogStore, PLAY_LOG_FILE_NAME, PlayLogStore};
 pub use playlist_store::{MemoryPlaylistStore, PlaylistStore};
 pub use playlist_store_disk::{

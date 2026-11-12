@@ -12,6 +12,7 @@ use super::audio::{AudioBackend, AudioError, clamp_speed};
 use super::audio_dsp::{SkipSilence, append_normalized, normalization_stage};
 use super::audio_fade::{spawn_fade_in, spawn_fade_out};
 use super::audio_stream_cache_worker::cache_download_worker;
+use super::opus_source::{OpusWebmSource, is_opus_webm, sniff_webm_header};
 use super::stream::{AudioQuality, ResolvedStream};
 use super::stream_chain::StreamChain;
 use super::stream_disk_cache::StreamDiskCache;
@@ -43,12 +44,8 @@ fn log_open_stream_error(track_id: &str, err: anyhow::Error) -> anyhow::Error {
 
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-fn log_decode_stream_error(
-    track_id: &str,
-    err: impl std::error::Error + Send + Sync + 'static,
-) -> anyhow::Error {
-    let anyhow_err = anyhow::Error::new(err)
-        .context(format!("failed to decode audio stream for track '{track_id}'"));
+fn log_decode_stream_error(track_id: &str, err: anyhow::Error) -> anyhow::Error {
+    let anyhow_err = err.context(format!("failed to decode audio stream for track '{track_id}'"));
     tracing::warn!(track_id = %track_id, error = ?anyhow_err, "failed to decode audio stream");
     anyhow_err
 }
@@ -123,10 +120,12 @@ impl RodioBackend {
         self.stream_cache.as_ref()
     }
 
-    fn append_dsp_to_sink<R>(&self, sink: &Sink, source: Decoder<R>, loudness_db: Option<f32>)
-    where
-        R: std::io::Read + std::io::Seek + Send + Sync + 'static,
-    {
+    fn append_dsp_to_sink(
+        &self,
+        sink: &Sink,
+        source: Box<dyn Source<Item = f32> + Send>,
+        loudness_db: Option<f32>,
+    ) {
         let stage = normalization_stage(self.loudness_normalization, loudness_db);
         if self.skip_silence {
             append_normalized(sink, SkipSilence::new(source), stage);
@@ -135,14 +134,12 @@ impl RodioBackend {
         }
     }
 
-    fn apply_playback_source<R>(
+    fn apply_playback_source(
         &mut self,
         track_id: &str,
-        source: Decoder<R>,
+        source: Box<dyn Source<Item = f32> + Send>,
         loudness_db: Option<f32>,
-    ) where
-        R: std::io::Read + std::io::Seek + Send + Sync + 'static,
-    {
+    ) {
         let total_duration = source.total_duration();
         self.fade_generation.fetch_add(1, Ordering::SeqCst);
         let new_sink = Sink::connect_new(self._stream.mixer());
@@ -164,23 +161,28 @@ impl RodioBackend {
         url: &str,
         track_id: &str,
         prefix: Option<Vec<u8>>,
-    ) -> anyhow::Result<
-        Decoder<super::stream_reader::RangeReader<super::stream_reqwest::ReqwestRangeTransport>>,
-    > {
+        mime_type: Option<&str>,
+    ) -> anyhow::Result<Box<dyn Source<Item = f32> + Send>> {
         let stream = open_audio_stream_with_prefix(url, prefix)
             .map_err(|err| log_open_stream_error(track_id, err))?;
-        Decoder::new(stream).map_err(|err| log_decode_stream_error(track_id, err))
+        if is_opus_webm(mime_type, url) {
+            let source = OpusWebmSource::new(stream)
+                .map_err(|err| log_decode_stream_error(track_id, err))?;
+            Ok(Box::new(source))
+        } else {
+            let decoder = Decoder::new(stream)
+                .map_err(|err| log_decode_stream_error(track_id, err.into()))?;
+            Ok(Box::new(decoder))
+        }
     }
 
-    fn apply_crossfade_source<R>(
+    fn apply_crossfade_source(
         &mut self,
         track_id: &str,
-        source: Decoder<R>,
+        source: Box<dyn Source<Item = f32> + Send>,
         duration: Duration,
         loudness_db: Option<f32>,
-    ) where
-        R: std::io::Read + std::io::Seek + Send + Sync + 'static,
-    {
+    ) {
         let total_duration = source.total_duration();
         let new_sink = Sink::connect_new(self._stream.mixer());
         let new_sink_arc = Arc::new(new_sink);
@@ -209,7 +211,8 @@ impl RodioBackend {
 
     fn play_resolved(&mut self, track_id: &str, stream: &ResolvedStream) -> anyhow::Result<()> {
         let prefix = self.resolver.take_prefetched(&stream.url);
-        let source = self.decode_source(&stream.url, track_id, prefix)?;
+        let source =
+            self.decode_source(&stream.url, track_id, prefix, stream.mime_type.as_deref())?;
         self.apply_playback_source(track_id, source, stream.loudness_db);
         self.maybe_spawn_cache_download(track_id, &stream.url);
         Ok(())
@@ -222,7 +225,8 @@ impl RodioBackend {
         duration: Duration,
     ) -> anyhow::Result<()> {
         let prefix = self.resolver.take_prefetched(&stream.url);
-        let source = self.decode_source(&stream.url, track_id, prefix)?;
+        let source =
+            self.decode_source(&stream.url, track_id, prefix, stream.mime_type.as_deref())?;
         self.apply_crossfade_source(track_id, source, duration, stream.loudness_db);
         self.maybe_spawn_cache_download(track_id, &stream.url);
         Ok(())
@@ -264,14 +268,24 @@ impl RodioBackend {
     fn decode_cached_file(
         path: &std::path::Path,
         track_id: &str,
-    ) -> anyhow::Result<Decoder<std::io::BufReader<std::fs::File>>> {
+    ) -> anyhow::Result<Box<dyn Source<Item = f32> + Send>> {
         let file = std::fs::File::open(path)
             .with_context(|| format!("failed to open cached stream at '{}'", path.display()))?;
-        Decoder::new(std::io::BufReader::new(file))
-            .map_err(|err| log_decode_stream_error(track_id, err))
+        let mut reader = std::io::BufReader::new(file);
+        let is_webm = sniff_webm_header(&mut reader)
+            .with_context(|| format!("failed to inspect cached stream at '{}'", path.display()))?;
+        if is_webm {
+            let source = OpusWebmSource::new(reader)
+                .map_err(|err| log_decode_stream_error(track_id, err))?;
+            Ok(Box::new(source))
+        } else {
+            let decoder = Decoder::new(reader)
+                .map_err(|err| log_decode_stream_error(track_id, err.into()))?;
+            Ok(Box::new(decoder))
+        }
     }
 
-    fn cached_source(&self, track_id: &str) -> Option<Decoder<std::io::BufReader<std::fs::File>>> {
+    fn cached_source(&self, track_id: &str) -> Option<Box<dyn Source<Item = f32> + Send>> {
         let path = self.stream_cache.as_ref()?.get(track_id)?;
         Self::decode_cached_file(&path, track_id).ok()
     }
@@ -698,7 +712,7 @@ mod tests {
 
         let source1 =
             Decoder::new(std::io::Cursor::new(MINIMAL_WAV_HEADER)).expect("valid wav decoder 1");
-        backend.apply_playback_source("track-1", source1, None);
+        backend.apply_playback_source("track-1", Box::new(source1), None);
 
         assert!(!Arc::ptr_eq(&initial_sink, &backend.sink));
         let second_sink = Arc::clone(&backend.sink);
@@ -707,7 +721,7 @@ mod tests {
 
         let source2 =
             Decoder::new(std::io::Cursor::new(MINIMAL_WAV_HEADER)).expect("valid wav decoder 2");
-        backend.apply_playback_source("track-2", source2, None);
+        backend.apply_playback_source("track-2", Box::new(source2), None);
 
         assert!(!Arc::ptr_eq(&second_sink, &backend.sink));
         assert_eq!(backend.last_requested(), Some("track-2"));

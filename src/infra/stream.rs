@@ -18,15 +18,15 @@ pub enum AudioQuality {
 
 /// Maps an [`AudioQuality`] preference to yt-dlp format selector (SDD Q-3).
 ///
-/// [`AudioQuality::High`] shares the standard selector because unauthenticated
-/// YouTube Music serves AAC itag 140 (~128-130 kbps) as its bitrate ceiling: an
-/// `abr` floor above it never matches and would only add a dead branch. Higher
-/// tiers (AAC itag 141, ~256 kbps) require Premium authentication, and Opus itag
-/// 251 is not decodable by the rodio/symphonia stack.
+/// [`AudioQuality::High`] prefers Opus in WebM (itag 251, ~136 kbps, 48 kHz) decoded
+/// via libopus through [`OpusWebmSource`], with AAC m4a and unconstrained audio as
+/// fallbacks. [`AudioQuality::Standard`] uses AAC m4a (~128-130 kbps), and
+/// [`AudioQuality::Compact`] constrains bitrate to <=64 kbps.
 pub const fn audio_quality_format(quality: AudioQuality) -> &'static str {
     match quality {
         AudioQuality::Compact => "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
-        AudioQuality::Standard | AudioQuality::High => "bestaudio[ext=m4a]/bestaudio/best",
+        AudioQuality::Standard => "bestaudio[ext=m4a]/bestaudio/best",
+        AudioQuality::High => "bestaudio[ext=webm][acodec=opus]/bestaudio[ext=m4a]/bestaudio/best",
     }
 }
 
@@ -116,7 +116,10 @@ mod tests {
                 "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
             ),
             (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
-            (AudioQuality::High, "bestaudio[ext=m4a]/bestaudio/best"),
+            (
+                AudioQuality::High,
+                "bestaudio[ext=webm][acodec=opus]/bestaudio[ext=m4a]/bestaudio/best",
+            ),
         ];
         for (quality, expected) in cases {
             assert_eq!(audio_quality_format(quality), expected);
@@ -126,11 +129,10 @@ mod tests {
     #[test]
     fn audio_quality_high_never_requests_an_unreachable_bitrate_floor() {
         let high = audio_quality_format(AudioQuality::High);
-        assert_eq!(high, audio_quality_format(AudioQuality::Standard));
-        assert!(
-            !high.contains("abr>="),
-            "High must not request an abr floor above the AAC ceiling (itag 140)"
-        );
+        assert!(high.starts_with("bestaudio[ext=webm][acodec=opus]"));
+        assert!(high.contains("bestaudio[ext=m4a]"));
+        assert!(high.ends_with("/bestaudio/best"));
+        assert!(!high.contains("abr>="), "High must not request an unreachable bitrate floor");
     }
 
     #[test]
@@ -140,7 +142,7 @@ mod tests {
             let selectors: Vec<&str> = format.split('/').collect();
             let first_unconstrained = selectors
                 .iter()
-                .position(|&s| !s.contains("ext=m4a"))
+                .position(|&s| !s.contains('['))
                 .expect("must contain at least one unconstrained fallback");
             let first_m4a = selectors
                 .iter()
