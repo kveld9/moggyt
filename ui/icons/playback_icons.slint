@@ -1,5 +1,9 @@
 import { Theme } from "../theme.slint";
 
+// Solid glyphs are drawn as one filled path. Stroking the same closed outline on top of its
+// fill makes the renderer composite two antialiased edges, which leaves a one-pixel background
+// hole at the path start (a chipped top-left corner on the player bar button). The commands are
+// also shifted 1.1 units left so the bounding box, x 5.9 to 18.05, is centered in the viewbox.
 export component IconPlay inherits Rectangle {
     in property <color> tint: Theme.text;
     in property <length> size: 20px;
@@ -11,9 +15,7 @@ export component IconPlay inherits Rectangle {
         height: root.size;
         viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
         fill: root.tint;
-        stroke: root.tint;
-        stroke-width: 1.8px;
-        commands: "M 7 6.5 C 7 5.2 8.3 4.5 9.4 5.1 L 18.4 10.6 C 19.5 11.2 19.5 12.8 18.4 13.4 L 9.4 18.9 C 8.3 19.5 7 18.8 7 17.5 Z";
+        commands: "M 5.9 6.5 C 5.9 5.2 7.2 4.5 8.3 5.1 L 17.3 10.6 C 18.4 11.2 18.4 12.8 17.3 13.4 L 8.3 18.9 C 7.2 19.5 5.9 18.8 5.9 17.5 Z";
     }
 }
 
