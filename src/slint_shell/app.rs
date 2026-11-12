@@ -184,6 +184,7 @@ pub(crate) fn apply_persisted_settings(state: &mut SlintAppState, settings: &Set
     state.stream_cache_limit_mb = settings.stream_cache_limit_mb;
     state.hi_res_covers = settings.hi_res_covers;
     state.songs_only = settings.songs_only;
+    state.detail_compact_tracks = settings.detail_compact_tracks;
     state.autoplay = settings.autoplay_enabled;
     state.theme = settings.theme;
     state.accent_override = settings.accent_override.as_deref().and_then(parse_hex_rgb);
@@ -317,6 +318,7 @@ mod tests {
         let settings = Settings {
             liked_ids: vec!["a".to_owned(), "b".to_owned()],
             songs_only: true,
+            detail_compact_tracks: true,
             crossfade_seconds: 4,
             stream_cache_limit_mb: 64,
             player_bar_show_volume: false,
@@ -330,6 +332,7 @@ mod tests {
         assert!(state.liked_ids.contains("a"));
         assert!(state.liked_ids.contains("b"));
         assert!(state.songs_only);
+        assert!(state.detail_compact_tracks);
         assert_eq!(state.crossfade_seconds, 4);
         assert_eq!(state.stream_cache_limit_mb, 64);
         assert!(!state.player_bar.show_volume);

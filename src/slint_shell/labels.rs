@@ -54,6 +54,8 @@ pub struct StaticLabels {
     pub empty_detail: &'static str,
     pub play_button: &'static str,
     pub shuffle_button: &'static str,
+    pub compact_view: &'static str,
+    pub cover_view: &'static str,
     pub empty_songs: &'static str,
     pub show_all: &'static str,
     pub section_theme: &'static str,
@@ -236,6 +238,8 @@ impl StaticLabels {
             empty_detail: tr(locale, "No details available."),
             play_button: tr(locale, "Play"),
             shuffle_button: tr(locale, "Shuffle"),
+            compact_view: tr(locale, "Compact view"),
+            cover_view: tr(locale, "Cover view"),
             empty_songs: tr(locale, "No songs available."),
             show_all: tr(locale, "Show all"),
             section_theme: tr(locale, "Theme"),
@@ -420,6 +424,8 @@ impl StaticLabels {
         labels.set_empty_detail_text(self.empty_detail.into());
         labels.set_play_button_label(self.play_button.into());
         labels.set_shuffle_button_label(self.shuffle_button.into());
+        labels.set_compact_view_label(self.compact_view.into());
+        labels.set_cover_view_label(self.cover_view.into());
         labels.set_empty_songs_text(self.empty_songs.into());
         labels.set_show_all_label(self.show_all.into());
 

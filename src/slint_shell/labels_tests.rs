@@ -42,6 +42,8 @@ mod tests {
         assert_eq!(en_labels.lyrics_tab_label, "Lyrics");
         assert_eq!(en_labels.up_next_tab_label, "Up next");
         assert_eq!(en_labels.show_all, "Show all");
+        assert_eq!(en_labels.compact_view, "Compact view");
+        assert_eq!(en_labels.cover_view, "Cover view");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish, None);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -74,6 +76,8 @@ mod tests {
         assert_eq!(es_labels.lyrics_tab_label, "Letras");
         assert_eq!(es_labels.up_next_tab_label, "A continuacion");
         assert_eq!(es_labels.show_all, "Mostrar todo");
+        assert_eq!(es_labels.compact_view, "Vista compacta");
+        assert_eq!(es_labels.cover_view, "Vista con carátulas");
     }
 
     #[test]

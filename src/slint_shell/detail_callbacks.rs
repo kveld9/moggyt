@@ -14,7 +14,7 @@ use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::sync_window;
 use crate::slint_shell::window::{open_detail_async, trigger_playback};
-use crate::slint_shell::{LocalEditUi, MoggytWindow};
+use crate::slint_shell::{DetailUi, LocalEditUi, MoggytWindow};
 
 /// Wires detail view track selection and playback action callbacks.
 pub(crate) fn wire_detail_callbacks(
@@ -55,6 +55,15 @@ pub(crate) fn wire_detail_callbacks(
     let tx = worker_tx.clone();
     window.on_detail_show_all_songs(move || {
         with_window_state(&w, &s, |win, st| handle_detail_show_all_songs(win, st, &tx));
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.global::<DetailUi>().on_compact_toggled(move || {
+        with_window_state(&w, &s, |win, st| {
+            st.toggle_detail_compact_tracks();
+            sync_window(win, st);
+        });
     });
 
     let local_ui = window.global::<LocalEditUi>();

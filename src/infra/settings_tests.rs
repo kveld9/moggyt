@@ -222,6 +222,20 @@ mod tests {
     }
 
     #[test]
+    fn test_detail_compact_tracks_defaults_false_and_roundtrips() {
+        let default_settings = Settings::default();
+        assert!(!default_settings.detail_compact_tracks);
+        let missing_key: Settings = serde_json::from_str("{}").expect("deserialize empty json");
+        assert!(!missing_key.detail_compact_tracks);
+        let loaded: Settings =
+            serde_json::from_str(r#"{"detail_compact_tracks": true}"#).expect("deserialize true");
+        assert!(loaded.detail_compact_tracks);
+        let roundtrip = serde_json::to_string(&loaded).expect("serialize settings");
+        let decoded: Settings = serde_json::from_str(&roundtrip).expect("deserialize roundtrip");
+        assert!(decoded.detail_compact_tracks);
+    }
+
+    #[test]
     fn test_autoplay_enabled_setting_defaults_false_and_roundtrips() {
         let default_settings = Settings::default();
         assert!(!default_settings.autoplay_enabled);
