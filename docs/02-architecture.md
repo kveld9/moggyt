@@ -164,6 +164,10 @@ and `BlockPool::drop` can join its workers within that bound.
 Next-track prefix prefetch is skipped when the track is already fully cached on
 disk, so a cached track never pays for a redundant 256 KiB download.
 
+The DSP wrappers (`SkipSilence`, `StaticGain`, `LoudnessNormalizer`) forward `try_seek`
+to the inner source and reset their processing state, so seeking works with
+skip-silence and normalization enabled.
+
 ## Evolution rules
 
 1. One concept, one owner: each domain type lives in a single module (single source of truth).

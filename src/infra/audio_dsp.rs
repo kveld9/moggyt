@@ -7,6 +7,7 @@
 use std::collections::VecDeque;
 use std::time::Duration;
 
+use rodio::source::SeekError;
 use rodio::{Sink, Source};
 
 /// Default silence threshold in linear amplitude (~-54 dBFS).
@@ -252,6 +253,14 @@ impl<I: Source<Item = f32>> Source for SkipSilence<I> {
     fn total_duration(&self) -> Option<Duration> {
         self.input.total_duration()
     }
+    fn try_seek(&mut self, pos: Duration) -> Result<(), SeekError> {
+        self.input.try_seek(pos)?;
+        self.exhausted = false;
+        self.leading_trimmed = true; // Seek targets chosen position; silence is intentional.
+        self.silence_frames.clear();
+        self.output_queue.clear();
+        Ok(())
+    }
 }
 
 /// Progressive real-time loudness normalizer adjusting gain toward a -14.0 dB target.
@@ -417,6 +426,14 @@ impl<I: Source<Item = f32>> Source for LoudnessNormalizer<I> {
     fn total_duration(&self) -> Option<Duration> {
         self.input.total_duration()
     }
+    fn try_seek(&mut self, pos: Duration) -> Result<(), SeekError> {
+        self.input.try_seek(pos)?;
+        self.current_gain = 1.0; // Previous position's gain estimate must not apply after seek.
+        self.target_gain = 1.0;
+        self.sample_count = 0;
+        self.sum_squares = 0.0;
+        Ok(())
+    }
 }
 
 /// Provider loudness offset in dB applied to YouTube's reported `loudnessDb`.
@@ -507,6 +524,9 @@ impl<I: Source<Item = f32>> Source for StaticGain<I> {
     fn total_duration(&self) -> Option<Duration> {
         self.input.total_duration()
     }
+    fn try_seek(&mut self, pos: Duration) -> Result<(), SeekError> {
+        self.input.try_seek(pos)
+    }
 }
 
 /// Appends an audio source to a rodio sink using the selected normalization stage.
@@ -521,6 +541,9 @@ where
     }
 }
 
+#[cfg(test)]
+#[path = "audio_dsp_seek_tests.rs"]
+mod seek_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
