@@ -139,7 +139,7 @@ pub fn detail_header_description(value: &Value) -> Option<String> {
 /// The immersive header is intentionally absent from [`detail_header_node`]: it
 /// carries a long biography instead of the short subtitle/description pair, so
 /// reading it there would leak the biography into the subtitle. Line breaks are
-/// collapsed because the detail header renders the description on one elided line.
+/// collapsed so the biography renders as one flowing paragraph in the detail header.
 fn artist_header_description(value: &Value) -> Option<String> {
     let header = value.pointer("/header/musicImmersiveHeaderRenderer")?;
     let text = description_from_runs(header).or_else(|| description_from_simple(header))?;
