@@ -111,22 +111,30 @@ Extended backlog requirements (milestones and port mappings):
 
 ## 3 Scope
 
-V1 (MVP):
+V1 (Core & Landed Features):
 
 - Search with filters; idle state with recent-search history; artist, album, playlist detail pages.
-- Transport (play, pause, next, previous, seek, volume) plus a persistent player bar.
-- Playback queue with reorder, shuffle, and repeat modes; radio and autoplay queues.
+- Transport (play, pause, next, previous, seek, volume), crossfade, and persistent player bar.
+- Playback queue with reorder, smart shuffle, and repeat modes; radio and autoplay continuation.
 - Library read access (playlists, liked tracks, saved albums) behind optional sign-in.
-- Synced lyrics from LRCLIB; cover art with memory plus disk cache.
-- Persistent settings; MPRIS on Linux and SMTC on Windows; tray icon with single instance.
+- Local playlist storage, mutation (rename, delete, reorder), and Spotify playlist/album import (FR-18).
+- Multi-tier lyrics cascade (lrc.red TTML primary + LRCLIB fallback) with real-time sync and manual offset.
+- Cover art with memory LRU plus disk cache and progressive hi-res decoding.
+- Audio DSP pipeline: libopus decoding, rubato resampling, skip-silence, and loudness normalization.
+- Desktop integrations: MPRIS on Linux, SMTC on Windows, media keys, system tray, and single instance lock.
+- Ecosystem integrations: Discord Rich Presence, Last.fm scrobbling, and SponsorBlock auto-skipping.
+- Persistent settings, sleep timer, listening stats dashboard, and recording version overrides.
 - Update check against GitHub Releases.
 
-V1.1: Discord presence, Last.fm scrobbling, hi-res cover upgrade, persistent queue, sleep timer,
-skip-silence, loudness normalization, stream-cache budget, JSON backup export, search-by-lyrics,
-non-music segment skip, QR token-login helper.
-V2: equalizer (10-band EQ detail), crossfade, quality selector (per-network quality ceiling), minimal
-plugin host, multi-queue, tagged downloads + Smart Prefetch, local-file unified library, collaborative
-listening rooms, translation cache, stats/Replay dashboard.
+V2 (Future Milestones):
+
+- 10-band graphic equalizer with profile import.
+- Standalone tagged audio downloads manager and smart offline prefetch.
+- Local-file unified library with audio origin badges.
+- Collaborative listening rooms / phone-as-remote pairing over local network.
+- Full third-party plugin host and extension SDK.
+- Multi-account switching and YouTube Music history write-back.
+
 Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 
 ## 4 Functional requirements
@@ -147,11 +155,11 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-11: single instance; tray icon with play/pause/next and show/hide actions.
 - FR-12: check GitHub Releases for updates and offer the download page (no silent install).
   Note: unauthenticated checks return 404 on private repo and soft-fail to CheckFailed (see ADR-001).
-- FR-13 (v1.1): persistent playback queue across application restarts (serializes track list and position).
-- FR-14 (v1.1): sleep timer with standard interval presets and stop-after-current-track option.
-- FR-15 (v1.1): DSP settings for skip-silence and -14 LUFS loudness normalization in playback.
-- FR-16 (v1.1): stream-cache LRU with user-sized storage budget and JSON library backup import/export.
-- FR-17 (v1.1): search-by-lyrics lookup and non-music segment-skip by video id.
+- FR-13: persistent playback queue across application restarts (serializes track list and position).
+- FR-14: sleep timer with standard interval presets and stop-after-current-track option.
+- FR-15: DSP settings for skip-silence and -14 LUFS loudness normalization in playback.
+- FR-16: stream-cache LRU with user-sized storage budget and JSON library backup import/export.
+- FR-17: search-by-lyrics lookup and non-music segment-skip by video id.
 - FR-18: import Spotify playlists and albums from web links, embed URLs, Spotify URIs, Exportify CSV files,
   and JSON backups into local playlists with automated matching and interactive review.
 
@@ -492,16 +500,16 @@ cargo test --all-features
 
 ## 13 Milestones
 
-Each milestone ships as small PRs under 400 lines:
+All v1 core milestones are completed and validated:
 
-1. Ports plus fakes; harden queue and search domain logic.
-2. Read-only catalog adapter (search, shelves, detail).
-3. `yt-dlp` resolver plus `rodio` playback plus player bar.
-4. Cookie-import auth with OS keyring plus library views.
-5. LRCLIB lyrics plus cover cache.
-6. MPRIS/SMTC plus tray plus single instance (inbound media-key routing is live).
-7. Release pipeline (AppImage, deb, exe) plus update check.
-8. Polish: Discord presence, Last.fm, hi-res covers.
+1. Ports plus fakes; harden queue and search domain logic (Completed).
+2. Read-only catalog adapter (search, shelves, detail) (Completed).
+3. `yt-dlp` resolver plus `rodio` playback plus player bar (Completed).
+4. Cookie-import auth with OS keyring plus library views (Completed).
+5. LRCLIB lyrics plus cover cache (Completed).
+6. MPRIS/SMTC plus tray plus single instance (Completed).
+7. Release pipeline (AppImage, deb, exe) plus update check (Completed).
+8. Polish & ecosystem: Discord presence, Last.fm, SponsorBlock, Matugen theming, listening stats, and Spotify import (Completed).
 
 ## 14 Risks and mitigations
 
