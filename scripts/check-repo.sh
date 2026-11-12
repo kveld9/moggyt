@@ -182,6 +182,9 @@ while IFS= read -r file; do
     if [[ "${clean_file}" == "ui/shell.slint" ]] && grep -qE '^[[:space:]]*(export[[:space:]]+)?component[[:space:]]' "${full_path}"; then
       echo -e "  [${RED}FAIL${RESET}] ${clean_file} (thin entry must be import-only with no component definitions)"
       FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    elif (( lines * 10 >= max_lines * 9 )); then
+      echo -e "  [${YELLOW}WARN${RESET}] ${clean_file} (${lines} lines >= 90% of ${max_lines}; split before adding more)"
+      PASSED_CHECKS=$((PASSED_CHECKS + 1))
     else
       echo -e "  [${GREEN}OK${RESET}] ${clean_file} (${lines} lines <= ${max_lines} max)"
       PASSED_CHECKS=$((PASSED_CHECKS + 1))
