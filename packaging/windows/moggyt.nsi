@@ -114,6 +114,7 @@ Section "MainSection" SEC01
   ; Install application files (path anchored on the script directory)
   SetOutPath "$INSTDIR"
   File "..\\..\\target\\release\\moggyt.exe"
+  File "..\\..\\THIRD_PARTY_NOTICES.md"
 
   ; Create uninstaller executable
   WriteUninstaller "$INSTDIR\Uninstall.exe"
