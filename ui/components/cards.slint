@@ -74,3 +74,58 @@ export component MediaCard inherits Rectangle {
         }
     }
 }
+
+export component DetailTile inherits Rectangle {
+    in property <int> index: -1;
+    in property <bool> circular: false;
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> has-cover: false;
+    in property <image> cover;
+    callback clicked();
+
+    width: 150px;
+    height: root.circular ? 226px : 204px;
+    border-radius: 10px;
+    background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent);
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 6px;
+        alignment: start;
+
+        Rectangle {
+            height: root.circular ? 134px : 140px;
+            border-radius: root.circular ? 67px : 8px;
+            background: Theme.surface;
+            clip: true;
+
+            if root.has-cover : Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.cover;
+                image-fit: ImageFit.cover;
+            }
+        }
+
+        Text {
+            text: root.title;
+            color: Theme.text;
+            font-size: 13px;
+            font-weight: 600;
+            overflow: elide;
+        }
+
+        if root.subtitle != "" : Text {
+            text: root.subtitle;
+            color: Theme.secondary;
+            font-size: 11px;
+            wrap: word-wrap;
+        }
+    }
+}

@@ -43,6 +43,7 @@ pub mod cover_pool;
 pub mod covers;
 pub mod detail;
 mod detail_callbacks;
+mod detail_sections;
 pub mod discord;
 pub mod explore;
 pub mod format;
@@ -76,6 +77,9 @@ pub mod shortcuts;
 mod sleep_fade;
 pub mod spotify_connect;
 pub mod state;
+#[cfg(test)]
+#[path = "state_artist_tests.rs"]
+mod state_artist_tests;
 pub mod state_init;
 pub mod state_lyrics;
 pub mod state_search;

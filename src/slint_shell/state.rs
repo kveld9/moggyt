@@ -367,7 +367,11 @@ impl SlintAppState {
             .map_or(Err(CatalogError::Transport), |c| c.detail(browse_id, kind))
         {
             Ok(Some(d)) => {
-                let phase = if d.tracks.is_empty() { ViewPhase::Empty } else { ViewPhase::Ready };
+                let phase = if crate::slint_shell::detail::detail_is_empty(&d) {
+                    ViewPhase::Empty
+                } else {
+                    ViewPhase::Ready
+                };
                 (Some(d), phase)
             }
             Ok(None) => (None, ViewPhase::Empty),
