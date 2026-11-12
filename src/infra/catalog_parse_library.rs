@@ -1,6 +1,8 @@
 //! Library browse response parser for playlists, albums, and liked tracks.
 
-use super::catalog_parse_common::{best_thumbnail, parse_track_count, parse_two_row};
+use super::catalog_parse_common::{
+    best_thumbnail, item_artist_id, parse_track_count, parse_two_row,
+};
 use super::catalog_parse_detail::detail_sections;
 use crate::domain::{Album, Playlist};
 use serde_json::Value;
@@ -47,7 +49,7 @@ fn parse_library_album_item(item: &Value) -> Option<Album> {
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let id = browse_id?;
     let thumb_url = best_thumbnail(renderer);
-    Some(Album::new(&id, &title, &subtitle, thumb_url))
+    Some(Album::new(&id, &title, &subtitle, thumb_url).with_artist_id(item_artist_id(renderer)))
 }
 
 /// Parses saved albums from catalog API browse response payload.
@@ -93,5 +95,35 @@ mod tests {
     fn parse_library_albums_tolerates_empty_and_malformed() {
         assert!(parse_library_albums(&serde_json::json!({})).is_empty());
         assert!(parse_library_albums(&serde_json::json!({"contents": null})).is_empty());
+    }
+
+    #[test]
+    fn parse_library_albums_reads_artist_id() {
+        let payload = serde_json::json!({ "sectionListRenderer": { "contents": [{ "gridRenderer": { "items": [{
+            "musicTwoRowItemRenderer": {
+                "title": { "runs": [{ "text": "Saved Album" }] },
+                "subtitle": { "runs": [
+                    { "text": "Album" },
+                    { "text": " • " },
+                    { "text": "Album Artist", "navigationEndpoint": { "browseEndpoint": {
+                        "browseId": "UC_saved_artist",
+                        "browseEndpointContextSupportedConfigs": {
+                            "browseEndpointContextMusicConfig": {
+                                "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                            }
+                        }
+                    } } }
+                ] },
+                "navigationEndpoint": { "browseEndpoint": { "browseId": "MPREb_saved" } }
+            }
+        }] } }] } });
+
+        let albums = parse_library_albums(&payload);
+        assert_eq!(albums.len(), 1);
+        assert_eq!(
+            albums[0],
+            Album::new("MPREb_saved", "Saved Album", "Album", None)
+                .with_artist_id(Some("UC_saved_artist".to_owned()))
+        );
     }
 }

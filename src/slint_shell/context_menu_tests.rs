@@ -7,8 +7,8 @@ mod tests {
     };
     use crate::i18n::Locale;
     use crate::slint_shell::context_menu::{
-        ContextAction, ContextSubject, ContextTarget, FollowUp, apply_action, menu_items,
-        resolve_subject,
+        ArtistTarget, ContextAction, ContextSubject, ContextTarget, FollowUp, apply_action,
+        menu_items, resolve_subject,
     };
     use crate::slint_shell::page::SlintPage;
     use crate::slint_shell::test_support::test_wired;
@@ -91,7 +91,11 @@ mod tests {
 
     #[test]
     fn container_menu_offers_only_open() {
-        let container = ContextSubject::Container { id: "a1".to_owned(), kind: DetailKind::Album };
+        let container = ContextSubject::Container {
+            id: "a1".to_owned(),
+            kind: DetailKind::Album,
+            artist: None,
+        };
         let en_items = menu_items(Locale::English, &container, false);
         assert_eq!(en_items.len(), 1);
         assert_eq!(en_items[0].index, 0);
@@ -105,13 +109,73 @@ mod tests {
     }
 
     #[test]
+    fn container_menu_offers_open_and_go_to_artist_for_albums() {
+        let container = ContextSubject::Container {
+            id: "a1".to_owned(),
+            kind: DetailKind::Album,
+            artist: Some(ArtistTarget::Id("UC_artist".to_owned())),
+        };
+        let en_items = menu_items(Locale::English, &container, false);
+        assert_eq!(en_items.len(), 2);
+        assert_eq!(en_items[0].label, "Open");
+        assert_eq!(en_items[0].icon, ContextIcon::Open);
+        assert_eq!(en_items[1].label, "Go to artist");
+        assert_eq!(en_items[1].icon, ContextIcon::Artist);
+
+        let es_items = menu_items(Locale::Spanish, &container, false);
+        assert_eq!(es_items[0].label, "Abrir");
+        assert_eq!(es_items[1].label, "Ir al artista");
+    }
+
+    #[test]
+    fn album_container_without_artist_offers_only_open() {
+        let container = ContextSubject::Container {
+            id: "a1".to_owned(),
+            kind: DetailKind::Album,
+            artist: None,
+        };
+        let items = menu_items(Locale::English, &container, false);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label, "Open");
+    }
+
+    #[test]
+    fn playlist_and_artist_containers_never_offer_go_to_artist() {
+        for kind in [DetailKind::Playlist, DetailKind::Artist] {
+            let container = ContextSubject::Container {
+                id: "c1".to_owned(),
+                kind,
+                artist: Some(ArtistTarget::Name("Artist".to_owned())),
+            };
+            let items = menu_items(Locale::English, &container, false);
+            assert_eq!(items.len(), 1, "kind {kind:?} must offer only Open");
+            assert_eq!(items[0].label, "Open");
+        }
+    }
+
+    #[test]
+    fn album_container_action_index_mapping() {
+        let container = ContextSubject::Container {
+            id: "a1".to_owned(),
+            kind: DetailKind::Album,
+            artist: Some(ArtistTarget::Id("UC_artist".to_owned())),
+        };
+        assert_eq!(container.action_at(0), Some(ContextAction::Open));
+        assert_eq!(container.action_at(1), Some(ContextAction::GoToArtist));
+        assert_eq!(container.action_at(2), None);
+    }
+
+    #[test]
     fn resolve_subject_reads_search_items() {
         let mut state = test_wired();
         let track = Track::new("t1", "Track 1", "Artist 1");
-        let album = Album::new("a1", "Album 1", "Artist 1", None);
+        let album = Album::new("a1", "Album 1", "Artist 1", None)
+            .with_artist_id(Some("UC_search_artist".to_owned()));
+        let album_plain = Album::new("a2", "Album 2", "Artist 2", None);
         let mut shelf = Shelf::new("Results");
         shelf.items.push(SearchResult::Track(track.clone()));
         shelf.items.push(SearchResult::Album(album));
+        shelf.items.push(SearchResult::Album(album_plain));
         state.home_shelves = vec![shelf];
 
         let target_track = ContextTarget { surface: ContextSurface::Search, index: 0 };
@@ -120,7 +184,21 @@ mod tests {
         let target_album = ContextTarget { surface: ContextSurface::Search, index: 1 };
         assert_eq!(
             resolve_subject(&state, target_album),
-            Some(ContextSubject::Container { id: "a1".to_owned(), kind: DetailKind::Album })
+            Some(ContextSubject::Container {
+                id: "a1".to_owned(),
+                kind: DetailKind::Album,
+                artist: Some(ArtistTarget::Id("UC_search_artist".to_owned())),
+            })
+        );
+
+        let target_album_plain = ContextTarget { surface: ContextSurface::Search, index: 2 };
+        assert_eq!(
+            resolve_subject(&state, target_album_plain),
+            Some(ContextSubject::Container {
+                id: "a2".to_owned(),
+                kind: DetailKind::Album,
+                artist: None,
+            })
         );
     }
 
@@ -138,26 +216,59 @@ mod tests {
     fn resolve_subject_reads_explore_and_category_shelves() {
         let mut state = test_wired();
         let artist = Artist::new("art1", "Artist 1", None);
+        let explore_album = Album::new("exp_alb", "Exp Album", "Artist", None)
+            .with_artist_id(Some("UC_explore_artist".to_owned()));
         let playlist = Playlist::new("pl1", "Playlist 1", 10, None);
+        let category_album = Album::new("cat_alb", "Cat Album", "Artist", None);
 
         let mut explore_shelf = Shelf::new("Explore");
         explore_shelf.items.push(SearchResult::Artist(artist));
+        explore_shelf.items.push(SearchResult::Album(explore_album));
         state.explore_shelves = vec![explore_shelf];
 
         let mut category_shelf = Shelf::new("Category");
         category_shelf.items.push(SearchResult::Playlist(playlist));
+        category_shelf.items.push(SearchResult::Album(category_album));
         state.category_shelves = vec![category_shelf];
 
         let target_explore = ContextTarget { surface: ContextSurface::Explore, index: 0 };
         assert_eq!(
             resolve_subject(&state, target_explore),
-            Some(ContextSubject::Container { id: "art1".to_owned(), kind: DetailKind::Artist })
+            Some(ContextSubject::Container {
+                id: "art1".to_owned(),
+                kind: DetailKind::Artist,
+                artist: None,
+            })
+        );
+
+        let target_explore_album = ContextTarget { surface: ContextSurface::Explore, index: 1 };
+        assert_eq!(
+            resolve_subject(&state, target_explore_album),
+            Some(ContextSubject::Container {
+                id: "exp_alb".to_owned(),
+                kind: DetailKind::Album,
+                artist: Some(ArtistTarget::Id("UC_explore_artist".to_owned())),
+            })
         );
 
         let target_category = ContextTarget { surface: ContextSurface::Category, index: 0 };
         assert_eq!(
             resolve_subject(&state, target_category),
-            Some(ContextSubject::Container { id: "pl1".to_owned(), kind: DetailKind::Playlist })
+            Some(ContextSubject::Container {
+                id: "pl1".to_owned(),
+                kind: DetailKind::Playlist,
+                artist: None,
+            })
+        );
+
+        let target_category_album = ContextTarget { surface: ContextSurface::Category, index: 1 };
+        assert_eq!(
+            resolve_subject(&state, target_category_album),
+            Some(ContextSubject::Container {
+                id: "cat_alb".to_owned(),
+                kind: DetailKind::Album,
+                artist: None,
+            })
         );
     }
 
@@ -165,18 +276,29 @@ mod tests {
     fn resolve_subject_reads_library_items() {
         let mut state = test_wired();
         state.library_playlists = vec![Playlist::new("pl1", "Playlist 1", 5, None)];
-        state.library_albums = vec![Album::new("al1", "Album 1", "Artist 1", None)];
+        state.library_albums = vec![
+            Album::new("al1", "Album 1", "Artist 1", None)
+                .with_artist_id(Some("UC_lib_artist".to_owned())),
+        ];
 
         let target_playlist = ContextTarget { surface: ContextSurface::LibraryPlaylist, index: 0 };
         assert_eq!(
             resolve_subject(&state, target_playlist),
-            Some(ContextSubject::Container { id: "pl1".to_owned(), kind: DetailKind::Playlist })
+            Some(ContextSubject::Container {
+                id: "pl1".to_owned(),
+                kind: DetailKind::Playlist,
+                artist: None,
+            })
         );
 
         let target_album = ContextTarget { surface: ContextSurface::LibraryAlbum, index: 0 };
         assert_eq!(
             resolve_subject(&state, target_album),
-            Some(ContextSubject::Container { id: "al1".to_owned(), kind: DetailKind::Album })
+            Some(ContextSubject::Container {
+                id: "al1".to_owned(),
+                kind: DetailKind::Album,
+                artist: Some(ArtistTarget::Id("UC_lib_artist".to_owned())),
+            })
         );
     }
 
@@ -205,13 +327,21 @@ mod tests {
         let target_0 = ContextTarget { surface: ContextSurface::DetailCard, index: 0 };
         assert_eq!(
             resolve_subject(&state, target_0),
-            Some(ContextSubject::Container { id: "c-album".to_owned(), kind: DetailKind::Album })
+            Some(ContextSubject::Container {
+                id: "c-album".to_owned(),
+                kind: DetailKind::Album,
+                artist: Some(ArtistTarget::Name("Artist Name".to_owned())),
+            })
         );
 
         let target_1 = ContextTarget { surface: ContextSurface::DetailCard, index: 1 };
         assert_eq!(
             resolve_subject(&state, target_1),
-            Some(ContextSubject::Container { id: "c-artist".to_owned(), kind: DetailKind::Artist })
+            Some(ContextSubject::Container {
+                id: "c-artist".to_owned(),
+                kind: DetailKind::Artist,
+                artist: None,
+            })
         );
 
         let target_2 = ContextTarget { surface: ContextSurface::DetailCard, index: 2 };
