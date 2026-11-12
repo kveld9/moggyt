@@ -1,6 +1,7 @@
 import { Labels } from "../labels.slint";
 import { Theme, TrackRowData, DetailSectionData } from "../theme.slint";
 import { TrackRow } from "../components/rows.slint";
+import { ViewModeToggle } from "../components/view_mode_toggle.slint";
 import { ContextSurface } from "../components/context_menu.slint";
 import { DetailTile } from "../components/cards.slint";
 import { StyledInputField } from "../components/controls.slint";
@@ -13,6 +14,11 @@ export global LocalEditUi {
     callback delete-requested();
     callback remove-track-requested(int);
     callback move-track-requested(int, int);
+}
+
+export global DetailUi {
+    in-out property <bool> compact-tracks: false;
+    callback compact-toggled();
 }
 
 export component DetailView inherits VerticalLayout {
@@ -190,6 +196,11 @@ export component DetailView inherits VerticalLayout {
                             }
                         }
                     }
+
+                    if root.tracks.length > 0 : ViewModeToggle {
+                        compact: DetailUi.compact-tracks;
+                        toggled => { DetailUi.compact-toggled(); }
+                    }
                 }
 
                 if LocalEditUi.is-local : HorizontalLayout {
@@ -288,6 +299,7 @@ export component DetailView inherits VerticalLayout {
             surface: ContextSurface.detail;
             cover: track.cover;
             show-remove: LocalEditUi.is-local;
+            compact: DetailUi.compact-tracks;
             clicked => { root.track-selected(track.index); }
             remove-requested => { LocalEditUi.remove-track-requested(track.index); }
             move-up-requested => { LocalEditUi.move-track-requested(track.index, track.index - 1); }

@@ -13,6 +13,7 @@ export component TrackRow inherits Rectangle {
     in property <image> cover;
     in property <bool> is-active: false;
     in property <bool> show-remove: false;
+    in property <bool> compact: false;
     callback clicked();
     callback remove-requested();
     callback move-up-requested();
@@ -22,7 +23,7 @@ export component TrackRow inherits Rectangle {
         root.artist != "" ? root.artist : root.album
     );
 
-    height: 56px;
+    height: root.compact ? 40px : 56px;
     border-radius: 8px;
     background: root.is-active ? (touch.pressed ? Theme.overlay : Theme.surface) : (touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent));
     animate background { duration: 150ms; easing: ease-in-out; }
@@ -46,7 +47,7 @@ export component TrackRow inherits Rectangle {
         padding-right: 12px;
         spacing: 12px;
 
-        VerticalLayout {
+        if !root.compact : VerticalLayout {
             alignment: center;
             Rectangle {
                 width: 40px;
@@ -64,6 +65,18 @@ export component TrackRow inherits Rectangle {
             }
         }
 
+        if root.compact && root.index >= 0 : VerticalLayout {
+            alignment: center;
+            Text {
+                width: 22px;
+                text: "\{root.index + 1}";
+                color: Theme.secondary;
+                font-size: 12px;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+        }
+
         VerticalLayout {
             alignment: center;
             spacing: 2px;
@@ -72,7 +85,7 @@ export component TrackRow inherits Rectangle {
             Text {
                 text: root.title;
                 color: root.is-active ? Theme.accent : Theme.text;
-                font-size: 14px;
+                font-size: root.compact ? 13px : 14px;
                 font-weight: 600;
                 overflow: elide;
                 vertical-alignment: center;
@@ -81,7 +94,7 @@ export component TrackRow inherits Rectangle {
             if root.subtitle-text != "" : Text {
                 text: root.subtitle-text;
                 color: Theme.secondary;
-                font-size: 12px;
+                font-size: root.compact ? 11px : 12px;
                 overflow: elide;
                 vertical-alignment: center;
             }

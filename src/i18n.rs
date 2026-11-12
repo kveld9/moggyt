@@ -126,6 +126,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Clear queue?", "¿Vaciar cola?"),
     ("Clear search", "Borrar búsqueda"),
     ("Close", "Cerrar"),
+    ("Compact view", "Vista compacta"),
     ("Connect with Last.fm", "Conectar con Last.fm"),
     ("Connected as", "Conectado como"),
     (
@@ -134,6 +135,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ),
     ("Copy link", "Copiar enlace"),
     ("Could not copy the link", "No se pudo copiar el enlace"),
+    ("Cover view", "Vista con carátulas"),
     ("Crossfade", "Fundido cruzado"),
     ("Custom", "Personalizado"),
     ("Custom Discord Application ID", "ID de aplicación personalizada de Discord"),

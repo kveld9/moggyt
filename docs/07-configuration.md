@@ -136,7 +136,8 @@ The configuration file uses JSON serialization with atomic replacement:
   "player_bar_show_repeat": true,
   "player_bar_show_skip_seconds": false,
   "player_bar_show_queue": true,
-  "player_bar_show_volume": true
+  "player_bar_show_volume": true,
+  "detail_compact_tracks": false
 }
 ```
 
@@ -225,6 +226,10 @@ The configuration file uses JSON serialization with atomic replacement:
   - `player_bar_show_skip_seconds` (boolean, default `false`): Whether `-10s` / `+10s` buttons are shown.
   - `player_bar_show_queue` (boolean, default `true`): Whether queue button is shown.
   - `player_bar_show_volume` (boolean, default `true`): Whether speaker icon and volume slider are shown.
+- **Detail Track List (`detail_compact_tracks`)**:
+  - `detail_compact_tracks` (boolean, default `false`): Whether album, artist, and playlist track lists start in
+    compact mode, hiding cover thumbnails and tightening row height. The `Compact view` toggle in the detail header
+    updates this key.
 
 Note: Keyboard shortcuts are always on and have no configuration key.
 

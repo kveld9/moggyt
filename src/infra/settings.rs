@@ -105,6 +105,9 @@ pub struct Settings {
     /// Whether only songs (dropping music videos) are preferred.
     #[serde(default = "default_false")]
     pub songs_only: bool,
+    /// Whether detail track lists render in compact mode without cover thumbnails.
+    #[serde(default = "default_false")]
+    pub detail_compact_tracks: bool,
     /// Whether playback continues with similar tracks when the queue ends.
     #[serde(default = "default_false")]
     pub autoplay_enabled: bool,
@@ -171,6 +174,7 @@ impl Default for Settings {
             secondary_lastfm_enabled: false,
             hi_res_covers: false,
             songs_only: false,
+            detail_compact_tracks: false,
             autoplay_enabled: false,
             skip_silence: false,
             loudness_normalization: false,

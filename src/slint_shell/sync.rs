@@ -29,8 +29,8 @@ use crate::slint_shell::state::{PersistenceError, PersistenceStore, SlintAppStat
 use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{
-    LibraryItemData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow, PlaybackUi,
-    PlayerUi, ShelfData, TrackRowData,
+    DetailUi, LibraryItemData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow,
+    PlaybackUi, PlayerUi, ShelfData, TrackRowData,
 };
 
 fn derive_library_phase(state: &SlintAppState) -> ViewPhase {
@@ -169,6 +169,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     let player = window.global::<PlayerUi>();
     sync_audio_snapshot(window, state);
     window.set_songs_only(state.songs_only);
+    window.global::<DetailUi>().set_compact_tracks(state.detail_compact_tracks);
     window.global::<PlaybackUi>().set_autoplay_enabled(state.autoplay);
     window.set_crossfade_seconds(state.crossfade_seconds as i32);
     window.set_stream_cache_limit_mb(state.stream_cache_limit_mb as i32);

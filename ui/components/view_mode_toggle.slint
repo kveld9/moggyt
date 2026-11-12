@@ -1,0 +1,31 @@
+import { Labels } from "../labels.slint";
+import { Theme } from "../theme.slint";
+
+// Pill button that switches the detail track list between cover rows and compact rows.
+export component ViewModeToggle inherits Rectangle {
+    in property <bool> compact: false;
+    callback toggled();
+
+    height: 36px;
+    border-radius: 18px;
+    background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : Theme.surface);
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => { root.toggled(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 20px;
+        alignment: center;
+
+        Text {
+            text: root.compact ? Labels.cover-view-label : Labels.compact-view-label;
+            color: touch.has-hover ? Theme.accent : Theme.text;
+            font-size: 13px;
+            font-weight: 700;
+            vertical-alignment: center;
+        }
+    }
+}

@@ -129,6 +129,8 @@ pub struct SlintAppState {
     pub stream_cache_limit_mb: u32,
     pub hi_res_covers: bool,
     pub songs_only: bool,
+    /// Whether detail track lists render in compact mode without cover thumbnails.
+    pub detail_compact_tracks: bool,
     pub signed_in: bool,
     pub theme: ThemeId,
     pub custom_theme: Option<CustomThemeFile>,
@@ -194,6 +196,14 @@ impl SlintAppState {
         self.theme = theme;
         let mut settings = self.settings_store.load();
         settings.theme = theme;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Toggles the compact detail track list preference and persists it to disk.
+    pub fn toggle_detail_compact_tracks(&mut self) {
+        self.detail_compact_tracks = !self.detail_compact_tracks;
+        let mut settings = self.settings_store.load();
+        settings.detail_compact_tracks = self.detail_compact_tracks;
         let _ = self.settings_store.save(&settings);
     }
 
@@ -735,6 +745,10 @@ mod tests {
         assert!(!state.settings_store.load().player_bar_show_artwork);
         state.toggle_player_bar_option(4);
         assert!(state.settings_store.load().player_bar_show_skip_seconds);
+        assert!(!state.detail_compact_tracks);
+        state.toggle_detail_compact_tracks();
+        assert!(state.detail_compact_tracks);
+        assert!(state.settings_store.load().detail_compact_tracks);
         state.hi_res_covers = false;
         assert_eq!(state.cover_max_px(), 512);
         state.hi_res_covers = true;
