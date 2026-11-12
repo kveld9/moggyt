@@ -351,6 +351,21 @@ Users can customize the player bar appearance and element visibility under **Set
   The elapsed label tracks audible playback, so it stays frozen while playback is
   paused and never shows a position longer than the displayed duration.
 
+## Context Menu
+
+Track rows across the app expose a right-click context menu rendered as a themed popup anchored at
+the pointer:
+
+- **Track lists**: `Search` results, detail track listings, the queue panel, and the Now Playing
+  `Up next` list.
+- **Play**: queues the track and starts playback on it immediately.
+- **Play next**: inserts the track immediately after the current queue position, leaving the
+  current playback untouched.
+- **Add to queue**: appends the track to the end of the queue.
+- The menu closes when an entry is chosen or when you press anywhere outside the popup. Albums,
+  artists, and playlists in the `Search` results do not open a context menu; left-click them to
+  open their detail page.
+
 ## Keyboard Shortcuts
 
 Keyboard shortcuts are always enabled and cannot be disabled. They provide transport and playback control whenever a

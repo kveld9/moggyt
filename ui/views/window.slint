@@ -5,6 +5,7 @@ import { QueuePanel } from "../components/queue_panel.slint";
 import { ShortcutScope } from "../components/shortcut_scope.slint";
 import { ContentArea } from "./content_area.slint";
 import { ImportOverlay } from "import_overlay.slint";
+import { ContextMenuLayer } from "../components/context_menu.slint";
 
 export component MoggytWindow inherits Window {
     title: "Moggyt";
@@ -377,5 +378,9 @@ export component MoggytWindow inherits Window {
         alternative-chosen(idx) => { root.import-alternative-chosen(idx); }
         picker-dismissed => { root.import-picker-dismissed(); }
         custom-id-submitted(text) => { root.import-custom-id-submitted(text); }
+    }
+    ContextMenuLayer {
+        x: 0;
+        y: 0;
     }
 }

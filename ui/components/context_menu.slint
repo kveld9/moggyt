@@ -1,0 +1,76 @@
+import { Theme } from "../theme.slint";
+
+export enum ContextSurface { search, detail, queue }
+
+export struct ContextMenuItemData {
+    index: int,
+    label: string,
+}
+
+export global ContextUi {
+    in-out property <bool> is-open: false;
+    in-out property <length> x: 0px;
+    in-out property <length> y: 0px;
+    in-out property <[ContextMenuItemData]> items: [];
+    callback opened(ContextSurface, int, length, length);
+    callback item-activated(int);
+    callback dismissed();
+}
+
+export component ContextMenuLayer inherits Rectangle {
+    width: 100%;
+    height: 100%;
+
+    if ContextUi.is-open : Rectangle {
+        width: 100%;
+        height: 100%;
+
+        backdrop := TouchArea {
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down {
+                    ContextUi.dismissed();
+                }
+            }
+        }
+
+        panel := Rectangle {
+            width: 220px;
+            height: ContextUi.items.length * 34px + 10px;
+            x: min(max(ContextUi.x, 8px), parent.width - self.width - 8px);
+            y: min(max(ContextUi.y, 8px), parent.height - self.height - 8px);
+            background: Theme.panel;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: Theme.border;
+
+            VerticalLayout {
+                padding: 6px;
+                spacing: 2px;
+                alignment: start;
+
+                for item in ContextUi.items : Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: item-touch.pressed ? Theme.overlay : (item-touch.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    item-touch := TouchArea {
+                        clicked => { ContextUi.item-activated(item.index); }
+                    }
+
+                    Text {
+                        x: 10px;
+                        y: 0;
+                        width: parent.width - 20px;
+                        height: parent.height;
+                        text: item.label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+    }
+}

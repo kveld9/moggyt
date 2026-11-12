@@ -39,6 +39,7 @@ pub mod audio_snapshot;
 mod auto_skip;
 pub mod callbacks;
 pub mod category;
+pub mod context_menu;
 pub mod cover_pool;
 pub mod covers;
 pub mod detail;

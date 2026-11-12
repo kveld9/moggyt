@@ -36,6 +36,19 @@ impl PlaybackQueue {
         self.tracks.push(track);
     }
 
+    /// Inserts a track immediately after the current cursor, keeping the cursor on the same track.
+    ///
+    /// An empty queue receives the track and places the cursor on it.
+    pub fn insert_next(&mut self, track: Track) {
+        if self.tracks.is_empty() {
+            self.tracks.push(track);
+            self.cursor = 0;
+            return;
+        }
+        let at = (self.cursor + 1).min(self.tracks.len());
+        self.tracks.insert(at, track);
+    }
+
     /// Number of queued tracks.
     pub fn len(&self) -> usize {
         self.tracks.len()
@@ -325,5 +338,30 @@ mod tests {
         let q_one = queue_from(&["a", "b", "c"], 1, RepeatMode::One);
         assert_eq!(q_one.peek_next(), None);
         assert_eq!(q_one.cursor(), 1);
+    }
+
+    #[test]
+    fn insert_next_on_empty_queue_places_cursor_on_the_track() {
+        let mut q = PlaybackQueue::new();
+        q.insert_next(Track::new("a", "title", "artist"));
+        assert_eq!(q.len(), 1);
+        assert_eq!(q.cursor(), 0);
+        assert_eq!(current_id(&q), Some("a"));
+    }
+
+    #[test]
+    fn insert_next_after_middle_cursor_keeps_current_track() {
+        let mut q = queue_from(&["a", "b", "c"], 1, RepeatMode::Off);
+        q.insert_next(Track::new("x", "title", "artist"));
+        assert_eq!(track_ids(&q), ["a", "b", "x", "c"]);
+        assert_eq!(current_id(&q), Some("b"));
+    }
+
+    #[test]
+    fn insert_next_at_tail_appends_and_keeps_current_track() {
+        let mut q = queue_from(&["a", "b"], 1, RepeatMode::Off);
+        q.insert_next(Track::new("x", "title", "artist"));
+        assert_eq!(track_ids(&q), ["a", "b", "x"]);
+        assert_eq!(current_id(&q), Some("b"));
     }
 }

@@ -5,6 +5,7 @@ import { SettingsModeButton } from "../components/settings_rows.slint";
 import { VinylDeck } from "../components/vinyl_deck.slint";
 import { PlayerCenterControls } from "../components/player_controls.slint";
 import { TrackRow } from "../components/rows.slint";
+import { ContextSurface } from "../components/context_menu.slint";
 import { IconHeart, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
 import { VersionFixUi } from "version_fix.slint";
 
@@ -322,6 +323,8 @@ export component NowPlayingView inherits HorizontalLayout {
                         album: track.album;
                         duration: track.duration;
                         kind: track.kind;
+                        index: track.index;
+                        surface: ContextSurface.queue;
                         cover: track.cover;
                         is-active: track.index == root.queue-selected-index;
                         clicked => { root.queue-track-selected(track.index); }

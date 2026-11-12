@@ -73,6 +73,8 @@ pub struct SlintAppState {
     pub version_store: Box<dyn crate::infra::VersionOverrideStore>,
     /// Transient picker state for audio version overrides.
     pub version_fix: crate::slint_shell::version_fix::VersionFixState,
+    /// Row that owns the open right-click context menu, when any.
+    pub context_menu: crate::slint_shell::context_menu::ContextMenuState,
     pub updater_rx: Option<std::sync::mpsc::Receiver<Option<ReleaseInfo>>>,
 
     pub page: SlintPage,
