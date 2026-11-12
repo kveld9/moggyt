@@ -131,7 +131,30 @@ We follow the **Conventional Commits** specification (`feat`, `fix`, `docs`, `re
   Domain code (`src/domain/`) stays free of I/O; external crates hide behind ports in `src/infra/`.
   See [`docs/02-architecture.md`](docs/02-architecture.md).
 
-### 4. Rust Verification Gates
+### 4. Prerequisites & Verification Gates
+
+Install required system packages before building or running tests:
+
+- **Debian / Ubuntu**:
+
+  ```bash
+  sudo apt install libasound2-dev libayatana-appindicator3-dev libdbus-1-dev \
+    pkg-config cmake build-essential nodejs npm
+  ```
+
+- **Arch Linux**:
+
+  ```bash
+  sudo pacman -S --needed alsa-lib libayatana-appindicator dbus pkg-config \
+    cmake base-devel nodejs npm
+  ```
+
+- **Fedora**:
+
+  ```bash
+  sudo dnf install alsa-lib-devel libayatana-appindicator-gtk3-devel \
+    dbus-devel pkgconf-pkg-config cmake gcc gcc-c++ nodejs npm
+  ```
 
 Run the same gates as CI before pushing:
 
