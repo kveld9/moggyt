@@ -95,6 +95,8 @@ fn record_once(logged: &mut HashSet<FallbackReason>, reason: FallbackReason) -> 
 /// Layered resolver combining an InnerTube primary tier with a yt-dlp fallback.
 #[derive(Clone)]
 pub struct StreamChain {
+    binary: PathBuf,
+    session_cookies: Option<String>,
     primary: Option<Arc<dyn PrimaryStreamResolver>>,
     fallback: YtDlpResolver,
     primary_cache: StreamUrlCache,
@@ -107,6 +109,8 @@ pub struct StreamChain {
 impl std::fmt::Debug for StreamChain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StreamChain")
+            .field("binary", &self.binary)
+            .field("has_cookies", &self.session_cookies.is_some())
             .field("has_primary", &self.primary.is_some())
             .field("quality", &self.quality)
             .finish()
@@ -116,8 +120,19 @@ impl std::fmt::Debug for StreamChain {
 impl StreamChain {
     /// Creates a stream chain with InnerTube primary and yt-dlp fallback.
     pub fn new(binary: impl Into<PathBuf>) -> Self {
+        Self::with_session_cookies(binary, None)
+    }
+
+    /// Creates a stream chain with InnerTube primary initialized with session cookies.
+    pub fn with_session_cookies(binary: impl Into<PathBuf>, cookies: Option<&str>) -> Self {
+        let binary = binary.into();
+        let mut resolver = InnertubeResolver::new();
+        resolver.set_session_cookies(cookies);
+        let normalized_cookies = resolver.session_cookies().map(ToString::to_string);
         Self {
-            primary: Some(Arc::new(InnertubeResolver::new())),
+            binary: binary.clone(),
+            session_cookies: normalized_cookies,
+            primary: Some(Arc::new(resolver)),
             fallback: YtDlpResolver::new(binary),
             primary_cache: StreamUrlCache::new(),
             quality: AudioQuality::default(),
@@ -130,7 +145,10 @@ impl StreamChain {
     /// Constructs a stream chain with an explicit primary resolver and fallback adapter.
     pub fn with_primary(primary: Arc<dyn PrimaryStreamResolver>, fallback: YtDlpResolver) -> Self {
         let quality = fallback.quality();
+        let binary = fallback.binary().to_path_buf();
         Self {
+            binary,
+            session_cookies: None,
             primary: Some(primary),
             fallback,
             primary_cache: StreamUrlCache::new(),
@@ -144,7 +162,10 @@ impl StreamChain {
     /// Constructs a stream chain using only the yt-dlp fallback tier with primary disabled.
     pub fn from_ytdlp(fallback: YtDlpResolver) -> Self {
         let quality = fallback.quality();
+        let binary = fallback.binary().to_path_buf();
         Self {
+            binary,
+            session_cookies: None,
             primary: None,
             fallback,
             primary_cache: StreamUrlCache::new(),
@@ -176,6 +197,27 @@ impl StreamChain {
     pub fn set_quality(&mut self, quality: AudioQuality) {
         self.quality = quality;
         self.fallback.set_quality(quality);
+    }
+
+    /// Returns the configured yt-dlp binary path.
+    pub fn binary(&self) -> &std::path::Path {
+        &self.binary
+    }
+
+    /// Returns the currently stored session cookies, if any.
+    pub fn session_cookies(&self) -> Option<&str> {
+        self.session_cookies.as_deref()
+    }
+
+    /// Updates the session cookies and rebuilds the primary InnerTube resolver.
+    pub fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        let mut resolver = InnertubeResolver::new();
+        resolver.set_quality(self.quality);
+        resolver.set_session_cookies(cookies);
+        self.session_cookies = resolver.session_cookies().map(ToString::to_string);
+        if self.primary.is_some() {
+            self.primary = Some(Arc::new(resolver));
+        }
     }
 
     /// Invalidates cached stream entries for `video_id` across both tiers.
@@ -614,5 +656,36 @@ mod tests {
         assert!(chain.prefetch_prefix("v-single"));
         assert_eq!(chain.take_prefetched("https://primary.test/v-single"), Some(vec![1, 2, 3]));
         assert_eq!(chain.take_prefetched("https://primary.test/v-single"), None);
+    }
+
+    #[test]
+    fn stream_chain_with_session_cookies_stores_cookies_and_builds() {
+        let chain = StreamChain::with_session_cookies(
+            "/definitely/missing/binary/yt-dlp",
+            Some("SAPISID=cookie_1"),
+        );
+        assert_eq!(chain.session_cookies(), Some("SAPISID=cookie_1"));
+        assert_eq!(chain.binary(), std::path::Path::new("/definitely/missing/binary/yt-dlp"));
+    }
+
+    #[test]
+    fn stream_chain_set_session_cookies_updates_cookies_and_preserves_binary() {
+        let mut chain = StreamChain::new("/definitely/missing/binary/yt-dlp");
+        assert_eq!(chain.session_cookies(), None);
+        assert_eq!(chain.binary(), std::path::Path::new("/definitely/missing/binary/yt-dlp"));
+
+        chain.set_session_cookies(Some("  SAPISID=cookie_2  "));
+        assert_eq!(chain.session_cookies(), Some("SAPISID=cookie_2"));
+        assert_eq!(chain.binary(), std::path::Path::new("/definitely/missing/binary/yt-dlp"));
+        assert_eq!(
+            chain.fallback.binary(),
+            std::path::Path::new("/definitely/missing/binary/yt-dlp")
+        );
+
+        chain.set_session_cookies(Some("   "));
+        assert_eq!(chain.session_cookies(), None);
+
+        chain.set_session_cookies(None);
+        assert_eq!(chain.session_cookies(), None);
     }
 }

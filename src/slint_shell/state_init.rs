@@ -42,7 +42,7 @@ impl SlintAppState {
         let covers: SharedCovers = Arc::new(Mutex::new(Box::new(covers)));
         let settings_store = Box::new(MemorySettingsStore::default());
         let recent_searches = settings_store.load().recent_searches;
-        Self {
+        let mut state = Self {
             catalog,
             audio,
             session,
@@ -143,7 +143,9 @@ impl SlintAppState {
             worker_tx: None,
             persistence_error: None,
             audio_snapshot: Default::default(),
-        }
+        };
+        state.apply_session_to_audio();
+        state
     }
 }
 

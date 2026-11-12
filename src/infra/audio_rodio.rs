@@ -107,6 +107,11 @@ impl RodioBackend {
         *self.resolver = resolver;
     }
 
+    /// Updates session cookies for stream resolution authentication.
+    pub fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        self.resolver.set_session_cookies(cookies);
+    }
+
     /// Configures or clears the backing stream disk cache.
     pub fn set_stream_cache(&mut self, cache: Option<Arc<StreamDiskCache>>) {
         self.stream_cache = cache;
@@ -471,6 +476,10 @@ impl AudioBackend for RodioBackend {
     fn set_loudness_normalization(&mut self, on: bool) {
         self.loudness_normalization = on;
     }
+
+    fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        self.set_session_cookies(cookies);
+    }
 }
 
 #[cfg(test)]
@@ -730,5 +739,18 @@ mod tests {
         assert!(!Arc::ptr_eq(&second_sink, &backend.sink));
         assert_eq!(backend.last_requested(), Some("track-2"));
         assert!(backend.is_playing());
+    }
+
+    #[test]
+    fn rodio_backend_set_session_cookies_forwards_to_resolver() {
+        let Some(mut backend) = test_backend() else {
+            return;
+        };
+        backend.set_session_cookies(Some("SAPISID=rodio_cookie"));
+        let prefetcher = backend.stream_prefetcher().expect("prefetcher available");
+        assert_eq!(prefetcher.session_cookies(), Some("SAPISID=rodio_cookie"));
+        backend.set_session_cookies(None);
+        let prefetcher = backend.stream_prefetcher().expect("prefetcher available");
+        assert_eq!(prefetcher.session_cookies(), None);
     }
 }

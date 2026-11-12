@@ -19,7 +19,7 @@ use crate::infra::{
     DeviceIdentityMonitor, DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource,
     MediaKeyAction, OutputDeviceWatch, PlayLogStore, QueueStore, ReleaseInfo, Scrobbler,
     SessionStore, SettingsStore, SkipProvider, SkipStore, TrayAction, TrayHandle, decode_cover,
-    decode_handoff, fetch_artwork, sanitize_cookie_input,
+    fetch_artwork,
 };
 use crate::slint_shell::auto_skip::{SponsorFetchOutcome, SponsorRangeState};
 use crate::slint_shell::covers::request_queue_track_cover;
@@ -469,41 +469,6 @@ impl SlintAppState {
                 }
             }
         }
-    }
-
-    /// Sanitizes cookie input, updates keyring session store, and binds catalog client.
-    pub fn sign_in_from_input(&mut self, cleaned: &str) -> bool {
-        let Some(cookies) = sanitize_cookie_input(cleaned) else {
-            return false;
-        };
-        self.session.save(&cookies);
-        if let Ok(mut c) = self.catalog.lock() {
-            c.set_session_cookies(Some(&cookies));
-        }
-        self.signed_in = true;
-        true
-    }
-
-    /// Imports session from companion QR/handoff code string.
-    pub fn import_handoff(&mut self, text: &str) -> bool {
-        let Ok(cookies) = decode_handoff(text) else {
-            return false;
-        };
-        self.session.save(&cookies);
-        if let Ok(mut c) = self.catalog.lock() {
-            c.set_session_cookies(Some(&cookies));
-        }
-        self.signed_in = true;
-        true
-    }
-
-    /// Clears active session and resets catalog client to anonymous browsing.
-    pub fn sign_out(&mut self) {
-        self.session.clear();
-        if let Ok(mut c) = self.catalog.lock() {
-            c.set_session_cookies(None);
-        }
-        self.signed_in = false;
     }
 
     /// Sets active custom theme by name, updates handle, and persists preference.

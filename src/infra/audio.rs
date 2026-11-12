@@ -95,6 +95,8 @@ pub trait AudioBackend {
     fn has_cached_stream(&self, _track_id: &str) -> bool {
         false
     }
+    /// Updates session cookies for stream resolution authentication.
+    fn set_session_cookies(&mut self, _cookies: Option<&str>) {}
 }
 
 /// In-memory no-op audio stub alias.
@@ -112,6 +114,7 @@ pub struct AudioStub {
     quality: AudioQuality,
     skip_silence: bool,
     loudness_normalization: bool,
+    session_cookies: Option<String>,
 }
 
 impl Default for AudioStub {
@@ -126,6 +129,7 @@ impl Default for AudioStub {
             quality: AudioQuality::default(),
             skip_silence: false,
             loudness_normalization: false,
+            session_cookies: None,
         }
     }
 }
@@ -156,6 +160,11 @@ impl AudioStub {
     /// Returns the last requested track identifier, if any.
     pub fn last_requested_id(&self) -> Option<&str> {
         self.last_requested.as_deref()
+    }
+
+    /// Returns the currently stored session cookies, if any.
+    pub fn session_cookies(&self) -> Option<&str> {
+        self.session_cookies.as_deref()
     }
 }
 
@@ -234,6 +243,11 @@ impl AudioBackend for AudioStub {
 
     fn speed(&self) -> f32 {
         self.speed
+    }
+
+    fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        self.session_cookies =
+            cookies.map(str::trim).filter(|s| !s.is_empty()).map(ToString::to_string);
     }
 }
 
@@ -366,5 +380,17 @@ mod tests {
         assert!(audio.is_playing());
         assert_eq!(audio.last_requested(), Some("track-ok"));
         assert_eq!(audio.position_secs(), 0);
+    }
+
+    #[test]
+    fn audio_stub_session_cookies_recording() {
+        let mut audio = AudioStub::new();
+        assert_eq!(audio.session_cookies(), None);
+        audio.set_session_cookies(Some("  SAPISID=cookie_audio  "));
+        assert_eq!(audio.session_cookies(), Some("SAPISID=cookie_audio"));
+        audio.set_session_cookies(Some("   "));
+        assert_eq!(audio.session_cookies(), None);
+        audio.set_session_cookies(None);
+        assert_eq!(audio.session_cookies(), None);
     }
 }

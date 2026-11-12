@@ -123,6 +123,10 @@ impl AudioBackend for LiveAudio {
     fn has_cached_stream(&self, track_id: &str) -> bool {
         delegate_audio!(self, has_cached_stream, track_id)
     }
+
+    fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        delegate_audio!(self, set_session_cookies, cookies);
+    }
 }
 
 #[cfg(test)]
@@ -169,8 +173,10 @@ mod tests {
         assert_eq!(audio.quality(), AudioQuality::Compact);
         audio.set_skip_silence(true);
         audio.set_loudness_normalization(true);
+        audio.set_session_cookies(Some("SAPISID=live_test"));
         assert!(audio.stream_prefetcher().is_none());
         assert!(!audio.has_cached_stream("track-muted-1"));
+        audio.set_session_cookies(None);
     }
 
     #[test]
