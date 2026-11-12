@@ -29,7 +29,26 @@ in Rust (Slint).
 
 ### For Contributors
 
-1. Read [Vision and Scope](01-vision.md) and [Architecture](02-architecture.md) to understand modular boundaries.
-2. Read [Software Design Document (SDD)](04-sdd.md) to inspect technical contracts and functional requirements.
-3. Follow [Development and Verification](03-development.md) for local verification gates and coding rules.
-4. Review [ADR-001](adr/001-update-check-releases.md) for current update check distribution decisions.
+#### Onboarding Learning Tracks
+
+- **Track 1: Day 1 Developer Setup and First Build**
+  1. Install system dev headers and toolchain per [CONTRIBUTING.md](../CONTRIBUTING.md).
+  2. Follow [Development and Verification](03-development.md) to run the 6 local CI verification gates.
+  3. Install the recommended pre-commit hook (`cp .githooks/pre-commit.example .githooks/pre-commit`).
+  4. Launch the application window via `cargo run`.
+
+- **Track 2: Hexagonal Architecture and Data Flow**
+  1. Read [Vision and Scope](01-vision.md) to understand project principles and non-goals.
+  2. Study [Architecture](02-architecture.md) for the pure domain skeleton, module map, and port contracts.
+  3. Review the "Anatomy of a feature" walkthrough in [Development and Verification](03-development.md) to
+     follow how Slint UI callbacks traverse async channels to pure domain logic and back.
+  4. Review [Software Design Document (SDD)](04-sdd.md) for detailed contracts across core subsystems.
+
+- **Track 3: UI Development and Slint Guidelines**
+  1. Review the UI verification and Slint lessons in [Development and Verification](03-development.md).
+  2. Review Slint components in `ui/shell.slint`, `ui/views/`, and `ui/components/`.
+  3. Learn layout rules (avoiding collapsing `Flickable`, centering children, and thread safety).
+  4. Understand UI chrome translation invariants (`src/i18n.rs`).
+
+- **Architecture Decisions**
+  - Consult [ADR-001](adr/001-update-check-releases.md) for update check and release distribution rationale.
