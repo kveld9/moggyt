@@ -49,19 +49,20 @@ pub const ITAG_AAC_COMPACT: u32 = 139;
 /// Adaptive format itag for medium-bitrate AAC (~130 kbps).
 pub const ITAG_AAC_STANDARD: u32 = 140;
 
+/// Adaptive format itag for high-quality Opus (~136 kbps, 48 kHz).
+pub const ITAG_OPUS_HIGH: u32 = 251;
+
 const ORIGIN: &str = "https://www.youtube.com";
 
 /// Selects the preferred InnerTube itag for the given audio quality.
 ///
-/// Returns 139 (AAC ~50 kbps) for [`AudioQuality::Compact`], and 140 (AAC ~130 kbps)
-/// for [`AudioQuality::Standard`] and [`AudioQuality::High`].
-///
-/// Note that itag 251 (Opus) is deliberately excluded because the rodio/symphonia
-/// audio stack cannot decode WebM Opus streams.
+/// Returns 139 (AAC ~50 kbps) for [`AudioQuality::Compact`], 140 (AAC ~130 kbps)
+/// for [`AudioQuality::Standard`], and 251 (Opus ~136 kbps) for [`AudioQuality::High`].
 pub const fn select_itag(quality: AudioQuality) -> u32 {
     match quality {
         AudioQuality::Compact => ITAG_AAC_COMPACT,
-        AudioQuality::Standard | AudioQuality::High => ITAG_AAC_STANDARD,
+        AudioQuality::Standard => ITAG_AAC_STANDARD,
+        AudioQuality::High => ITAG_OPUS_HIGH,
     }
 }
 
@@ -172,17 +173,38 @@ fn convert_format_to_stream(format: AudioFormat) -> Result<ResolvedStream, Fallb
     Ok(ResolvedStream { url, mime_type: format.mime_type, loudness_db: format.loudness_db })
 }
 
+const fn quality_preference_itags(quality: AudioQuality) -> &'static [u32] {
+    match quality {
+        AudioQuality::High => &[251, 141, 140, 250, 139],
+        AudioQuality::Standard => &[140],
+        AudioQuality::Compact => &[139],
+    }
+}
+
 /// Selects a playable audio stream matching the requested audio quality preference.
 pub fn select_stream(
     payload: &Value,
     quality: AudioQuality,
 ) -> Result<ResolvedStream, FallbackReason> {
     check_playability_status(payload)?;
-    let target_itag = select_itag(quality);
+    let preferences = quality_preference_itags(quality);
     let formats = parse_audio_formats(payload);
-    let format =
-        formats.into_iter().find(|fmt| fmt.itag == target_itag).ok_or(FallbackReason::NoFormats)?;
-    convert_format_to_stream(format)
+    let mut saw_ciphered = false;
+
+    for &target_itag in preferences {
+        let Some(format) = formats.iter().find(|fmt| fmt.itag == target_itag) else {
+            continue;
+        };
+        if format.ciphered {
+            saw_ciphered = true;
+            continue;
+        }
+        if format.url.is_some() {
+            return convert_format_to_stream(format.clone());
+        }
+    }
+
+    if saw_ciphered { Err(FallbackReason::Ciphered) } else { Err(FallbackReason::NoFormats) }
 }
 
 fn classify_request_error(err: reqwest::Error) -> FallbackReason {
@@ -348,7 +370,7 @@ mod tests {
     fn select_itag_maps_quality_to_aac_itags() {
         assert_eq!(select_itag(AudioQuality::Compact), ITAG_AAC_COMPACT);
         assert_eq!(select_itag(AudioQuality::Standard), ITAG_AAC_STANDARD);
-        assert_eq!(select_itag(AudioQuality::High), ITAG_AAC_STANDARD);
+        assert_eq!(select_itag(AudioQuality::High), ITAG_OPUS_HIGH);
     }
 
     #[test]
@@ -379,16 +401,117 @@ mod tests {
         assert!(mime.starts_with("audio/mp4"));
     }
 
+    fn quality_payload(formats: serde_json::Value) -> Value {
+        serde_json::json!({
+            "playabilityStatus": { "status": "OK" },
+            "streamingData": { "adaptiveFormats": formats }
+        })
+    }
+
     #[test]
-    fn high_quality_keeps_aac_and_never_selects_opus() {
+    fn high_quality_prefers_opus_over_aac() {
         let fixture: Value = serde_json::from_str(include_str!(
             "../../tests/fixtures/innertube_visionos_player.json"
         ))
         .expect("fixture parses");
         let stream =
             select_stream(&fixture, AudioQuality::High).expect("high stream resolution succeeds");
-        assert!(stream.url.contains("itag=140"));
-        assert!(!stream.url.contains("itag=251"));
+        assert!(stream.url.contains("itag=251"));
+        assert!(!stream.url.contains("itag=140"));
+    }
+
+    #[test]
+    fn high_quality_skips_ciphered_opus_and_plays_direct_aac() {
+        let payload = quality_payload(serde_json::json!([
+            {
+                "itag": 251,
+                "mimeType": "audio/webm; codecs=\"opus\"",
+                "signatureCipher": "s=mock_cipher"
+            },
+            {
+                "itag": 140,
+                "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+                "url": "https://stream.local/140"
+            }
+        ]));
+        let stream = select_stream(&payload, AudioQuality::High).expect("skips ciphered opus");
+        assert_eq!(stream.url, "https://stream.local/140");
+    }
+
+    #[test]
+    fn high_quality_reports_ciphered_when_all_candidates_are_ciphered() {
+        let payload = quality_payload(serde_json::json!([
+            {
+                "itag": 251,
+                "mimeType": "audio/webm; codecs=\"opus\"",
+                "signatureCipher": "s=mock_cipher"
+            }
+        ]));
+        let err = select_stream(&payload, AudioQuality::High)
+            .expect_err("all candidates ciphered must report ciphered");
+        assert_eq!(err, FallbackReason::Ciphered);
+    }
+
+    #[test]
+    fn payload_with_only_140_present_and_quality_high_picks_140() {
+        let payload = quality_payload(serde_json::json!([
+            {
+                "itag": 140,
+                "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+                "url": "https://stream.local/140"
+            }
+        ]));
+        let stream = select_stream(&payload, AudioQuality::High).expect("falls back to 140");
+        assert_eq!(stream.url, "https://stream.local/140");
+    }
+
+    #[test]
+    fn payload_with_251_and_140_and_quality_high_picks_251() {
+        let payload = quality_payload(serde_json::json!([
+            {
+                "itag": 140,
+                "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+                "url": "https://stream.local/140"
+            },
+            {
+                "itag": 251,
+                "mimeType": "audio/webm; codecs=\"opus\"",
+                "url": "https://stream.local/251"
+            }
+        ]));
+        let stream = select_stream(&payload, AudioQuality::High).expect("selects 251");
+        assert_eq!(stream.url, "https://stream.local/251");
+    }
+
+    #[test]
+    fn payload_with_141_only_and_quality_high_picks_141_premium() {
+        let payload = quality_payload(serde_json::json!([
+            {
+                "itag": 141,
+                "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+                "url": "https://stream.local/141"
+            }
+        ]));
+        let stream = select_stream(&payload, AudioQuality::High).expect("selects 141");
+        assert_eq!(stream.url, "https://stream.local/141");
+    }
+
+    #[test]
+    fn standard_quality_ignores_opus_251() {
+        let payload = quality_payload(serde_json::json!([
+            {
+                "itag": 251,
+                "mimeType": "audio/webm; codecs=\"opus\"",
+                "url": "https://stream.local/251"
+            },
+            {
+                "itag": 140,
+                "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+                "url": "https://stream.local/140"
+            }
+        ]));
+        let stream = select_stream(&payload, AudioQuality::Standard).expect("selects 140");
+        assert_eq!(stream.url, "https://stream.local/140");
     }
 
     #[test]

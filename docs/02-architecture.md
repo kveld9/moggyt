@@ -73,7 +73,8 @@ src/
     ├── tray.rs        # System tray handle and action event loop
     ├── updater*.rs    # Updater port and GitHub Releases release checker
     ├── ytdlp.rs       # yt-dlp sidecar download and stream resolution adapter
-    ├── innertube_stream.rs # InnerTube VISIONOS player adapter (direct AAC URLs, loudnessDb)
+    ├── innertube_stream.rs # InnerTube VISIONOS player adapter (direct audio URLs, loudnessDb)
+    ├── opus_source.rs # WebM Opus demuxing (Symphonia) and decoding (libopus)
     ├── catalog.rs      # Catalog port trait definition
     ├── catalog_live.rs # Catalog API-backed live adapter
     └── catalog_stub.rs # Deterministic catalog stub for testing
@@ -92,22 +93,20 @@ Playback stream resolution is layered (`stream_chain.rs`):
 1. InnerTube tier cache entries for the track and quality (20 min TTL, 8 entries).
 2. yt-dlp tier cache entries for the same track and quality.
 3. InnerTube `player` endpoint with the `VISIONOS` client (`innertube_stream.rs`):
-   direct AAC URLs (itag 139 for compact, 140 for standard and high) with the
-   provider `loudnessDb` per format.
+   direct stream URLs (itag 251 Opus in WebM preferred for High with AAC fallback;
+   itag 140 AAC for Standard; itag 139 AAC for Compact) with the provider
+   `loudnessDb` per format.
 4. yt-dlp sidecar (`ytdlp.rs`) whenever InnerTube fails: HTTP error, timeout, a
    `playabilityStatus` other than `OK`, no compatible audio format, a ciphered
    (`signatureCipher`/`cipher`) entry, an invalid payload, or a bot check
    ("Sign in to confirm you're not a bot"). The failure reason is logged once per
    cause and playback continues through the sidecar.
 
-Opus (itag 251) stays excluded because the rodio/symphonia stack has no Opus
-decoder; AAC in MP4 is the only supported stream format. The yt-dlp sidecar and
-its `deno` requirement remain mandatory fallbacks.
-
-Unauthenticated playback also has an AAC ceiling: itag 140 (~130 kbps) is the highest
-adaptive format served, while itag 141 (~256 kbps) requires Premium authentication. The
-`High` quality preference therefore resolves to the same itag as `Standard` and shares
-its format selector instead of requesting an unreachable `abr>=192` floor.
+Opus in WebM (itag 251, ~136 kbps, 48 kHz) is decoded via libopus through `opus_source.rs`
+using Symphonia for container demuxing. For `High` quality, InnerTube resolution prefers
+itag 251 and falls back to AAC formats (141, 140, 250, 139) when Opus is unavailable;
+the yt-dlp sidecar selector for `High` similarly prefers WebM Opus before AAC and
+unconstrained audio. The yt-dlp sidecar and its `deno` requirement remain mandatory fallbacks.
 
 Player requests include the `Cookie` header and, when `SAPISID` is present in the cookies,
 an `Authorization: SAPISIDHASH <unix-seconds>_<sha1>` header from the stored user session,
