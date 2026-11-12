@@ -1,5 +1,5 @@
 import { Theme } from "../theme.slint";
-import { IconCopy, IconHeart, IconNext, IconOpen, IconPlay, IconQueue } from "../icons.slint";
+import { IconAlbum, IconArtist, IconCopy, IconHeart, IconNext, IconOpen, IconPlay, IconQueue } from "../icons.slint";
 
 export enum ContextSurface {
     search,
@@ -12,7 +12,7 @@ export enum ContextSurface {
     library-album,
 }
 
-export enum ContextIcon { play, next, queue, heart, heart-filled, copy, open, close }
+export enum ContextIcon { play, next, queue, artist, album, heart, heart-filled, copy, open, close }
 
 export struct ContextMenuItemData {
     index: int,
@@ -74,6 +74,8 @@ export component ContextMenuLayer inherits Rectangle {
                     if item.icon == ContextIcon.play : IconPlay { x: 10px; y: 8px; size: 16px; tint: Theme.text; }
                     if item.icon == ContextIcon.next : IconNext { x: 10px; y: 8px; size: 16px; tint: Theme.text; }
                     if item.icon == ContextIcon.queue : IconQueue { x: 10px; y: 8px; size: 16px; tint: Theme.text; }
+                    if item.icon == ContextIcon.artist : IconArtist { x: 10px; y: 8px; size: 16px; tint: Theme.text; }
+                    if item.icon == ContextIcon.album : IconAlbum { x: 10px; y: 8px; size: 16px; tint: Theme.text; }
                     if item.icon == ContextIcon.heart : IconHeart { x: 10px; y: 8px; size: 16px; tint: Theme.text; }
                     if item.icon == ContextIcon.heart-filled : IconHeart { x: 10px; y: 8px; size: 16px; tint: Theme.accent; is-filled: true; }
                     if item.icon == ContextIcon.copy : IconCopy { x: 10px; y: 8px; size: 16px; tint: Theme.text; }

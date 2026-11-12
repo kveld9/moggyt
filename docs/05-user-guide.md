@@ -363,6 +363,9 @@ the pointer:
 - **Play next**: inserts the track immediately after the current queue position, leaving the
   current playback untouched.
 - **Add to queue**: appends the track to the end of the queue.
+- **Go to artist** and **Go to album**: open the matching detail page for the row. The container is
+  resolved by name against the catalog off the UI thread; when nothing matches, a toast reports the
+  failure. These entries appear when the row carries an artist.
 - **Like**: adds the track to your local favorites and switches the entry to `Unlike` while the
   track is already liked. Favorites are stored in `settings.json` and survive restarts; they are
   device-local and are never synced with your YouTube Music account.

@@ -187,3 +187,37 @@ export component IconOpen inherits Rectangle {
     }
 }
 
+export component IconArtist inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 8.5 9.5 A 3.5 3.5 0 1 0 15.5 9.5 A 3.5 3.5 0 1 0 8.5 9.5 M 5 20 C 5 16.4 8.1 13.5 12 13.5 C 15.9 13.5 19 16.4 19 20";
+    }
+}
+
+export component IconAlbum inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 3.5 12 A 8.5 8.5 0 1 0 20.5 12 A 8.5 8.5 0 1 0 3.5 12 M 10 12 A 2 2 0 1 0 14 12 A 2 2 0 1 0 10 12";
+    }
+}
+

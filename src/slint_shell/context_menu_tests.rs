@@ -18,7 +18,7 @@ mod tests {
     fn menu_items_follow_track_action_order() {
         let subject = ContextSubject::Track(Track::new("t1", "Title", "Artist"));
         let items = menu_items(Locale::English, &subject, false);
-        assert_eq!(items.len(), 5);
+        assert_eq!(items.len(), 7);
         assert_eq!(items[0].index, 0);
         assert_eq!(items[0].label, "Play");
         assert_eq!(items[0].icon, ContextIcon::Play);
@@ -29,11 +29,17 @@ mod tests {
         assert_eq!(items[2].label, "Add to queue");
         assert_eq!(items[2].icon, ContextIcon::Queue);
         assert_eq!(items[3].index, 3);
-        assert_eq!(items[3].label, "Like");
-        assert_eq!(items[3].icon, ContextIcon::Heart);
+        assert_eq!(items[3].label, "Go to artist");
+        assert_eq!(items[3].icon, ContextIcon::Artist);
         assert_eq!(items[4].index, 4);
-        assert_eq!(items[4].label, "Copy link");
-        assert_eq!(items[4].icon, ContextIcon::Copy);
+        assert_eq!(items[4].label, "Go to album");
+        assert_eq!(items[4].icon, ContextIcon::Album);
+        assert_eq!(items[5].index, 5);
+        assert_eq!(items[5].label, "Like");
+        assert_eq!(items[5].icon, ContextIcon::Heart);
+        assert_eq!(items[6].index, 6);
+        assert_eq!(items[6].label, "Copy link");
+        assert_eq!(items[6].icon, ContextIcon::Copy);
     }
 
     #[test]
@@ -47,6 +53,8 @@ mod tests {
                 "Reproducir",
                 "Reproducir a continuación",
                 "Añadir a la cola",
+                "Ir al artista",
+                "Ir al álbum",
                 "Me gusta",
                 "Copiar enlace",
             ]
@@ -57,14 +65,14 @@ mod tests {
     fn menu_items_switch_like_label_when_liked() {
         let subject = ContextSubject::Track(Track::new("t1", "Title", "Artist"));
         let en_items = menu_items(Locale::English, &subject, true);
-        assert_eq!(en_items.get(3).map(|item| item.label.as_str()), Some("Unlike"));
-        assert_eq!(en_items.get(3).map(|item| item.icon), Some(ContextIcon::HeartFilled));
+        assert_eq!(en_items.get(5).map(|item| item.label.as_str()), Some("Unlike"));
+        assert_eq!(en_items.get(5).map(|item| item.icon), Some(ContextIcon::HeartFilled));
 
         let unliked_items = menu_items(Locale::English, &subject, false);
-        assert_eq!(unliked_items.get(3).map(|item| item.icon), Some(ContextIcon::Heart));
+        assert_eq!(unliked_items.get(5).map(|item| item.icon), Some(ContextIcon::Heart));
 
         let es_items = menu_items(Locale::Spanish, &subject, true);
-        assert_eq!(es_items.get(3).map(|item| item.label.as_str()), Some("Quitar me gusta"));
+        assert_eq!(es_items.get(5).map(|item| item.label.as_str()), Some("Quitar me gusta"));
     }
 
     #[test]
@@ -73,10 +81,12 @@ mod tests {
         assert_eq!(subject.action_at(0), Some(ContextAction::PlayNow));
         assert_eq!(subject.action_at(1), Some(ContextAction::PlayNext));
         assert_eq!(subject.action_at(2), Some(ContextAction::AddToQueue));
-        assert_eq!(subject.action_at(3), Some(ContextAction::ToggleLike));
-        assert_eq!(subject.action_at(4), Some(ContextAction::CopyLink));
+        assert_eq!(subject.action_at(3), Some(ContextAction::GoToArtist));
+        assert_eq!(subject.action_at(4), Some(ContextAction::GoToAlbum));
+        assert_eq!(subject.action_at(5), Some(ContextAction::ToggleLike));
+        assert_eq!(subject.action_at(6), Some(ContextAction::CopyLink));
         assert_eq!(subject.action_at(-1), None);
-        assert_eq!(subject.action_at(5), None);
+        assert_eq!(subject.action_at(7), None);
     }
 
     #[test]
@@ -306,5 +316,34 @@ mod tests {
         let follow_up = apply_action(&mut state, target, ContextAction::CopyLink, track);
 
         assert_eq!(follow_up, FollowUp::None);
+    }
+
+    #[test]
+    fn track_without_artist_omits_navigation_actions() {
+        let subject = ContextSubject::Track(Track::new("t1", "Title", " "));
+        let items = menu_items(Locale::English, &subject, false);
+        let labels: Vec<&str> = items.iter().map(|item| item.label.as_str()).collect();
+        assert_eq!(labels, ["Play", "Play next", "Add to queue", "Like", "Copy link"]);
+    }
+
+    #[test]
+    fn apply_action_targets_artist_and_album_queries() {
+        let mut state = test_wired();
+        let target = ContextTarget { surface: ContextSurface::Search, index: 0 };
+        let with_album = Track::new("t1", "Title", "Artist").with_album("Record");
+        assert_eq!(
+            apply_action(&mut state, target, ContextAction::GoToArtist, with_album.clone()),
+            FollowUp::GoToArtist("Artist".to_owned())
+        );
+        assert_eq!(
+            apply_action(&mut state, target, ContextAction::GoToAlbum, with_album),
+            FollowUp::GoToAlbum("Artist Record".to_owned())
+        );
+
+        let without_album = Track::new("t2", "Title", "Artist");
+        assert_eq!(
+            apply_action(&mut state, target, ContextAction::GoToAlbum, without_album),
+            FollowUp::GoToAlbum("Artist Title".to_owned())
+        );
     }
 }
