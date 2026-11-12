@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use crate::domain::{Detail, SearchResult, Shelf};
 pub(crate) use crate::slint_shell::cover_pool::spawn_cover_fetch_pool;
 use crate::slint_shell::playback_worker::{PlaybackWorkerCommand, thumbnail_variant_for_row};
+use crate::slint_shell::search_top::artwork_url;
 use crate::slint_shell::state::SlintAppState;
 
 /// Helper extracting artwork URLs across shelves for pre-fetching.
@@ -70,6 +71,9 @@ pub(crate) fn request_shelf_covers(
 ) {
     let mut seen = HashSet::new();
     for url in iter_shelf_artwork_urls(&state.home_shelves) {
+        dispatch_shelf_cover_if_needed(url, state, worker_tx, &mut seen);
+    }
+    if let Some(url) = state.search_top_result.as_ref().and_then(artwork_url) {
         dispatch_shelf_cover_if_needed(url, state, worker_tx, &mut seen);
     }
 }

@@ -69,7 +69,7 @@ fn derive_search_phase(state: &SlintAppState) -> ViewPhase {
     match state.search_phase {
         ViewPhase::Error | ViewPhase::Loading => state.search_phase,
         _ if !state.search_active => ViewPhase::Idle,
-        _ if state.home_shelves.iter().any(|shelf| !shelf.items.is_empty()) => ViewPhase::Ready,
+        _ if state.has_search_results() => ViewPhase::Ready,
         _ => ViewPhase::Empty,
     }
 }
@@ -301,6 +301,7 @@ pub(crate) fn sync_shelves_and_queue(window: &MoggytWindow, state: &SlintAppStat
         .collect();
     window.set_queue_tracks(ModelRc::new(VecModel::from(q_tracks)));
     window.set_queue_selected_index(state.queue.cursor() as i32);
+    super::search_top::sync_top_result(window, state);
 }
 
 /// Synchronizes recent search queries and search-active state with Slint window.

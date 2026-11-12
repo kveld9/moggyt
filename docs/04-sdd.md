@@ -142,7 +142,8 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-1: search the catalog with type filters (tracks, albums, artists, playlists), featuring an idle state with
   persistent recent-search history (capped at 10 entries, case-insensitive deduplication, per-entry deletion, and full
   clear).
-- FR-2: render search result shelves for active queries; prefetch detail content on hover or focus intent.
+- FR-2: render search result shelves for active queries with a single promoted top-result card for the best
+  name match; prefetch detail content on hover or focus intent.
 - FR-3: show track, album, artist, and playlist detail views from cached plus fresh data.
 - FR-4: queue operations (add, remove, reorder, clear, shuffle, repeat off / all / one).
 - FR-5: transport controls with seek and volume, including keyboard shortcuts.
