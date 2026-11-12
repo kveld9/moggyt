@@ -7,7 +7,7 @@ for `moggyt`.
 
 Release automation runs across standard GitHub Actions runners:
 
-- **Linux**: built on `ubuntu-latest` with standard ALSA and Ayatana AppIndicator build dependencies.
+- **Linux**: built on `ubuntu-latest` with standard ALSA, Ayatana AppIndicator, and CMake build dependencies.
 - **Windows**: built on `windows-latest` targeting 64-bit Windows (`x86_64-pc-windows-msvc`).
 - **Reproducibility**: `Cargo.lock` is tracked in version control and acts as the single source of truth for all crate
   dependencies across development and release pipelines.

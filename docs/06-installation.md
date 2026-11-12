@@ -8,6 +8,7 @@ Building `moggyt` from source requires:
 
 - Stable Rust toolchain 1.85 or newer (edition 2024 support).
 - Cargo and standard components (`rustfmt`, `clippy`).
+- CMake and a C toolchain (the bundled Opus decoder compiles from vendored sources).
 - Operating system development headers:
   - **Linux**: ALSA development headers (`libasound2-dev` on Debian/Ubuntu, `alsa-lib` on Arch Linux) for audio
     output via `rodio`, and Ayatana AppIndicator headers (`libayatana-appindicator3-dev` on Debian/Ubuntu,
@@ -114,7 +115,8 @@ the portable tarball ships only the `moggyt` binary. Install the runtime librari
 - Debian/Ubuntu: `sudo apt install libasound2 libayatana-appindicator3-1`
 - Arch Linux: `sudo pacman -S --needed alsa-lib libayatana-appindicator`
 
-Without them, audio initialization falls back to a muted stub and the system tray stays disabled.
+The Opus decoder is statically bundled, so no extra audio library beyond ALSA and Ayatana AppIndicator is required
+at runtime. Without them, audio initialization falls back to a muted stub and the system tray stays disabled.
 
 1. Download `moggyt-<version>-linux.tar.gz` and `SHA256SUMS.txt` from GitHub Releases.
 1. Verify archive integrity:

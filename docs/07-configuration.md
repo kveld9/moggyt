@@ -176,13 +176,14 @@ The configuration file uses JSON serialization with atomic replacement:
     10 GB) on load. Setting to `0` disables stream caching on disk.
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.
-  - `"compact"`: Low-bandwidth audio stream using yt-dlp selector
+  - `"compact"`: Low-bandwidth audio stream using InnerTube itag 139 (AAC ~50 kbps) or yt-dlp selector
     `"bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best"`.
-  - `"standard"`: Balanced audio stream using yt-dlp selector `"bestaudio[ext=m4a]/bestaudio/best"` (default).
-  - `"high"`: Highest available audio stream. Currently identical to `"standard"` and using the same yt-dlp
-    selector `"bestaudio[ext=m4a]/bestaudio/best"`, because unauthenticated YouTube Music caps AAC at itag 140
-    (~130 kbps). AAC itag 141 (~256 kbps) requires Premium authentication and Opus itag 251 is not decodable by
-    the rodio/symphonia stack.
+  - `"standard"`: Balanced audio stream using InnerTube itag 140 (AAC ~130 kbps, 44.1 kHz) or yt-dlp selector
+    `"bestaudio[ext=m4a]/bestaudio/best"` (default).
+  - `"high"`: Highest available audio stream. InnerTube prefers itag 251 (Opus in WebM, ~136 kbps, 48 kHz)
+    decoded with the bundled libopus and falls back through `[141, 140, 250, 139]`. Note that itag 141
+    (~256 kbps AAC) requires a Premium session. yt-dlp uses selector
+    `"bestaudio[ext=webm][acodec=opus]/bestaudio[ext=m4a]/bestaudio/best"`.
 - **Prefer Songs Over Videos (`songs_only`)**:
   - `false`: Search results and autoplay radio retain both official tracks and music videos (default).
   - `true`: Search results and autoplay radio drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks
