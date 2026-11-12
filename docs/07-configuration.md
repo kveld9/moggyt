@@ -284,14 +284,21 @@ install -Dm644 /path/to/moggyt/packaging/matugen/moggyt-theme.json \
 Packaged installs can point `input_path` directly at `/usr/share/moggyt/matugen/moggyt-theme.json` instead of
 copying the file.
 
-Register the template in `~/.config/matugen/config.toml`:
+Register the template in `~/.config/matugen/config.toml`. Matugen requires the `[config]` section even when it is
+empty, so keep the existing one when the file already exists:
 
 ```toml
+[config]
+
 [templates.moggyt]
 input_path = '~/.config/matugen/templates/moggyt-theme.json'
 output_path = '~/.config/moggyt/custom-theme.json'
 pre_hook = 'mkdir -p ~/.config/moggyt'
 ```
+
+Replace `~/.config/moggyt` in `output_path` and `pre_hook` with your configuration directory when
+`XDG_CONFIG_HOME` is set; the default is `~/.config/moggyt` and the Matugen theme hint in Settings shows the
+resolved path.
 
 Generate colors from a wallpaper or a source hex:
 
