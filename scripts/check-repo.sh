@@ -222,17 +222,29 @@ is_test_exempt() {
 }
 
 # Sibling test modules (`*_tests.rs`) hold the tests of the module that declares them with
-# `#[cfg(test)] #[path = "<file>"] mod ...;`. They satisfy the test policy when that reference
-# exists, so they do not need an inline `mod tests` marker of their own. An unreferenced
-# `*_tests.rs` file still fails: the reference is what proves the file is wired into the crate.
+# `#[cfg(test)] #[path = "<file>"] mod ...;`. They satisfy the test policy when a tracked
+# Rust file in the same directory declares that path, so they do not need an inline
+# `mod tests` marker of their own. Matching the directory mirrors Rust's resolution of
+# `#[path]` and stops an unreferenced file in another module from passing on a duplicate
+# basename; an unreferenced `*_tests.rs` still fails: the reference is what proves the file is
+# wired into the crate.
 is_sibling_test_module() {
   local target="$1"
   local repo="$2"
   local base_name
+  local target_dir
+  local referrers
+  local referrer
 
   [[ "${target}" == *_tests.rs ]] || return 1
   base_name="${target##*/}"
-  git -C "${repo}" grep -q -F -e "#[path = \"${base_name}\"]" -- '*.rs'
+  target_dir="${target%/*}"
+  referrers="$(git -C "${repo}" grep -l -F -e "#[path = \"${base_name}\"]" -- '*.rs' || true)"
+  while IFS= read -r referrer; do
+    [[ -n "${referrer}" ]] || continue
+    [[ "${referrer%/*}" == "${target_dir}" ]] && return 0
+  done <<< "${referrers}"
+  return 1
 }
 
 while IFS= read -r file; do
