@@ -2,6 +2,7 @@ import { Theme } from "../theme.slint";
 
 export struct ToastData {
     text: string,
+    progress: float,
 }
 
 export global ToastsUi {
@@ -12,42 +13,40 @@ export component ToastsLayer inherits Rectangle {
     width: 100%;
     height: 100%;
 
-    VerticalLayout {
-        width: parent.width;
-        height: parent.height;
-        alignment: end;
-        padding-bottom: 104px;
-        padding-left: 16px;
-        padding-right: 16px;
-        spacing: 8px;
+    for toast[idx] in ToastsUi.items : Rectangle {
+        width: min(toast-label.preferred-width + 24px, 420px);
+        height: 32px;
+        x: parent.width - self.width - 12px;
+        y: parent.height - 112px - (ToastsUi.items.length - idx) * 38px;
+        border-radius: 8px;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.border;
+        drop-shadow-blur: 14px;
+        drop-shadow-color: #00000066;
+        drop-shadow-offset-y: 3px;
+        clip: true;
 
-        for toast in ToastsUi.items : HorizontalLayout {
-            alignment: center;
+        toast-label := Text {
+            x: 12px;
+            y: 0;
+            width: parent.width - 24px;
+            height: parent.height;
+            text: toast.text;
+            color: Theme.text;
+            font-size: 13px;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
 
-            Rectangle {
-                width: min(380px, parent.width);
-                height: 40px;
-                border-radius: 10px;
-                background: Theme.panel;
-                border-width: 1px;
-                border-color: Theme.border;
-                drop-shadow-blur: 14px;
-                drop-shadow-color: #00000066;
-                drop-shadow-offset-y: 3px;
-
-                Text {
-                    x: 14px;
-                    y: 0;
-                    width: parent.width - 28px;
-                    height: parent.height;
-                    text: toast.text;
-                    color: Theme.text;
-                    font-size: 13px;
-                    vertical-alignment: center;
-                    horizontal-alignment: center;
-                    overflow: elide;
-                }
-            }
+        Rectangle {
+            x: 0;
+            y: parent.height - 2px;
+            width: parent.width * toast.progress;
+            height: 2px;
+            background: Theme.accent;
+            animate width { duration: 500ms; easing: linear; }
         }
     }
 }

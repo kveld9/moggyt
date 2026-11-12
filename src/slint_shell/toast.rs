@@ -8,7 +8,7 @@ use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::{MoggytWindow, ToastData, ToastsUi};
 
 /// Lifetime of one toast, measured in 500 ms application timer ticks.
-pub const TOAST_LIFETIME_TICKS: u32 = 4;
+pub const TOAST_LIFETIME_TICKS: u32 = 6;
 
 /// Maximum number of simultaneous toasts; pushing past it drops the oldest.
 pub const MAX_TOASTS: usize = 3;
@@ -19,6 +19,13 @@ pub struct Toast {
     /// Message text already localized.
     pub text: String,
     remaining_ticks: u32,
+}
+
+impl Toast {
+    /// Fraction of the lifetime still remaining, in 0.0..=1.0.
+    pub fn progress(&self) -> f32 {
+        self.remaining_ticks as f32 / TOAST_LIFETIME_TICKS as f32
+    }
 }
 
 /// Toast buffer owned by the UI state.
@@ -36,14 +43,16 @@ impl ToastState {
         self.toasts.push(Toast { text: text.into(), remaining_ticks: TOAST_LIFETIME_TICKS });
     }
 
-    /// Advances one timer tick; returns true when a toast expired.
+    /// Advances one timer tick; returns true when a toast is visible or just expired.
     pub fn tick(&mut self) -> bool {
+        if self.toasts.is_empty() {
+            return false;
+        }
         for toast in &mut self.toasts {
             toast.remaining_ticks = toast.remaining_ticks.saturating_sub(1);
         }
-        let before = self.toasts.len();
         self.toasts.retain(|toast| toast.remaining_ticks > 0);
-        self.toasts.len() != before
+        true
     }
 
     /// Messages to render, oldest first.
@@ -63,7 +72,7 @@ pub(crate) fn sync_toasts(window: &MoggytWindow, state: &SlintAppState) {
         .toasts
         .visible()
         .iter()
-        .map(|toast| ToastData { text: toast.text.clone().into() })
+        .map(|toast| ToastData { text: toast.text.clone().into(), progress: toast.progress() })
         .collect();
     window.global::<ToastsUi>().set_items(ModelRc::new(VecModel::from(items)));
 }
@@ -99,9 +108,14 @@ mod tests {
     fn tick_expires_toasts_after_the_configured_lifetime() {
         let mut state = ToastState::default();
         state.push("message");
-        for _ in 1..TOAST_LIFETIME_TICKS {
-            assert!(!state.tick());
+
+        for elapsed in 1..TOAST_LIFETIME_TICKS {
+            assert!(state.tick());
+            let remaining = TOAST_LIFETIME_TICKS - elapsed;
+            let expected = remaining as f32 / TOAST_LIFETIME_TICKS as f32;
+            assert!((state.visible()[0].progress() - expected).abs() < f32::EPSILON);
         }
+
         assert!(state.tick());
         assert!(state.visible().is_empty());
     }
