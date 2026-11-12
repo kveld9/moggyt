@@ -1,7 +1,8 @@
 import { Labels } from "../labels.slint";
-import { Theme, ShelfData } from "../theme.slint";
+import { Theme, ShelfData, TopResultData } from "../theme.slint";
 import { FilterChip } from "../components/controls.slint";
 import { TrackRow } from "../components/rows.slint";
+import { TopResultCard } from "../components/cards.slint";
 import { ContextSurface } from "../components/context_menu.slint";
 import { IconSearch, IconClose } from "../icons.slint";
 
@@ -11,6 +12,8 @@ export component SearchView inherits VerticalLayout {
     in property <int> active-filter: 0;
     in property <[string]> recent-searches: [];
     in property <bool> search-active: false;
+    in property <TopResultData> top-result;
+    callback top-result-selected();
     // Phase index contract: 0 Idle, 1 Loading, 2 Ready, 3 Empty, 4 Error (ViewPhase::to_index).
     in property <int> search-phase: 0;
     callback query-submitted(string);
@@ -220,6 +223,16 @@ export component SearchView inherits VerticalLayout {
     if root.search-phase == 2 : VerticalLayout {
         spacing: 16px;
         alignment: start;
+
+        if root.top-result.has-result : TopResultCard {
+            heading: root.top-result.heading;
+            title: root.top-result.title;
+            subtitle: root.top-result.subtitle;
+            has-cover: root.top-result.has-cover;
+            cover: root.top-result.cover;
+            circular: root.top-result.circular;
+            clicked => { root.top-result-selected(); }
+        }
 
         for shelf in root.shelves : VerticalLayout {
             spacing: 8px;

@@ -152,3 +152,71 @@ export component DetailTile inherits Rectangle {
         }
     }
 }
+
+export component TopResultCard inherits Rectangle {
+    in property <string> heading;
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> has-cover: false;
+    in property <image> cover;
+    in property <bool> circular: false;
+    callback clicked();
+
+    horizontal-stretch: 1;
+    height: 120px;
+    border-radius: 12px;
+    background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : Theme.surface);
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding: 12px;
+        spacing: 14px;
+
+        Rectangle {
+            width: 96px;
+            height: 96px;
+            border-radius: root.circular ? 48px : 8px;
+            background: Theme.panel;
+            clip: true;
+
+            if root.has-cover : Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.cover;
+                image-fit: ImageFit.cover;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 4px;
+
+            Text {
+                text: root.heading;
+                color: Theme.secondary;
+                font-size: 12px;
+                font-weight: 700;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: 22px;
+                font-weight: 700;
+                overflow: elide;
+            }
+
+            if root.subtitle != "" : Text {
+                text: root.subtitle;
+                color: Theme.secondary;
+                font-size: 13px;
+                overflow: elide;
+            }
+        }
+    }
+}

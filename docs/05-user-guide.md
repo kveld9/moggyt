@@ -35,6 +35,10 @@ The search view accepts queries for tracks, artists, and albums, and maintains a
     indicates no recent searches.
 - **Search Execution**: type your query into the input field and press `Enter` or click `Search` to view filtered
   search results.
+- **Top result**: when one catalog hit clearly matches the query, a `Top result` card appears above the
+  result list with its artwork, name, and type. Clicking it opens that album, artist, or playlist, or plays
+  the track when the top result is a song. The promoted hit is not repeated in the list below. Queries with
+  no clear match show no card.
 - `All`: displays results across all categories.
 - `Songs`: filters results to individual tracks.
 - `Albums`: filters results to albums.

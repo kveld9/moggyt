@@ -87,6 +87,7 @@ pub struct SlintAppState {
     pub search_active: bool,
     pub recent_searches: RecentSearches,
     pub search_results: Vec<Track>,
+    pub search_top_result: Option<SearchResult>,
     pub library_playlists: Vec<Playlist>,
     pub library_albums: Vec<Album>,
     pub detail: Option<Detail>,
@@ -330,6 +331,7 @@ impl SlintAppState {
         self.search_active = false;
         self.home_shelves.clear();
         self.search_results.clear();
+        self.search_top_result = None;
         self.search_phase = ViewPhase::Idle;
     }
 
@@ -348,6 +350,7 @@ impl SlintAppState {
         let mut shelf = Shelf::new(tr(self.locale, "Search Results"));
         shelf.items = items;
         self.home_shelves = vec![shelf];
+        self.split_search_top_result();
         self.search_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
     }
 

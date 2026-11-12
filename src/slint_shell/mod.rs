@@ -75,6 +75,7 @@ pub mod player_bar;
 mod scrobble_control;
 pub mod search;
 pub mod search_submit;
+pub mod search_top;
 mod settings_callbacks;
 pub mod shortcuts;
 mod sleep_fade;

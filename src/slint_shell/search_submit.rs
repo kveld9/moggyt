@@ -47,6 +47,7 @@ pub(crate) fn submit_search_with_filter_async(
 
     state.search_query = query.to_string();
     state.search_filter = filter;
+    state.search_top_result = None;
     state.search_phase = ViewPhase::Loading;
     state.search_generation = state.search_generation.wrapping_add(1);
     let generation = state.search_generation;

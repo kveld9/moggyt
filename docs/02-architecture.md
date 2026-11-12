@@ -47,6 +47,7 @@ src/
 │   ├── shuffle.rs     # Smart shuffle ordering (artist adjacency, recency window)
 │   ├── sleep_timer.rs # Sleep timer state, presets, and faded volume calculation
 │   ├── theme.rs       # Theme identifiers, RGB palettes, and player bar presentation modes
+│   ├── top_result.rs  # Ranked top-result selection for catalog search
 │   └── version_override.rs # Recording alternative overrides (catalog ID to replacement track)
 └── infra/             # Ports and adapters: real I/O and deterministic test stubs
     ├── atomic_file.rs # Crash-safe atomic file persistence and stale temp file cleanup

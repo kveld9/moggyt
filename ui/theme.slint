@@ -13,6 +13,16 @@ export struct ShelfData {
     tracks: [TrackRowData],
 }
 
+export struct TopResultData {
+    has-result: bool,
+    heading: string,
+    title: string,
+    subtitle: string,
+    has-cover: bool,
+    cover: image,
+    circular: bool,
+}
+
 export struct ExploreCardData {
     index: int,
     title: string,

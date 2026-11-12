@@ -2,6 +2,7 @@ import {
     Theme,
     PlayerUi,
     ShelfData,
+    TopResultData,
     TrackRowData,
     LyricLineData,
     LibraryItemData,
@@ -28,6 +29,7 @@ export component ContentArea inherits Rectangle {
     in property <bool> signed-in: false;
     in property <[ShelfData]> shelves: [];
     in property <int> search-filter: 0;
+    in property <TopResultData> top-result;
     in property <[TrackRowData]> queue-tracks: [];
     in property <int> queue-selected-index: -1;
     in property <string> active-track-title: "No track playing";
@@ -90,6 +92,7 @@ export component ContentArea inherits Rectangle {
     callback recent-search-selected(string);
     callback recent-search-removed(string);
     callback recent-searches-cleared();
+    callback top-result-selected();
     callback explore-track-selected(int);
     callback category-item-selected(int);
     callback playlist-selected(int);
@@ -219,6 +222,7 @@ export component ContentArea inherits Rectangle {
                 query <=> root.query;
                 shelves: root.shelves;
                 active-filter: root.search-filter;
+                top-result: root.top-result;
                 recent-searches: root.recent-searches;
                 search-active: root.search-active;
                 search-phase: root.search-phase;
@@ -229,6 +233,7 @@ export component ContentArea inherits Rectangle {
                 recent-search-selected(q) => { root.recent-search-selected(q); }
                 recent-search-removed(q) => { root.recent-search-removed(q); }
                 recent-searches-cleared => { root.recent-searches-cleared(); }
+                top-result-selected => { root.top-result-selected(); }
             }
 
             if root.active-page == 1 : NowPlayingView {

@@ -1,4 +1,4 @@
-import { Theme, TrackRowData, ShelfData, ExploreShelfData, LibraryItemData, LyricLineData, ImportRowData, ImportAlternativeData, DetailSectionData } from "../theme.slint";
+import { Theme, TrackRowData, ShelfData, TopResultData, ExploreShelfData, LibraryItemData, LyricLineData, ImportRowData, ImportAlternativeData, DetailSectionData } from "../theme.slint";
 import { Sidebar } from "../components/sidebar.slint";
 import { PlayerBar } from "../components/player_bar.slint";
 import { QueuePanel } from "../components/queue_panel.slint";
@@ -83,6 +83,7 @@ export component MoggytWindow inherits Window {
     in-out property <[string]> recent-searches: [];
     in-out property <bool> search-active: false;
     in-out property <int> search-phase: 0;
+    in-out property <TopResultData> top-result;
     in-out property <string> queue-button-text: "Queue";
     in-out property <int> player-bar-mode: 0;
     in-out property <bool> player-bar-show-artwork: true;
@@ -143,6 +144,7 @@ export component MoggytWindow inherits Window {
     callback recent-search-selected(string);
     callback recent-search-removed(string);
     callback recent-searches-cleared();
+    callback top-result-selected();
     callback explore-track-selected(int);
     callback category-item-selected(int);
     callback width-changed(int);
@@ -244,6 +246,7 @@ export component MoggytWindow inherits Window {
                     recent-searches: root.recent-searches;
                     search-active: root.search-active;
                     search-phase: root.search-phase;
+                    top-result: root.top-result;
                     sleep-timer-status-text: root.sleep-timer-status-text;
                     active-sleep-timer-index: root.active-sleep-timer-index;
                     active-audio-quality-index: root.active-audio-quality-index;
@@ -267,6 +270,7 @@ export component MoggytWindow inherits Window {
                     recent-search-selected(q) => { root.recent-search-selected(q); }
                     recent-search-removed(q) => { root.recent-search-removed(q); }
                     recent-searches-cleared => { root.recent-searches-cleared(); }
+                    top-result-selected => { root.top-result-selected(); }
                     explore-track-selected(idx) => { root.explore-track-selected(idx); }
                     category-item-selected(idx) => { root.category-item-selected(idx); }
                     playlist-selected(idx) => { root.playlist-selected(idx); }

@@ -17,6 +17,7 @@ mod segments;
 mod shuffle;
 mod sleep_timer;
 mod theme;
+mod top_result;
 mod version_override;
 
 pub use artist_match::{
@@ -58,4 +59,5 @@ pub use sleep_timer::{SLEEP_FADE_WINDOW_SECS, SleepTimer, TimerPreset, faded_vol
 pub use theme::{
     CustomPaletteError, Palette, PlayerBarMode, ThemeId, format_hex_rgb, parse_hex_rgb,
 };
+pub use top_result::{MIN_TOP_RESULT_SCORE, best_match, entity_name, score_top_result};
 pub use version_override::{MAX_VERSION_OVERRIDES, VersionOverrideError, VersionOverrides};

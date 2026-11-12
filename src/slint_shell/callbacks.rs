@@ -264,6 +264,18 @@ fn wire_search_callbacks(
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
+    window.on_top_result_selected(move || {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        let item_opt = st.search_top_result.clone();
+        if let Some(item) = item_opt {
+            handle_filtered_item_click(&win, &mut st, item, &tx);
+        }
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_explore_track_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();

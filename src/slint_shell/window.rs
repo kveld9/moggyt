@@ -188,6 +188,7 @@ pub(crate) fn apply_async_search_outcome(
                     _ => None,
                 })
                 .collect();
+            state.split_search_top_result();
             state.search_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
             true
         }
