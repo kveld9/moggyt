@@ -33,8 +33,14 @@ Enforced automatically by `./scripts/check-repo.sh`:
   with no component definitions.
 - Near-limit warning: the audit reports `WARN` at or above 90% of a cap, so a split is planned
   before the limit is reached.
-- Remediation path: split oversized files by concept (one view or endpoint-domain per module), landing each
-  extracted unit via one small PR per module (< 400 lines diff).
+- Remediation patterns:
+  - Companion test modules: when unit tests cause a file to approach or exceed the 800-line cap, extract the test
+    suite into an adjacent `*_tests.rs` file. Declare it in the parent module using:
+    `#[cfg(test)] #[path = "<file>_tests.rs"] mod tests;`. Sibling test modules are exempted from logic-free root
+    checks while remaining subject to the 800-line modularity limit.
+  - Submodule extraction: split large implementation files by sub-domain or discrete concerns (for example,
+    `catalog_parse_search.rs`, `catalog_parse_shelf.rs`, `catalog_parse_artist.rs`).
+  - Landing rule: land each extracted unit via one small PR per module (< 400 lines diff).
 
 ## Complexity limits
 
@@ -89,6 +95,35 @@ cp .githooks/pre-commit.example .githooks/pre-commit
 chmod +x .githooks/pre-commit
 git config core.hooksPath .githooks
 ```
+
+## Anatomy of a feature (end-to-end data flow)
+
+Every user-driven interaction traverses the application layers according to strict hexagonal boundaries:
+
+1. **Slint UI event (`ui/views/` or `ui/components/`)**:
+   Components define explicit callbacks in Slint markup (e.g. `callback play-track(string)`). User inputs,
+   button clicks, or keyboard shortcuts invoke the callback.
+2. **Shell callback wiring (`src/slint_shell/*callbacks.rs`)**:
+   During window bootstrap in `src/slint_shell/`, callback handlers are bound to the Slint handle
+   (e.g. `ui.on_play_track(...)`). Handlers validate inputs, translate UI coordinates or strings, and delegate
+   to in-memory state or asynchronous workers.
+3. **Async workers and threading (`tokio` / worker channels)**:
+   Lengthy tasks (network requests, audio decoding, catalog searches, disk I/O) are never executed on the
+   Slint UI thread. Instead, callbacks send messages over mpsc channels to dedicated worker tasks
+   (`playback_worker`, `worker_catalog`, `import_worker`) or spawn Tokio background tasks.
+4. **Pure domain logic and port invocations (`src/domain/` & `src/infra/`)**:
+   Workers invoke pure domain services and models (`src/domain/`). When external services, disk, or network
+   are needed, the worker interacts with port traits defined in the domain and implemented by adapters in
+   `src/infra/` (e.g. HTTP catalog client, audio sinks, keyring credentials). Domain logic remains 100% free
+   of I/O and side effects, tested via in-memory fakes.
+5. **UI thread dispatch (`dispatch_to_ui`)**:
+   Workers hold a weak reference to the Slint window (`window.as_weak()`). When background computations or
+   network responses arrive, they marshal state updates back onto the Slint event loop using
+   `crate::slint_shell::platform::dispatch_to_ui(weak, move |ui| { ... })` or `slint::invoke_from_event_loop`.
+6. **In-memory state and UI sync (`src/slint_shell/sync.rs` & `SlintAppState`)**:
+   Inside the UI thread closure, the application mutates `SlintAppState` (the single source of truth in memory)
+   and synchronizes reactive Slint properties using synchronization helpers in `src/slint_shell/sync.rs`.
+   Slint property bindings automatically re-render the affected view components.
 
 ## UI verification (Slint)
 
