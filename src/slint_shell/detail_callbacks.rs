@@ -194,25 +194,33 @@ fn enqueue_detail_tracks(
     start_idx
 }
 
+/// Enqueues the open detail container and moves the cursor to `idx` inside the appended block.
+///
+/// Returns the absolute queue index of the selected track, or `None` when no detail is open
+/// or the index does not address a track.
+fn enqueue_detail_at_row(
+    st: &mut SlintAppState,
+    tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+    idx: usize,
+) -> Option<usize> {
+    let track_count = st.detail.as_ref()?.tracks.len();
+    if idx >= track_count {
+        return None;
+    }
+    let start = enqueue_detail_tracks(st, tx);
+    let target = start + idx;
+    st.play_track_at_index_in_memory(target);
+    Some(target)
+}
+
 fn handle_detail_track_selected(
     win: &MoggytWindow,
     st: &mut SlintAppState,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
     idx: i32,
 ) {
-    if let Some(detail) = st.detail.clone() {
-        if let Some(track) = detail.tracks.get(idx as usize).cloned() {
-            request_queue_track_cover(
-                track.artwork.as_deref(),
-                st.play_generation,
-                &st.search_covers,
-                tx,
-            );
-            st.queue.push(track);
-            let last = st.queue.len().saturating_sub(1);
-            st.play_track_at_index_in_memory(last);
-            trigger_playback(win, st);
-        }
+    if idx >= 0 && enqueue_detail_at_row(st, tx, idx as usize).is_some() {
+        trigger_playback(win, st);
     }
     sync_window(win, st);
 }
@@ -318,6 +326,70 @@ mod tests {
         state.play_track_at_index_in_memory(0);
         assert_eq!(state.queue.len(), 2);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+    }
+
+    #[test]
+    fn test_detail_track_row_queues_container_and_starts_at_row() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.detail = Some(Detail::new(
+            DetailKind::Artist,
+            "Artist",
+            "",
+            vec![
+                Track::new("t1", "Track 1", "Artist"),
+                Track::new("t2", "Track 2", "Artist"),
+                Track::new("t3", "Track 3", "Artist"),
+            ],
+        ));
+
+        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 1), Some(1));
+        let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["t1", "t2", "t3"]);
+        assert_eq!(state.queue.cursor(), 1);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+    }
+
+    #[test]
+    fn test_detail_track_row_appends_after_existing_queue() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.queue.push(Track::new("old", "Old", "Other"));
+        state.detail = Some(Detail::new(
+            DetailKind::Album,
+            "Album",
+            "",
+            vec![Track::new("a1", "A1", "Artist"), Track::new("a2", "A2", "Artist")],
+        ));
+
+        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 1), Some(2));
+        let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["old", "a1", "a2"]);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("a2"));
+    }
+
+    #[test]
+    fn test_detail_track_row_out_of_range_does_not_enqueue() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.detail = Some(Detail::new(
+            DetailKind::Album,
+            "Album",
+            "",
+            vec![Track::new("a1", "A1", "Artist")],
+        ));
+
+        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 1), None);
+        assert!(state.queue.is_empty());
+    }
+
+    #[test]
+    fn test_detail_track_row_without_detail_is_noop() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+
+        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 0), None);
+        assert!(state.queue.is_empty());
     }
 
     #[test]
