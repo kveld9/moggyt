@@ -6,6 +6,7 @@ import { ShortcutScope } from "../components/shortcut_scope.slint";
 import { ContentArea } from "./content_area.slint";
 import { ImportOverlay } from "import_overlay.slint";
 import { ContextMenuLayer } from "../components/context_menu.slint";
+import { ToastsLayer } from "../components/toasts.slint";
 
 export component MoggytWindow inherits Window {
     title: "Moggyt";
@@ -380,6 +381,10 @@ export component MoggytWindow inherits Window {
         custom-id-submitted(text) => { root.import-custom-id-submitted(text); }
     }
     ContextMenuLayer {
+        x: 0;
+        y: 0;
+    }
+    ToastsLayer {
         x: 0;
         y: 0;
     }

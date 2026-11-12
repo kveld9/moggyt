@@ -437,6 +437,7 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
         state.poll_sleep_timer();
         apply_custom_theme_if_changed(&win, &mut state);
         drain_updater_check(&win, &mut state);
+        super::toast::tick_toasts(&win, &mut state);
         sync_playback_tick(&win, &mut state);
     });
     timer

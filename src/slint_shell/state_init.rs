@@ -62,6 +62,7 @@ impl SlintAppState {
             version_store: Box::new(crate::infra::MemoryVersionOverrideStore::new()),
             version_fix: Default::default(),
             context_menu: Default::default(),
+            toasts: Default::default(),
             updater_rx: None,
             page: SlintPage::Search,
             queue_panel_open: false,

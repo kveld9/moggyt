@@ -92,6 +92,7 @@ pub mod sync;
 #[cfg(test)]
 pub mod test_support;
 pub mod theme;
+pub mod toast;
 pub mod version_fix;
 pub mod view_phase;
 pub mod window;

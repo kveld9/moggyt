@@ -75,6 +75,8 @@ pub struct SlintAppState {
     pub version_fix: crate::slint_shell::version_fix::VersionFixState,
     /// Row that owns the open right-click context menu, when any.
     pub context_menu: crate::slint_shell::context_menu::ContextMenuState,
+    /// Transient informational messages shown above the player bar.
+    pub toasts: crate::slint_shell::toast::ToastState,
     pub updater_rx: Option<std::sync::mpsc::Receiver<Option<ReleaseInfo>>>,
 
     pub page: SlintPage,
