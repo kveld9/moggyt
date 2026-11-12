@@ -1,4 +1,5 @@
 import { Theme } from "../theme.slint";
+import { Labels } from "../labels.slint";
 import { ThemedSlider } from "./controls.slint";
 import {
     IconNext, IconPause, IconPlay,
@@ -51,6 +52,10 @@ export component PlayerCenterControls inherits VerticalLayout {
                     clicked => { root.toggle-shuffle(); }
                 }
 
+                Tooltip {
+                    text: @markdown("\{Labels.shuffle-tooltip}");
+                }
+
                 IconShuffle {
                     tint: root.is-shuffle ? Theme.accent : (shuf-touch.has-hover ? Theme.text : Theme.secondary);
                     size: 16px;
@@ -70,6 +75,10 @@ export component PlayerCenterControls inherits VerticalLayout {
 
                 pt := TouchArea {
                     clicked => { root.prev-track(); }
+                }
+
+                Tooltip {
+                    text: @markdown("\{Labels.previous-track-tooltip}");
                 }
 
                 IconPrev {
@@ -122,6 +131,10 @@ export component PlayerCenterControls inherits VerticalLayout {
 
                 pp := TouchArea {
                     clicked => { root.toggle-play(); }
+                }
+
+                Tooltip {
+                    text: @markdown("\{root.is-playing ? Labels.pause-tooltip : Labels.play-tooltip}");
                 }
 
                 if root.is-playing : IconPause {
@@ -180,6 +193,10 @@ export component PlayerCenterControls inherits VerticalLayout {
                     clicked => { root.next-track(); }
                 }
 
+                Tooltip {
+                    text: @markdown("\{Labels.next-track-tooltip}");
+                }
+
                 IconNext {
                     tint: nt.has-hover ? Theme.text : Theme.secondary;
                     size: 16px;
@@ -199,6 +216,10 @@ export component PlayerCenterControls inherits VerticalLayout {
 
                 rep-touch := TouchArea {
                     clicked => { root.cycle-repeat(); }
+                }
+
+                Tooltip {
+                    text: @markdown("\{Labels.repeat-tooltip}");
                 }
 
                 if root.repeat-mode == 2 : IconRepeatOne {

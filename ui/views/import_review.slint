@@ -186,6 +186,10 @@ export component ImportReviewView inherits VerticalLayout {
                                     clicked => { root.row-exclusion-toggled(row.index); }
                                 }
 
+                                Tooltip {
+                                    text: @markdown("\{row.excluded ? Labels.include-track-tooltip : Labels.exclude-track-tooltip}");
+                                }
+
                                 if row.excluded : Rectangle {
                                     width: 8px;
                                     height: 8px;

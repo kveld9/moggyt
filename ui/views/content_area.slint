@@ -9,6 +9,7 @@ import {
     ExploreShelfData,
     DetailSectionData,
 } from "../theme.slint";
+import { Labels } from "../labels.slint";
 import { IconBack, IconSettings } from "../icons.slint";
 import { SearchView } from "./search_view.slint";
 import { ExploreView } from "./explore_view.slint";
@@ -166,6 +167,10 @@ export component ContentArea inherits Rectangle {
                                 clicked => { root.back-pressed(); }
                             }
 
+                            Tooltip {
+                                text: @markdown("\{Labels.back-tooltip}");
+                            }
+
                             IconBack {
                                 size: 16px;
                                 tint: back-btn.has-hover ? Theme.accent : Theme.text;
@@ -195,6 +200,10 @@ export component ContentArea inherits Rectangle {
 
                         settings-btn := TouchArea {
                             clicked => { root.open-settings(); }
+                        }
+
+                        Tooltip {
+                            text: @markdown("\{Labels.open-settings-label}");
                         }
 
                         IconSettings {
