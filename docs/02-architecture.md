@@ -20,70 +20,74 @@ UI (slint_shell/, Slint) --> domain (domain/) <-- ports <-- adapters (infra/)
 
 ```text
 src/
-├── main.rs            # Composition root (bin): tracing, tokio runtime, Slint bootstrap
-├── lib.rs             # Public contracts: slint_shell + domain + i18n + infra
-├── i18n.rs            # Interface localization skeleton and translation lookup
-├── slint_shell/       # Slint UI shell: window controller, bridges, and app runner
+├── main.rs            # Composition root: tracing, tokio runtime, adapter instantiation, Slint bootstrap
+├── lib.rs             # Public root re-exporting domain, i18n, infra, slint_shell
+├── i18n.rs            # Interface localization catalog, locale detection, and key lookup
+├── slint_shell/       # Slint UI shell: window controller, UI state, callbacks, and worker synchronization
 │   ├── app.rs         # Shell composition root: SlintAppState, event handlers, and window wiring
-│   ├── detail_callbacks.rs # Detail view callbacks: track selection, play and shuffle of the open container
-│   ├── history.rs     # Account history playlist entry projection, detail labeling, and subtitles
-│   ├── lastfm_connect.rs # Last.fm desktop authentication and connect flow
-│   ├── scrobble_control.rs # Scrobble submission and presence sync for the playing track
-│   ├── settings_callbacks.rs # Settings callbacks: account sign-in, preferences, sleep timer and window resize
-│   ├── sleep_fade.rs  # Sleep timer polling and the volume fade applied before it fires
-│   ├── stats.rs       # Wrapped-style listening statistics UI view model and refresh wiring
-│   ├── stream_prefetch.rs # Next-track stream URL prefetching thread spawner
-│   └── bridges/       # Platform and domain integration bridges
-├── domain/
-│   ├── mod.rs         # Re-exports the public domain contract
+│   ├── callbacks.rs   # Global event handlers (navigation, search, queue, playback control)
+│   ├── detail*.rs     # Detail view models, sections, callbacks, and track actions
+│   ├── import*.rs     # Spotify/CSV import session, worker thread, searcher, and callbacks
+│   ├── playback*.rs   # Playback worker, request dispatch, auto-skip, and player bar sync
+│   ├── state*.rs      # SlintAppState definition, initialization, lyrics, search, and session state
+│   ├── sync.rs        # Bi-directional sync between domain models and Slint UI properties
+│   ├── theme.rs       # Theme palette application, accent overrides, and Matugen watcher
+│   ├── window.rs      # Window event handlers, shortcuts, and platform window bindings
+│   └── ...            # Subsystem adapters (lastfm_connect, discord, shortcuts, stats, etc.)
+├── domain/            # Pure domain: immutable types, algorithms, and business rules (zero I/O)
 │   ├── library.rs     # Library and catalog models (Album, Artist, Playlist, Shelf)
-│   ├── listening_stats.rs # Wrapped-style listening statistics from play records
-│   ├── play_log.rs    # Listening history models and duration clamping
-│   ├── queue.rs       # Pure playback queue (add, next, previous, shuffle, repeat)
-│   ├── search.rs      # Search models (immutable query, track model)
-│   ├── shuffle.rs     # Smart shuffle ordering (artist adjacency, recency)
-│   ├── version_override.rs # Audio version overrides (catalog id to alternative recording)
-│   └── theme.rs       # Color palette data and ThemeId domain models
-└── infra/
-    ├── mod.rs         # Re-exports adapters and port traits
-    ├── audio.rs       # AudioBackend trait definition (playback, crossfade, seeking, volume)
-    ├── audio_live.rs  # Dual-mode live rodio vs. muted audio backend fallback
-    ├── audio_rodio.rs # rodio playback adapter with dual-sink crossfade and stream cache support
-    ├── audio_fade.rs  # Fade-out and fade-in ramps applied to rodio sinks
-    ├── audio_stream_cache_worker.rs # Background download of a resolved track into the disk stream cache
-    ├── browser.rs     # Platform browser opener adapter
-    ├── cover*.rs      # CoverCache port and memory/disk caching adapters
-    ├── custom_theme.rs # Custom theme JSON loader with file modification monitoring
-    ├── catalog_client.rs # Catalog API search request builder and parser
-    ├── instance.rs    # SingleInstanceGuard lock
-    ├── lastfm_auth.rs # Last.fm desktop authentication (token, authorize URL, session)
-    ├── lyrics*.rs     # LyricsSource port, lrc.red TTML client, LRCLIB client, and cascade
-    ├── lyrics_cache.rs # LyricsSource decorator with bounded FIFO cache
-    ├── play_log_store.rs # PlayLogStore port and JSON Lines file persistence
+│   ├── local_playlist.rs # Local playlist and track models with confidence scoring
+│   ├── matching.rs    # Multi-factor track matching heuristics (Levenshtein, Jaccard, Prism penalties)
+│   ├── playback_phase.rs # Explicit playback lifecycle state machine and event modeling
+│   ├── playlist_import.rs # Spotify URL and identifier reference parsing
+│   ├── play_log.rs    # Listening history models, play records, and duration clamping
+│   ├── queue.rs       # Pure playback queue (push, advance, retreat, shuffle, repeat)
+│   ├── search.rs      # Search models (query, filter categories, track models, recent searches)
+│   ├── segments.rs    # SponsorBlock and silence skip segment models
+│   ├── shuffle.rs     # Smart shuffle ordering (artist adjacency, recency window)
+│   ├── sleep_timer.rs # Sleep timer state, presets, and faded volume calculation
+│   ├── theme.rs       # Theme identifiers, RGB palettes, and player bar presentation modes
+│   └── version_override.rs # Recording alternative overrides (catalog ID to replacement track)
+└── infra/             # Ports and adapters: real I/O and deterministic test stubs
+    ├── atomic_file.rs # Crash-safe atomic file persistence and stale temp file cleanup
+    ├── audio*.rs      # AudioBackend port, Rodio dual-sink crossfade, rubato resampler, DSP filters
+    ├── catalog*.rs    # Catalog port, InnerTube client, endpoint parsers (artist, detail, explore, home, search)
+    ├── cover*.rs      # CoverCache port, memory LRU, and disk-backed cache
+    ├── innertube_stream.rs # Direct audio stream URL resolution (VISIONOS client, Opus/AAC itags)
+    ├── lyrics*.rs     # LyricsSource port, LRCLIB client, lrc.red TTML client, and cascade fallback
+    ├── playlist_store*.rs # PlaylistStore port and atomic JSON disk storage (playlists.json)
     ├── presence*.rs   # DesktopPresence (MPRIS/SMTC) and Discord Rich Presence
-    ├── scrobble.rs    # Scrobbler port and Last.fm client adapter
-    ├── session*.rs    # SessionStore port and Keyring cookie persistence
-    ├── settings.rs    # SettingsStore port and atomic JSON persistence
-    ├── stream.rs      # StreamResolver trait definition
-    ├── stream_pool.rs # Prefetching 256 KiB block pool with worker threads and sliding window
-    ├── stream_window.rs # Sliding window scheduling for block prefetch
-    ├── stream_chain.rs # Layered stream resolution: InnerTube primary, yt-dlp fallback
-    ├── stream_disk_cache.rs # Disk-backed audio stream cache with quota and LRU eviction
-    ├── stream_url_cache.rs # Stream URL cache with TTL and capacity eviction
-    ├── tray.rs        # System tray handle and action event loop
-    ├── updater*.rs    # Updater port and GitHub Releases release checker
-    ├── ytdlp.rs       # yt-dlp sidecar download and stream resolution adapter
-    ├── innertube_stream.rs # InnerTube VISIONOS player adapter (direct audio URLs, loudnessDb)
-    ├── opus_source.rs # WebM Opus demuxing (Symphonia) and decoding (libopus)
-    ├── catalog.rs      # Catalog port trait definition
-    ├── catalog_live.rs # Catalog API-backed live adapter
-    └── catalog_stub.rs # Deterministic catalog stub for testing
+    ├── scrobble*.rs   # Scrobbler port, Last.fm client, credentials, and API signatures
+    ├── session*.rs    # SessionStore port and OS keyring cookie persistence (Secret Service / Win CredMgr)
+    ├── settings*.rs   # SettingsStore port and atomic JSON configuration (settings.json)
+    ├── stream*.rs     # StreamResolver port, layered StreamChain, block pool worker, prefetch & disk cache
+    ├── tray.rs        # System tray icon and platform action loop
+    ├── updater*.rs    # Updater port and GitHub Releases update checker
+    └── ytdlp.rs       # Standalone yt-dlp sidecar download and stream resolution fallback
 
 ui/
-├── shell.slint        # Thin import-only UI entry point
-├── stats.slint        # StatsData global and StatsEntryData model definitions
-└── views/
-    └── stats_view.slint # Wrapped-style statistics view with period chips and rankings
+├── shell.slint        # Thin import-only UI entry point (exempt from modularity cap)
+├── labels.slint       # Static chrome translation keys and labels global
+├── theme.slint        # Native Theme global, palette slots, and geometry tokens
+├── components/        # Reusable UI controls and widgets
+│   ├── cards.slint    # Shelf and category cards
+│   ├── controls.slint # Buttons, sliders, switches, and text inputs
+│   ├── player_bar.slint # Persistent transport player bar (classic & floating modes)
+│   ├── queue_panel.slint # Collapsible upcoming queue panel
+│   ├── settings/      # Settings panels (playback, theme, session, integrations, about)
+│   └── ...            # Special widgets (alternative_picker, vinyl_deck, shortcut_scope)
+├── icons/             # Custom SVG vector path icons (audio, navigation, playback)
+└── views/             # Top-level page views
+    ├── content_area.slint # Header, breadcrumbs, update notification, and view switcher
+    ├── detail_view.slint  # Album, artist, and playlist tracklistings
+    ├── explore_view.slint # Catalog explore categories and mood/genre shelves
+    ├── import_*.slint     # Spotify/CSV import modal, progress overlay, and review screen
+    ├── library_view.slint # User playlists, liked songs, and saved albums
+    ├── now_playing_view.slint # Dual-column playback dashboard with synced lyrics
+    ├── search_view.slint  # Search input, recent-search chips, and result shelves
+    ├── settings_view.slint # Application settings tabs and preferences
+    ├── stats_view.slint   # Wrapped-style listening statistics with period chips
+    └── window.slint       # MoggytWindow root component definition
 ```
 
 ## Stream resolution order
