@@ -18,7 +18,7 @@ use crate::slint_shell::format::{
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
     cycle_repeat_mode, progress_fraction, push_time_labels, repeat_mode_to_int,
-    resolve_display_duration, should_seek, toggle_like,
+    resolve_display_duration, should_seek,
 };
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::search::iter_shelf_items;
@@ -509,11 +509,11 @@ fn handle_seek_to(
 }
 
 fn handle_toggle_like(win: &MoggytWindow, st: &mut SlintAppState) {
-    if let Some(track) = st.queue.current() {
-        let id = track.id.clone();
-        let is_liked = toggle_like(&mut st.liked_ids, &id);
-        win.global::<PlayerUi>().set_is_liked(is_liked);
-    }
+    let Some(track_id) = st.queue.current().map(|t| t.id.clone()) else {
+        return;
+    };
+    let is_liked = super::likes::toggle_and_persist(st, &track_id);
+    win.global::<PlayerUi>().set_is_liked(is_liked);
 }
 
 fn handle_cycle_repeat(win: &MoggytWindow, st: &mut SlintAppState) {
@@ -537,7 +537,7 @@ fn handle_audio_quality_selected(win: &MoggytWindow, st: &mut SlintAppState, idx
 mod tests {
     use super::*;
     use crate::domain::Track;
-    use crate::slint_shell::playback::is_track_liked;
+    use crate::slint_shell::playback::{is_track_liked, toggle_like};
     use crate::slint_shell::test_support::test_wired;
 
     #[test]

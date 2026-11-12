@@ -145,7 +145,8 @@ pub fn run(
         state.reload_matugen_theme();
     }
     state.player_bar = PlayerBarPrefs::from_settings(&settings);
-    state.recent_searches = settings.recent_searches;
+    state.recent_searches = settings.recent_searches.clone();
+    state.liked_ids = crate::slint_shell::likes::load_liked_ids(&settings);
     if let Ok(mut c) = state.catalog.lock() {
         c.set_locale(settings.locale);
     }

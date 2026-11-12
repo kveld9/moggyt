@@ -141,6 +141,9 @@ pub struct Settings {
     /// Whether volume slider is shown in the player bar.
     #[serde(default = "default_true")]
     pub player_bar_show_volume: bool,
+    /// Locally liked track identifiers, persisted across restarts.
+    #[serde(default)]
+    pub liked_ids: Vec<String>,
     /// Recent search queries (capped, newest first).
     #[serde(default)]
     pub recent_searches: RecentSearches,
@@ -180,6 +183,7 @@ impl Default for Settings {
             player_bar_show_skip_seconds: false,
             player_bar_show_queue: true,
             player_bar_show_volume: true,
+            liked_ids: Vec::new(),
             recent_searches: RecentSearches::default(),
         }
     }
