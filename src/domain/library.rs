@@ -145,6 +145,59 @@ pub enum DetailKind {
     Playlist,
 }
 
+/// Category of a card rendered inside an artist page section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DetailCardKind {
+    Album,
+    Artist,
+}
+
+/// Browsable card in an artist page section (album, single/EP, or similar artist).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetailCard {
+    pub id: String,
+    pub title: String,
+    pub subtitle: String,
+    pub artwork: Option<String>,
+    pub kind: DetailCardKind,
+}
+
+impl DetailCard {
+    pub fn new(
+        id: &str,
+        title: &str,
+        subtitle: &str,
+        artwork: Option<String>,
+        kind: DetailCardKind,
+    ) -> Self {
+        Self {
+            id: id.to_owned(),
+            title: title.to_owned(),
+            subtitle: subtitle.to_owned(),
+            artwork,
+            kind,
+        }
+    }
+}
+
+/// Named section of an artist page (Albums, Singles and EPs, similar artists).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetailSection {
+    pub title: String,
+    pub cards: Vec<DetailCard>,
+}
+
+/// Artist-specific detail payload carried by [`Detail::artist`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtistPage {
+    /// Server-provided heading for the most popular songs shelf.
+    pub songs_title: String,
+    /// Browse id of the full songs list ("Show all"); starts with `VL`.
+    pub songs_more_id: Option<String>,
+    /// Ordered carousel sections returned by the artist page.
+    pub sections: Vec<DetailSection>,
+}
+
 /// Detailed view for an album, artist, or playlist.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Detail {
@@ -154,6 +207,8 @@ pub struct Detail {
     pub description: Option<String>,
     pub artwork: Option<String>,
     pub tracks: Vec<Track>,
+    /// Artist-page sections; `None` for albums and playlists.
+    pub artist: Option<ArtistPage>,
 }
 
 impl Detail {
@@ -165,6 +220,7 @@ impl Detail {
             description: None,
             artwork: None,
             tracks,
+            artist: None,
         }
     }
 
@@ -177,6 +233,11 @@ impl Detail {
     pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {
         let art = artwork.into();
         self.artwork = if art.trim().is_empty() { None } else { Some(art) };
+        self
+    }
+
+    pub fn with_artist_page(mut self, page: ArtistPage) -> Self {
+        self.artist = Some(page);
         self
     }
 }
@@ -195,6 +256,7 @@ mod tests {
         assert_eq!(detail.description, None);
         assert_eq!(detail.artwork, None);
         assert_eq!(detail.tracks, tracks);
+        assert_eq!(detail.artist, None);
 
         let enriched = detail
             .with_description("A collection of tracks.")
@@ -205,6 +267,29 @@ mod tests {
         let trimmed_empty = enriched.with_description("   ").with_artwork("");
         assert_eq!(trimmed_empty.description, None);
         assert_eq!(trimmed_empty.artwork, None);
+    }
+
+    #[test]
+    fn artist_page_construction_and_builder() {
+        let page = ArtistPage {
+            songs_title: "Popular songs".to_owned(),
+            songs_more_id: Some("VL123".to_owned()),
+            sections: vec![DetailSection {
+                title: "Albums".to_owned(),
+                cards: vec![DetailCard::new(
+                    "MPREb_1",
+                    "Album",
+                    "2026",
+                    Some("https://img.local/a.jpg".to_owned()),
+                    DetailCardKind::Album,
+                )],
+            }],
+        };
+        let detail = Detail::new(DetailKind::Artist, "Artist", "", Vec::new())
+            .with_artist_page(page.clone());
+        assert_eq!(detail.artist, Some(page.clone()));
+        assert_eq!(page.sections[0].cards[0].kind, DetailCardKind::Album);
+        assert_eq!(DetailCardKind::Artist, DetailCardKind::Artist);
     }
 
     #[test]

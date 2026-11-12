@@ -1,5 +1,6 @@
 //! Detail view response parser for albums, artists, and playlists.
 
+use super::catalog_parse_artist::parse_artist_page;
 use super::catalog_parse_common::{
     best_thumbnail, flex_text, panel_artist, parse_duration_secs, watch_video_id,
 };
@@ -22,6 +23,8 @@ fn detail_header_node(value: &Value) -> Option<&Value> {
 
 fn detail_header_title(value: &Value) -> String {
     const PATHS: &[&str] = &[
+        "/header/musicImmersiveHeaderRenderer/title/runs/0/text",
+        "/header/musicImmersiveHeaderRenderer/title/simpleText",
         "/title/runs/0/text",
         "/title/simpleText",
         "/header/musicResponsiveHeaderRenderer/title/runs/0/text",
@@ -318,7 +321,11 @@ pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
         return None;
     }
     let detail = Detail::new(kind, &title, &subtitle, tracks);
-    Some(fill_missing_track_artwork(with_optional_detail_fields(detail, value)))
+    let detail = fill_missing_track_artwork(with_optional_detail_fields(detail, value));
+    if kind == DetailKind::Artist {
+        return Some(detail.with_artist_page(parse_artist_page(value)));
+    }
+    Some(detail)
 }
 
 #[cfg(test)]
@@ -684,5 +691,13 @@ mod tests {
         );
         assert_eq!(detail.subtitle, "", "the biography must not leak into the subtitle");
         assert_eq!(detail.title, "Los Angeles Azules");
+    }
+
+    #[test]
+    fn parse_detail_all_playlist_has_no_artist_page() {
+        let raw = include_str!("../../tests/fixtures/catalog_detail.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let detail = parse_detail_all(&payload, DetailKind::Album).expect("parsed detail");
+        assert_eq!(detail.artist, None);
     }
 }

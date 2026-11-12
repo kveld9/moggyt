@@ -22,7 +22,10 @@ mod version_override;
 pub use artist_match::{
     TOPIC_CHANNEL_SUFFIX, artist_score, split_source_artists, strip_topic_suffix,
 };
-pub use library::{Album, Artist, Detail, DetailKind, Playlist, SearchResult, Shelf};
+pub use library::{
+    Album, Artist, ArtistPage, Detail, DetailCard, DetailCardKind, DetailKind, DetailSection,
+    Playlist, SearchResult, Shelf,
+};
 pub use listening_stats::{
     ListeningStats, RankedEntry, SECS_PER_DAY, STATS_TOP_LIMIT, StatsPeriod,
     compute_listening_stats,
