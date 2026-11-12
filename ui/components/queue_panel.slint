@@ -1,6 +1,7 @@
 import { Labels } from "../labels.slint";
 import { PlaybackUi, Theme, TrackRowData } from "../theme.slint";
 import { TrackRow } from "./rows.slint";
+import { ContextSurface } from "./context_menu.slint";
 import { IconClose } from "../icons.slint";
 
 export component QueuePanel inherits Rectangle {
@@ -113,6 +114,8 @@ export component QueuePanel inherits Rectangle {
                     album: track.album;
                     duration: track.duration;
                     kind: track.kind;
+                    index: track.index;
+                    surface: ContextSurface.queue;
                     cover: track.cover;
                     is-active: track.index == root.selected-index;
                     clicked => { root.track-selected(track.index); }

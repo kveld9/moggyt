@@ -1,5 +1,6 @@
 import { Labels } from "../labels.slint";
 import { Theme } from "../theme.slint";
+import { ContextSurface, ContextUi } from "./context_menu.slint";
 
 export component TrackRow inherits Rectangle {
     in property <string> title;
@@ -7,6 +8,8 @@ export component TrackRow inherits Rectangle {
     in property <string> album;
     in property <string> duration;
     in property <string> kind;
+    in property <int> index: -1;
+    in property <ContextSurface> surface: ContextSurface.search;
     in property <image> cover;
     in property <bool> is-active: false;
     in property <bool> show-remove: false;
@@ -26,6 +29,16 @@ export component TrackRow inherits Rectangle {
 
     touch := TouchArea {
         clicked => { root.clicked(); }
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                ContextUi.opened(
+                    root.surface,
+                    root.index,
+                    self.absolute-position.x + self.mouse-x,
+                    self.absolute-position.y + self.mouse-y,
+                );
+            }
+        }
     }
 
     HorizontalLayout {

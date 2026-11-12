@@ -128,6 +128,7 @@ pub(crate) fn wire_window_callbacks(
     super::spotify_connect::wire_spotify_callbacks(window, &state_rc);
     super::stats::wire_stats_callbacks(window, &state_rc);
     super::version_fix::wire(window, state_rc.clone());
+    super::context_menu::wire(window, &state_rc, &worker_tx);
 }
 
 fn handle_page_selected(

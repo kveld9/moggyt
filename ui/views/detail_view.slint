@@ -1,6 +1,7 @@
 import { Labels } from "../labels.slint";
 import { Theme, TrackRowData, DetailSectionData } from "../theme.slint";
 import { TrackRow } from "../components/rows.slint";
+import { ContextSurface } from "../components/context_menu.slint";
 import { DetailTile } from "../components/cards.slint";
 import { StyledInputField } from "../components/controls.slint";
 import { IconPlay, IconShuffle } from "../icons.slint";
@@ -283,6 +284,8 @@ export component DetailView inherits VerticalLayout {
             album: track.album;
             duration: track.duration;
             kind: track.kind;
+            index: track.index;
+            surface: ContextSurface.detail;
             cover: track.cover;
             show-remove: LocalEditUi.is-local;
             clicked => { root.track-selected(track.index); }

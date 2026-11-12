@@ -2,6 +2,7 @@ import { Labels } from "../labels.slint";
 import { Theme, ShelfData } from "../theme.slint";
 import { FilterChip } from "../components/controls.slint";
 import { TrackRow } from "../components/rows.slint";
+import { ContextSurface } from "../components/context_menu.slint";
 import { IconSearch, IconClose } from "../icons.slint";
 
 export component SearchView inherits VerticalLayout {
@@ -237,6 +238,8 @@ export component SearchView inherits VerticalLayout {
                 album: track.album;
                 duration: track.duration;
                 kind: track.kind;
+                index: track.index;
+                surface: ContextSurface.search;
                 cover: track.cover;
                 clicked => {
                     root.track-selected(track.index);
