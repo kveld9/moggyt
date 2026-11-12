@@ -20,7 +20,9 @@ use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::sync_window;
 use crate::slint_shell::toast::notify;
 use crate::slint_shell::window::{open_detail_async, trigger_playback};
-use crate::slint_shell::{ContextMenuItemData, ContextSurface, ContextUi, MoggytWindow};
+use crate::slint_shell::{
+    ContextIcon, ContextMenuItemData, ContextSurface, ContextUi, MoggytWindow,
+};
 
 /// Track actions offered by the context menu, in rendering order.
 pub const TRACK_ACTIONS: [ContextAction; 5] = [
@@ -86,6 +88,19 @@ impl ContextAction {
             Self::ToggleLike => tr(locale, "Like"),
             Self::CopyLink => tr(locale, "Copy link"),
             Self::Open => tr(locale, "Open"),
+        }
+    }
+
+    /// Icon shown next to the action label.
+    pub fn icon(self, liked: bool) -> ContextIcon {
+        match self {
+            Self::PlayNow => ContextIcon::Play,
+            Self::PlayNext => ContextIcon::Next,
+            Self::AddToQueue => ContextIcon::Queue,
+            Self::ToggleLike if liked => ContextIcon::HeartFilled,
+            Self::ToggleLike => ContextIcon::Heart,
+            Self::CopyLink => ContextIcon::Copy,
+            Self::Open => ContextIcon::Open,
         }
     }
 }
@@ -231,6 +246,7 @@ pub fn menu_items(
         .map(|(index, action)| ContextMenuItemData {
             index: index as i32,
             label: action.label(locale, liked).into(),
+            icon: action.icon(liked),
         })
         .collect()
 }
