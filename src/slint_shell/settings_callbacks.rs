@@ -5,7 +5,8 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 
 use crate::domain::{ThemeId, TimerPreset};
-use crate::slint_shell::MoggytWindow;
+use crate::i18n::tr;
+use crate::infra::open_url;
 use crate::slint_shell::callbacks::with_window_state;
 use crate::slint_shell::explore::explore_columns_for_width;
 use crate::slint_shell::format::timer_preset_from_index;
@@ -14,7 +15,9 @@ use crate::slint_shell::player_bar::mode_from_index;
 use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{sync_explore_shelves, sync_sleep_timer, sync_window};
 use crate::slint_shell::theme::{apply_palette, theme_from_index};
+use crate::slint_shell::toast::notify;
 use crate::slint_shell::window::refresh_library_async;
+use crate::slint_shell::{ContextIcon, MoggytWindow};
 
 /// Wires settings, account authentication, player bar preferences, and resize callbacks.
 pub(crate) fn wire_settings_callbacks(
@@ -44,6 +47,17 @@ pub(crate) fn wire_settings_callbacks(
         st.sign_out();
         refresh_library_async(&win, &mut st, &tx);
         sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_open_project_page(move || {
+        let Some(win) = w.upgrade() else { return };
+        if let Err(err) = open_url(env!("CARGO_PKG_REPOSITORY")) {
+            let mut st = s.borrow_mut();
+            let text = format!("{}: {err:#}", tr(st.locale, "Failed to open browser"));
+            notify(&win, &mut st, &text, ContextIcon::Open);
+        }
     });
 
     let s = Rc::clone(state_rc);
