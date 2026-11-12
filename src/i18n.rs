@@ -127,6 +127,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
         "Connection lost. Retry or save the matched tracks.",
         "Se perdió la conexión. Reintenta o guarda las canciones coincidentes.",
     ),
+    ("Copy link", "Copiar enlace"),
     ("Crossfade", "Fundido cruzado"),
     ("Custom", "Personalizado"),
     ("Custom Discord Application ID", "ID de aplicación personalizada de Discord"),

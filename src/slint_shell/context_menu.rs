@@ -19,11 +19,12 @@ use crate::slint_shell::window::trigger_playback;
 use crate::slint_shell::{ContextMenuItemData, ContextSurface, ContextUi, MoggytWindow};
 
 /// Track actions offered by the context menu, in rendering order.
-pub const TRACK_ACTIONS: [ContextAction; 4] = [
+pub const TRACK_ACTIONS: [ContextAction; 5] = [
     ContextAction::PlayNow,
     ContextAction::PlayNext,
     ContextAction::AddToQueue,
     ContextAction::ToggleLike,
+    ContextAction::CopyLink,
 ];
 
 /// Action a track-row context menu entry performs.
@@ -37,6 +38,8 @@ pub enum ContextAction {
     AddToQueue,
     /// Toggle the local favorite flag for the track.
     ToggleLike,
+    /// Copy the YouTube Music watch URL for the track.
+    CopyLink,
 }
 
 impl ContextAction {
@@ -48,6 +51,7 @@ impl ContextAction {
             Self::AddToQueue => tr(locale, "Add to queue"),
             Self::ToggleLike if liked => tr(locale, "Unlike"),
             Self::ToggleLike => tr(locale, "Like"),
+            Self::CopyLink => tr(locale, "Copy link"),
         }
     }
 
@@ -90,12 +94,14 @@ impl ContextMenuState {
 }
 
 /// Window work requested after a queue mutation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FollowUp {
     /// No playback or view change is needed.
     None,
     /// Playback must be (re)triggered for the track under the cursor.
     StartPlayback,
+    /// The derived watch URL must be written to the system clipboard.
+    CopyLink(String),
 }
 
 /// Resolves the track a context target points at, when the row is a track.
@@ -144,6 +150,12 @@ pub fn apply_action(
         ContextAction::ToggleLike => {
             super::likes::toggle_and_persist(state, &track.id);
             FollowUp::None
+        }
+        ContextAction::CopyLink => {
+            match crate::slint_shell::import_open::youtube_music_url(&track.id) {
+                Some(url) => FollowUp::CopyLink(url),
+                None => FollowUp::None,
+            }
         }
     }
 }
@@ -214,10 +226,18 @@ fn activate(
         &state.search_covers,
         worker_tx,
     );
-    if apply_action(state, target, action, track) == FollowUp::StartPlayback {
-        trigger_playback(window, state);
+    match apply_action(state, target, action, track) {
+        FollowUp::StartPlayback => trigger_playback(window, state),
+        FollowUp::CopyLink(url) => copy_track_link(&url),
+        FollowUp::None => {}
     }
     sync_window(window, state);
+}
+
+fn copy_track_link(url: &str) {
+    if let Err(err) = crate::infra::copy_text(url) {
+        tracing::warn!("failed to copy track link: {err}");
+    }
 }
 
 /// Wires the context menu global callbacks to the window and application state.
@@ -267,7 +287,7 @@ mod tests {
     #[test]
     fn menu_items_follow_track_action_order() {
         let items = menu_items(Locale::English, false);
-        assert_eq!(items.len(), 4);
+        assert_eq!(items.len(), 5);
         assert_eq!(items[0].index, 0);
         assert_eq!(items[0].label, "Play");
         assert_eq!(items[1].index, 1);
@@ -276,6 +296,8 @@ mod tests {
         assert_eq!(items[2].label, "Add to queue");
         assert_eq!(items[3].index, 3);
         assert_eq!(items[3].label, "Like");
+        assert_eq!(items[4].index, 4);
+        assert_eq!(items[4].label, "Copy link");
     }
 
     #[test]
@@ -284,17 +306,23 @@ mod tests {
         let labels: Vec<&str> = items.iter().map(|item| item.label.as_str()).collect();
         assert_eq!(
             labels,
-            ["Reproducir", "Reproducir a continuación", "Añadir a la cola", "Me gusta"]
+            [
+                "Reproducir",
+                "Reproducir a continuación",
+                "Añadir a la cola",
+                "Me gusta",
+                "Copiar enlace",
+            ]
         );
     }
 
     #[test]
     fn menu_items_switch_like_label_when_liked() {
         let en_items = menu_items(Locale::English, true);
-        assert_eq!(en_items.last().map(|item| item.label.as_str()), Some("Unlike"));
+        assert_eq!(en_items.get(3).map(|item| item.label.as_str()), Some("Unlike"));
 
         let es_items = menu_items(Locale::Spanish, true);
-        assert_eq!(es_items.last().map(|item| item.label.as_str()), Some("Quitar me gusta"));
+        assert_eq!(es_items.get(3).map(|item| item.label.as_str()), Some("Quitar me gusta"));
     }
 
     #[test]
@@ -303,8 +331,9 @@ mod tests {
         assert_eq!(ContextAction::from_index(1), Some(ContextAction::PlayNext));
         assert_eq!(ContextAction::from_index(2), Some(ContextAction::AddToQueue));
         assert_eq!(ContextAction::from_index(3), Some(ContextAction::ToggleLike));
+        assert_eq!(ContextAction::from_index(4), Some(ContextAction::CopyLink));
         assert_eq!(ContextAction::from_index(-1), None);
-        assert_eq!(ContextAction::from_index(4), None);
+        assert_eq!(ContextAction::from_index(5), None);
     }
 
     #[test]
@@ -408,5 +437,29 @@ mod tests {
         assert_eq!(follow_up, FollowUp::None);
         assert!(state.liked_ids.contains("t1"));
         assert_eq!(state.settings_store.load().liked_ids, vec!["t1"]);
+    }
+
+    #[test]
+    fn apply_action_copy_link_returns_the_watch_url() {
+        let mut state = test_wired();
+        let track = Track::new("abc-123_XYZ", "Title", "Artist");
+        let target = ContextTarget { surface: ContextSurface::Search, index: 0 };
+        let follow_up = apply_action(&mut state, target, ContextAction::CopyLink, track);
+
+        assert_eq!(
+            follow_up,
+            FollowUp::CopyLink("https://music.youtube.com/watch?v=abc-123_XYZ".to_owned())
+        );
+        assert_eq!(state.queue.len(), 0);
+    }
+
+    #[test]
+    fn apply_action_copy_link_skips_invalid_identifiers() {
+        let mut state = test_wired();
+        let track = Track::new("bad id", "Title", "Artist");
+        let target = ContextTarget { surface: ContextSurface::Search, index: 0 };
+        let follow_up = apply_action(&mut state, target, ContextAction::CopyLink, track);
+
+        assert_eq!(follow_up, FollowUp::None);
     }
 }

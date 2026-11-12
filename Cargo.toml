@@ -9,6 +9,7 @@ rust-version = "1.85"
 autoexamples = false
 
 [dependencies]
+arboard = { version = "3.7", default-features = false }
 anyhow = "1.0.104"
 cpal = "0.16"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
