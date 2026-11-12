@@ -137,6 +137,26 @@ is open; both routes below work in that situation.
   (`ui/shell.slint`), enable debug info (`CompilerConfiguration::new().with_debug_info(true)`, the
   element-handle API requires it), initialize with `i_slint_backend_testing::init_no_event_loop()`,
   then read `ElementHandle::absolute_position()` and `.size()` after `show()`.
+- Probe pitfalls with `i-slint-backend-testing` (verified on 1.18.1):
+  - The crate does not build with its `internal` feature outside the Slint repository:
+    `configure_test_fonts` includes `../../../tests/screenshots/fonts/*.ttf`. The public
+    `mock_elapsed_time(std::time::Duration)` is already exported without that feature and is the
+    only way to advance animations and timers, because `init_no_event_loop()` freezes the clock;
+    a 180ms panel animation only progresses through 20ms steps.
+  - `Window::size()` returns physical pixels: divide by `Window::scale_factor()` before comparing
+    it with the logical geometry of `ElementHandle::absolute_position()`/`size()`.
+  - Element traversal skips culled items: a card fully clipped by its container never appears in
+    `ElementHandle::find_by_element_type_name`, so assert clipping from the last VISIBLE element's
+    right edge, never from the model length.
+  - `ui/shell.slint` does not re-export the model structs (`ExploreShelfData` and friends live in
+    `ui/theme.slint`), so compile a two-line probe scene over a copy of `ui/` that re-exports
+    `MoggytWindow` plus those structs instead of editing the worktree.
+  - Run the repo gate first and the probe afterwards: both saturate the CPU, and a probe whose
+    link step races the test build expires without producing a binary.
+- Panel-driven layout states: when a sibling panel (the queue panel, a drawer) shrinks the content
+  column without resizing the window, measure both states. Resizing the window never reproduces
+  the pairing, so a column count derived from the window width looks correct in every check that
+  only resizes the window.
 - Pixel changes: render the real component offscreen with `slint-viewer --screenshot` from a
   temporary scene under `ui/` that imports the component by relative path. Set the `Theme` colors
   explicitly (the globals have no defaults) and use `--backend software`. Delete the scene after
