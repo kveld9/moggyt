@@ -8,12 +8,14 @@ use crate::domain::{ThemeId, TimerPreset};
 use crate::i18n::tr;
 use crate::infra::open_url;
 use crate::slint_shell::callbacks::with_window_state;
-use crate::slint_shell::explore::explore_columns_for_width;
+use crate::slint_shell::explore::apply_content_width;
 use crate::slint_shell::format::timer_preset_from_index;
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::player_bar::mode_from_index;
 use crate::slint_shell::state::{SharedState, SlintAppState};
-use crate::slint_shell::sync::{sync_explore_shelves, sync_sleep_timer, sync_window};
+use crate::slint_shell::sync::{
+    sync_category_shelves, sync_explore_shelves, sync_sleep_timer, sync_window,
+};
 use crate::slint_shell::theme::{apply_palette, theme_from_index};
 use crate::slint_shell::toast::notify;
 use crate::slint_shell::window::refresh_library_async;
@@ -162,16 +164,17 @@ pub(crate) fn wire_settings_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_width_changed(move |width| {
+    window.on_content_width_changed(move |width| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        let columns = explore_columns_for_width(width);
-        if st.explore_columns == columns {
+        if !apply_content_width(&mut st, width) {
             return;
         }
-        st.explore_columns = columns;
         if st.explore_loaded {
             sync_explore_shelves(&win, &st);
+        }
+        if !st.category_shelves.is_empty() {
+            sync_category_shelves(&win, &st);
         }
     });
 

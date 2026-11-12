@@ -179,9 +179,12 @@ guessing; every rule here was verified against a build or the official documenta
 - Rows of cards only wrap when each card has a real width: a `HorizontalLayout` of cards
   without a width sizes them from their own preferred width, so the row overflows the window
   and gets clipped, and `preferred-width: 0px` collapses it to zero instead. Give the card a
-  fixed `width` and chunk the model into rows of the cards that fit the window width, then
-  recompute that chunking from a `changed width => { ... }` handler on the `Window`, which
-  Slint fires on every resize and is the only way to reflow without a scroll offset.
+  fixed `width` and chunk the model into rows of the cards that fit the available width, then
+  recompute that chunking from a `changed width => { ... }` handler on the component that owns
+  the reported width, which Slint fires on every relayout and is the only way to reflow without
+  a scroll offset. Measure the content column, never the `Window`: opening the queue panel
+  shrinks the content area by 340px while the window width stays unchanged, so a window-derived
+  column count keeps the previous rows and clips the trailing cards.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/horizontallayout/>.
 - `FlexboxLayout` (`flex-wrap` defaults to `wrap`) is the documented element for a grid that
   must wrap, but it is not a drop-in inside this app's explore `Flickable`: on slint 1.18.1

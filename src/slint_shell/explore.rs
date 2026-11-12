@@ -230,20 +230,34 @@ pub(crate) fn refresh_explore_covers_if_loaded(
 pub(crate) const EXPLORE_CARD_WIDTH: i32 = 150;
 /// Horizontal gap between cards in logical pixels.
 pub(crate) const EXPLORE_CARD_GAP: i32 = 12;
-/// Sidebar width plus content padding in logical pixels.
-pub(crate) const EXPLORE_CHROME_WIDTH: i32 = 248;
-/// Column bounds: never fewer than 2, never more than 12.
-const MIN_EXPLORE_COLUMNS: usize = 2;
+/// Horizontal padding of the content column (24px per side in `ui/views/content_area.slint`).
+pub(crate) const EXPLORE_CONTENT_PADDING: i32 = 48;
+/// Column bounds: a single column is the only fit in a content area squeezed by the queue
+/// panel, and 12 caps the grid on very wide windows.
+const MIN_EXPLORE_COLUMNS: usize = 1;
 const MAX_EXPLORE_COLUMNS: usize = 12;
 
-/// Number of cards that fit in one row for a given window width.
-pub(crate) fn explore_columns_for_width(window_width: i32) -> usize {
-    let usable = window_width - EXPLORE_CHROME_WIDTH + EXPLORE_CARD_GAP;
+/// Number of cards that fit in one row for a given content-area width.
+pub(crate) fn explore_columns_for_width(content_width: i32) -> usize {
+    let usable = content_width - EXPLORE_CONTENT_PADDING + EXPLORE_CARD_GAP;
     let per_card = EXPLORE_CARD_WIDTH + EXPLORE_CARD_GAP;
     if usable <= 0 {
         return MIN_EXPLORE_COLUMNS;
     }
     ((usable / per_card) as usize).clamp(MIN_EXPLORE_COLUMNS, MAX_EXPLORE_COLUMNS)
+}
+
+/// Stores the card column count for a content-area width.
+///
+/// Returns true only when the count changed, so callers re-chunk the card models once per
+/// threshold crossing instead of on every animation frame of the queue panel.
+pub(crate) fn apply_content_width(state: &mut SlintAppState, content_width: i32) -> bool {
+    let columns = explore_columns_for_width(content_width);
+    if state.explore_columns == columns {
+        return false;
+    }
+    state.explore_columns = columns;
+    true
 }
 
 /// Muted tile palette used for explore items that carry no artwork.
@@ -360,6 +374,7 @@ mod tests {
     use crate::slint_shell::platform::rgba_to_image;
     use crate::slint_shell::playback_worker::thumbnail_variant_for_row;
     use crate::slint_shell::search::SearchRow;
+    use crate::slint_shell::sync::DEFAULT_EXPLORE_COLUMNS;
     use crate::slint_shell::test_support::test_wired;
 
     fn make_test_card(index: i32) -> ExploreCardData {
@@ -517,11 +532,46 @@ mod tests {
 
     #[test]
     fn test_explore_columns_for_width() {
-        assert_eq!(explore_columns_for_width(1900), 10);
-        assert_eq!(explore_columns_for_width(940), 4);
-        assert_eq!(explore_columns_for_width(800), 3);
-        assert_eq!(explore_columns_for_width(500), 2);
-        assert_eq!(explore_columns_for_width(4000), 12);
+        // 1924px window minus the 200px sidebar.
+        assert_eq!(explore_columns_for_width(1724), 10);
+        // Same window with the 340px queue panel open: the grid loses two columns.
+        assert_eq!(explore_columns_for_width(1384), 8);
+        assert_eq!(explore_columns_for_width(740), 4);
+        assert_eq!(explore_columns_for_width(600), 3);
+        // Minimum window width (800px) with the queue panel open: one column, no clipping.
+        assert_eq!(explore_columns_for_width(260), 1);
+        assert_eq!(explore_columns_for_width(0), 1);
+        assert_eq!(explore_columns_for_width(3800), 12);
+    }
+
+    #[test]
+    fn test_explore_columns_never_overflow_the_content_width() {
+        for content_width in (200..=4000).step_by(17) {
+            let columns = explore_columns_for_width(content_width) as i32;
+            let row_width = columns * EXPLORE_CARD_WIDTH + (columns - 1) * EXPLORE_CARD_GAP;
+            let available = (content_width - EXPLORE_CONTENT_PADDING).max(EXPLORE_CARD_WIDTH);
+            assert!(
+                row_width <= available,
+                "{columns} columns ({row_width}px) overflow {available}px available at content \
+                 width {content_width}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_apply_content_width_reports_threshold_crossings() {
+        let mut state = test_wired();
+        assert_eq!(state.explore_columns, DEFAULT_EXPLORE_COLUMNS);
+
+        assert!(apply_content_width(&mut state, 1724));
+        assert_eq!(state.explore_columns, 10);
+
+        // Another width inside the same 10-column band must not re-chunk the models.
+        assert!(!apply_content_width(&mut state, 1730));
+
+        // Opening the queue panel crosses into the 8-column band.
+        assert!(apply_content_width(&mut state, 1384));
+        assert_eq!(state.explore_columns, 8);
     }
 
     #[test]
