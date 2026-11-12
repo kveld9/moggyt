@@ -31,4 +31,10 @@ package() {
   install -Dm644 "${srcdir}/moggyt.desktop" "${pkgdir}/usr/share/applications/moggyt.desktop"
   install -Dm644 "${srcdir}/moggyt-theme.json" \
     "${pkgdir}/usr/share/moggyt/matugen/moggyt-theme.json"
+
+  # Release tarballs from the next version onward include the third-party notices.
+  if [ -f "${srcdir}/THIRD_PARTY_NOTICES.md" ]; then
+    install -Dm644 "${srcdir}/THIRD_PARTY_NOTICES.md" \
+      "${pkgdir}/usr/share/licenses/${pkgname}/THIRD_PARTY_NOTICES.md"
+  fi
 }

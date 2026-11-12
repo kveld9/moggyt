@@ -43,6 +43,7 @@ depends = "$auto, libasound2, libayatana-appindicator3-1"
 assets = [
     ["target/release/moggyt", "usr/bin/", "755"],
     ["packaging/deb/moggyt.desktop", "usr/share/applications/", "644"],
+    ["THIRD_PARTY_NOTICES.md", "usr/share/doc/moggyt/", "644"],
 ]
 extended-description = """\
 Native YouTube Music client written in Rust (Slint)."""

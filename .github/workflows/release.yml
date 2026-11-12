@@ -12,7 +12,7 @@
 #   - workflow_dispatch: Manual release execution from the Actions tab.
 #
 # Release Artifacts:
-#   - moggyt-<version>-linux.tar.gz: Portable tarball containing the Linux binary (x86_64).
+#   - moggyt-<version>-linux.tar.gz: Portable tarball containing the Linux binary (x86_64) and third-party notices.
 #   - moggyt-<version>-windows.zip: Portable zip containing the Windows binary (x86_64).
 #   - moggyt_<version>_amd64.deb: Debian/Ubuntu package with automated dependency resolution.
 #   - moggyt-<version>-x86_64.AppImage: Standalone portable AppImage bundle for Linux (x86_64).
@@ -134,10 +134,11 @@ jobs:
         run: |
           VERSION="${{ needs.semver.outputs.version }}"
           mkdir -p dist
+          cp THIRD_PARTY_NOTICES.md target/release/
           if [ "${{ runner.os }}" = "Windows" ]; then
-            (cd target/release && 7z a "../../dist/moggyt-${VERSION}-windows.zip" moggyt.exe)
+            (cd target/release && 7z a "../../dist/moggyt-${VERSION}-windows.zip" moggyt.exe THIRD_PARTY_NOTICES.md)
           else
-            tar -czf "dist/moggyt-${VERSION}-linux.tar.gz" -C target/release moggyt
+            tar -czf "dist/moggyt-${VERSION}-linux.tar.gz" -C target/release moggyt THIRD_PARTY_NOTICES.md
           fi
 
       - name: Install NSIS
@@ -208,6 +209,9 @@ jobs:
             -d packaging/appimage/moggyt.desktop \
             -i packaging/appimage/moggyt.png \
             "${EXTRA_LIBS[@]}"
+
+          mkdir -p AppDir/usr/share/doc/moggyt
+          cp THIRD_PARTY_NOTICES.md AppDir/usr/share/doc/moggyt/
 
           ARCH=x86_64 ./appimagetool.AppImage AppDir "dist/moggyt-${VERSION}-x86_64.AppImage"
 

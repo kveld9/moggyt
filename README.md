@@ -87,4 +87,4 @@ never sent with media stream requests. Disclose vulnerabilities privately per
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE). For bundled third-party components, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

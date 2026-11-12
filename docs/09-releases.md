@@ -38,6 +38,8 @@ Release assets by shipment status:
 | `moggyt-*-x86_64.AppImage` | Linux | GitHub Releases | Shipped |
 | `moggyt-*-setup.exe` | Windows 64-bit | GitHub Releases (NSIS installer) | Planned |
 
+Linux tarballs, .deb packages, AppImages, the Windows installer and the Arch package include `THIRD_PARTY_NOTICES.md`.
+
 ### Arch Linux Packaging
 
 The repository maintains an Arch Linux package specification in `packaging/arch/moggyt-bin/PKGBUILD`. It downloads and
