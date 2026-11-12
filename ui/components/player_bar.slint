@@ -79,13 +79,14 @@ export component PlayerBar inherits Rectangle {
                 }
             }
 
+            // `alignment: start` keeps the title and like button next to the artwork: any other
+            // value cancels horizontal-stretch and centers the group in the leftover width.
             HorizontalLayout {
                 horizontal-stretch: 1;
                 spacing: 6px;
-                alignment: center;
+                alignment: start;
 
                 VerticalLayout {
-                    horizontal-stretch: 1;
                     alignment: center;
                     spacing: 2px;
 
