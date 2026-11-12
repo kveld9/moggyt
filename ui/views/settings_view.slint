@@ -47,6 +47,7 @@ export component SettingsView inherits VerticalLayout {
     callback sign-out();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
+    callback open-project-page();
 
     spacing: 20px;
     alignment: start;
@@ -106,5 +107,6 @@ export component SettingsView inherits VerticalLayout {
         app-version: root.app-version;
         update-status-text: root.update-status-text;
         has-update: root.has-update;
+        open-project-page => { root.open-project-page(); }
     }
 }

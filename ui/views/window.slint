@@ -160,6 +160,7 @@ export component MoggytWindow inherits Window {
     callback close-queue-panel();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
+    callback open-project-page();
     callback import-browse-requested();
     callback import-link-changed(string);
     callback import-start-requested();
@@ -291,6 +292,7 @@ export component MoggytWindow inherits Window {
                     back-pressed => { root.back-pressed(); }
                     player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
                     player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
+                    open-project-page => { root.open-project-page(); }
                     persistence-error-text: root.persistence-error-text;
                     persistence-dismiss-text: root.persistence-dismiss-text;
                     persistence-error-dismissed => { root.persistence-error-dismissed(); }

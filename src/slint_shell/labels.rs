@@ -100,8 +100,10 @@ pub struct StaticLabels {
     pub status_signed_in: &'static str,
     pub status_anonymous: &'static str,
     pub section_about: &'static str,
-    pub app_version: &'static str,
+    pub about_author: &'static str,
+    pub about_tagline: &'static str,
     pub update_status: &'static str,
+    pub view_on_github: &'static str,
     pub explore_loading: &'static str,
     pub explore_empty: &'static str,
     pub section_player_bar: &'static str,
@@ -283,8 +285,10 @@ impl StaticLabels {
             status_signed_in: tr(locale, "Status: Signed in"),
             status_anonymous: tr(locale, "Status: Anonymous"),
             section_about: tr(locale, "About"),
-            app_version: tr(locale, "App version"),
+            about_author: tr(locale, "Developed by kveld9"),
+            about_tagline: tr(locale, "Native YouTube Music client written in Rust"),
             update_status: tr(locale, "Update status"),
+            view_on_github: tr(locale, "View on GitHub"),
             explore_loading: tr(locale, "Loading explore..."),
             explore_empty: tr(locale, "No sections found in Explore."),
             section_player_bar: tr(locale, "Player bar"),
@@ -463,8 +467,10 @@ impl StaticLabels {
         labels.set_status_signed_in_label(self.status_signed_in.into());
         labels.set_status_anonymous_label(self.status_anonymous.into());
         labels.set_section_about_label(self.section_about.into());
-        labels.set_app_version_label(self.app_version.into());
+        labels.set_about_author_label(self.about_author.into());
+        labels.set_about_tagline_label(self.about_tagline.into());
         labels.set_update_status_label(self.update_status.into());
+        labels.set_view_on_github_label(self.view_on_github.into());
         labels.set_explore_loading_text(self.explore_loading.into());
         labels.set_explore_empty_text(self.explore_empty.into());
         labels.set_section_player_bar_label(self.section_player_bar.into());

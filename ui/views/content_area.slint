@@ -115,6 +115,7 @@ export component ContentArea inherits Rectangle {
     callback back-pressed();
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
+    callback open-project-page();
     callback library-import-requested();
     in property <string> persistence-error-text: "";
     in property <string> persistence-dismiss-text: "Dismiss";
@@ -314,6 +315,7 @@ export component ContentArea inherits Rectangle {
                 sign-out => { root.sign-out(); }
                 player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
                 player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
+                open-project-page => { root.open-project-page(); }
             }
 
             if root.active-page == 5 : ExploreView {

@@ -171,8 +171,10 @@ mod tests {
         assert_eq!(es.status_signed_in, "Estado: Sesión iniciada");
         assert_eq!(es.status_anonymous, "Estado: Anónimo");
         assert_eq!(es.section_about, "Acerca de");
-        assert_eq!(es.app_version, "Versión de la app");
+        assert_eq!(es.about_author, "Desarrollado por kveld9");
+        assert_eq!(es.about_tagline, "Cliente nativo de YouTube Music escrito en Rust");
         assert_eq!(es.update_status, "Estado de actualización");
+        assert_eq!(es.view_on_github, "Ver en GitHub");
         assert_eq!(es.explore_loading, "Cargando exploracion...");
         assert_eq!(es.explore_empty, "No se encontraron secciones en Explorar.");
         assert_eq!(es.section_player_bar, "Barra de reproducción");
@@ -333,8 +335,10 @@ mod tests {
         assert_eq!(en.status_signed_in, "Status: Signed in");
         assert_eq!(en.status_anonymous, "Status: Anonymous");
         assert_eq!(en.section_about, "About");
-        assert_eq!(en.app_version, "App version");
+        assert_eq!(en.about_author, "Developed by kveld9");
+        assert_eq!(en.about_tagline, "Native YouTube Music client written in Rust");
         assert_eq!(en.update_status, "Update status");
+        assert_eq!(en.view_on_github, "View on GitHub");
         assert_eq!(en.explore_loading, "Loading explore...");
         assert_eq!(en.explore_empty, "No sections found in Explore.");
         assert_eq!(en.section_player_bar, "Player bar");
