@@ -88,7 +88,8 @@ The Now Playing view presents a full two-column playback dashboard:
     of the current track. The chosen alternative is stored in `version_overrides.json` and used for
     playback only; the title, artwork, lyrics and scrobbling keep the original track.
   - **Track Details**: large track title and artist name with text elision.
-  - **Favorites**: circular like button toggling favorite status through `PlayerUi`.
+  - **Favorites**: circular like button toggling favorite status through `PlayerUi`. The favorite
+    set is persisted in `settings.json` across restarts.
   - **Transport Controls**: playback center controls featuring play/pause, previous/next, shuffle,
     repeat, track position timeline, and +/-10s seek buttons.
   - **Volume Row**: speaker icon with one-click mute/unmute and volume slider (`0-100`).
@@ -362,6 +363,8 @@ the pointer:
 - **Play next**: inserts the track immediately after the current queue position, leaving the
   current playback untouched.
 - **Add to queue**: appends the track to the end of the queue.
+- **Like**: adds the track to your local favorites and switches the entry to `Unlike` while the
+  track is already liked. Favorites are stored in `settings.json` and survive restarts.
 - The menu closes when an entry is chosen or when you press anywhere outside the popup. Albums,
   artists, and playlists in the `Search` results do not open a context menu; left-click them to
   open their detail page.

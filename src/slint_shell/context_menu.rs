@@ -19,8 +19,12 @@ use crate::slint_shell::window::trigger_playback;
 use crate::slint_shell::{ContextMenuItemData, ContextSurface, ContextUi, MoggytWindow};
 
 /// Track actions offered by the context menu, in rendering order.
-pub const TRACK_ACTIONS: [ContextAction; 3] =
-    [ContextAction::PlayNow, ContextAction::PlayNext, ContextAction::AddToQueue];
+pub const TRACK_ACTIONS: [ContextAction; 4] = [
+    ContextAction::PlayNow,
+    ContextAction::PlayNext,
+    ContextAction::AddToQueue,
+    ContextAction::ToggleLike,
+];
 
 /// Action a track-row context menu entry performs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,15 +35,19 @@ pub enum ContextAction {
     PlayNext,
     /// Append the track to the end of the queue.
     AddToQueue,
+    /// Toggle the local favorite flag for the track.
+    ToggleLike,
 }
 
 impl ContextAction {
     /// Localized menu label for the action.
-    pub fn label(self, locale: Locale) -> &'static str {
+    pub fn label(self, locale: Locale, liked: bool) -> &'static str {
         match self {
             Self::PlayNow => tr(locale, "Play"),
             Self::PlayNext => tr(locale, "Play next"),
             Self::AddToQueue => tr(locale, "Add to queue"),
+            Self::ToggleLike if liked => tr(locale, "Unlike"),
+            Self::ToggleLike => tr(locale, "Like"),
         }
     }
 
@@ -105,13 +113,13 @@ pub fn resolve_track(state: &SlintAppState, target: ContextTarget) -> Option<Tra
 }
 
 /// Builds the Slint menu model for a track row.
-pub fn menu_items(locale: Locale) -> Vec<ContextMenuItemData> {
+pub fn menu_items(locale: Locale, liked: bool) -> Vec<ContextMenuItemData> {
     TRACK_ACTIONS
         .iter()
         .enumerate()
         .map(|(index, action)| ContextMenuItemData {
             index: index as i32,
-            label: action.label(locale).into(),
+            label: action.label(locale, liked).into(),
         })
         .collect()
 }
@@ -133,6 +141,10 @@ pub fn apply_action(
             FollowUp::None
         }
         ContextAction::PlayNow => play_now(state, target, track),
+        ContextAction::ToggleLike => {
+            super::likes::toggle_and_persist(state, &track.id);
+            FollowUp::None
+        }
     }
 }
 
@@ -163,13 +175,14 @@ fn open_menu(window: &MoggytWindow, state: &mut SlintAppState, request: MenuRequ
         return;
     };
     let target = ContextTarget { surface: request.surface, index };
-    if resolve_track(state, target).is_none() {
+    let Some(track) = resolve_track(state, target) else {
         close_menu(window, state);
         return;
-    }
+    };
+    let liked = crate::slint_shell::playback::is_track_liked(&state.liked_ids, &track.id);
     state.context_menu.open(target);
     let ui = window.global::<ContextUi>();
-    ui.set_items(ModelRc::new(VecModel::from(menu_items(state.locale))));
+    ui.set_items(ModelRc::new(VecModel::from(menu_items(state.locale, liked))));
     ui.set_x(request.x);
     ui.set_y(request.y);
     ui.set_is_open(true);
@@ -253,21 +266,35 @@ mod tests {
 
     #[test]
     fn menu_items_follow_track_action_order() {
-        let items = menu_items(Locale::English);
-        assert_eq!(items.len(), 3);
+        let items = menu_items(Locale::English, false);
+        assert_eq!(items.len(), 4);
         assert_eq!(items[0].index, 0);
         assert_eq!(items[0].label, "Play");
         assert_eq!(items[1].index, 1);
         assert_eq!(items[1].label, "Play next");
         assert_eq!(items[2].index, 2);
         assert_eq!(items[2].label, "Add to queue");
+        assert_eq!(items[3].index, 3);
+        assert_eq!(items[3].label, "Like");
     }
 
     #[test]
     fn menu_items_are_localized() {
-        let items = menu_items(Locale::Spanish);
+        let items = menu_items(Locale::Spanish, false);
         let labels: Vec<&str> = items.iter().map(|item| item.label.as_str()).collect();
-        assert_eq!(labels, ["Reproducir", "Reproducir a continuación", "Añadir a la cola"]);
+        assert_eq!(
+            labels,
+            ["Reproducir", "Reproducir a continuación", "Añadir a la cola", "Me gusta"]
+        );
+    }
+
+    #[test]
+    fn menu_items_switch_like_label_when_liked() {
+        let en_items = menu_items(Locale::English, true);
+        assert_eq!(en_items.last().map(|item| item.label.as_str()), Some("Unlike"));
+
+        let es_items = menu_items(Locale::Spanish, true);
+        assert_eq!(es_items.last().map(|item| item.label.as_str()), Some("Quitar me gusta"));
     }
 
     #[test]
@@ -275,8 +302,9 @@ mod tests {
         assert_eq!(ContextAction::from_index(0), Some(ContextAction::PlayNow));
         assert_eq!(ContextAction::from_index(1), Some(ContextAction::PlayNext));
         assert_eq!(ContextAction::from_index(2), Some(ContextAction::AddToQueue));
+        assert_eq!(ContextAction::from_index(3), Some(ContextAction::ToggleLike));
         assert_eq!(ContextAction::from_index(-1), None);
-        assert_eq!(ContextAction::from_index(3), None);
+        assert_eq!(ContextAction::from_index(4), None);
     }
 
     #[test]
@@ -368,5 +396,17 @@ mod tests {
         assert_eq!(state.queue.len(), 1);
         assert_eq!(state.queue.cursor(), 0);
         assert_eq!(state.page, SlintPage::NowPlaying);
+    }
+
+    #[test]
+    fn apply_action_toggle_like_updates_set_and_settings() {
+        let mut state = test_wired();
+        let track = Track::new("t1", "Title 1", "Artist 1");
+        let target = ContextTarget { surface: ContextSurface::Queue, index: 0 };
+        let follow_up = apply_action(&mut state, target, ContextAction::ToggleLike, track);
+
+        assert_eq!(follow_up, FollowUp::None);
+        assert!(state.liked_ids.contains("t1"));
+        assert_eq!(state.settings_store.load().liked_ids, vec!["t1"]);
     }
 }
