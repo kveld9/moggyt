@@ -1,52 +1,93 @@
 import { Theme } from "../theme.slint";
+import { ContextIcon } from "./context_menu.slint";
+import { IconClose, IconCopy, IconHeart, IconNext, IconOpen, IconPlay, IconQueue } from "../icons.slint";
 
 export struct ToastData {
     text: string,
+    icon: ContextIcon,
     progress: float,
 }
 
 export global ToastsUi {
-    in-out property <[ToastData]> items: [];
+    in-out property <ToastData> toast0: { text: "", icon: ContextIcon.next, progress: 0.0 };
+    in-out property <ToastData> toast1: { text: "", icon: ContextIcon.next, progress: 0.0 };
+    in-out property <ToastData> toast2: { text: "", icon: ContextIcon.next, progress: 0.0 };
+}
+
+component ToastSlot inherits Rectangle {
+    in property <ToastData> toast;
+    in property <int> level: 0;
+    in property <length> parent-width;
+    in property <length> parent-height;
+
+    width: min(toast-label.preferred-width + 58px, 420px);
+    height: 34px;
+    x: parent-width - self.width - 12px;
+    y: parent-height - 112px - level * 38px + (toast.text == "" ? 10px : 0px);
+    opacity: toast.text == "" ? 0 : 1;
+    border-radius: 8px;
+    background: Theme.panel;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: 14px;
+    drop-shadow-color: #00000066;
+    drop-shadow-offset-y: 3px;
+    clip: true;
+    animate opacity { duration: 180ms; easing: ease-out; }
+    animate y { duration: 180ms; easing: ease-out; }
+
+    if toast.icon == ContextIcon.next : IconNext { x: 10px; y: 9px; size: 16px; tint: Theme.text; }
+    if toast.icon == ContextIcon.queue : IconQueue { x: 10px; y: 9px; size: 16px; tint: Theme.text; }
+    if toast.icon == ContextIcon.heart : IconHeart { x: 10px; y: 9px; size: 16px; tint: Theme.text; }
+    if toast.icon == ContextIcon.heart-filled : IconHeart { x: 10px; y: 9px; size: 16px; tint: Theme.accent; is-filled: true; }
+    if toast.icon == ContextIcon.copy : IconCopy { x: 10px; y: 9px; size: 16px; tint: Theme.text; }
+    if toast.icon == ContextIcon.close : IconClose { x: 10px; y: 9px; size: 16px; tint: Theme.text; }
+    if toast.icon == ContextIcon.play : IconPlay { x: 10px; y: 9px; size: 16px; tint: Theme.text; }
+    if toast.icon == ContextIcon.open : IconOpen { x: 10px; y: 9px; size: 16px; tint: Theme.text; }
+
+    toast-label := Text {
+        x: 34px;
+        y: 0;
+        width: parent.width - 44px;
+        height: parent.height;
+        text: toast.text;
+        color: Theme.text;
+        font-size: 13px;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+
+    Rectangle {
+        x: 0;
+        y: parent.height - 2px;
+        width: parent.width * toast.progress;
+        height: 2px;
+        background: Theme.accent;
+        animate width { duration: 500ms; easing: linear; }
+    }
 }
 
 export component ToastsLayer inherits Rectangle {
     width: 100%;
     height: 100%;
 
-    for toast[idx] in ToastsUi.items : Rectangle {
-        width: min(toast-label.preferred-width + 24px, 420px);
-        height: 32px;
-        x: parent.width - self.width - 12px;
-        y: parent.height - 112px - (ToastsUi.items.length - idx) * 38px;
-        border-radius: 8px;
-        background: Theme.panel;
-        border-width: 1px;
-        border-color: Theme.border;
-        drop-shadow-blur: 14px;
-        drop-shadow-color: #00000066;
-        drop-shadow-offset-y: 3px;
-        clip: true;
-
-        toast-label := Text {
-            x: 12px;
-            y: 0;
-            width: parent.width - 24px;
-            height: parent.height;
-            text: toast.text;
-            color: Theme.text;
-            font-size: 13px;
-            vertical-alignment: center;
-            horizontal-alignment: center;
-            overflow: elide;
-        }
-
-        Rectangle {
-            x: 0;
-            y: parent.height - 2px;
-            width: parent.width * toast.progress;
-            height: 2px;
-            background: Theme.accent;
-            animate width { duration: 500ms; easing: linear; }
-        }
+    ToastSlot {
+        toast: ToastsUi.toast2;
+        level: 0;
+        parent-width: root.width;
+        parent-height: root.height;
+    }
+    ToastSlot {
+        toast: ToastsUi.toast1;
+        level: 1;
+        parent-width: root.width;
+        parent-height: root.height;
+    }
+    ToastSlot {
+        toast: ToastsUi.toast0;
+        level: 2;
+        parent-width: root.width;
+        parent-height: root.height;
     }
 }
