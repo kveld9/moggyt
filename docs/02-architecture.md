@@ -134,6 +134,11 @@ normalizer -> sink. The static gain sits inside the source graph, so the sink
 volume and the crossfade/fade-in ramps multiply it once and never attenuate the
 same signal twice.
 
+Decoded sources whose rate differs from the output stream are resampled with
+rubato `FftFixedIn` (BlackmanHarris2 window), which avoids rodio's linear
+interpolation; AAC itag 140 is 44.1 kHz and Opus itag 251 is 48 kHz, so this
+matters on both native-rate devices.
+
 ## Block streaming and seek behavior
 
 Audio byte ranges are fetched by a pool of four workers in 256 KiB blocks
