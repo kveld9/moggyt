@@ -89,10 +89,12 @@ impl SlintAppState {
         self.request_current_play();
     }
 
-    /// Toggles playback: pauses if playing, resumes if requested, or starts head.
+    /// Toggles playback: pauses if playing, resumes a paused track, or starts the
+    /// current track (which also restarts it after the stream drained).
     pub fn toggle_play(&mut self) {
         let is_playing = self.audio.lock().map(|a| a.is_playing()).unwrap_or(false);
         let has_last = self.audio.lock().map(|a| a.last_requested().is_some()).unwrap_or(false);
+        let is_empty = self.audio.lock().map(|a| a.is_empty()).unwrap_or(true);
         if is_playing {
             if let Ok(mut a) = self.audio.lock() {
                 a.pause();
@@ -100,7 +102,7 @@ impl SlintAppState {
             self.pause_play_ledger();
             self.set_playback_phase(PlaybackPhase::Paused);
             self.sync_presence_playing(false);
-        } else if has_last {
+        } else if has_last && !is_empty {
             if let Ok(mut a) = self.audio.lock() {
                 a.resume_play();
             }
@@ -765,5 +767,19 @@ mod tests {
         let _ = state.begin_play_request().expect("request");
         assert!(!state.should_apply_play_result(old));
         assert!(state.should_apply_play_result(state.play_generation));
+    }
+
+    #[test]
+    fn toggle_play_restarts_current_track_when_sink_drained() {
+        let mut state = test_wired();
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("a", 180))));
+        state.queue.push(Track::new("a", "Track A", "Artist").with_duration(180));
+
+        state.toggle_play();
+
+        let audio = state.audio.lock().unwrap();
+        assert_eq!(audio.last_requested(), Some("a"));
+        assert!(audio.is_playing());
+        assert!(!audio.is_empty());
     }
 }
