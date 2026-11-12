@@ -189,8 +189,20 @@ impl PacketReader for QueuePacketReader {
     }
 }
 
+/// Probes the total byte length exposed by a seekable reader, restoring its position.
+///
+/// Returns `None` when the reader cannot seek relative to its end, which is how the
+/// range reader behaves before it learns the remote total length.
+fn probe_stream_len<R: Seek>(reader: &mut R) -> Option<u64> {
+    let start = reader.stream_position().ok()?;
+    let end = reader.seek(std::io::SeekFrom::End(0)).ok()?;
+    reader.seek(std::io::SeekFrom::Start(start)).ok()?;
+    Some(end)
+}
+
 struct MediaSourceAdapter<R> {
     inner: R,
+    len: Option<u64>,
 }
 
 impl<R: Read> Read for MediaSourceAdapter<R> {
@@ -206,12 +218,14 @@ impl<R: Seek> Seek for MediaSourceAdapter<R> {
 }
 
 impl<R: Read + Seek + Send + Sync> MediaSource for MediaSourceAdapter<R> {
+    /// Reports seekability only when the byte length is known: Symphonia's Matroska
+    /// demuxer rejects a source that claims to be seekable without a length.
     fn is_seekable(&self) -> bool {
-        true
+        self.len.is_some()
     }
 
     fn byte_len(&self) -> Option<u64> {
-        None
+        self.len
     }
 }
 
@@ -227,11 +241,12 @@ pub struct OpusWebmSource {
 
 impl OpusWebmSource {
     /// Creates a new `OpusWebmSource` reading and demuxing from a stream.
-    pub fn new<R>(reader: R) -> anyhow::Result<Self>
+    pub fn new<R>(mut reader: R) -> anyhow::Result<Self>
     where
         R: Read + Seek + Send + Sync + 'static,
     {
-        let adapter = MediaSourceAdapter { inner: reader };
+        let len = probe_stream_len(&mut reader);
+        let adapter = MediaSourceAdapter { inner: reader, len };
         let mss = MediaSourceStream::new(Box::new(adapter), Default::default());
 
         let mut hint = Hint::new();
@@ -365,6 +380,59 @@ impl Source for OpusWebmSource {
 mod tests {
     use super::*;
     use opus::{Application, Encoder};
+
+    struct EndSeekUnsupported {
+        inner: std::io::Cursor<Vec<u8>>,
+    }
+
+    impl std::io::Read for EndSeekUnsupported {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            self.inner.read(buf)
+        }
+    }
+
+    impl std::io::Seek for EndSeekUnsupported {
+        fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+            if matches!(pos, std::io::SeekFrom::End(_)) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "cannot seek from end",
+                ));
+            }
+            self.inner.seek(pos)
+        }
+    }
+
+    #[test]
+    fn probe_stream_len_reports_length_and_restores_position() {
+        let mut cursor = std::io::Cursor::new(vec![0u8; 12]);
+        cursor.set_position(3);
+
+        assert_eq!(probe_stream_len(&mut cursor), Some(12));
+        assert_eq!(cursor.position(), 3);
+    }
+
+    #[test]
+    fn probe_stream_len_is_none_when_end_seek_is_unsupported() {
+        let mut reader = EndSeekUnsupported { inner: std::io::Cursor::new(vec![0u8; 12]) };
+        reader.inner.set_position(5);
+
+        assert_eq!(probe_stream_len(&mut reader), None);
+        assert_eq!(reader.inner.position(), 5);
+    }
+
+    #[test]
+    fn media_source_adapter_claims_seekable_only_with_known_length() {
+        let seekable =
+            MediaSourceAdapter { inner: std::io::Cursor::new(vec![0u8; 8]), len: Some(8) };
+        assert!(seekable.is_seekable());
+        assert_eq!(seekable.byte_len(), Some(8));
+
+        let streaming =
+            MediaSourceAdapter { inner: std::io::Cursor::new(Vec::<u8>::new()), len: None };
+        assert!(!streaming.is_seekable());
+        assert_eq!(streaming.byte_len(), None);
+    }
 
     #[test]
     fn is_opus_webm_detects_mime_and_url_patterns() {
