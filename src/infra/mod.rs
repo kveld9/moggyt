@@ -29,6 +29,7 @@ pub mod catalog_parse_radio;
 pub mod catalog_parse_search;
 pub mod catalog_requests;
 mod catalog_stub;
+pub mod clipboard;
 mod cover;
 mod cover_art;
 mod cover_disk;
@@ -108,6 +109,7 @@ pub use catalog_requests::{
     LIBRARY_PLAYLISTS_BROWSE_ID,
 };
 pub use catalog_stub::CatalogStub;
+pub use clipboard::{Clipboard, MemoryClipboard, SystemClipboard, copy_text};
 pub use cover::{CAPACITY, CoverCache, MemoryCoverCache};
 pub use cover_art::{COVER_HIRES_MAX_PX, COVER_MAX_PX, decode_cover, fetch_artwork};
 pub use cover_disk::{DiskCoverCache, cache_file_name, fnv1a_hex};

@@ -365,6 +365,8 @@ the pointer:
 - **Add to queue**: appends the track to the end of the queue.
 - **Like**: adds the track to your local favorites and switches the entry to `Unlike` while the
   track is already liked. Favorites are stored in `settings.json` and survive restarts.
+- **Copy link**: copies the track's YouTube Music URL (`https://music.youtube.com/watch?v=<id>`) to
+  the system clipboard.
 - The menu closes when an entry is chosen or when you press anywhere outside the popup. Albums,
   artists, and playlists in the `Search` results do not open a context menu; left-click them to
   open their detail page.
