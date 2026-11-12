@@ -376,9 +376,10 @@ the pointer:
 - Switching to another application leaves the popup open. It closes on the first click after you
   return, or with `Esc`.
 
-Context actions confirm their result with a transient toast above the player bar: link copied, copy
-failure, added to the queue, playing next, and favorite added or removed. Toasts stack up to three and
-disappear on their own after about two seconds.
+Context actions confirm their result with a transient toast in the bottom-right corner, above the
+player bar: link copied, copy failure, added to the queue, playing next, and favorite added or
+removed. Each toast hugs its message, stacks up to three, and disappears after three seconds while a
+thin accent line along its bottom edge shrinks to zero.
 
 ## Keyboard Shortcuts
 
