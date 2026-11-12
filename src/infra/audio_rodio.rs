@@ -11,6 +11,7 @@ use rodio::{Decoder, OutputStream, Sink, Source};
 use super::audio::{AudioBackend, AudioError, clamp_speed};
 use super::audio_dsp::{SkipSilence, append_normalized, normalization_stage};
 use super::audio_fade::{spawn_fade_in, spawn_fade_out};
+use super::audio_resample::ResamplingSource;
 use super::audio_stream_cache_worker::cache_download_worker;
 use super::opus_source::{OpusWebmSource, is_opus_webm, sniff_webm_header};
 use super::stream::{AudioQuality, ResolvedStream};
@@ -120,6 +121,10 @@ impl RodioBackend {
         self.stream_cache.as_ref()
     }
 
+    fn output_sample_rate(&self) -> u32 {
+        self._stream.config().sample_rate()
+    }
+
     fn append_dsp_to_sink(
         &self,
         sink: &Sink,
@@ -156,23 +161,29 @@ impl RodioBackend {
         self.track_duration = total_duration;
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn decode_source(
         &self,
         url: &str,
         track_id: &str,
         prefix: Option<Vec<u8>>,
         mime_type: Option<&str>,
+        target_rate: u32,
     ) -> anyhow::Result<Box<dyn Source<Item = f32> + Send>> {
         let stream = open_audio_stream_with_prefix(url, prefix)
             .map_err(|err| log_open_stream_error(track_id, err))?;
         if is_opus_webm(mime_type, url) {
             let source = OpusWebmSource::new(stream)
                 .map_err(|err| log_decode_stream_error(track_id, err))?;
-            Ok(Box::new(source))
+            let resampled = ResamplingSource::new(source, target_rate)
+                .map_err(|err| log_decode_stream_error(track_id, err))?;
+            Ok(Box::new(resampled))
         } else {
             let decoder = Decoder::new(stream)
                 .map_err(|err| log_decode_stream_error(track_id, err.into()))?;
-            Ok(Box::new(decoder))
+            let resampled = ResamplingSource::new(decoder, target_rate)
+                .map_err(|err| log_decode_stream_error(track_id, err))?;
+            Ok(Box::new(resampled))
         }
     }
 
@@ -211,8 +222,13 @@ impl RodioBackend {
 
     fn play_resolved(&mut self, track_id: &str, stream: &ResolvedStream) -> anyhow::Result<()> {
         let prefix = self.resolver.take_prefetched(&stream.url);
-        let source =
-            self.decode_source(&stream.url, track_id, prefix, stream.mime_type.as_deref())?;
+        let source = self.decode_source(
+            &stream.url,
+            track_id,
+            prefix,
+            stream.mime_type.as_deref(),
+            self.output_sample_rate(),
+        )?;
         self.apply_playback_source(track_id, source, stream.loudness_db);
         self.maybe_spawn_cache_download(track_id, &stream.url);
         Ok(())
@@ -225,8 +241,13 @@ impl RodioBackend {
         duration: Duration,
     ) -> anyhow::Result<()> {
         let prefix = self.resolver.take_prefetched(&stream.url);
-        let source =
-            self.decode_source(&stream.url, track_id, prefix, stream.mime_type.as_deref())?;
+        let source = self.decode_source(
+            &stream.url,
+            track_id,
+            prefix,
+            stream.mime_type.as_deref(),
+            self.output_sample_rate(),
+        )?;
         self.apply_crossfade_source(track_id, source, duration, stream.loudness_db);
         self.maybe_spawn_cache_download(track_id, &stream.url);
         Ok(())
@@ -268,6 +289,7 @@ impl RodioBackend {
     fn decode_cached_file(
         path: &std::path::Path,
         track_id: &str,
+        target_rate: u32,
     ) -> anyhow::Result<Box<dyn Source<Item = f32> + Send>> {
         let file = std::fs::File::open(path)
             .with_context(|| format!("failed to open cached stream at '{}'", path.display()))?;
@@ -277,17 +299,21 @@ impl RodioBackend {
         if is_webm {
             let source = OpusWebmSource::new(reader)
                 .map_err(|err| log_decode_stream_error(track_id, err))?;
-            Ok(Box::new(source))
+            let resampled = ResamplingSource::new(source, target_rate)
+                .map_err(|err| log_decode_stream_error(track_id, err))?;
+            Ok(Box::new(resampled))
         } else {
             let decoder = Decoder::new(reader)
                 .map_err(|err| log_decode_stream_error(track_id, err.into()))?;
-            Ok(Box::new(decoder))
+            let resampled = ResamplingSource::new(decoder, target_rate)
+                .map_err(|err| log_decode_stream_error(track_id, err))?;
+            Ok(Box::new(resampled))
         }
     }
 
     fn cached_source(&self, track_id: &str) -> Option<Box<dyn Source<Item = f32> + Send>> {
         let path = self.stream_cache.as_ref()?.get(track_id)?;
-        Self::decode_cached_file(&path, track_id).ok()
+        Self::decode_cached_file(&path, track_id, self.output_sample_rate()).ok()
     }
 
     fn try_play_cached(&mut self, track_id: &str) -> bool {

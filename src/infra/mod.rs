@@ -10,6 +10,7 @@ mod audio_device;
 mod audio_dsp;
 mod audio_fade;
 mod audio_live;
+pub mod audio_resample;
 mod audio_rodio;
 mod audio_stream_cache_worker;
 mod browser;
@@ -96,6 +97,7 @@ pub use audio_dsp::{
     is_silent_sample, linear_to_db, normalization_stage, replaygain_linear, rms_to_db,
 };
 pub use audio_live::LiveAudio;
+pub use audio_resample::ResamplingSource;
 pub use audio_rodio::{RodioBackend, volume_to_amplitude};
 pub use browser::{open_url, opener_command};
 pub use catalog::{Catalog, CatalogError};
