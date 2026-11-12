@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink, Source};
@@ -27,6 +27,11 @@ use super::stream_reqwest::open_audio_stream_with_prefix;
 pub fn volume_to_amplitude(volume: u8) -> f32 {
     let normalized = volume.min(100) as f32 / 100.0;
     normalized * normalized * normalized
+}
+
+/// Clamps a playback position to the known track duration.
+fn clamp_playback_position(pos: Duration, duration: Option<Duration>) -> Duration {
+    duration.map_or(pos, |duration| pos.min(duration))
 }
 
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
@@ -58,8 +63,6 @@ pub struct RodioBackend {
     track_duration: Option<Duration>,
     volume: u8,
     speed: f32,
-    anchor: Option<Instant>,
-    paused_accum: Duration,
     skip_silence: bool,
     loudness_normalization: bool,
     fade_generation: Arc<AtomicU64>,
@@ -94,8 +97,6 @@ impl RodioBackend {
             track_duration: None,
             volume: 100,
             speed: 1.0,
-            anchor: None,
-            paused_accum: Duration::ZERO,
             skip_silence: false,
             loudness_normalization: false,
             fade_generation: Arc::new(AtomicU64::new(0)),
@@ -154,8 +155,6 @@ impl RodioBackend {
         self.append_dsp_to_sink(&new_sink_arc, source, loudness_db);
         new_sink_arc.play();
 
-        self.anchor = Some(Instant::now());
-        self.paused_accum = Duration::ZERO;
         self.last_requested = Some(track_id.to_owned());
         self.track_duration = total_duration;
     }
@@ -204,8 +203,6 @@ impl RodioBackend {
             generation_id,
         );
 
-        self.anchor = Some(Instant::now());
-        self.paused_accum = Duration::ZERO;
         self.last_requested = Some(track_id.to_owned());
         self.track_duration = total_duration;
     }
@@ -252,30 +249,6 @@ impl RodioBackend {
         duration: Duration,
     ) -> anyhow::Result<()> {
         self.play_resolved_crossfade(track_id, &ResolvedStream::from_url(url), duration)
-    }
-
-    fn freeze_anchor(&mut self) {
-        if let Some(anchor) = self.anchor.take() {
-            self.paused_accum = self.paused_accum.saturating_add(anchor.elapsed());
-        }
-    }
-
-    fn reanchor(&mut self) {
-        if self.anchor.is_none() {
-            self.anchor = Some(Instant::now());
-        }
-    }
-
-    fn reanchor_seek(&mut self, target: Duration) {
-        if self.anchor.is_some() {
-            self.anchor = Some(Instant::now());
-        }
-        self.paused_accum = target;
-    }
-
-    fn current_position(&self) -> Duration {
-        let active = self.anchor.map_or(Duration::ZERO, |anchor| anchor.elapsed());
-        self.paused_accum.saturating_add(active)
     }
 
     /// Returns whether skip-silence processing is enabled.
@@ -401,20 +374,17 @@ impl AudioBackend for RodioBackend {
 
     fn pause(&mut self) {
         self.sink.pause();
-        self.freeze_anchor();
     }
 
     fn resume_play(&mut self) {
         if self.last_requested.is_some() {
             self.sink.play();
-            self.reanchor();
         }
     }
 
     fn seek(&mut self, position_secs: u64) {
         let target = Duration::from_secs(position_secs);
         let _ = self.sink.try_seek(target);
-        self.reanchor_seek(target);
     }
 
     fn set_volume(&mut self, volume: u8) {
@@ -437,8 +407,9 @@ impl AudioBackend for RodioBackend {
         self.speed
     }
 
+    /// Returns the audio sink's real playback position, clamped to the known duration.
     fn position_secs(&self) -> u64 {
-        self.current_position().as_secs()
+        clamp_playback_position(self.sink.get_pos(), self.track_duration).as_secs()
     }
 
     fn duration_secs(&self) -> u64 {
@@ -486,6 +457,7 @@ impl AudioBackend for RodioBackend {
 mod tests {
     use super::*;
     use crate::infra::YtDlpResolver;
+    use std::time::Instant;
 
     fn test_backend() -> Option<RodioBackend> {
         let mut backend = match RodioBackend::new("/definitely/missing/binary/yt-dlp") {
@@ -573,11 +545,12 @@ mod tests {
         backend.set_volume(150);
         assert_eq!(backend.volume(), 100);
 
+        // A seek with no loaded source must not fabricate a playback position.
         backend.seek(15);
-        assert_eq!(backend.position_secs(), 15);
+        assert_eq!(backend.position_secs(), 0);
 
         backend.pause();
-        assert_eq!(backend.position_secs(), 15);
+        assert_eq!(backend.position_secs(), 0);
         assert!(!backend.is_playing());
 
         backend.resume_play();
@@ -752,5 +725,13 @@ mod tests {
         backend.set_session_cookies(None);
         let prefetcher = backend.stream_prefetcher().expect("prefetcher available");
         assert_eq!(prefetcher.session_cookies(), None);
+    }
+
+    #[test]
+    fn clamp_playback_position_never_exceeds_duration() {
+        let secs = Duration::from_secs;
+        assert_eq!(clamp_playback_position(secs(5), Some(secs(3))), secs(3));
+        assert_eq!(clamp_playback_position(secs(2), Some(secs(3))), secs(2));
+        assert_eq!(clamp_playback_position(secs(300), None), secs(300));
     }
 }
