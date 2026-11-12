@@ -38,7 +38,22 @@ pub fn track_actions(track: &Track) -> Vec<ContextAction> {
 }
 
 /// Actions offered for container rows, in rendering order.
-pub const CONTAINER_ACTIONS: [ContextAction; 1] = [ContextAction::Open];
+pub fn container_actions(kind: DetailKind, artist: Option<&ArtistTarget>) -> Vec<ContextAction> {
+    let mut actions = vec![ContextAction::Open];
+    if kind == DetailKind::Album && artist.is_some() {
+        actions.push(ContextAction::GoToArtist);
+    }
+    actions
+}
+
+/// Artist a container menu entry navigates to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArtistTarget {
+    /// Artist page opened directly by its browse id.
+    Id(String),
+    /// Artist name resolved through a catalog search.
+    Name(String),
+}
 
 /// Subject addressed by an open context menu.
 #[derive(Debug, Clone, PartialEq)]
@@ -46,7 +61,7 @@ pub enum ContextSubject {
     /// A single playable track.
     Track(Track),
     /// A browsable album, artist, or playlist.
-    Container { id: String, kind: DetailKind },
+    Container { id: String, kind: DetailKind, artist: Option<ArtistTarget> },
 }
 
 impl ContextSubject {
@@ -54,7 +69,7 @@ impl ContextSubject {
     pub fn actions(&self) -> Vec<ContextAction> {
         match self {
             Self::Track(track) => track_actions(track),
-            Self::Container { .. } => CONTAINER_ACTIONS.to_vec(),
+            Self::Container { kind, artist, .. } => container_actions(*kind, artist.as_ref()),
         }
     }
 
@@ -204,23 +219,32 @@ fn library_subject(state: &SlintAppState, target: ContextTarget) -> Option<Conte
     match target.surface {
         ContextSurface::LibraryPlaylist => {
             let playlist = state.library_playlists.get(target.index)?;
-            Some(container_subject(&playlist.id, DetailKind::Playlist))
+            Some(container_subject(&playlist.id, DetailKind::Playlist, None))
         }
         ContextSurface::LibraryAlbum => {
             let album = state.library_albums.get(target.index)?;
-            Some(container_subject(&album.id, DetailKind::Album))
+            Some(container_subject(
+                &album.id,
+                DetailKind::Album,
+                album.artist_id.clone().map(ArtistTarget::Id),
+            ))
         }
         _ => None,
     }
 }
 
 fn detail_card_subject(state: &SlintAppState, index: usize) -> Option<ContextSubject> {
-    let page = state.detail.as_ref()?.artist.as_ref()?;
+    let detail = state.detail.as_ref()?;
+    let page = detail.artist.as_ref()?;
+    let artist_name = detail.title.trim();
+    let artist = (!artist_name.is_empty()).then(|| ArtistTarget::Name(artist_name.to_owned()));
     let mut flat = 0usize;
     for section in &page.sections {
         for card in &section.cards {
             if flat == index {
-                return Some(container_subject(&card.id, card_detail_kind(card.kind)));
+                let kind = card_detail_kind(card.kind);
+                let target = (kind == DetailKind::Album).then(|| artist.clone()).flatten();
+                return Some(container_subject(&card.id, kind, target));
             }
             flat += 1;
         }
@@ -235,17 +259,23 @@ fn card_detail_kind(kind: DetailCardKind) -> DetailKind {
     }
 }
 
-fn container_subject(id: &str, kind: DetailKind) -> ContextSubject {
-    ContextSubject::Container { id: id.to_owned(), kind }
+fn container_subject(id: &str, kind: DetailKind, artist: Option<ArtistTarget>) -> ContextSubject {
+    ContextSubject::Container { id: id.to_owned(), kind, artist }
 }
 
 fn subject_from_item(item: &SearchResult) -> Option<ContextSubject> {
     match item {
         SearchResult::Track(track) => Some(ContextSubject::Track(track.clone())),
-        SearchResult::Album(album) => Some(container_subject(&album.id, DetailKind::Album)),
-        SearchResult::Artist(artist) => Some(container_subject(&artist.id, DetailKind::Artist)),
+        SearchResult::Album(album) => Some(container_subject(
+            &album.id,
+            DetailKind::Album,
+            album.artist_id.clone().map(ArtistTarget::Id),
+        )),
+        SearchResult::Artist(artist) => {
+            Some(container_subject(&artist.id, DetailKind::Artist, None))
+        }
         SearchResult::Playlist(playlist) => {
-            Some(container_subject(&playlist.id, DetailKind::Playlist))
+            Some(container_subject(&playlist.id, DetailKind::Playlist, None))
         }
     }
 }
@@ -384,10 +414,30 @@ fn activate(
             );
             finish_track(window, state, target, action, track);
         }
-        ContextSubject::Container { id, kind } => {
-            if action == ContextAction::Open {
-                open_detail_async(window, state, &id, kind, worker_tx);
+        ContextSubject::Container { id, kind, artist } => match action {
+            ContextAction::Open => open_detail_async(window, state, &id, kind, worker_tx),
+            ContextAction::GoToArtist => {
+                if let Some(target) = artist {
+                    open_artist_target(window, state, target, worker_tx);
+                }
             }
+            _ => {}
+        },
+    }
+}
+
+fn open_artist_target(
+    window: &MoggytWindow,
+    state: &mut SlintAppState,
+    target: ArtistTarget,
+    worker_tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
+) {
+    match target {
+        ArtistTarget::Id(id) => {
+            open_detail_async(window, state, &id, DetailKind::Artist, worker_tx)
+        }
+        ArtistTarget::Name(name) => {
+            super::navigate::open_named_detail_async(window, state, &name, DetailKind::Artist);
         }
     }
 }

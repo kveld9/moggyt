@@ -1,8 +1,8 @@
 //! Explore feed response parser for charts, releases, and genre shelves.
 
 use super::catalog_parse_common::{
-    best_thumbnail, browse_of, classify_home_item, extract_two_row_duration, parse_two_row,
-    watch_video_id,
+    best_thumbnail, browse_of, classify_home_item, extract_two_row_duration, item_artist_id,
+    parse_two_row, watch_video_id,
 };
 use super::catalog_parse_detail::{build_detail_track, detail_artist, detail_title};
 use crate::domain::{Playlist, SearchResult, Shelf, Track};
@@ -58,14 +58,14 @@ fn parse_explore_responsive(renderer: &Value) -> Option<SearchResult> {
     let browse_id = browse_of(renderer)?;
     let artist = detail_artist(renderer);
     let thumb = best_thumbnail(renderer);
-    Some(classify_home_item(&browse_id, &title, &artist, thumb))
+    Some(classify_home_item(&browse_id, &title, &artist, thumb, item_artist_id(renderer)))
 }
 
 fn parse_explore_two_row(renderer: &Value) -> Option<SearchResult> {
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let thumb = best_thumbnail(renderer);
     if let Some(id) = browse_id {
-        return Some(classify_home_item(&id, &title, &subtitle, thumb));
+        return Some(classify_home_item(&id, &title, &subtitle, thumb, item_artist_id(renderer)));
     }
     let vid = watch_video_id(renderer)?;
     let mut track = Track::new(&vid, &title, &subtitle);
@@ -514,6 +514,51 @@ mod tests {
         assert_eq!(
             parse_explore_item(&no_params),
             Some(SearchResult::Playlist(Playlist::new("FEmusic_moods", "Chill", 0, None)))
+        );
+    }
+
+    #[test]
+    fn parse_explore_album_hit_keeps_artist_id() {
+        let payload = serde_json::json!({
+            "sectionListRenderer": { "contents": [{ "musicCarouselShelfRenderer": {
+                "header": { "musicCarouselShelfBasicHeaderRenderer": {
+                    "title": { "runs": [{ "text": "New releases" }] }
+                } },
+                "contents": [{ "musicTwoRowItemRenderer": {
+                    "title": { "runs": [{ "text": "Call Me" }] },
+                    "subtitle": { "runs": [
+                        { "text": "Single" },
+                        { "text": " • " },
+                        { "text": "Toosii", "navigationEndpoint": { "browseEndpoint": {
+                            "browseId": "UC_toosii",
+                            "browseEndpointContextSupportedConfigs": {
+                                "browseEndpointContextMusicConfig": {
+                                    "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                }
+                            }
+                        } } }
+                    ] },
+                    "navigationEndpoint": { "browseEndpoint": {
+                        "browseId": "MPREb_call_me",
+                        "browseEndpointContextSupportedConfigs": {
+                            "browseEndpointContextMusicConfig": {
+                                "pageType": "MUSIC_PAGE_TYPE_ALBUM"
+                            }
+                        }
+                    } }
+                } }]
+            } }] }
+        });
+
+        let shelves = parse_explore_all(&payload);
+        assert_eq!(shelves.len(), 1);
+        assert_eq!(shelves[0].title, "New releases");
+        assert_eq!(
+            shelves[0].items[0],
+            SearchResult::Album(
+                Album::new("MPREb_call_me", "Call Me", "Single", None)
+                    .with_artist_id(Some("UC_toosii".to_owned()))
+            )
         );
     }
 }

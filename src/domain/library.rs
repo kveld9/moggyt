@@ -12,15 +12,29 @@ pub struct Album {
     pub artist: String,
     #[serde(default)]
     pub artwork: Option<String>,
+    /// Browse id of the credited artist when the catalog item carries one.
+    #[serde(default)]
+    pub artist_id: Option<String>,
 }
 
 impl Album {
     pub fn new(id: &str, title: &str, artist: &str, artwork: Option<String>) -> Self {
-        Self { id: id.to_owned(), title: title.to_owned(), artist: artist.to_owned(), artwork }
+        Self {
+            id: id.to_owned(),
+            title: title.to_owned(),
+            artist: artist.to_owned(),
+            artwork,
+            artist_id: None,
+        }
     }
 
     pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {
         self.artwork = Some(artwork.into());
+        self
+    }
+
+    pub fn with_artist_id(mut self, artist_id: Option<String>) -> Self {
+        self.artist_id = artist_id;
         self
     }
 
@@ -352,6 +366,17 @@ mod tests {
         let playlist_de: Playlist =
             serde_json::from_str(&playlist_json).expect("deserialize playlist");
         assert_eq!(playlist, playlist_de);
+    }
+
+    #[test]
+    fn album_with_artist_id_roundtrips() {
+        let album = Album::new("a1", "Album", "Single", None);
+        assert_eq!(album.artist_id, None);
+        assert_eq!(album.display(), "Album - Single");
+
+        let tagged = album.with_artist_id(Some("UC_artist".to_owned()));
+        assert_eq!(tagged.artist_id.as_deref(), Some("UC_artist"));
+        assert_eq!(tagged.display(), "Album - Single");
     }
 
     #[test]
