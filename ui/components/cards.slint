@@ -86,6 +86,7 @@ export component DetailTile inherits Rectangle {
 
     width: 150px;
     height: root.circular ? 226px : 204px;
+    opacity: root.index < 0 ? 0 : 1;
     border-radius: 10px;
     background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent);
     animate background { duration: 150ms; easing: ease-in-out; }
