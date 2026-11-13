@@ -27,6 +27,7 @@ export component DetailView inherits VerticalLayout {
     in property <string> title: "";
     in property <string> subtitle: "";
     in property <string> description: "";
+    property <bool> description-expanded: false;
     in property <string> kind-label: "";
     in property <image> cover;
     in property <[TrackRowData]> tracks: [];
@@ -39,6 +40,7 @@ export component DetailView inherits VerticalLayout {
     callback shuffle();
     callback card-selected(int);
     callback show-all-songs();
+    changed description => { root.description-expanded = false; }
     spacing: 16px;
     alignment: start;
 
@@ -121,6 +123,37 @@ export component DetailView inherits VerticalLayout {
                     color: Theme.secondary;
                     font-size: 12px;
                     wrap: word-wrap;
+                    max-lines: (root.is-artist && !root.description-expanded) ? 3 : 0;
+                    overflow: elide;
+                }
+
+                if root.is-artist && root.description != "" : HorizontalLayout {
+                    alignment: start;
+
+                    Rectangle {
+                        height: 28px;
+                        border-radius: 14px;
+                        background: desc-more-touch.pressed ? Theme.overlay : (desc-more-touch.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        desc-more-touch := TouchArea {
+                            clicked => { root.description-expanded = !root.description-expanded; }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+
+                            Text {
+                                text: root.description-expanded ? Labels.show-less-label : Labels.show-more-label;
+                                color: desc-more-touch.has-hover ? Theme.accent : Theme.text;
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
                 }
 
                 Rectangle { height: 4px; }
