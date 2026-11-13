@@ -123,11 +123,11 @@ export component DetailView inherits VerticalLayout {
                     color: Theme.secondary;
                     font-size: 12px;
                     wrap: word-wrap;
-                    max-lines: (root.is-artist && !root.description-expanded) ? 3 : 0;
+                    max-lines: root.description-expanded ? 0 : 3;
                     overflow: elide;
                 }
 
-                if root.is-artist && root.description != "" : HorizontalLayout {
+                if root.description != "" : HorizontalLayout {
                     alignment: start;
 
                     Rectangle {

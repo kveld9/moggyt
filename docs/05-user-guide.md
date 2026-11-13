@@ -61,6 +61,9 @@ The search view accepts queries for tracks, artists, and albums, and maintains a
 The detail view displays full tracklistings for an album, artist, or playlist:
 
 - **Header**: displays container title and subtitle (such as artist, release year, or item count).
+  Playlist headers also show the creator, the track count, and the total playback duration
+  (`Creator • 64 tracks • 3 h 47 min`), plus the playlist description, collapsed to three lines
+  behind a `Show more` toggle.
 - **Track List**: lists all tracks in the collection with title, artist, and duration.
 - **Compact view**: the `Compact view` button in the header hides row cover thumbnails, adds track numbers,
   and tightens row height. The button then reads `Cover view` and restores the default layout. The choice is

@@ -26,6 +26,7 @@ pub mod catalog_parse_detail;
 pub mod catalog_parse_explore;
 pub mod catalog_parse_home;
 pub mod catalog_parse_library;
+pub mod catalog_parse_playlist;
 pub mod catalog_parse_radio;
 pub mod catalog_parse_search;
 pub mod catalog_requests;

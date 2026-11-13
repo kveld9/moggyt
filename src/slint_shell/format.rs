@@ -122,6 +122,31 @@ pub fn format_sleep_timer_status(
     }
 }
 
+/// Formats a container track count for the detail header ("64 tracks", "1 track").
+pub fn format_track_count(locale: Locale, count: u32) -> String {
+    let key = if count == 1 { "{count} track" } else { "{count} tracks" };
+    tr(locale, key).replace("{count}", &count.to_string())
+}
+
+/// Formats a container total duration in seconds ("3 h 47 min", "45 min").
+pub fn format_total_duration(locale: Locale, secs: u32) -> String {
+    if secs == 0 {
+        return String::new();
+    }
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    if hours == 0 {
+        let rounded = minutes.max(1);
+        return tr(locale, "{m} min").replace("{m}", &rounded.to_string());
+    }
+    if minutes == 0 {
+        return tr(locale, "{h} h").replace("{h}", &hours.to_string());
+    }
+    tr(locale, "{h} h {m} min")
+        .replace("{h}", &hours.to_string())
+        .replace("{m}", &minutes.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,5 +262,28 @@ mod tests {
         assert_eq!(audio_quality_from_index(-1), AudioQuality::Standard);
         assert_eq!(audio_quality_from_index(3), AudioQuality::Standard);
         assert_eq!(audio_quality_from_index(99), AudioQuality::Standard);
+    }
+
+    #[test]
+    fn format_track_count_english_and_spanish() {
+        assert_eq!(format_track_count(Locale::English, 64), "64 tracks");
+        assert_eq!(format_track_count(Locale::Spanish, 64), "64 pistas");
+        assert_eq!(format_track_count(Locale::English, 1), "1 track");
+        assert_eq!(format_track_count(Locale::Spanish, 1), "1 pista");
+    }
+
+    #[test]
+    fn format_total_duration_table() {
+        for (secs, en, es) in [
+            (0, "", ""),
+            (13620, "3 h 47 min", "3 h 47 min"),
+            (7140, "1 h 59 min", "1 h 59 min"),
+            (115200, "32 h", "32 h"),
+            (2700, "45 min", "45 min"),
+            (30, "1 min", "1 min"),
+        ] {
+            assert_eq!(format_total_duration(Locale::English, secs), en, "en {secs}");
+            assert_eq!(format_total_duration(Locale::Spanish, secs), es, "es {secs}");
+        }
     }
 }

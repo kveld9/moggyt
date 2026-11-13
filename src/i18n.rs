@@ -368,6 +368,11 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("White", "Blanco"),
     ("YouTube video ID", "ID de video de YouTube"),
     ("plays", "reproducciones"),
+    ("{count} track", "{count} pista"),
+    ("{count} tracks", "{count} pistas"),
+    ("{h} h", "{h} h"),
+    ("{h} h {m} min", "{h} h {m} min"),
+    ("{m} min", "{m} min"),
 ];
 
 fn translate_spanish(key: &str) -> &str {

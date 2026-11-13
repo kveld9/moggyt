@@ -2,6 +2,8 @@
 //! Hexagonal invariant: pure in-memory with zero I/O, network, audio, or async.
 
 use crate::domain::{Detail, DetailCard, DetailKind};
+use crate::i18n::Locale;
+use crate::slint_shell::format::{format_total_duration, format_track_count};
 
 pub fn detail_kind_label(kind: DetailKind) -> &'static str {
     match kind {
@@ -9,6 +11,22 @@ pub fn detail_kind_label(kind: DetailKind) -> &'static str {
         DetailKind::Artist => "Artist",
         DetailKind::Playlist => "Playlist",
     }
+}
+
+/// Builds the detail subtitle line: the base subtitle plus the playlist count and duration.
+pub fn detail_subtitle(detail: &Detail, locale: Locale) -> String {
+    let base = detail.subtitle.trim().to_owned();
+    let count = detail.track_count.map(|count| format_track_count(locale, count));
+    let duration = detail
+        .total_duration_secs
+        .map(|secs| format_total_duration(locale, secs))
+        .filter(|text| !text.is_empty());
+    [Some(base), count, duration]
+        .into_iter()
+        .flatten()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" \u{2022} ")
 }
 
 /// Checks whether the detail view has its own header artwork URL.
@@ -166,5 +184,31 @@ mod tests {
 
         let plain = Detail::new(DetailKind::Album, "Album", "", Vec::new());
         assert!(detail_card_at(&plain, 0).is_none());
+    }
+
+    #[test]
+    fn detail_subtitle_composes_playlist_meta() {
+        let playlist = Detail::new(DetailKind::Playlist, "Title", "Creator", Vec::new())
+            .with_track_count(64)
+            .with_total_duration_secs(13620);
+        assert_eq!(
+            detail_subtitle(&playlist, Locale::English),
+            "Creator \u{2022} 64 tracks \u{2022} 3 h 47 min"
+        );
+        assert_eq!(
+            detail_subtitle(&playlist, Locale::Spanish),
+            "Creator \u{2022} 64 pistas \u{2022} 3 h 47 min"
+        );
+
+        let album = Detail::new(DetailKind::Album, "Album", "Artist", Vec::new());
+        assert_eq!(detail_subtitle(&album, Locale::English), "Artist");
+
+        let counted =
+            Detail::new(DetailKind::Playlist, "Title", "", Vec::new()).with_track_count(12);
+        assert_eq!(detail_subtitle(&counted, Locale::English), "12 tracks");
+        assert_eq!(detail_subtitle(&counted, Locale::Spanish), "12 pistas");
+
+        let bare = Detail::new(DetailKind::Playlist, "Title", "", Vec::new());
+        assert_eq!(detail_subtitle(&bare, Locale::English), "");
     }
 }
