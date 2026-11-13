@@ -100,7 +100,7 @@ pub fn audio_quality_from_index(i: i32) -> AudioQuality {
     }
 }
 
-/// Formats the sleep timer status line for display in UI settings.
+/// Formats the sleep timer status line for display in the player bar timer menu.
 pub fn format_sleep_timer_status(
     locale: Locale,
     preset: TimerPreset,

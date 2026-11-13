@@ -5,15 +5,12 @@ import { SettingsModeButton, SettingsToggleRow } from "../settings_rows.slint";
 
 export component PlaybackSettings inherits VerticalLayout {
     in property <string> playback-speed-text: "1.00x";
-    in property <string> sleep-timer-status-text: "Timer: Off";
-    in property <int> active-sleep-timer-index: 0;
     in property <int> active-audio-quality-index: 1;
     in property <int> crossfade-seconds: 0;
     in property <int> stream-cache-limit-mb: 512;
     in property <bool> songs-only: false;
 
     callback cycle-playback-speed();
-    callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
@@ -113,74 +110,6 @@ export component PlaybackSettings inherits VerticalLayout {
                         label: Labels.audio-quality-high-label;
                         is-active: root.active-audio-quality-index == 2;
                         clicked => { root.audio-quality-selected(2); }
-                    }
-                }
-            }
-
-            Rectangle {
-                height: 1px;
-                background: Theme.border;
-            }
-
-            VerticalLayout {
-                spacing: 12px;
-
-                HorizontalLayout {
-                    alignment: space-between;
-
-                    Text {
-                        text: Labels.sleep-timer-label;
-                        color: Theme.text;
-                        font-size: 14px;
-                        vertical-alignment: center;
-                    }
-
-                    Text {
-                        text: root.sleep-timer-status-text;
-                        color: root.active-sleep-timer-index != 0 ? Theme.accent : Theme.secondary;
-                        font-size: 13px;
-                        font-weight: 600;
-                        vertical-alignment: center;
-                    }
-                }
-
-                HorizontalLayout {
-                    spacing: 8px;
-
-                    SettingsModeButton {
-                        label: Labels.sleep-timer-off-label;
-                        is-active: root.active-sleep-timer-index == 0;
-                        clicked => { root.sleep-timer-preset-selected(0); }
-                    }
-
-                    SettingsModeButton {
-                        label: Labels.sleep-timer-15m-label;
-                        is-active: root.active-sleep-timer-index == 1;
-                        clicked => { root.sleep-timer-preset-selected(1); }
-                    }
-
-                    SettingsModeButton {
-                        label: Labels.sleep-timer-30m-label;
-                        is-active: root.active-sleep-timer-index == 2;
-                        clicked => { root.sleep-timer-preset-selected(2); }
-                    }
-
-                    SettingsModeButton {
-                        label: Labels.sleep-timer-45m-label;
-                        is-active: root.active-sleep-timer-index == 3;
-                        clicked => { root.sleep-timer-preset-selected(3); }
-                    }
-
-                    SettingsModeButton {
-                        label: Labels.sleep-timer-60m-label;
-                        is-active: root.active-sleep-timer-index == 4;
-                        clicked => { root.sleep-timer-preset-selected(4); }
-                    }
-
-                    SettingsModeButton {
-                        label: Labels.sleep-timer-end-of-track-label;
-                        is-active: root.active-sleep-timer-index == 5;
-                        clicked => { root.sleep-timer-preset-selected(5); }
                     }
                 }
             }

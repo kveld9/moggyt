@@ -19,7 +19,7 @@ use crate::slint_shell::sync::{
 use crate::slint_shell::theme::{apply_palette, theme_from_index};
 use crate::slint_shell::toast::notify;
 use crate::slint_shell::window::refresh_library_async;
-use crate::slint_shell::{ContextIcon, MoggytWindow};
+use crate::slint_shell::{ContextIcon, MoggytWindow, SleepTimerUi};
 
 /// Wires settings, account authentication, player bar preferences, and resize callbacks.
 pub(crate) fn wire_settings_callbacks(
@@ -137,11 +137,19 @@ pub(crate) fn wire_settings_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_sleep_timer_preset_selected(move |idx| {
+    window.global::<SleepTimerUi>().on_preset_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         handle_sleep_timer_selection(&mut st, idx);
         sync_sleep_timer(&win, &st);
+        win.global::<SleepTimerUi>().set_is_open(false);
+    });
+
+    let w = window.as_weak();
+    window.global::<SleepTimerUi>().on_dismissed(move || {
+        if let Some(win) = w.upgrade() {
+            win.global::<SleepTimerUi>().set_is_open(false);
+        }
     });
 
     let s = Rc::clone(state_rc);

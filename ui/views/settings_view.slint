@@ -18,8 +18,6 @@ export component SettingsView inherits VerticalLayout {
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Up to date";
     in property <bool> has-update: false;
-    in property <string> sleep-timer-status-text: "Timer: Off";
-    in property <int> active-sleep-timer-index: 0;
     in property <int> active-audio-quality-index: 1;
     in property <int> crossfade-seconds: 0;
     in property <int> stream-cache-limit-mb: 512;
@@ -32,13 +30,13 @@ export component SettingsView inherits VerticalLayout {
     in property <bool> player-bar-show-skip-seconds: false;
     in property <bool> player-bar-show-queue: true;
     in property <bool> player-bar-show-volume: true;
+    in property <bool> player-bar-show-timer: true;
 
     callback theme-selected(int);
     callback custom-theme-selected(string);
     callback accent-picked(color);
     callback accent-reset();
     callback cycle-playback-speed();
-    callback sleep-timer-preset-selected(int);
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
@@ -67,14 +65,11 @@ export component SettingsView inherits VerticalLayout {
 
     playback-panel := PlaybackSettings {
         playback-speed-text: root.playback-speed-text;
-        sleep-timer-status-text: root.sleep-timer-status-text;
-        active-sleep-timer-index: root.active-sleep-timer-index;
         active-audio-quality-index: root.active-audio-quality-index;
         crossfade-seconds: root.crossfade-seconds;
         stream-cache-limit-mb: root.stream-cache-limit-mb;
         songs-only: root.songs-only;
         cycle-playback-speed => { root.cycle-playback-speed(); }
-        sleep-timer-preset-selected(idx) => { root.sleep-timer-preset-selected(idx); }
         audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
         crossfade-changed(secs) => { root.crossfade-changed(secs); }
         stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
@@ -99,6 +94,7 @@ export component SettingsView inherits VerticalLayout {
         player-bar-show-skip-seconds: root.player-bar-show-skip-seconds;
         player-bar-show-queue: root.player-bar-show-queue;
         player-bar-show-volume: root.player-bar-show-volume;
+        player-bar-show-timer: root.player-bar-show-timer;
         player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
         player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
     }
