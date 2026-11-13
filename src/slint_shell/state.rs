@@ -216,7 +216,14 @@ impl SlintAppState {
     }
 
     /// Stores the current playback phase; this is the only assignment site.
+    ///
+    /// Emits one INFO event per real change so playback problems can be diagnosed from the
+    /// application log, and ignores repeated writes of the current phase.
     pub(crate) fn set_playback_phase(&mut self, phase: PlaybackPhase) {
+        if self.playback_phase == phase {
+            return;
+        }
+        tracing::info!(from = ?self.playback_phase, to = ?phase, "playback phase changed");
         self.playback_phase = phase;
     }
 
