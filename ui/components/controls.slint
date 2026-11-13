@@ -12,6 +12,9 @@ export component ThemedSlider inherits Rectangle {
     min-height: 20px;
     vertical-stretch: 0;
     horizontal-stretch: 1;
+    // A disabled slider keeps showing its position but reads as inert.
+    opacity: root.enabled ? 1.0 : 0.4;
+    animate opacity { duration: 150ms; easing: ease-in-out; }
 
     property <float> clamped-val: max(root.minimum, min(root.maximum, root.value));
     property <float> range: max(1, root.maximum - root.minimum);
