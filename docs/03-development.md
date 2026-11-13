@@ -158,9 +158,14 @@ is open; both routes below work in that situation.
   the pairing, so a column count derived from the window width looks correct in every check that
   only resizes the window.
 - Pixel changes: render the real component offscreen with `slint-viewer --screenshot` from a
-  temporary scene under `ui/` that imports the component by relative path. Set the `Theme` colors
-  explicitly (the globals have no defaults) and use `--backend software`. Delete the scene after
-  reading the image; it is scaffolding and is never committed.
+  temporary scene placed inside a copy of the `ui/` tree, importing the component by relative
+  path so every local import resolves. Set the `Theme` colors inside the scene's `init => { ... }`
+  block: the globals have no defaults, and assigning `Theme.<color>` at component level does not
+  parse. Then render with `--backend software`. A card label, for example, mounts
+  `HorizontalLayout { MediaCard { title: "Musicales y bandas sonoras"; has-cover: false; } }` and
+  renders with `slint-viewer --backend software --screenshot /tmp/card.png --size 360x240
+  probe.slint`. Delete the scene after reading the image; it is scaffolding and is never
+  committed.
 - Antialiasing-sensitive pixels (glyphs, icons, borders) must be read in the renderer the app
   ships, not the software rasterizer: `--screenshot` renders with the software backend, which
   hides seams that femtovg produces. A fill plus a stroke of the same closed path leaves a
