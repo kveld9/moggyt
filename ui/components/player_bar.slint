@@ -3,6 +3,7 @@ import { Labels } from "../labels.slint";
 import { ThemedSlider } from "./controls.slint";
 import { PlayerCenterControls } from "./player_controls.slint";
 import { IconHeart, IconQueue, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
+import { ContextSurface, ContextUi } from "./context_menu.slint";
 
 export component PlayerBar inherits Rectangle {
     in property <int> mode: 0;
@@ -71,6 +72,19 @@ export component PlayerBar inherits Rectangle {
                     background: Theme.surface;
                     clip: true;
 
+                    cover-touch := TouchArea {
+                        pointer-event(event) => {
+                            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                                ContextUi.opened(
+                                    ContextSurface.player-bar,
+                                    0,
+                                    self.absolute-position.x + self.mouse-x,
+                                    self.absolute-position.y + self.mouse-y,
+                                );
+                            }
+                        }
+                    }
+
                     Image {
                         width: parent.width;
                         height: parent.height;
@@ -91,19 +105,67 @@ export component PlayerBar inherits Rectangle {
                     alignment: center;
                     spacing: 2px;
 
-                    Text {
-                        text: root.active-track-title;
-                        color: Theme.text;
-                        font-size: 13px;
-                        font-weight: 700;
-                        overflow: elide;
+                    // The title line is its own right-click target. Its height follows the
+                    // intrinsic text height, so no font metric is duplicated here.
+                    Rectangle {
+                        height: title-text.preferred-height;
+                        horizontal-stretch: 1;
+
+                        title-text := Text {
+                            width: parent.width;
+                            height: parent.height;
+                            text: root.active-track-title;
+                            color: Theme.text;
+                            font-size: 13px;
+                            font-weight: 700;
+                            overflow: elide;
+                            vertical-alignment: center;
+                        }
+
+                        title-touch := TouchArea {
+                            pointer-event(event) => {
+                                if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                                    ContextUi.opened(
+                                        ContextSurface.player-bar,
+                                        0,
+                                        self.absolute-position.x + self.mouse-x,
+                                        self.absolute-position.y + self.mouse-y,
+                                    );
+                                }
+                            }
+                        }
                     }
 
-                    if root.active-track-artist != "" : Text {
-                        text: root.active-track-artist;
-                        color: Theme.secondary;
-                        font-size: 11px;
-                        overflow: elide;
+                    // The artist line opens the artist page on left click and carries the same
+                    // right-click target as the artwork and the title.
+                    if root.active-track-artist != "" : Rectangle {
+                        height: artist-text.preferred-height;
+                        horizontal-stretch: 1;
+
+                        artist-text := Text {
+                            width: parent.width;
+                            height: parent.height;
+                            text: root.active-track-artist;
+                            color: artist-touch.has-hover ? Theme.accent : Theme.secondary;
+                            font-size: 11px;
+                            overflow: elide;
+                            vertical-alignment: center;
+                        }
+
+                        artist-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { PlayerUi.open-artist(); }
+                            pointer-event(event) => {
+                                if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                                    ContextUi.opened(
+                                        ContextSurface.player-bar,
+                                        0,
+                                        self.absolute-position.x + self.mouse-x,
+                                        self.absolute-position.y + self.mouse-y,
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
 

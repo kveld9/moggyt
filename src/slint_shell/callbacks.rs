@@ -433,6 +433,15 @@ fn wire_playback_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    window.global::<PlayerUi>().on_open_artist(move || {
+        with_window_state(&w, &s, |win, st| {
+            let Some(artist) = super::navigate::current_artist_query(st) else { return };
+            super::navigate::open_named_detail_async(win, st, &artist, DetailKind::Artist);
+        });
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
     window.global::<PlayerUi>().on_toggle_shuffle(move || {
         with_window_state(&w, &s, |win, st| {
             st.toggle_shuffle();
