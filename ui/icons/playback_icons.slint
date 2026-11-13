@@ -208,3 +208,20 @@ export component IconTimer inherits Rectangle {
         commands: "M 12 3.5 A 8.5 8.5 0 1 0 12 20.5 A 8.5 8.5 0 1 0 12 3.5 M 12 7.5 L 12 12.5 L 15.5 14.5";
     }
 }
+
+export component IconSpeed inherits Rectangle {
+    in property <color> tint: Theme.text;
+    in property <length> size: 20px;
+    width: root.size;
+    height: root.size;
+
+    Path {
+        width: root.size;
+        height: root.size;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: 1.8px;
+        fill: transparent;
+        commands: "M 4.5 17.5 A 8.5 8.5 0 1 1 19.5 17.5 M 12 17 L 15.5 11.5";
+    }
+}

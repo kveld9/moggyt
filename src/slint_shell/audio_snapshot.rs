@@ -3,12 +3,14 @@
 //! Hexagonal invariant: avoids UI flicker by caching the last successfully observed
 //! backend state instead of fabricating literal values when the backend lock is held.
 
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::infra::AudioQuality;
-use crate::slint_shell::format::{audio_quality_to_index, format_playback_speed};
+use crate::slint_shell::format::{
+    audio_quality_to_index, playback_speed_preset_labels, speed_to_index,
+};
 use crate::slint_shell::state::{SharedAudio, SlintAppState};
-use crate::slint_shell::{MoggytWindow, PlayerUi};
+use crate::slint_shell::{MoggytWindow, PlaybackSpeedUi, PlayerUi};
 
 /// Last successfully observed audio backend state.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -52,7 +54,13 @@ pub(crate) fn sync_audio_snapshot(window: &MoggytWindow, state: &mut SlintAppSta
     let player = window.global::<PlayerUi>();
     player.set_is_playing(snapshot.is_playing);
     player.set_volume(i32::from(snapshot.volume));
-    window.set_playback_speed_text(format_playback_speed(snapshot.speed).into());
+    let speed_ui = window.global::<PlaybackSpeedUi>();
+    if speed_ui.get_items().row_count() == 0 {
+        let items: Vec<SharedString> =
+            playback_speed_preset_labels().into_iter().map(SharedString::from).collect();
+        speed_ui.set_items(ModelRc::new(VecModel::from(items)));
+    }
+    speed_ui.set_active_index(speed_to_index(snapshot.speed));
     window.set_active_audio_quality_index(audio_quality_to_index(snapshot.quality));
 }
 

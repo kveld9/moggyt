@@ -12,9 +12,7 @@ use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::explore::{
     explore_item_at, load_category_async, load_explore_async, refresh_explore_covers_if_loaded,
 };
-use crate::slint_shell::format::{
-    audio_quality_from_index, audio_quality_to_index, format_playback_speed,
-};
+use crate::slint_shell::format::{audio_quality_from_index, audio_quality_to_index};
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
     cycle_repeat_mode, progress_fraction, push_time_labels, repeat_mode_to_int,
@@ -458,12 +456,6 @@ fn wire_playback_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.on_cycle_playback_speed(move || {
-        with_window_state(&w, &s, handle_cycle_playback_speed);
-    });
-
-    let s = Rc::clone(state_rc);
-    let w = window.as_weak();
     window.on_audio_quality_selected(move |idx| {
         with_window_state(&w, &s, |win, st| handle_audio_quality_selected(win, st, idx));
     });
@@ -544,11 +536,6 @@ fn handle_cycle_repeat(win: &MoggytWindow, st: &mut SlintAppState) {
     let next = cycle_repeat_mode(st.queue.repeat());
     st.queue.set_repeat(next);
     win.global::<PlayerUi>().set_repeat_mode(repeat_mode_to_int(next));
-}
-
-fn handle_cycle_playback_speed(win: &MoggytWindow, st: &mut SlintAppState) {
-    let speed = st.cycle_playback_speed();
-    win.set_playback_speed_text(format_playback_speed(speed).into());
 }
 
 fn handle_audio_quality_selected(win: &MoggytWindow, st: &mut SlintAppState, idx: i32) {

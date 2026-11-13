@@ -12,6 +12,7 @@ export component PlayerBarSettings inherits VerticalLayout {
     in property <bool> player-bar-show-queue: true;
     in property <bool> player-bar-show-volume: true;
     in property <bool> player-bar-show-timer: true;
+    in property <bool> player-bar-show-speed: true;
 
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
@@ -95,6 +96,12 @@ export component PlayerBarSettings inherits VerticalLayout {
                 label: Labels.sleep-timer-label;
                 checked: root.player-bar-show-timer;
                 toggled => { root.player-bar-option-toggled(7); }
+            }
+
+            SettingsToggleRow {
+                label: Labels.playback-speed-label;
+                checked: root.player-bar-show-speed;
+                toggled => { root.player-bar-option-toggled(8); }
             }
         }
     }

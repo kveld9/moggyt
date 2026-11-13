@@ -34,6 +34,23 @@ pub fn format_playback_speed(speed: f32) -> String {
     format!("{:.2}x", speed)
 }
 
+/// Builds the playback speed menu labels, e.g. "0.50x".
+pub fn playback_speed_preset_labels() -> Vec<String> {
+    PLAYBACK_SPEED_PRESETS.iter().map(|speed| format_playback_speed(*speed)).collect()
+}
+
+/// Index of the preset closest to `speed`, for menu highlighting.
+pub fn speed_to_index(speed: f32) -> i32 {
+    let mut best = (0usize, f32::MAX);
+    for (index, preset) in PLAYBACK_SPEED_PRESETS.iter().enumerate() {
+        let delta = (speed - preset).abs();
+        if delta < best.1 {
+            best = (index, delta);
+        }
+    }
+    best.0 as i32
+}
+
 /// Formats update status string for the About settings section.
 pub fn format_update_status(
     locale: Locale,
@@ -168,6 +185,18 @@ mod tests {
         assert_eq!(format_playback_speed(0.75), "0.75x");
         assert_eq!(format_playback_speed(1.25), "1.25x");
         assert_eq!(format_playback_speed(2.0), "2.00x");
+    }
+
+    #[test]
+    fn test_playback_speed_preset_labels_and_speed_to_index() {
+        assert_eq!(
+            playback_speed_preset_labels(),
+            vec!["0.50x", "0.75x", "1.00x", "1.25x", "1.50x", "2.00x"]
+        );
+        assert_eq!(speed_to_index(1.0), 2);
+        assert_eq!(speed_to_index(0.5), 0);
+        assert_eq!(speed_to_index(2.0), 5);
+        assert_eq!(speed_to_index(1.3), 3);
     }
 
     #[test]

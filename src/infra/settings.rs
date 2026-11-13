@@ -147,6 +147,9 @@ pub struct Settings {
     /// Whether the sleep timer button is shown in the player bar.
     #[serde(default = "default_true")]
     pub player_bar_show_timer: bool,
+    /// Whether the playback speed button is shown in the player bar.
+    #[serde(default = "default_true")]
+    pub player_bar_show_speed: bool,
     /// Locally liked track identifiers, persisted across restarts.
     #[serde(default)]
     pub liked_ids: Vec<String>,
@@ -191,6 +194,7 @@ impl Default for Settings {
             player_bar_show_queue: true,
             player_bar_show_volume: true,
             player_bar_show_timer: true,
+            player_bar_show_speed: true,
             liked_ids: Vec::new(),
             recent_searches: RecentSearches::default(),
         }

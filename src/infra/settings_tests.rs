@@ -168,6 +168,7 @@ mod tests {
             player_bar_show_queue: false,
             player_bar_show_volume: false,
             player_bar_show_timer: false,
+            player_bar_show_speed: false,
             ..Settings::default()
         };
 
@@ -259,13 +260,14 @@ mod tests {
         assert!(!empty.player_bar_show_skip_seconds && empty.player_bar_show_queue);
         assert!(empty.player_bar_show_volume);
         assert!(empty.player_bar_show_timer);
+        assert!(empty.player_bar_show_speed);
 
         let explicit_json = r#"{
             "player_bar_mode": "floating", "player_bar_show_artwork": false,
             "player_bar_show_like": false, "player_bar_show_shuffle": false,
             "player_bar_show_repeat": false, "player_bar_show_skip_seconds": true,
             "player_bar_show_queue": false, "player_bar_show_volume": false,
-            "player_bar_show_timer": false
+            "player_bar_show_timer": false, "player_bar_show_speed": false
         }"#;
         let explicit: Settings = serde_json::from_str(explicit_json).expect("deserialize explicit");
         assert_eq!(explicit.player_bar_mode, PlayerBarMode::Floating);
@@ -274,6 +276,7 @@ mod tests {
         assert!(explicit.player_bar_show_skip_seconds && !explicit.player_bar_show_queue);
         assert!(!explicit.player_bar_show_volume);
         assert!(!explicit.player_bar_show_timer);
+        assert!(!explicit.player_bar_show_speed);
     }
 
     #[test]
@@ -299,6 +302,7 @@ mod tests {
         assert!(!loaded.player_bar_show_skip_seconds && loaded.player_bar_show_queue);
         assert!(loaded.player_bar_show_volume);
         assert!(loaded.player_bar_show_timer);
+        assert!(loaded.player_bar_show_speed);
         assert_eq!(loaded.crossfade_seconds, 0);
     }
 

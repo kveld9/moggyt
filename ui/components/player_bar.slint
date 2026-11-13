@@ -2,9 +2,9 @@ import { PlayerUi, Theme } from "../theme.slint";
 import { Labels } from "../labels.slint";
 import { ThemedSlider } from "./controls.slint";
 import { PlayerCenterControls } from "./player_controls.slint";
-import { IconHeart, IconQueue, IconSpeaker, IconSpeakerMuted, IconTimer } from "../icons.slint";
+import { IconHeart, IconQueue, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
 import { ContextSurface, ContextUi } from "./context_menu.slint";
-import { SleepTimerUi } from "./timer_menu.slint";
+import { PlaybackSpeedButton, SleepTimerButton } from "./player_bar_actions.slint";
 
 export component PlayerBar inherits Rectangle {
     in property <int> mode: 0;
@@ -16,6 +16,7 @@ export component PlayerBar inherits Rectangle {
     in property <bool> show-queue: true;
     in property <bool> show-volume: true;
     in property <bool> show-timer: true;
+    in property <bool> show-speed: true;
 
     in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
@@ -227,9 +228,9 @@ export component PlayerBar inherits Rectangle {
             toggle-time-display => { PlayerUi.show-remaining-time = !PlayerUi.show-remaining-time; }
         }
 
-        // RIGHT ZONE: Queue button, Volume Slider
+        // RIGHT ZONE: Queue button, Sleep timer button, Playback speed button, Volume slider
         HorizontalLayout {
-            width: root.mode == 1 ? 220px : 260px;
+            width: root.mode == 1 ? 264px : 260px;
             horizontal-stretch: 0;
             alignment: end;
             spacing: 10px;
@@ -264,32 +265,13 @@ export component PlayerBar inherits Rectangle {
             if root.show-timer : VerticalLayout {
                 alignment: center;
 
-                Rectangle {
-                    width: 32px;
-                    height: 32px;
-                    border-radius: 16px;
-                    background: timer-touch.pressed ? Theme.overlay : (timer-touch.has-hover || SleepTimerUi.is-open ? Theme.hover : transparent);
-                    animate background { duration: 150ms; easing: ease-in-out; }
+                SleepTimerButton {}
+            }
 
-                    timer-touch := TouchArea {
-                        clicked => {
-                            SleepTimerUi.x = self.absolute-position.x;
-                            SleepTimerUi.y = self.absolute-position.y;
-                            SleepTimerUi.is-open = !SleepTimerUi.is-open;
-                        }
-                    }
+            if root.show-speed : VerticalLayout {
+                alignment: center;
 
-                    Tooltip {
-                        text: @markdown("\{Labels.sleep-timer-label}");
-                    }
-
-                    IconTimer {
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                        size: 16px;
-                        tint: SleepTimerUi.active-index != 0 || timer-touch.has-hover ? Theme.accent : Theme.secondary;
-                    }
-                }
+                PlaybackSpeedButton {}
             }
 
             if root.show-volume : HorizontalLayout {

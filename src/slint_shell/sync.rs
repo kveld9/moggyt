@@ -192,6 +192,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_player_bar_show_queue(state.player_bar.show_queue);
     window.set_player_bar_show_volume(state.player_bar.show_volume);
     window.set_player_bar_show_timer(state.player_bar.show_timer);
+    window.set_player_bar_show_speed(state.player_bar.show_speed);
     sync_static_labels(window, state.locale, state.custom_theme.as_ref().map(|c| c.config_dir()));
     let is_liked =
         state.queue.current().map(|t| is_track_liked(&state.liked_ids, &t.id)).unwrap_or(false);

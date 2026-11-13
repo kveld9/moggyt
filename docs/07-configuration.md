@@ -138,6 +138,7 @@ The configuration file uses JSON serialization with atomic replacement:
   "player_bar_show_queue": true,
   "player_bar_show_volume": true,
   "player_bar_show_timer": true,
+  "player_bar_show_speed": true,
   "detail_compact_tracks": false
 }
 ```
@@ -229,6 +230,7 @@ The configuration file uses JSON serialization with atomic replacement:
   - `player_bar_show_queue` (boolean, default `true`): Whether queue button is shown.
   - `player_bar_show_volume` (boolean, default `true`): Whether speaker icon and volume slider are shown.
   - `player_bar_show_timer` (boolean, default `true`): Whether the sleep timer button is shown.
+  - `player_bar_show_speed` (boolean, default `true`): Whether the playback speed button is shown.
 - **Detail Track List (`detail_compact_tracks`)**:
   - `detail_compact_tracks` (boolean, default `false`): Whether album, artist, and playlist track lists start in
     compact mode, hiding cover thumbnails and tightening row height. The `Compact view` toggle in the detail header

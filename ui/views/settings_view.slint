@@ -12,7 +12,6 @@ export component SettingsView inherits VerticalLayout {
     in property <string> matugen-theme-status-text: "";
     in property <[string]> custom-theme-names: [];
     in property <string> active-custom-theme-name: "";
-    in property <string> playback-speed-text: "1.00x";
     in property <bool> signed-in: false;
     in-out property <string> cookie-text: "";
     in property <string> app-version: "0.1.0";
@@ -31,12 +30,12 @@ export component SettingsView inherits VerticalLayout {
     in property <bool> player-bar-show-queue: true;
     in property <bool> player-bar-show-volume: true;
     in property <bool> player-bar-show-timer: true;
+    in property <bool> player-bar-show-speed: true;
 
     callback theme-selected(int);
     callback custom-theme-selected(string);
     callback accent-picked(color);
     callback accent-reset();
-    callback cycle-playback-speed();
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
@@ -64,12 +63,10 @@ export component SettingsView inherits VerticalLayout {
     }
 
     playback-panel := PlaybackSettings {
-        playback-speed-text: root.playback-speed-text;
         active-audio-quality-index: root.active-audio-quality-index;
         crossfade-seconds: root.crossfade-seconds;
         stream-cache-limit-mb: root.stream-cache-limit-mb;
         songs-only: root.songs-only;
-        cycle-playback-speed => { root.cycle-playback-speed(); }
         audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
         crossfade-changed(secs) => { root.crossfade-changed(secs); }
         stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
@@ -95,6 +92,7 @@ export component SettingsView inherits VerticalLayout {
         player-bar-show-queue: root.player-bar-show-queue;
         player-bar-show-volume: root.player-bar-show-volume;
         player-bar-show-timer: root.player-bar-show-timer;
+        player-bar-show-speed: root.player-bar-show-speed;
         player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
         player-bar-option-toggled(idx) => { root.player-bar-option-toggled(idx); }
     }

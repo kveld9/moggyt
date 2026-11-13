@@ -4,13 +4,11 @@ import { ThemedSlider } from "../controls.slint";
 import { SettingsModeButton, SettingsToggleRow } from "../settings_rows.slint";
 
 export component PlaybackSettings inherits VerticalLayout {
-    in property <string> playback-speed-text: "1.00x";
     in property <int> active-audio-quality-index: 1;
     in property <int> crossfade-seconds: 0;
     in property <int> stream-cache-limit-mb: 512;
     in property <bool> songs-only: false;
 
-    callback cycle-playback-speed();
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
@@ -32,43 +30,6 @@ export component PlaybackSettings inherits VerticalLayout {
         VerticalLayout {
             padding: 16px;
             spacing: 16px;
-
-            HorizontalLayout {
-                alignment: space-between;
-
-                Text {
-                    text: Labels.playback-speed-label;
-                    color: Theme.text;
-                    font-size: 14px;
-                    vertical-alignment: center;
-                }
-
-                Rectangle {
-                    width: 90px;
-                    height: 32px;
-                    border-radius: 8px;
-                    background: speed-touch.pressed ? Theme.overlay : (speed-touch.has-hover ? Theme.hover : Theme.surface);
-                    animate background { duration: 150ms; easing: ease-in-out; }
-
-                    speed-touch := TouchArea {
-                        clicked => { root.cycle-playback-speed(); }
-                    }
-
-                    Text {
-                        text: root.playback-speed-text;
-                        color: Theme.accent;
-                        font-size: 12px;
-                        font-weight: 700;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-
-            Rectangle {
-                height: 1px;
-                background: Theme.border;
-            }
 
             VerticalLayout {
                 spacing: 12px;
