@@ -2,8 +2,9 @@ import { PlayerUi, Theme } from "../theme.slint";
 import { Labels } from "../labels.slint";
 import { ThemedSlider } from "./controls.slint";
 import { PlayerCenterControls } from "./player_controls.slint";
-import { IconHeart, IconQueue, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
+import { IconHeart, IconQueue, IconSpeaker, IconSpeakerMuted, IconTimer } from "../icons.slint";
 import { ContextSurface, ContextUi } from "./context_menu.slint";
+import { SleepTimerUi } from "./timer_menu.slint";
 
 export component PlayerBar inherits Rectangle {
     in property <int> mode: 0;
@@ -14,6 +15,7 @@ export component PlayerBar inherits Rectangle {
     in property <bool> show-skip-seconds: false;
     in property <bool> show-queue: true;
     in property <bool> show-volume: true;
+    in property <bool> show-timer: true;
 
     in property <string> active-track-title: "No track playing";
     in property <string> active-track-artist: "";
@@ -255,6 +257,37 @@ export component PlayerBar inherits Rectangle {
                         y: (parent.height - self.height) / 2;
                         size: 16px;
                         tint: q-touch.has-hover || root.is-queue-open ? Theme.accent : Theme.secondary;
+                    }
+                }
+            }
+
+            if root.show-timer : VerticalLayout {
+                alignment: center;
+
+                Rectangle {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 16px;
+                    background: timer-touch.pressed ? Theme.overlay : (timer-touch.has-hover || SleepTimerUi.is-open ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    timer-touch := TouchArea {
+                        clicked => {
+                            SleepTimerUi.x = self.absolute-position.x;
+                            SleepTimerUi.y = self.absolute-position.y;
+                            SleepTimerUi.is-open = !SleepTimerUi.is-open;
+                        }
+                    }
+
+                    Tooltip {
+                        text: @markdown("\{Labels.sleep-timer-label}");
+                    }
+
+                    IconTimer {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 16px;
+                        tint: SleepTimerUi.active-index != 0 || timer-touch.has-hover ? Theme.accent : Theme.secondary;
                     }
                 }
             }

@@ -7,7 +7,7 @@ use crate::domain::PlayerBarMode;
 use crate::infra::Settings;
 
 /// Number of customizable player bar element toggles.
-pub const PLAYER_BAR_OPTION_COUNT: usize = 7;
+pub const PLAYER_BAR_OPTION_COUNT: usize = 8;
 
 /// Customizable player bar preferences cached in the app state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +28,8 @@ pub struct PlayerBarPrefs {
     pub show_queue: bool,
     /// Whether the speaker icon and volume slider are displayed.
     pub show_volume: bool,
+    /// Whether the sleep timer button is displayed.
+    pub show_timer: bool,
 }
 
 impl Default for PlayerBarPrefs {
@@ -41,6 +43,7 @@ impl Default for PlayerBarPrefs {
             show_skip_seconds: false,
             show_queue: true,
             show_volume: true,
+            show_timer: true,
         }
     }
 }
@@ -57,6 +60,7 @@ impl PlayerBarPrefs {
             show_skip_seconds: settings.player_bar_show_skip_seconds,
             show_queue: settings.player_bar_show_queue,
             show_volume: settings.player_bar_show_volume,
+            show_timer: settings.player_bar_show_timer,
         }
     }
 
@@ -70,12 +74,13 @@ impl PlayerBarPrefs {
         settings.player_bar_show_skip_seconds = self.show_skip_seconds;
         settings.player_bar_show_queue = self.show_queue;
         settings.player_bar_show_volume = self.show_volume;
+        settings.player_bar_show_timer = self.show_timer;
     }
 
     /// Checks if a player bar option is enabled by its shared index.
     ///
     /// Indices: 0 = artwork, 1 = like, 2 = shuffle, 3 = repeat,
-    /// 4 = skip-seconds, 5 = queue, 6 = volume.
+    /// 4 = skip-seconds, 5 = queue, 6 = volume, 7 = sleep timer.
     pub fn is_enabled(&self, index: i32) -> bool {
         match index {
             0 => self.show_artwork,
@@ -85,6 +90,7 @@ impl PlayerBarPrefs {
             4 => self.show_skip_seconds,
             5 => self.show_queue,
             6 => self.show_volume,
+            7 => self.show_timer,
             _ => false,
         }
     }
@@ -102,6 +108,7 @@ impl PlayerBarPrefs {
             4 => copy.show_skip_seconds = !copy.show_skip_seconds,
             5 => copy.show_queue = !copy.show_queue,
             6 => copy.show_volume = !copy.show_volume,
+            7 => copy.show_timer = !copy.show_timer,
             _ => return *self,
         }
         copy
@@ -150,6 +157,7 @@ mod tests {
             show_skip_seconds: true,
             show_queue: false,
             show_volume: true,
+            show_timer: false,
         };
 
         assert!(prefs.is_enabled(0));
@@ -159,9 +167,10 @@ mod tests {
         assert!(prefs.is_enabled(4));
         assert!(!prefs.is_enabled(5));
         assert!(prefs.is_enabled(6));
+        assert!(!prefs.is_enabled(7));
 
         assert!(!prefs.is_enabled(-1));
-        assert!(!prefs.is_enabled(7));
+        assert!(!prefs.is_enabled(8));
         assert!(!prefs.is_enabled(100));
     }
 
@@ -194,7 +203,7 @@ mod tests {
     fn test_toggled_out_of_range_is_no_op() {
         let base = PlayerBarPrefs::default();
         assert_eq!(base.toggled(-1), base);
-        assert_eq!(base.toggled(7), base);
+        assert_eq!(base.toggled(8), base);
         assert_eq!(base.toggled(999), base);
     }
 
@@ -209,6 +218,7 @@ mod tests {
             player_bar_show_skip_seconds: true,
             player_bar_show_queue: false,
             player_bar_show_volume: false,
+            player_bar_show_timer: false,
             ..Settings::default()
         };
 
@@ -221,6 +231,7 @@ mod tests {
         assert!(prefs.show_skip_seconds);
         assert!(!prefs.show_queue);
         assert!(!prefs.show_volume);
+        assert!(!prefs.show_timer);
 
         let mut round_trip_settings = Settings::default();
         prefs.apply_to_settings(&mut round_trip_settings);
@@ -236,5 +247,6 @@ mod tests {
         );
         assert_eq!(round_trip_settings.player_bar_show_queue, settings.player_bar_show_queue);
         assert_eq!(round_trip_settings.player_bar_show_volume, settings.player_bar_show_volume);
+        assert_eq!(round_trip_settings.player_bar_show_timer, settings.player_bar_show_timer);
     }
 }

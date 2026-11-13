@@ -1,0 +1,103 @@
+import { Labels } from "../labels.slint";
+import { Theme } from "../theme.slint";
+
+export global SleepTimerUi {
+    in-out property <bool> is-open: false;
+    in-out property <length> x: 0px;
+    in-out property <length> y: 0px;
+    in-out property <int> active-index: 0;
+    in-out property <string> status-text: "";
+
+    callback dismissed();
+    callback preset-selected(int);
+}
+
+export component SleepTimerMenu inherits Rectangle {
+    width: 100%;
+    height: 100%;
+
+    property <[string]> preset-labels: [
+        Labels.sleep-timer-off-label,
+        Labels.sleep-timer-15m-label,
+        Labels.sleep-timer-30m-label,
+        Labels.sleep-timer-45m-label,
+        Labels.sleep-timer-60m-label,
+        Labels.sleep-timer-end-of-track-label,
+    ];
+
+    if SleepTimerUi.is-open : Rectangle {
+        width: 100%;
+        height: 100%;
+
+        backdrop := TouchArea {
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down {
+                    SleepTimerUi.dismissed();
+                }
+            }
+        }
+
+        panel := Rectangle {
+            width: 190px;
+            height: 52px + root.preset-labels.length * 32px;
+            x: min(max(SleepTimerUi.x + 16px - self.width / 2, 8px), parent.width - self.width - 8px);
+            y: min(max(SleepTimerUi.y - self.height - 8px, 8px), parent.height - self.height - 8px);
+            background: Theme.panel;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: Theme.border;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 2px;
+                alignment: start;
+
+                HorizontalLayout {
+                    height: 24px;
+                    spacing: 8px;
+
+                    Text {
+                        text: Labels.sleep-timer-label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: SleepTimerUi.status-text;
+                        color: SleepTimerUi.active-index != 0 ? Theme.accent : Theme.secondary;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+
+                for label[idx] in root.preset-labels : Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: idx == SleepTimerUi.active-index
+                        ? (preset-touch.pressed ? Theme.overlay : Theme.hover)
+                        : (preset-touch.pressed ? Theme.overlay : (preset-touch.has-hover ? Theme.hover : transparent));
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    preset-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { SleepTimerUi.preset-selected(idx); }
+                    }
+
+                    Text {
+                        x: 10px;
+                        width: parent.width - 20px;
+                        height: parent.height;
+                        text: label;
+                        color: idx == SleepTimerUi.active-index ? Theme.accent : Theme.text;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+    }
+}

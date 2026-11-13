@@ -30,7 +30,7 @@ use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{
     DetailUi, LibraryItemData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow,
-    PlaybackUi, PlayerUi, ShelfData, TrackRowData,
+    PlaybackUi, PlayerUi, ShelfData, SleepTimerUi, TrackRowData,
 };
 
 fn derive_library_phase(state: &SlintAppState) -> ViewPhase {
@@ -189,6 +189,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_player_bar_show_skip_seconds(state.player_bar.show_skip_seconds);
     window.set_player_bar_show_queue(state.player_bar.show_queue);
     window.set_player_bar_show_volume(state.player_bar.show_volume);
+    window.set_player_bar_show_timer(state.player_bar.show_timer);
     sync_static_labels(window, state.locale, state.custom_theme.as_ref().map(|c| c.config_dir()));
     let is_liked =
         state.queue.current().map(|t| is_track_liked(&state.liked_ids, &t.id)).unwrap_or(false);
@@ -486,14 +487,15 @@ pub(crate) fn observe_playback_phase(state: &mut SlintAppState) {
     state.set_playback_phase(state.playback_phase.next(event));
 }
 
-/// Synchronizes sleep timer preset selection index and formatted status text with Slint window.
+/// Synchronizes sleep timer preset selection index and formatted status text with the timer menu.
 pub(crate) fn sync_sleep_timer(window: &MoggytWindow, state: &SlintAppState) {
     let preset = state.sleep_timer.preset();
     let idx = timer_preset_to_index(preset);
     let status =
         format_sleep_timer_status(state.locale, preset, state.sleep_timer.remaining_secs());
-    window.set_active_sleep_timer_index(idx);
-    window.set_sleep_timer_status_text(status.into());
+    let ui = window.global::<SleepTimerUi>();
+    ui.set_active_index(idx);
+    ui.set_status_text(status.into());
 }
 
 /// Converts a domain track to Slint TrackRowData with cached cover art if available.
