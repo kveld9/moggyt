@@ -11,7 +11,9 @@ use crate::i18n::{Locale, tr};
 use crate::infra::{CatalogError, GithubUpdater, StoreHealth};
 use crate::slint_shell::audio_snapshot::sync_audio_snapshot;
 use crate::slint_shell::covers::resolve_row_cover_image;
-use crate::slint_shell::detail::{detail_has_artwork, detail_kind_label, resolve_detail_cover_url};
+use crate::slint_shell::detail::{
+    detail_has_artwork, detail_kind_label, detail_subtitle, resolve_detail_cover_url,
+};
 use crate::slint_shell::explore::explore_card_shelves;
 use crate::slint_shell::format::{
     format_queue_label, format_sleep_timer_status, format_update_status, timer_preset_to_index,
@@ -357,7 +359,7 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
         window.set_detail_has_detail(true);
         window.set_detail_has_artwork(detail_has_artwork(detail));
         window.set_detail_title(detail.title.clone().into());
-        window.set_detail_subtitle(detail.subtitle.clone().into());
+        window.set_detail_subtitle(detail_subtitle(detail, state.locale).into());
         window.set_detail_description(detail.description.as_deref().unwrap_or("").into());
         window.set_detail_kind_label(tr(state.locale, detail_kind_label(detail.kind)).into());
         let d_tracks: Vec<TrackRowData> = detail

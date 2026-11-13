@@ -4,6 +4,7 @@ use super::catalog_parse_artist::parse_artist_page;
 use super::catalog_parse_common::{
     best_thumbnail, flex_text, music_video_type, panel_artist, parse_duration_secs, watch_video_id,
 };
+use super::catalog_parse_playlist::{PlaylistMeta, playlist_meta};
 use crate::domain::{Detail, DetailKind, Track};
 use serde_json::Value;
 
@@ -17,8 +18,17 @@ fn detail_header_node(value: &Value) -> Option<&Value> {
         "/header/musicHeaderRenderer",
         "/header/musicEditablePlaylistDetailHeaderRenderer",
         "/header",
+        "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicResponsiveHeaderRenderer",
     ];
     PATHS.iter().find_map(|path| value.pointer(path))
+}
+
+/// Resolves playlist header metadata; other container kinds carry none.
+fn playlist_meta_for(value: &Value, kind: DetailKind) -> PlaylistMeta {
+    if kind != DetailKind::Playlist {
+        return PlaylistMeta::default();
+    }
+    playlist_meta(detail_header_node(value))
 }
 
 fn detail_header_title(value: &Value) -> String {
@@ -96,6 +106,7 @@ fn join_runs(runs: &[Value]) -> Option<String> {
 fn description_from_runs(header: &Value) -> Option<String> {
     const RUNS_PATHS: &[&str] = &[
         "/description/runs",
+        "/description/musicDescriptionShelfRenderer/description/runs",
         "/descriptionSnippet/runs",
         "/header/musicResponsiveHeaderRenderer/description/runs",
         "/header/musicResponsiveHeaderRenderer/descriptionSnippet/runs",
@@ -113,6 +124,7 @@ fn description_from_runs(header: &Value) -> Option<String> {
 fn description_from_simple(header: &Value) -> Option<String> {
     const SIMPLE_PATHS: &[&str] = &[
         "/description/simpleText",
+        "/description/musicDescriptionShelfRenderer/description/simpleText",
         "/descriptionSnippet/simpleText",
         "/header/musicResponsiveHeaderRenderer/description/simpleText",
         "/header/musicResponsiveHeaderRenderer/descriptionSnippet/simpleText",
@@ -318,12 +330,19 @@ fn fill_missing_track_artwork(mut detail: Detail) -> Detail {
 /// Returns `None` when neither a header title nor any valid track items are found.
 pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
     let title = resolve_detail_title(value);
-    let subtitle = detail_header_subtitle(value);
+    let meta = playlist_meta_for(value, kind);
+    let subtitle = meta.author.clone().unwrap_or_else(|| detail_header_subtitle(value));
     let tracks = collect_detail_tracks(value);
     if title.is_empty() && tracks.is_empty() {
         return None;
     }
-    let detail = Detail::new(kind, &title, &subtitle, tracks);
+    let mut detail = Detail::new(kind, &title, &subtitle, tracks);
+    if let Some(count) = meta.track_count {
+        detail = detail.with_track_count(count);
+    }
+    if let Some(secs) = meta.total_duration_secs {
+        detail = detail.with_total_duration_secs(secs);
+    }
     let detail = fill_missing_track_artwork(with_optional_detail_fields(detail, value));
     if kind == DetailKind::Artist {
         return Some(detail.with_artist_page(parse_artist_page(value)));

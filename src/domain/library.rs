@@ -239,6 +239,10 @@ pub struct Detail {
     pub subtitle: String,
     pub description: Option<String>,
     pub artwork: Option<String>,
+    /// Track count the server reports for the whole container (playlists only).
+    pub track_count: Option<u32>,
+    /// Total playback duration in seconds the server reports (playlists only).
+    pub total_duration_secs: Option<u32>,
     pub tracks: Vec<Track>,
     /// Artist-page sections; `None` for albums and playlists.
     pub artist: Option<ArtistPage>,
@@ -252,6 +256,8 @@ impl Detail {
             subtitle: subtitle.to_owned(),
             description: None,
             artwork: None,
+            track_count: None,
+            total_duration_secs: None,
             tracks,
             artist: None,
         }
@@ -266,6 +272,16 @@ impl Detail {
     pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {
         let art = artwork.into();
         self.artwork = if art.trim().is_empty() { None } else { Some(art) };
+        self
+    }
+
+    pub fn with_track_count(mut self, count: u32) -> Self {
+        self.track_count = Some(count);
+        self
+    }
+
+    pub fn with_total_duration_secs(mut self, secs: u32) -> Self {
+        self.total_duration_secs = Some(secs);
         self
     }
 
@@ -300,6 +316,16 @@ mod tests {
         let trimmed_empty = enriched.with_description("   ").with_artwork("");
         assert_eq!(trimmed_empty.description, None);
         assert_eq!(trimmed_empty.artwork, None);
+
+        let plain = Detail::new(DetailKind::Album, "Album", "", Vec::new());
+        assert_eq!(plain.track_count, None);
+        assert_eq!(plain.total_duration_secs, None);
+
+        let counted = Detail::new(DetailKind::Playlist, "Playlist", "", Vec::new())
+            .with_track_count(64)
+            .with_total_duration_secs(13620);
+        assert_eq!(counted.track_count, Some(64));
+        assert_eq!(counted.total_duration_secs, Some(13620));
     }
 
     #[test]
