@@ -159,8 +159,10 @@ and the sequential fallback for servers that ignore `Range` are unchanged.
 
 The next queued track prefetches its first block (256 KiB) into a bounded
 in-memory cache (`stream_prefetch_cache.rs`). Starting that track seeds the block
-pool with those bytes, so the first read does not issue a cold range request; a
-skipped track keeps at most two prefetched prefixes resident.
+pool with those bytes and with the remote total length when the range response
+reported one, so the seeded reader can seek relative to its end and the WebM
+probe runs with container cues; a skipped track keeps at most two prefetched
+prefixes resident.
 
 Range requests use a single 60 s total timeout that covers connection and transfer,
 so a stalled connection fails that block fetch instead of blocking the worker pool,

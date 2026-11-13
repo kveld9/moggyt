@@ -5,6 +5,7 @@ use reqwest::StatusCode;
 use reqwest::header::{CONTENT_RANGE, RANGE};
 
 use super::stream::{RangeResponse, RangeTransport};
+use super::stream_prefetch_cache::PrefetchedPrefix;
 use super::stream_reader::{
     DEFAULT_STREAM_CHUNK_SIZE, RangeReader, SyncReader, parse_content_range_total,
 };
@@ -97,14 +98,14 @@ pub fn open_audio_stream(url: &str) -> anyhow::Result<RangeReader<ReqwestRangeTr
     Ok(RangeReader::new(transport).with_chunk_size(DEFAULT_STREAM_CHUNK_SIZE))
 }
 
-/// Opens a streaming audio source seeded with prefetched leading bytes.
+/// Opens a streaming audio source seeded with a prefetched prefix.
 pub fn open_audio_stream_with_prefix(
     url: &str,
-    prefix: Option<Vec<u8>>,
+    prefix: Option<PrefetchedPrefix>,
 ) -> anyhow::Result<RangeReader<ReqwestRangeTransport>> {
     let reader = open_audio_stream(url)?;
     Ok(match prefix {
-        Some(bytes) => reader.with_prefetched(bytes),
+        Some(prefix) => reader.with_prefetched(prefix),
         None => reader,
     })
 }
@@ -139,7 +140,10 @@ mod tests {
 
     #[test]
     fn open_audio_stream_with_prefix_fails_loud_on_invalid_url() {
-        let result = open_audio_stream_with_prefix("invalid-url", Some(vec![1, 2, 3]));
+        let result = open_audio_stream_with_prefix(
+            "invalid-url",
+            Some(PrefetchedPrefix { bytes: vec![1, 2, 3], total_len: None }),
+        );
         assert!(result.is_err());
         let err = result.err().unwrap().to_string();
         assert!(err.contains("invalid audio stream url"));

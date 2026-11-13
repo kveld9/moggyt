@@ -203,7 +203,7 @@ pub use stream_chain::{PrefixFetcher, PrimaryStreamResolver, StreamChain};
 pub use stream_disk_cache::StreamDiskCache;
 pub use stream_pool::{BlockPool, STREAM_BLOCK_BYTES, STREAM_WORKERS};
 pub use stream_prefetch_cache::{
-    PREFETCH_BLOCK_COUNT, PREFETCH_BYTES, PREFETCH_CAPACITY, StreamPrefetchCache,
+    PREFETCH_BLOCK_COUNT, PREFETCH_BYTES, PREFETCH_CAPACITY, PrefetchedPrefix, StreamPrefetchCache,
 };
 pub use stream_url_cache::{
     ResolverSource, STREAM_URL_CACHE_CAPACITY, STREAM_URL_TTL, StreamUrlCache,
