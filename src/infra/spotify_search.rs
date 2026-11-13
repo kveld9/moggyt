@@ -135,6 +135,7 @@ pub fn video_type_from(raw: Option<&str>) -> MusicVideoType {
         "MUSIC_VIDEO_TYPE_ATV" | "ATV" => MusicVideoType::Atv,
         "MUSIC_VIDEO_TYPE_OMV" | "OMV" => MusicVideoType::Omv,
         "MUSIC_VIDEO_TYPE_UGC" | "UGC" => MusicVideoType::Ugc,
+        "MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC" | "OFFICIAL_SOURCE_MUSIC" => MusicVideoType::Omv,
         _ => MusicVideoType::Other,
     }
 }
@@ -345,6 +346,14 @@ mod tests {
         assert_eq!(video_type_from(None), MusicVideoType::Other);
         assert_eq!(video_type_from(Some("UNKNOWN_STRING")), MusicVideoType::Other);
         assert_eq!(video_type_from(Some("music_video_type_omv")), MusicVideoType::Omv);
+        assert_eq!(
+            video_type_from(Some("MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC")),
+            MusicVideoType::Omv
+        );
+        assert_eq!(
+            video_type_from(Some("music_video_type_official_source_music")),
+            MusicVideoType::Omv
+        );
         assert_eq!(video_type_from(Some("music_video_type_ugc")), MusicVideoType::Ugc);
         assert_eq!(video_type_from(Some("music_video_type_atv")), MusicVideoType::Atv);
         assert_eq!(video_type_from(Some("atv")), MusicVideoType::Atv);

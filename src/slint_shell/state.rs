@@ -287,8 +287,8 @@ impl SlintAppState {
         let res = self.catalog.lock().map_or(Err(CatalogError::Transport), |c| c.explore_shelves());
         match res {
             Ok(shelves) => {
-                let is_empty = shelves.is_empty();
-                self.explore_shelves = shelves;
+                self.explore_shelves = crate::domain::apply_shelf_policy(shelves, self.songs_only);
+                let is_empty = self.explore_shelves.is_empty();
                 self.explore_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
             }
             Err(_) => {
@@ -346,10 +346,7 @@ impl SlintAppState {
     }
 
     fn apply_search_items(&mut self, mut items: Vec<SearchResult>) {
-        if self.songs_only {
-            items = crate::domain::retain_song_results(items);
-        }
-        items = crate::domain::songs_first(items);
+        items = crate::domain::apply_result_policy(items, self.songs_only);
         self.search_results = items
             .iter()
             .filter_map(|it| match it {
@@ -385,6 +382,7 @@ impl SlintAppState {
             .map_or(Err(CatalogError::Transport), |c| c.detail(browse_id, kind))
         {
             Ok(Some(d)) => {
+                let d = crate::domain::apply_detail_policy(d, self.songs_only);
                 let phase = if crate::slint_shell::detail::detail_is_empty(&d) {
                     ViewPhase::Empty
                 } else {

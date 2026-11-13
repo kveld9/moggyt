@@ -97,6 +97,7 @@ pub mod test_support;
 pub mod theme;
 pub mod toast;
 pub mod version_fix;
+pub mod video_policy;
 pub mod view_phase;
 pub mod window;
 pub mod worker_catalog;

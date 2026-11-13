@@ -2,7 +2,7 @@
 
 use super::catalog_parse_artist::parse_artist_page;
 use super::catalog_parse_common::{
-    best_thumbnail, flex_text, panel_artist, parse_duration_secs, watch_video_id,
+    best_thumbnail, flex_text, music_video_type, panel_artist, parse_duration_secs, watch_video_id,
 };
 use crate::domain::{Detail, DetailKind, Track};
 use serde_json::Value;
@@ -213,6 +213,9 @@ pub fn build_detail_track(renderer: &Value) -> Option<Track> {
     let mut track = Track::new(&video_id, &title, &artist);
     if let Some(dur) = detail_duration(renderer) {
         track = track.with_duration(dur);
+    }
+    if let Some(video_type) = music_video_type(renderer) {
+        track = track.with_video_type(video_type);
     }
     if let Some(thumb) = best_thumbnail(renderer) {
         track = track.with_artwork(thumb);
@@ -699,5 +702,35 @@ mod tests {
         let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
         let detail = parse_detail_all(&payload, DetailKind::Album).expect("parsed detail");
         assert_eq!(detail.artist, None);
+    }
+
+    #[test]
+    fn build_detail_track_classifies_music_video_endpoint() {
+        let renderer = serde_json::json!({
+            "playlistItemData": { "videoId": "vid-video" },
+            "flexColumns": [
+                {
+                    "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": { "runs": [{ "text": "Live Video" }] }
+                    }
+                },
+                {
+                    "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": { "runs": [{ "text": "Artist" }] }
+                    }
+                }
+            ],
+            "navigationEndpoint": {
+                "watchEndpoint": {
+                    "watchEndpointMusicSupportedConfigs": {
+                        "watchEndpointMusicConfig": {
+                            "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                        }
+                    }
+                }
+            }
+        });
+        let track = build_detail_track(&renderer).expect("track");
+        assert_eq!(track.video_type, Some(crate::domain::MusicVideoType::Omv));
     }
 }

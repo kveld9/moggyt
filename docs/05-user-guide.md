@@ -309,8 +309,11 @@ In headless mode:
 
 Playback options can be configured under **Settings -> Playback**:
 
-- **Prefer songs over music videos**: When enabled, filters catalog search results and autoplay recommendations
-  to prefer audio tracks over music videos.
+- **Hide music videos**: When enabled, removes music videos from search results, Explore and category shelves,
+  remote album/playlist/artist track lists, and autoplay recommendations. Audio tracks and unknown track types are
+  kept; a list containing only music videos becomes empty. The queue, locally saved playlists, import matching, and
+  the audio version picker are unaffected. Search result lists always rank songs ahead of music videos, even with
+  this option disabled.
 - **Autoplay similar tracks**: Appends similar tracks when the queue ends. It is off by default; when enabled,
   playback continues with catalog radio recommendations after the last track.
 

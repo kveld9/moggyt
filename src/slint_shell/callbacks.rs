@@ -26,6 +26,7 @@ use crate::slint_shell::state::{SharedState, SlintAppState};
 use crate::slint_shell::sync::{
     persist_recent_searches, sync_recent_searches, sync_shelves_and_queue, sync_window,
 };
+use crate::slint_shell::video_policy::refresh_video_policy_views;
 use crate::slint_shell::window::{
     clear_search_and_sync, open_detail_async, refresh_library_async, submit_search_async,
     submit_search_with_filter_async, trigger_playback,
@@ -469,9 +470,11 @@ fn wire_playback_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    let toggle_tx = worker_tx.clone();
     window.on_songs_only_toggled(move || {
         with_window_state(&w, &s, |win, st| {
             st.toggle_songs_only();
+            refresh_video_policy_views(win, st, &toggle_tx);
             sync_window(win, st);
         });
     });
