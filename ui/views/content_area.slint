@@ -59,7 +59,6 @@ export component ContentArea inherits Rectangle {
     in property <string> matugen-theme-status-text: "";
     in property <[string]> custom-theme-names: [];
     in property <string> active-custom-theme-name: "";
-    in property <string> playback-speed-text: "1.00x";
     in property <int> active-audio-quality-index: 1;
     in property <int> crossfade-seconds: 0;
     in property <int> stream-cache-limit-mb: 512;
@@ -83,6 +82,7 @@ export component ContentArea inherits Rectangle {
     in property <bool> player-bar-show-queue: true;
     in property <bool> player-bar-show-volume: true;
     in property <bool> player-bar-show-timer: true;
+    in property <bool> player-bar-show-speed: true;
 
     callback query-submitted(string);
     callback query-cleared();
@@ -109,7 +109,6 @@ export component ContentArea inherits Rectangle {
     callback custom-theme-selected(string);
     callback accent-picked(color);
     callback accent-reset();
-    callback cycle-playback-speed();
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
@@ -300,7 +299,6 @@ export component ContentArea inherits Rectangle {
                 matugen-theme-status-text: root.matugen-theme-status-text;
                 custom-theme-names: root.custom-theme-names;
                 active-custom-theme-name: root.active-custom-theme-name;
-                playback-speed-text: root.playback-speed-text;
                 signed-in: root.signed-in;
                 cookie-text <=> root.settings-cookie-text;
                 app-version: root.app-version;
@@ -319,11 +317,11 @@ export component ContentArea inherits Rectangle {
                 player-bar-show-queue: root.player-bar-show-queue;
                 player-bar-show-volume: root.player-bar-show-volume;
                 player-bar-show-timer: root.player-bar-show-timer;
+                player-bar-show-speed: root.player-bar-show-speed;
                 theme-selected(idx) => { root.theme-selected(idx); }
                 custom-theme-selected(name) => { root.custom-theme-selected(name); }
                 accent-picked(color) => { root.accent-picked(color); }
                 accent-reset => { root.accent-reset(); }
-                cycle-playback-speed => { root.cycle-playback-speed(); }
                 audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
                 crossfade-changed(secs) => { root.crossfade-changed(secs); }
                 stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }

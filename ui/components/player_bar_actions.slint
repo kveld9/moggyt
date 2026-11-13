@@ -1,0 +1,87 @@
+import { Labels } from "../labels.slint";
+import { Theme } from "../theme.slint";
+import { IconSpeed, IconTimer } from "../icons.slint";
+import { PresetMenuUi } from "./preset_menu.slint";
+
+export global SleepTimerUi {
+    in-out property <int> active-index: 0;
+    in-out property <string> status-text: "";
+}
+
+export global PlaybackSpeedUi {
+    in-out property <int> active-index: 2;
+    in-out property <[string]> items: [];
+}
+
+export component SleepTimerButton inherits Rectangle {
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    background: touch.pressed ? Theme.overlay : (touch.has-hover || (PresetMenuUi.is-open && PresetMenuUi.kind == 0) ? Theme.hover : transparent);
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    property <[string]> preset-items: [
+        Labels.sleep-timer-off-label,
+        Labels.sleep-timer-15m-label,
+        Labels.sleep-timer-30m-label,
+        Labels.sleep-timer-45m-label,
+        Labels.sleep-timer-60m-label,
+        Labels.sleep-timer-end-of-track-label,
+    ];
+
+    touch := TouchArea {
+        clicked => {
+            PresetMenuUi.kind = 0;
+            PresetMenuUi.heading = Labels.sleep-timer-label;
+            PresetMenuUi.status-text = SleepTimerUi.status-text;
+            PresetMenuUi.items = root.preset-items;
+            PresetMenuUi.active-index = SleepTimerUi.active-index;
+            PresetMenuUi.x = self.absolute-position.x;
+            PresetMenuUi.y = self.absolute-position.y;
+            PresetMenuUi.is-open = true;
+        }
+    }
+
+    Tooltip {
+        text: @markdown("\{Labels.sleep-timer-label}");
+    }
+
+    IconTimer {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        size: 16px;
+        tint: SleepTimerUi.active-index != 0 || touch.has-hover ? Theme.accent : Theme.secondary;
+    }
+}
+
+export component PlaybackSpeedButton inherits Rectangle {
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    background: touch.pressed ? Theme.overlay : (touch.has-hover || (PresetMenuUi.is-open && PresetMenuUi.kind == 1) ? Theme.hover : transparent);
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => {
+            PresetMenuUi.kind = 1;
+            PresetMenuUi.heading = Labels.playback-speed-label;
+            PresetMenuUi.status-text = "";
+            PresetMenuUi.items = PlaybackSpeedUi.items;
+            PresetMenuUi.active-index = PlaybackSpeedUi.active-index;
+            PresetMenuUi.x = self.absolute-position.x;
+            PresetMenuUi.y = self.absolute-position.y;
+            PresetMenuUi.is-open = true;
+        }
+    }
+
+    Tooltip {
+        text: @markdown("\{Labels.playback-speed-label}");
+    }
+
+    IconSpeed {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        size: 16px;
+        tint: PlaybackSpeedUi.active-index != 2 || touch.has-hover ? Theme.accent : Theme.secondary;
+    }
+}

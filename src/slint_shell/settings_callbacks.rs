@@ -9,7 +9,7 @@ use crate::i18n::tr;
 use crate::infra::open_url;
 use crate::slint_shell::callbacks::with_window_state;
 use crate::slint_shell::explore::apply_content_width;
-use crate::slint_shell::format::timer_preset_from_index;
+use crate::slint_shell::format::{PLAYBACK_SPEED_PRESETS, timer_preset_from_index};
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::player_bar::mode_from_index;
 use crate::slint_shell::state::{SharedState, SlintAppState};
@@ -19,7 +19,7 @@ use crate::slint_shell::sync::{
 use crate::slint_shell::theme::{apply_palette, theme_from_index};
 use crate::slint_shell::toast::notify;
 use crate::slint_shell::window::refresh_library_async;
-use crate::slint_shell::{ContextIcon, MoggytWindow, SleepTimerUi};
+use crate::slint_shell::{ContextIcon, MoggytWindow, PresetMenuUi};
 
 /// Wires settings, account authentication, player bar preferences, and resize callbacks.
 pub(crate) fn wire_settings_callbacks(
@@ -137,18 +137,24 @@ pub(crate) fn wire_settings_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
-    window.global::<SleepTimerUi>().on_preset_selected(move |idx| {
+    window.global::<PresetMenuUi>().on_preset_selected(move |kind, idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
-        handle_sleep_timer_selection(&mut st, idx);
-        sync_sleep_timer(&win, &st);
-        win.global::<SleepTimerUi>().set_is_open(false);
+        match kind {
+            0 => {
+                handle_sleep_timer_selection(&mut st, idx);
+                sync_sleep_timer(&win, &st);
+            }
+            1 => handle_playback_speed_selection(&mut st, idx),
+            _ => {}
+        }
+        win.global::<PresetMenuUi>().set_is_open(false);
     });
 
     let w = window.as_weak();
-    window.global::<SleepTimerUi>().on_dismissed(move || {
+    window.global::<PresetMenuUi>().on_dismissed(move || {
         if let Some(win) = w.upgrade() {
-            win.global::<SleepTimerUi>().set_is_open(false);
+            win.global::<PresetMenuUi>().set_is_open(false);
         }
     });
 
@@ -213,6 +219,16 @@ pub(crate) fn handle_sleep_timer_selection(state: &mut SlintAppState, idx: i32) 
     }
 }
 
+/// Applies the playback speed preset at `idx`, falling back to real time out of range.
+pub(crate) fn handle_playback_speed_selection(state: &mut SlintAppState, idx: i32) {
+    let preset = usize::try_from(idx)
+        .ok()
+        .and_then(|i| PLAYBACK_SPEED_PRESETS.get(i))
+        .copied()
+        .unwrap_or(1.0);
+    state.set_playback_speed(preset);
+}
+
 /// Handles crossfade duration change, clamping to [0, 15] seconds and syncing state.
 pub(crate) fn handle_crossfade_change(state: &mut SlintAppState, secs: i32) {
     state.set_crossfade_seconds(secs.clamp(0, 15) as u32);
@@ -226,7 +242,8 @@ pub(crate) fn handle_stream_cache_limit_selection(state: &mut SlintAppState, mb:
 #[cfg(test)]
 mod tests {
     use super::{
-        handle_crossfade_change, handle_sleep_timer_selection, handle_stream_cache_limit_selection,
+        handle_crossfade_change, handle_playback_speed_selection, handle_sleep_timer_selection,
+        handle_stream_cache_limit_selection,
     };
     use crate::domain::{TimerPreset, Track};
     use crate::slint_shell::test_support::test_wired;
@@ -307,5 +324,21 @@ mod tests {
         handle_sleep_timer_selection(&mut state, 5);
         assert!(state.sleep_timer.is_armed());
         assert_eq!(state.sleep_timer.preset(), TimerPreset::StopAfterTrack);
+    }
+
+    #[test]
+    fn test_playback_speed_selection_callback_path() {
+        let mut state = test_wired();
+        assert_eq!(state.audio.lock().unwrap().speed(), 1.0);
+
+        handle_playback_speed_selection(&mut state, 5);
+        assert_eq!(state.audio.lock().unwrap().speed(), 2.0);
+        assert_eq!(state.settings_store.load().playback_speed, 2.0);
+
+        handle_playback_speed_selection(&mut state, 0);
+        assert_eq!(state.audio.lock().unwrap().speed(), 0.5);
+
+        handle_playback_speed_selection(&mut state, 99);
+        assert_eq!(state.audio.lock().unwrap().speed(), 1.0);
     }
 }

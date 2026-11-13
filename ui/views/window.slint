@@ -6,7 +6,7 @@ import { ShortcutScope } from "../components/shortcut_scope.slint";
 import { ContentArea } from "./content_area.slint";
 import { ImportOverlay } from "import_overlay.slint";
 import { ContextMenuLayer } from "../components/context_menu.slint";
-import { SleepTimerMenu } from "../components/timer_menu.slint";
+import { PresetMenuLayer } from "../components/preset_menu.slint";
 import { ToastsLayer } from "../components/toasts.slint";
 
 export component MoggytWindow inherits Window {
@@ -38,7 +38,6 @@ export component MoggytWindow inherits Window {
     in-out property <string> matugen-theme-status-text: "";
     in-out property <[string]> custom-theme-names: [];
     in-out property <string> active-custom-theme-name: "";
-    in-out property <string> playback-speed-text: "1.00x";
     in-out property <int> active-audio-quality-index: 1;
     in-out property <int> crossfade-seconds: 0;
     in-out property <int> stream-cache-limit-mb: 512;
@@ -93,6 +92,7 @@ export component MoggytWindow inherits Window {
     in-out property <bool> player-bar-show-queue: true;
     in-out property <bool> player-bar-show-volume: true;
     in-out property <bool> player-bar-show-timer: true;
+    in-out property <bool> player-bar-show-speed: true;
     in-out property <bool> show-import-modal: false;
     in-out property <int> import-tab: 0;
     in-out property <string> import-link-text: "";
@@ -130,7 +130,6 @@ export component MoggytWindow inherits Window {
     callback custom-theme-selected(string);
     callback accent-picked(color);
     callback accent-reset();
-    callback cycle-playback-speed();
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
@@ -239,7 +238,6 @@ export component MoggytWindow inherits Window {
                     matugen-theme-status-text: root.matugen-theme-status-text;
                     custom-theme-names: root.custom-theme-names;
                     active-custom-theme-name: root.active-custom-theme-name;
-                    playback-speed-text: root.playback-speed-text;
                     settings-cookie-text <=> root.settings-cookie-text;
                     app-version: root.app-version;
                     update-status-text: root.update-status-text;
@@ -260,6 +258,7 @@ export component MoggytWindow inherits Window {
                     player-bar-show-queue: root.player-bar-show-queue;
                     player-bar-show-volume: root.player-bar-show-volume;
                     player-bar-show-timer: root.player-bar-show-timer;
+                    player-bar-show-speed: root.player-bar-show-speed;
                     open-settings => { root.page-selected(4); }
                     library-import-requested => { root.library-import-requested(); }
                     query-submitted(q) => { root.query-submitted(q); }
@@ -285,7 +284,6 @@ export component MoggytWindow inherits Window {
                     custom-theme-selected(name) => { root.custom-theme-selected(name); }
                     accent-picked(color) => { root.accent-picked(color); }
                     accent-reset => { root.accent-reset(); }
-                    cycle-playback-speed => { root.cycle-playback-speed(); }
                     audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
                     crossfade-changed(secs) => { root.crossfade-changed(secs); }
                     stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
@@ -326,6 +324,7 @@ export component MoggytWindow inherits Window {
                     show-queue: root.player-bar-show-queue;
                     show-volume: root.player-bar-show-volume;
                     show-timer: root.player-bar-show-timer;
+                    show-speed: root.player-bar-show-speed;
                     width: root.player-bar-mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
                     height: 72px;
                     x: (parent.width - self.width) / 2;
@@ -388,7 +387,7 @@ export component MoggytWindow inherits Window {
         x: 0;
         y: 0;
     }
-    SleepTimerMenu {}
+    PresetMenuLayer {}
     ToastsLayer {
         x: 0;
         y: 0;
