@@ -9,7 +9,6 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 
 use super::sync::set_lyrics_highlight;
 use crate::domain::{PlaybackPhase, Track};
-use crate::i18n::tr;
 use crate::infra::{AudioBackend, AudioQuality, Catalog};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::current_unix_secs;
@@ -370,7 +369,7 @@ pub fn apply_play_track_completion(
     res: PlayTrackResult,
 ) {
     if !res.success {
-        window.set_active_track_title(tr(state.locale, "Failed to play track").into());
+        super::playback_failure::notify_playback_failure(window, state, &res.title);
         window.global::<PlayerUi>().set_is_playing(false);
         return;
     }
