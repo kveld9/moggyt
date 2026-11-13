@@ -17,6 +17,9 @@ const PREFIX_MATCH_BONUS: f32 = 0.10;
 /// Bonus applied when every normalized query token appears in the entity name.
 const TOKEN_CONTAINMENT_BONUS: f32 = 0.08;
 
+/// Score penalty applied to music videos so a comparably matching song wins the card.
+const VIDEO_TOP_RESULT_PENALTY: f32 = 0.15;
+
 /// Returns the display name used to match a search hit against the query.
 pub fn entity_name(item: &SearchResult) -> &str {
     match item {
@@ -32,6 +35,7 @@ fn type_prior(item: &SearchResult) -> f32 {
         SearchResult::Artist(_) => 0.06,
         SearchResult::Album(_) => 0.05,
         SearchResult::Playlist(_) => 0.02,
+        SearchResult::Track(track) if track.is_music_video() => -VIDEO_TOP_RESULT_PENALTY,
         SearchResult::Track(_) => 0.0,
     }
 }
@@ -88,7 +92,7 @@ pub fn best_match(query: &str, items: &[SearchResult]) -> Option<SearchResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Album, Artist, Playlist, Track};
+    use crate::domain::{Album, Artist, MusicVideoType, Playlist, Track};
 
     fn track(title: &str, artist: &str) -> SearchResult {
         SearchResult::Track(Track::new("t-1", title, artist))
@@ -187,5 +191,41 @@ mod tests {
         let best = best_match("same", &items).expect("match");
         assert_eq!(entity_name(&best), "Same");
         assert!(matches!(&best, SearchResult::Track(t) if t.artist == "A"));
+    }
+
+    #[test]
+    fn music_video_loses_to_an_equally_named_song() {
+        let video = SearchResult::Track(
+            Track::new("v1", "Midnight City", "M83").with_video_type(MusicVideoType::Omv),
+        );
+        let song = SearchResult::Track(
+            Track::new("s1", "Midnight City", "M83").with_video_type(MusicVideoType::Atv),
+        );
+        let best = best_match("midnight city", &[video, song.clone()]).expect("match");
+        assert_eq!(best, song);
+    }
+
+    #[test]
+    fn exact_music_video_still_wins_over_an_unrelated_song() {
+        let video = SearchResult::Track(
+            Track::new("v1", "Midnight City", "M83").with_video_type(MusicVideoType::Omv),
+        );
+        let song = SearchResult::Track(
+            Track::new("s1", "Starboy", "The Weeknd").with_video_type(MusicVideoType::Atv),
+        );
+        let best = best_match("midnight city", &[video, song]).expect("match");
+        assert!(matches!(&best, SearchResult::Track(track) if track.id == "v1"));
+    }
+
+    #[test]
+    fn video_penalty_lowers_the_top_result_score() {
+        let video = SearchResult::Track(
+            Track::new("v1", "Midnight City", "M83").with_video_type(MusicVideoType::Ugc),
+        );
+        let song = SearchResult::Track(
+            Track::new("s1", "Midnight City", "M83").with_video_type(MusicVideoType::Atv),
+        );
+        let delta = raw_score("midnight city", &song) - raw_score("midnight city", &video);
+        assert!((delta - VIDEO_TOP_RESULT_PENALTY).abs() < 1e-6);
     }
 }
