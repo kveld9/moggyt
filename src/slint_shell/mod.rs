@@ -70,6 +70,9 @@ pub mod play_log;
 pub mod playback;
 pub mod playback_control;
 pub mod playback_failure;
+#[cfg(test)]
+#[path = "playback_phase_trace_tests.rs"]
+mod playback_phase_trace_tests;
 pub mod playback_request;
 pub mod playback_worker;
 pub mod player_bar;
