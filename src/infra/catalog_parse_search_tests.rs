@@ -171,13 +171,10 @@ mod tests {
     fn parse_search_filtered_albums_golden_fixture() {
         let hits = parse_search_all(&fixture_json("catalog_search_filtered_albums.json"));
         assert_eq!(hits.albums.len(), 1);
-        check_album(
-            &hits.albums[0],
-            "MPREb_test_album_1",
-            "Test Album Title",
-            "Test Artist \u{2022} 2024",
-        );
+        check_album(&hits.albums[0], "MPREb_test_album_1", "Test Album Title", "Test Artist");
         check_lh3(hits.albums[0].thumb_url.as_deref(), "test-album-thumb");
+        assert_eq!(hits.albums[0].artist_id.as_deref(), Some("UC_test_artist"));
+        assert_eq!(hits.albums[0].release_type.as_deref(), Some("Album"));
     }
 
     fn test_endpoint(id: &str, page_type: &str) -> Value {
@@ -267,7 +264,9 @@ mod tests {
             "Latin Beats Podcast",
         );
         check_lh3(first.tracks[2].thumb_url.as_deref(), "episode-thumb");
-        check_album(&first.albums[0], "MPREb_single_1", "Eres Mia", "Romeo Santos \u{2022} 2014");
+        check_album(&first.albums[0], "MPREb_single_1", "Eres Mia", "Romeo Santos");
+        assert_eq!(first.albums[0].artist_id.as_deref(), Some("UC_romeo_1"));
+        assert_eq!(first.albums[0].release_type.as_deref(), Some("Single"));
         check_lh3(first.albums[0].thumb_url.as_deref(), "single-thumb");
         check_artist(&first.artists[0], "UC_romeo_1", "Romeo Santos");
         check_lh3(first.artists[0].thumb_url.as_deref(), "artist-thumb");
@@ -381,6 +380,8 @@ mod tests {
         dispatch_bare(&renderer, &mut hits);
         assert_eq!(hits.albums.len(), 1);
         assert_eq!(hits.albums[0].browse_id, "MPREb_un_verano");
+        assert_eq!(hits.albums[0].artist, "Bad Bunny");
         assert_eq!(hits.albums[0].artist_id.as_deref(), Some("UC_bunny"));
+        assert_eq!(hits.albums[0].release_type.as_deref(), Some("Album"));
     }
 }

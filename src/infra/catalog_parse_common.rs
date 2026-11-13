@@ -1,5 +1,6 @@
 //! Shared parsing primitives and renderer extractors for catalog payloads.
 
+use super::catalog_parse_album::{AlbumCredits, apply_credits};
 use crate::domain::{Album, Artist, MusicVideoType, Playlist, SearchResult};
 use crate::infra::spotify_search::video_type_from;
 use serde_json::Value;
@@ -158,27 +159,6 @@ pub fn parse_two_row(renderer: &Value) -> Option<(String, String, Option<String>
     Some((title, subtitle, id))
 }
 
-/// Browse id of the artist credited by a catalog item's metadata runs.
-///
-/// Release and album rows place the item type first ("Single - Toosii",
-/// "Album - Bad Bunny - 2025"), so the credited artist is the run whose browse target is an
-/// artist page rather than the first run.
-pub fn item_artist_id(renderer: &Value) -> Option<String> {
-    const RUN_PATHS: [&str; 2] =
-        ["/subtitle/runs", "/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs"];
-    RUN_PATHS
-        .iter()
-        .find_map(|path| renderer.pointer(path)?.as_array()?.iter().find_map(artist_run_id))
-}
-
-fn artist_run_id(run: &Value) -> Option<String> {
-    if browse_page_type(run) != Some("MUSIC_PAGE_TYPE_ARTIST") {
-        return None;
-    }
-    let id = run.pointer("/navigationEndpoint/browseEndpoint/browseId")?.as_str()?.trim();
-    if id.is_empty() { None } else { Some(id.to_owned()) }
-}
-
 fn parse_mm_ss(mins: &str, secs: &str) -> Option<u32> {
     mins.parse::<u32>().ok()?.checked_mul(60)?.checked_add(secs.parse().ok()?)
 }
@@ -251,7 +231,7 @@ pub fn classify_home_item(
     title: &str,
     subtitle: &str,
     artwork: Option<String>,
-    artist_id: Option<String>,
+    credits: &AlbumCredits,
 ) -> SearchResult {
     if id.starts_with("UC") {
         return SearchResult::Artist(Artist::new(id, title, artwork));
@@ -259,7 +239,7 @@ pub fn classify_home_item(
     if id.starts_with("VL") || id.starts_with("RD") || id.starts_with("FEmusic_") {
         return SearchResult::Playlist(Playlist::new(id, title, 0, artwork));
     }
-    SearchResult::Album(Album::new(id, title, subtitle, artwork).with_artist_id(artist_id))
+    SearchResult::Album(apply_credits(Album::new(id, title, subtitle, artwork), credits))
 }
 
 /// Parses track count integer from subtitle text strings.
@@ -493,110 +473,70 @@ mod tests {
 
     #[test]
     fn classify_home_item_routing() {
-        let artist = classify_home_item("UC_art_1", "ArtTitle", "ArtSub", None, None);
+        let artist =
+            classify_home_item("UC_art_1", "ArtTitle", "ArtSub", None, &AlbumCredits::default());
         assert_eq!(artist, SearchResult::Artist(Artist::new("UC_art_1", "ArtTitle", None)));
 
-        let playlist_vl = classify_home_item("VL_pl_1", "PLTitle", "PLSub", None, None);
+        let playlist_vl =
+            classify_home_item("VL_pl_1", "PLTitle", "PLSub", None, &AlbumCredits::default());
         assert_eq!(
             playlist_vl,
             SearchResult::Playlist(Playlist::new("VL_pl_1", "PLTitle", 0, None))
         );
 
-        let playlist_rd = classify_home_item("RD_radio_1", "RadioTitle", "RadioSub", None, None);
+        let playlist_rd = classify_home_item(
+            "RD_radio_1",
+            "RadioTitle",
+            "RadioSub",
+            None,
+            &AlbumCredits::default(),
+        );
         assert_eq!(
             playlist_rd,
             SearchResult::Playlist(Playlist::new("RD_radio_1", "RadioTitle", 0, None))
         );
 
-        let playlist_fe = classify_home_item("FEmusic_mix", "MixTitle", "MixSub", None, None);
+        let playlist_fe =
+            classify_home_item("FEmusic_mix", "MixTitle", "MixSub", None, &AlbumCredits::default());
         assert_eq!(
             playlist_fe,
             SearchResult::Playlist(Playlist::new("FEmusic_mix", "MixTitle", 0, None))
         );
 
-        let album = classify_home_item(
-            "MPREb_alb_1",
-            "AlbTitle",
-            "AlbSub",
-            None,
-            Some("UC_alb_artist".to_owned()),
-        );
+        let album =
+            classify_home_item("MPREb_alb_1", "AlbTitle", "AlbSub", None, &AlbumCredits::default());
         assert_eq!(
             album,
+            SearchResult::Album(Album::new("MPREb_alb_1", "AlbTitle", "AlbSub", None))
+        );
+    }
+
+    #[test]
+    fn classify_home_item_credits_albums_only() {
+        let credits = AlbumCredits {
+            artist: Some("Toosii".to_owned()),
+            artist_id: Some("UC_toosii".to_owned()),
+            release_type: Some("Single".to_owned()),
+        };
+
+        assert_eq!(
+            classify_home_item("MPREb_alb_1", "Call Me", "Single", None, &credits),
             SearchResult::Album(
-                Album::new("MPREb_alb_1", "AlbTitle", "AlbSub", None)
-                    .with_artist_id(Some("UC_alb_artist".to_owned()))
+                Album::new("MPREb_alb_1", "Call Me", "Toosii", None)
+                    .with_artist_id(Some("UC_toosii".to_owned()))
+                    .with_release_type(Some("Single".to_owned()))
             )
         );
-        if let SearchResult::Album(album) = &album {
-            assert_eq!(album.artist_id.as_deref(), Some("UC_alb_artist"));
-        }
-    }
 
-    #[test]
-    fn item_artist_id_picks_the_credited_artist_run() {
-        let renderer = serde_json::json!({
-            "subtitle": { "runs": [
-                { "text": "Single" },
-                { "text": " • " },
-                { "text": "Toosii", "navigationEndpoint": { "browseEndpoint": {
-                    "browseId": "UC_toosii",
-                    "browseEndpointContextSupportedConfigs": {
-                        "browseEndpointContextMusicConfig": {
-                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
-                        }
-                    }
-                } } }
-            ] }
-        });
-        assert_eq!(item_artist_id(&renderer).as_deref(), Some("UC_toosii"));
-    }
+        assert_eq!(
+            classify_home_item("UC_art_1", "Artist", "Sub", None, &credits),
+            SearchResult::Artist(Artist::new("UC_art_1", "Artist", None))
+        );
 
-    #[test]
-    fn item_artist_id_reads_responsive_album_rows() {
-        let renderer = serde_json::json!({
-            "flexColumns": [
-                { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [
-                    { "text": "Un Verano Sin Ti" }
-                ] } } },
-                { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [
-                    { "text": "Album" },
-                    { "text": " • " },
-                    { "text": "Bad Bunny", "navigationEndpoint": { "browseEndpoint": {
-                        "browseId": "UC_bunny",
-                        "browseEndpointContextSupportedConfigs": {
-                            "browseEndpointContextMusicConfig": {
-                                "pageType": "MUSIC_PAGE_TYPE_ARTIST"
-                            }
-                        }
-                    } } },
-                    { "text": " • " },
-                    { "text": "2022" }
-                ] } } }
-            ]
-        });
-        assert_eq!(item_artist_id(&renderer).as_deref(), Some("UC_bunny"));
-    }
-
-    #[test]
-    fn item_artist_id_is_absent_for_plain_subtitles() {
-        let plain = serde_json::json!({ "subtitle": { "runs": [{ "text": "Album Artist 1" }] } });
-        assert_eq!(item_artist_id(&plain), None);
-
-        let empty_id = serde_json::json!({
-            "subtitle": { "runs": [{ "text": "Single" }, { "text": " • " }, {
-                "text": "Nobody",
-                "navigationEndpoint": { "browseEndpoint": {
-                    "browseId": "   ",
-                    "browseEndpointContextSupportedConfigs": {
-                        "browseEndpointContextMusicConfig": {
-                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
-                        }
-                    }
-                } }
-            }] }
-        });
-        assert_eq!(item_artist_id(&empty_id), None);
+        assert_eq!(
+            classify_home_item("VL_pl_1", "Playlist", "Sub", None, &credits),
+            SearchResult::Playlist(Playlist::new("VL_pl_1", "Playlist", 0, None))
+        );
     }
 
     #[test]

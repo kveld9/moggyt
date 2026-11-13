@@ -166,7 +166,15 @@
                                     "runs": [
                                       { "text": "Single" },
                                       { "text": " \u2022 " },
-                                      { "text": "Romeo Santos" },
+                                      {
+                                        "text": "Romeo Santos",
+                                        "navigationEndpoint": {
+                                          "browseEndpoint": {
+                                            "browseId": "UC_romeo_1",
+                                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                          }
+                                        }
+                                      },
                                       { "text": " \u2022 " },
                                       { "text": "2014" }
                                     ]

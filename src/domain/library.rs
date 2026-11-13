@@ -15,6 +15,9 @@ pub struct Album {
     /// Browse id of the credited artist when the catalog item carries one.
     #[serde(default)]
     pub artist_id: Option<String>,
+    /// Release type label carried by the payload ("Single", "Album", "EP"), when present.
+    #[serde(default)]
+    pub release_type: Option<String>,
 }
 
 impl Album {
@@ -25,6 +28,7 @@ impl Album {
             artist: artist.to_owned(),
             artwork,
             artist_id: None,
+            release_type: None,
         }
     }
 
@@ -38,8 +42,23 @@ impl Album {
         self
     }
 
+    pub fn with_release_type(mut self, release_type: Option<String>) -> Self {
+        self.release_type = release_type;
+        self
+    }
+
     pub fn display(&self) -> String {
         format!("{} - {}", self.title, self.artist)
+    }
+
+    /// Caption shown under the album title: release type, then the credited artist.
+    pub fn caption(&self) -> String {
+        let artist = self.artist.trim();
+        match self.release_type.as_deref() {
+            Some(kind) if !artist.is_empty() => format!("{kind} \u{2022} {artist}"),
+            Some(kind) => kind.to_owned(),
+            None => artist.to_owned(),
+        }
     }
 }
 
@@ -377,6 +396,26 @@ mod tests {
         let tagged = album.with_artist_id(Some("UC_artist".to_owned()));
         assert_eq!(tagged.artist_id.as_deref(), Some("UC_artist"));
         assert_eq!(tagged.display(), "Album - Single");
+    }
+
+    #[test]
+    fn album_caption_combines_release_type_and_artist() {
+        let album = Album::new("a1", "Call Me", "Toosii", None);
+        assert_eq!(album.caption(), "Toosii");
+
+        let single = album.with_release_type(Some("Single".to_owned()));
+        assert_eq!(single.caption(), "Single \u{2022} Toosii");
+        assert_eq!(single.display(), "Call Me - Toosii");
+    }
+
+    #[test]
+    fn album_caption_handles_missing_parts() {
+        let typed =
+            Album::new("a1", "Call Me", "  ", None).with_release_type(Some("EP".to_owned()));
+        assert_eq!(typed.caption(), "EP");
+
+        let empty = Album::new("a2", "Call Me", " ", None);
+        assert_eq!(empty.caption(), "");
     }
 
     #[test]

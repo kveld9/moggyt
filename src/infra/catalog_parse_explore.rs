@@ -1,8 +1,9 @@
 //! Explore feed response parser for charts, releases, and genre shelves.
 
+use super::catalog_parse_album::album_credits;
 use super::catalog_parse_common::{
-    best_thumbnail, browse_of, classify_home_item, extract_two_row_duration, item_artist_id,
-    parse_two_row, watch_video_id,
+    best_thumbnail, browse_of, classify_home_item, extract_two_row_duration, parse_two_row,
+    watch_video_id,
 };
 use super::catalog_parse_detail::{build_detail_track, detail_artist, detail_title};
 use crate::domain::{Playlist, SearchResult, Shelf, Track};
@@ -58,14 +59,14 @@ fn parse_explore_responsive(renderer: &Value) -> Option<SearchResult> {
     let browse_id = browse_of(renderer)?;
     let artist = detail_artist(renderer);
     let thumb = best_thumbnail(renderer);
-    Some(classify_home_item(&browse_id, &title, &artist, thumb, item_artist_id(renderer)))
+    Some(classify_home_item(&browse_id, &title, &artist, thumb, &album_credits(renderer)))
 }
 
 fn parse_explore_two_row(renderer: &Value) -> Option<SearchResult> {
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let thumb = best_thumbnail(renderer);
     if let Some(id) = browse_id {
-        return Some(classify_home_item(&id, &title, &subtitle, thumb, item_artist_id(renderer)));
+        return Some(classify_home_item(&id, &title, &subtitle, thumb, &album_credits(renderer)));
     }
     let vid = watch_video_id(renderer)?;
     let mut track = Track::new(&vid, &title, &subtitle);
@@ -556,8 +557,9 @@ mod tests {
         assert_eq!(
             shelves[0].items[0],
             SearchResult::Album(
-                Album::new("MPREb_call_me", "Call Me", "Single", None)
+                Album::new("MPREb_call_me", "Call Me", "Toosii", None)
                     .with_artist_id(Some("UC_toosii".to_owned()))
+                    .with_release_type(Some("Single".to_owned()))
             )
         );
     }

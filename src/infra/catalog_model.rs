@@ -28,6 +28,8 @@ pub struct RawAlbum {
     pub thumb_url: Option<String>,
     /// Browse id of the artist credited by the hit, when the payload carries it.
     pub artist_id: Option<String>,
+    /// Release type label carried by the hit ("Single", "Album", "EP"), when present.
+    pub release_type: Option<String>,
 }
 
 /// Parsed artist hit from catalog API search.
@@ -95,6 +97,7 @@ mod tests {
             artist: "Art".into(),
             thumb_url: None,
             artist_id: None,
+            release_type: None,
         });
         assert!(!with_album.is_empty());
 

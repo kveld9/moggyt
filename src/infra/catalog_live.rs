@@ -92,7 +92,8 @@ fn map_albums(albums: Vec<RawAlbum>) -> impl Iterator<Item = SearchResult> {
     albums.into_iter().map(|a| {
         SearchResult::Album(
             Album::new(&a.browse_id, &a.title, &a.artist, a.thumb_url)
-                .with_artist_id(a.artist_id.clone()),
+                .with_artist_id(a.artist_id.clone())
+                .with_release_type(a.release_type.clone()),
         )
     })
 }
@@ -226,6 +227,7 @@ mod tests {
                 artist: "Art".into(),
                 thumb_url: Some("https://artwork.test/alb1".into()),
                 artist_id: None,
+                release_type: None,
             }],
             artists: vec![RawArtist {
                 browse_id: "ar1".into(),
