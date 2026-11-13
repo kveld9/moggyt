@@ -349,6 +349,7 @@ impl SlintAppState {
         if self.songs_only {
             items = crate::domain::retain_song_results(items);
         }
+        items = crate::domain::songs_first(items);
         self.search_results = items
             .iter()
             .filter_map(|it| match it {

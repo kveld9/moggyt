@@ -142,4 +142,25 @@ mod tests {
         state.home_shelves = shelves_with(Vec::new());
         assert!(!state.has_search_results());
     }
+
+    #[test]
+    fn submit_search_ranks_songs_ahead_of_music_videos() {
+        use crate::domain::MusicVideoType;
+        use crate::slint_shell::test_support::{MockLibraryCatalog, wrap_mock_catalog};
+
+        let video = SearchResult::Track(
+            Track::new("v1", "Alpha Live", "Artist").with_video_type(MusicVideoType::Omv),
+        );
+        let song = SearchResult::Track(
+            Track::new("s1", "Alpha", "Artist").with_video_type(MusicVideoType::Atv),
+        );
+        let catalog = MockLibraryCatalog::default()
+            .with_search_filtered(Ok(vec![video.clone(), song.clone()]));
+        let mut state = test_wired();
+        state.catalog = wrap_mock_catalog(catalog);
+
+        state.submit_search("zzz");
+
+        assert_eq!(state.home_shelves[0].items, vec![song, video]);
+    }
 }
