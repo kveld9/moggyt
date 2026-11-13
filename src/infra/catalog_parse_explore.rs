@@ -2,8 +2,8 @@
 
 use super::catalog_parse_album::album_credits;
 use super::catalog_parse_common::{
-    best_thumbnail, browse_of, classify_home_item, extract_two_row_duration, parse_two_row,
-    watch_video_id,
+    best_thumbnail, browse_of, classify_home_item, extract_two_row_duration, is_non_music_audio,
+    parse_two_row, watch_video_id,
 };
 use super::catalog_parse_detail::{build_detail_track, detail_artist, detail_title};
 use crate::domain::{Playlist, SearchResult, Shelf, Track};
@@ -55,6 +55,9 @@ fn parse_explore_responsive(renderer: &Value) -> Option<SearchResult> {
     if let Some(track) = build_detail_track(renderer) {
         return Some(SearchResult::Track(track));
     }
+    if is_non_music_audio(renderer) {
+        return None;
+    }
     let title = detail_title(renderer)?;
     let browse_id = browse_of(renderer)?;
     let artist = detail_artist(renderer);
@@ -66,6 +69,9 @@ fn parse_explore_two_row(renderer: &Value) -> Option<SearchResult> {
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let thumb = best_thumbnail(renderer);
     if let Some(id) = browse_id {
+        if is_non_music_audio(renderer) {
+            return None;
+        }
         return Some(classify_home_item(&id, &title, &subtitle, thumb, &album_credits(renderer)));
     }
     let vid = watch_video_id(renderer)?;
@@ -562,5 +568,23 @@ mod tests {
                     .with_release_type(Some("Single".to_owned()))
             )
         );
+    }
+
+    #[test]
+    fn parse_explore_two_row_skips_non_music_audio() {
+        let renderer = serde_json::json!({
+            "title": { "runs": [{ "text": "Vini - Aria" }] },
+            "subtitle": { "runs": [{ "text": "8 min 9 s" }] },
+            "navigationEndpoint": { "browseEndpoint": {
+                "browseId": "MPED_audio_1",
+                "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                    }
+                }
+            } }
+        });
+
+        assert_eq!(parse_explore_two_row(&renderer), None);
     }
 }

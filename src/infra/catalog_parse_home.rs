@@ -1,7 +1,9 @@
 //! Home carousel shelf response parser for browse payloads.
 
 use super::catalog_parse_album::album_credits;
-use super::catalog_parse_common::{best_thumbnail, classify_home_item, parse_two_row};
+use super::catalog_parse_common::{
+    best_thumbnail, classify_home_item, is_non_music_audio, parse_two_row,
+};
 use crate::domain::{SearchResult, Shelf};
 use serde_json::Value;
 
@@ -31,6 +33,9 @@ fn carousel_shelf_title(shelf: &Value) -> Option<String> {
 
 fn parse_carousel_item(item: &Value) -> Option<SearchResult> {
     let renderer = item.get("musicTwoRowItemRenderer")?;
+    if is_non_music_audio(renderer) {
+        return None;
+    }
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let id = browse_id?;
     let thumb = best_thumbnail(renderer);
@@ -171,5 +176,47 @@ mod tests {
                 Some("https://yt3.googleusercontent.com/home-large.jpg".to_owned())
             ))
         );
+    }
+
+    #[test]
+    fn parse_carousel_item_skips_non_music_audio() {
+        let audio = serde_json::json!({ "musicTwoRowItemRenderer": {
+            "title": { "runs": [{ "text": "Vini - Aria" }] },
+            "subtitle": { "runs": [
+                { "text": "8 min 9 s" },
+                { "text": " - " },
+                { "text": "Dj Vini", "navigationEndpoint": { "browseEndpoint": {
+                    "browseId": "UC_dj_vini",
+                    "browseEndpointContextSupportedConfigs": {
+                        "browseEndpointContextMusicConfig": {
+                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                        }
+                    }
+                } } }
+            ] },
+            "navigationEndpoint": { "browseEndpoint": {
+                "browseId": "MPED_audio_1",
+                "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                    }
+                }
+            } }
+        } });
+        assert_eq!(parse_carousel_item(&audio), None);
+
+        let album = serde_json::json!({ "musicTwoRowItemRenderer": {
+            "title": { "runs": [{ "text": "Call Me" }] },
+            "subtitle": { "runs": [{ "text": "Toosii" }] },
+            "navigationEndpoint": { "browseEndpoint": {
+                "browseId": "MPREb_call_me",
+                "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_ALBUM"
+                    }
+                }
+            } }
+        } });
+        assert!(parse_carousel_item(&album).is_some());
     }
 }

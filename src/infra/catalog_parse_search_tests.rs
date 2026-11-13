@@ -384,4 +384,40 @@ mod tests {
         assert_eq!(hits.albums[0].artist_id.as_deref(), Some("UC_bunny"));
         assert_eq!(hits.albums[0].release_type.as_deref(), Some("Album"));
     }
+
+    #[test]
+    fn parse_search_drops_non_music_audio_hits() {
+        let renderer = serde_json::json!({
+            "flexColumns": [
+                { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [
+                    { "text": "Vini - Aria" }
+                ] } } },
+                { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [
+                    { "text": "Single" },
+                    { "text": " \u{2022} " },
+                    { "text": "Dj Vini", "navigationEndpoint": { "browseEndpoint": {
+                        "browseId": "UC_dj_vini",
+                        "browseEndpointContextSupportedConfigs": {
+                            "browseEndpointContextMusicConfig": {
+                                "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                            }
+                        }
+                    } } }
+                ] } } }
+            ],
+            "navigationEndpoint": { "browseEndpoint": {
+                "browseId": "MPED_audio_1",
+                "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                    }
+                }
+            } }
+        });
+
+        let mut hits = SearchHits::default();
+        dispatch_bare(&renderer, &mut hits);
+        assert!(hits.albums.is_empty());
+        assert!(hits.tracks.is_empty());
+    }
 }
