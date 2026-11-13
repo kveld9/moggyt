@@ -17,12 +17,18 @@ pub struct AlbumCredits {
 }
 
 /// Parses the credited artist, its browse id, and the release type from a catalog item.
+///
+/// A release type is only accepted when the payload also credits an artist: without an artist run
+/// the first run is ordinary subtitle text, not a metadata column with a type label.
 pub fn album_credits(renderer: &Value) -> AlbumCredits {
     let Some(runs) = metadata_runs(renderer) else {
         return AlbumCredits::default();
     };
+    let Some(artist) = artist_text(runs) else {
+        return AlbumCredits::default();
+    };
     AlbumCredits {
-        artist: artist_text(runs),
+        artist: Some(artist),
         artist_id: runs.iter().find_map(artist_run_id),
         release_type: release_type_text(runs),
     }
@@ -67,8 +73,12 @@ fn artist_text(runs: &[Value]) -> Option<String> {
 }
 
 fn release_type_text(runs: &[Value]) -> Option<String> {
-    let head = runs.first()?.get("text")?.as_str()?.trim();
-    if is_type_label(head) { Some(head.to_owned()) } else { None }
+    let head = runs.first()?;
+    if is_artist_run(head) {
+        return None;
+    }
+    let text = head.get("text")?.as_str()?.trim();
+    if is_type_label(text) { Some(text.to_owned()) } else { None }
 }
 
 /// Item-type labels the catalog prepends to a release or metadata run list.
@@ -251,5 +261,38 @@ mod tests {
                 .with_artist_id(Some("UC_toosii".to_owned()))
                 .with_release_type(Some("Single".to_owned()))
         );
+    }
+
+    #[test]
+    fn album_credits_without_artist_runs_ignore_the_type_label() {
+        let plain = serde_json::json!({ "subtitle": { "runs": [{ "text": "Single" }] } });
+        assert_eq!(album_credits(&plain), AlbumCredits::default());
+
+        let album =
+            apply_credits(Album::new("a1", "Call Me", "Single", None), &album_credits(&plain));
+        assert_eq!(album.artist, "Single");
+        assert_eq!(album.release_type, None);
+        assert_eq!(album.caption(), "Single");
+    }
+
+    #[test]
+    fn album_credits_ignore_a_head_run_that_is_an_artist_link() {
+        let renderer = serde_json::json!({
+            "subtitle": { "runs": [
+                { "text": "Single", "navigationEndpoint": { "browseEndpoint": {
+                    "browseId": "UC_single_band",
+                    "browseEndpointContextSupportedConfigs": {
+                        "browseEndpointContextMusicConfig": {
+                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                        }
+                    }
+                } } }
+            ] }
+        });
+
+        let credits = album_credits(&renderer);
+        assert_eq!(credits.artist.as_deref(), Some("Single"));
+        assert_eq!(credits.artist_id.as_deref(), Some("UC_single_band"));
+        assert_eq!(credits.release_type, None);
     }
 }
