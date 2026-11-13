@@ -397,6 +397,8 @@ player bar: link copied, copy failure, added to the queue, playing next, and fav
 removed. Each toast shows the action's icon, fades and slides in, hugs its message, stacks up to
 three, and disappears after three seconds while a thin accent line along its bottom edge shrinks to
 zero.
+A track that fails to start playback reports it with the same toast, naming the track, while the
+player bar keeps the current track metadata.
 
 ## Keyboard Shortcuts
 
