@@ -3,8 +3,8 @@
 use super::catalog_model::{RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits};
 use super::catalog_parse_album::{album_credits, is_type_label};
 use super::catalog_parse_common::{
-    best_thumbnail, browse_of, browse_page_type, flex_text, music_video_type, parse_duration_secs,
-    parse_runs_duration, parse_two_row, watch_video_id,
+    best_thumbnail, browse_of, browse_page_type, flex_text, is_non_music_audio, music_video_type,
+    parse_duration_secs, parse_runs_duration, parse_two_row, watch_video_id,
 };
 use crate::domain::SearchFilter;
 use serde_json::Value;
@@ -175,6 +175,9 @@ fn dispatch_two_row(category: SearchFilter, renderer: &Value, hits: &mut SearchH
     let thumb_url = best_thumbnail(renderer);
     match category {
         SearchFilter::Albums => {
+            if is_non_music_audio(renderer) {
+                return;
+            }
             let credits = album_credits(renderer);
             hits.albums.push(RawAlbum {
                 browse_id: id,
@@ -365,6 +368,9 @@ fn dispatch_category(
     let thumb_url = best_thumbnail(renderer);
     match cat {
         SearchFilter::Albums => {
+            if is_non_music_audio(renderer) {
+                return;
+            }
             let credits = album_credits(renderer);
             hits.albums.push(RawAlbum {
                 browse_id,

@@ -151,6 +151,15 @@ pub fn browse_page_type(renderer: &Value) -> Option<&str> {
     None
 }
 
+/// Returns true when the item is a non-music audio page: uploaded mixes, sets, and similar.
+///
+/// The catalog mixes them into album shelves, but their browse page is not an album and carries no
+/// watch id, so they cannot be opened or played as a music item and are dropped instead of being
+/// misclassified as albums.
+pub fn is_non_music_audio(renderer: &Value) -> bool {
+    browse_page_type(renderer) == Some("MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE")
+}
+
 /// Parses title, subtitle, and optional browse ID from a two-row item renderer.
 pub fn parse_two_row(renderer: &Value) -> Option<(String, String, Option<String>)> {
     let title = two_row_title(renderer)?;
@@ -300,6 +309,35 @@ mod tests {
 
         let empty = serde_json::json!({});
         assert_eq!(browse_page_type(&empty), None);
+    }
+
+    #[test]
+    fn non_music_audio_detection() {
+        let audio = serde_json::json!({
+            "navigationEndpoint": { "browseEndpoint": {
+                "browseId": "MPED_audio_1",
+                "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                    }
+                }
+            } }
+        });
+        assert!(is_non_music_audio(&audio));
+
+        let album = serde_json::json!({
+            "navigationEndpoint": { "browseEndpoint": {
+                "browseId": "MPREb_album_1",
+                "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_ALBUM"
+                    }
+                }
+            } }
+        });
+        assert!(!is_non_music_audio(&album));
+
+        assert!(!is_non_music_audio(&serde_json::json!({})));
     }
 
     #[test]
