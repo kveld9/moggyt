@@ -1,5 +1,7 @@
 //! Single playback transition request builder and dispatch authority.
 
+use crate::domain::PlaybackPhase;
+
 #[cfg(test)]
 use crate::slint_shell::playback_worker::PlaybackWorkerAdapters;
 use crate::slint_shell::playback_worker::{
@@ -13,11 +15,15 @@ impl SlintAppState {
     /// Runs the sleep-timer track-change hook for the target track before bumping the
     /// generation. The hook pauses audio and returns true for `StopAfterTrack`; returning
     /// `None` means no request is dispatched for that transition.
+    ///
+    /// Marks the phase as `Resolving` so a track that already reached `Ended` cannot advance
+    /// the queue again before the new stream starts.
     pub fn begin_play_request(&mut self) -> Option<PlayTrackRequest> {
         let track = self.queue.current().cloned()?;
         if self.on_track_changing_sleep_timer(&track.id) {
             return None;
         }
+        self.set_playback_phase(PlaybackPhase::Resolving);
         self.play_generation = self.play_generation.wrapping_add(1);
         let generation = self.play_generation;
         self.maybe_scrobble_current();
@@ -82,8 +88,10 @@ impl SlintAppState {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use crate::domain::Track;
-    use crate::slint_shell::test_support::test_wired;
+    use crate::slint_shell::test_support::{EndedAudio, test_wired};
 
     #[test]
     fn begin_play_request_bumps_generation_and_targets_current_track() {
@@ -186,5 +194,25 @@ mod tests {
 
         assert_eq!(request.track_id, "plain");
         assert_eq!(request.prefetch_stream_id, None);
+    }
+
+    #[test]
+    fn play_request_after_ended_does_not_skip_the_rest_of_the_queue() {
+        use crate::domain::PlaybackPhase;
+
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1").with_duration(180));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2").with_duration(180));
+        state.queue.push(Track::new("t3", "Track 3", "Artist 3").with_duration(180));
+        state.audio = Arc::new(Mutex::new(Box::new(EndedAudio::new("t1", 180))));
+
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+        assert_eq!(state.playback_phase, PlaybackPhase::Resolving);
+
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+        state.continue_autoplay_if_ended();
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
     }
 }
