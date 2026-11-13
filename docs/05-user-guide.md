@@ -35,6 +35,8 @@ The search view accepts queries for tracks, artists, and albums, and maintains a
     indicates no recent searches.
 - **Search Execution**: type your query into the input field and press `Enter` or click `Search` to view filtered
   search results.
+- **Ordering**: result lists rank audio tracks ahead of music videos; the relative order inside
+  each group follows the catalog response.
 - **Top result**: when one catalog hit clearly matches the query, a `Top result` card appears above the
   result list with its artwork, name, and type. Clicking it opens that album, artist, or playlist, or plays
   the track when the top result is a song. The promoted hit is not repeated in the list below. Queries with

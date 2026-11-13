@@ -19,6 +19,7 @@ mod sleep_timer;
 mod theme;
 mod top_result;
 mod version_override;
+mod videos;
 
 pub use artist_match::{
     TOPIC_CHANNEL_SUFFIX, artist_score, split_source_artists, strip_topic_suffix,
@@ -61,3 +62,4 @@ pub use theme::{
 };
 pub use top_result::{MIN_TOP_RESULT_SCORE, best_match, entity_name, score_top_result};
 pub use version_override::{MAX_VERSION_OVERRIDES, VersionOverrideError, VersionOverrides};
+pub use videos::songs_first;

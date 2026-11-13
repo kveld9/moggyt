@@ -36,6 +36,7 @@ pub fn execute_search<C: Catalog>(
         if songs_only {
             items = crate::domain::retain_song_results(items);
         }
+        items = crate::domain::songs_first(items);
         let mut shelf = Shelf::new(tr(locale, "Search Results"));
         shelf.items = items;
         vec![shelf]
@@ -54,5 +55,25 @@ mod tests {
         let query = SearchQuery::parse("test").expect("valid query");
         let results = resolve_search(&catalog, &query).expect("results ok");
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_execute_search_ranks_songs_ahead_of_music_videos() {
+        use crate::domain::{MusicVideoType, Track};
+
+        let video = SearchResult::Track(
+            Track::new("v1", "Video", "Artist").with_video_type(MusicVideoType::Omv),
+        );
+        let song = SearchResult::Track(
+            Track::new("s1", "Song", "Artist").with_video_type(MusicVideoType::Atv),
+        );
+        let catalog = MockLibraryCatalog::default()
+            .with_search_filtered(Ok(vec![video.clone(), song.clone()]));
+        let cat = Arc::new(Mutex::new(catalog));
+        let query = SearchQuery::parse("zzz").expect("valid query");
+
+        let (_, _, shelves) = execute_search(1, &query, &cat, Locale::English, false);
+
+        assert_eq!(shelves.expect("shelves ok")[0].items, vec![song, video]);
     }
 }
