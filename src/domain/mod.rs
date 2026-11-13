@@ -62,4 +62,4 @@ pub use theme::{
 };
 pub use top_result::{MIN_TOP_RESULT_SCORE, best_match, entity_name, score_top_result};
 pub use version_override::{MAX_VERSION_OVERRIDES, VersionOverrideError, VersionOverrides};
-pub use videos::songs_first;
+pub use videos::{apply_detail_policy, apply_result_policy, apply_shelf_policy, songs_first};

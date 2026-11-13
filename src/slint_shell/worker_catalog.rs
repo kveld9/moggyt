@@ -33,10 +33,7 @@ pub fn execute_search<C: Catalog>(
         .map_err(|_| CatalogError::Transport)
         .and_then(|c| resolve_search(&*c, query));
     let shelves = res.map(|mut items| {
-        if songs_only {
-            items = crate::domain::retain_song_results(items);
-        }
-        items = crate::domain::songs_first(items);
+        items = crate::domain::apply_result_policy(items, songs_only);
         let mut shelf = Shelf::new(tr(locale, "Search Results"));
         shelf.items = items;
         vec![shelf]

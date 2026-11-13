@@ -235,29 +235,15 @@ impl Track {
 
 /// Drops music videos (OMV and UGC) from `tracks`, preserving songs and unknown types.
 ///
-/// Invariant: if dropping music videos would remove every track from a non-empty
-/// list, the input list is returned unchanged so playback is never stalled.
+/// Invariant: every music video is removed, even when that leaves an empty list.
 pub fn retain_songs(tracks: Vec<Track>) -> Vec<Track> {
-    if tracks.iter().all(|t| t.is_music_video()) {
-        tracks
-    } else {
-        tracks.into_iter().filter(|t| !t.is_music_video()).collect()
-    }
+    tracks.into_iter().filter(|track| !track.is_music_video()).collect()
 }
 
 /// Drops music video track results from `items`, keeping non-track results in order.
 ///
-/// Invariant: if the input contained at least one track and dropping videos would
-/// leave zero tracks, the input list is returned unchanged.
+/// Invariant: every music video track is removed, even when that leaves no tracks.
 pub fn retain_song_results(items: Vec<SearchResult>) -> Vec<SearchResult> {
-    let had_tracks = items.iter().any(|item| matches!(item, SearchResult::Track(_)));
-    let songs_survive = items.iter().any(|item| match item {
-        SearchResult::Track(track) => !track.is_music_video(),
-        _ => false,
-    });
-    if had_tracks && !songs_survive {
-        return items;
-    }
     items
         .into_iter()
         .filter(|item| match item {
@@ -458,11 +444,11 @@ mod tests {
     }
 
     #[test]
-    fn retain_songs_fallback_when_all_are_videos() {
+    fn retain_songs_drops_every_track_when_all_are_videos() {
         let omv = Track::new("t1", "OMV", "Artist").with_video_type(MusicVideoType::Omv);
         let ugc = Track::new("t2", "UGC", "Artist").with_video_type(MusicVideoType::Ugc);
-        let input = vec![omv.clone(), ugc.clone()];
-        assert_eq!(retain_songs(input), vec![omv, ugc]);
+        let input = vec![omv, ugc];
+        assert_eq!(retain_songs(input), Vec::<Track>::new());
     }
 
     #[test]
@@ -487,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn retain_song_results_fallback_when_no_tracks_survive() {
+    fn retain_song_results_drops_videos_even_when_no_track_survives() {
         let album = SearchResult::Album(crate::domain::Album::new("a1", "Alb", "Art", None));
         let omv = SearchResult::Track(
             Track::new("t1", "OMV", "Art").with_video_type(MusicVideoType::Omv),
@@ -495,8 +481,8 @@ mod tests {
         let ugc = SearchResult::Track(
             Track::new("t2", "UGC", "Art").with_video_type(MusicVideoType::Ugc),
         );
-        let input = vec![album.clone(), omv.clone(), ugc.clone()];
-        assert_eq!(retain_song_results(input), vec![album, omv, ugc]);
+        let input = vec![album.clone(), omv, ugc];
+        assert_eq!(retain_song_results(input), vec![album]);
     }
 
     #[test]

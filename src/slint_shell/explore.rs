@@ -76,8 +76,8 @@ pub(crate) fn apply_explore_outcome(
 ) {
     match result {
         Ok(shelves) => {
-            let is_empty = shelves.is_empty();
-            st.explore_shelves = shelves;
+            st.explore_shelves = crate::domain::apply_shelf_policy(shelves, st.songs_only);
+            let is_empty = st.explore_shelves.is_empty();
             st.explore_loaded = true;
             st.explore_loading = false;
             st.explore_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
@@ -96,8 +96,8 @@ pub(crate) fn apply_category_outcome(
 ) {
     match result {
         Ok(shelves) => {
-            let is_empty = shelves.is_empty();
-            st.category_shelves = shelves;
+            st.category_shelves = crate::domain::apply_shelf_policy(shelves, st.songs_only);
+            let is_empty = st.category_shelves.is_empty();
             st.category_loading = false;
             st.category_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
         }

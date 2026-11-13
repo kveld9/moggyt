@@ -290,7 +290,7 @@ impl StaticLabels {
             audio_quality_low_label: tr(locale, "Low (<=64 kbps)"),
             audio_quality_standard_label: tr(locale, "Standard (~128 kbps)"),
             audio_quality_high_label: tr(locale, "High (AAC max ~130 kbps)"),
-            songs_only_label: tr(locale, "Prefer songs over music videos"),
+            songs_only_label: tr(locale, "Hide music videos"),
             autoplay_label: tr(locale, "Autoplay similar tracks"),
             crossfade: tr(locale, "Crossfade"),
             crossfade_hint: tr(locale, "Smooth transition between tracks"),

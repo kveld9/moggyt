@@ -210,6 +210,7 @@ fn apply_detail_outcome(
     }
     match detail {
         Ok(Some(detail)) => {
+            let detail = crate::domain::apply_detail_policy(detail, state.songs_only);
             let is_empty = detail_is_empty(&detail);
             state.detail = apply_detail_result(Some(detail), id, state.locale);
             state.detail_error = None;

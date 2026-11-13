@@ -118,10 +118,7 @@ mod tests {
         assert_eq!(tr(Locale::Spanish, "Show skip 10s buttons"), "Mostrar botones +/-10s");
         assert_eq!(tr(Locale::Spanish, "Show queue button"), "Mostrar botón de cola");
         assert_eq!(tr(Locale::Spanish, "Show volume slider"), "Mostrar control de volumen");
-        assert_eq!(
-            tr(Locale::Spanish, "Prefer songs over music videos"),
-            "Preferir canciones a videoclips"
-        );
+        assert_eq!(tr(Locale::Spanish, "Hide music videos"), "Ocultar videoclips");
 
         // Stats page labels
         assert_eq!(tr(Locale::Spanish, "Last 4 weeks"), "Últimas 4 semanas");

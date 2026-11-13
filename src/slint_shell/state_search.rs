@@ -163,4 +163,26 @@ mod tests {
 
         assert_eq!(state.home_shelves[0].items, vec![song, video]);
     }
+
+    #[test]
+    fn submit_search_removes_music_videos_when_hide_is_enabled() {
+        use crate::domain::MusicVideoType;
+        use crate::slint_shell::test_support::{MockLibraryCatalog, wrap_mock_catalog};
+
+        let video = SearchResult::Track(
+            Track::new("v1", "Alpha Live", "Artist").with_video_type(MusicVideoType::Omv),
+        );
+        let song = SearchResult::Track(
+            Track::new("s1", "Alpha", "Artist").with_video_type(MusicVideoType::Atv),
+        );
+        let catalog =
+            MockLibraryCatalog::default().with_search_filtered(Ok(vec![song.clone(), video]));
+        let mut state = test_wired();
+        state.songs_only = true;
+        state.catalog = wrap_mock_catalog(catalog);
+
+        state.submit_search("zzz");
+
+        assert_eq!(state.home_shelves[0].items, vec![song]);
+    }
 }

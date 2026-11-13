@@ -48,7 +48,8 @@ src/
 │   ├── sleep_timer.rs # Sleep timer state, presets, and faded volume calculation
 │   ├── theme.rs       # Theme identifiers, RGB palettes, and player bar presentation modes
 │   ├── top_result.rs  # Ranked top-result selection for catalog search
-│   └── version_override.rs # Recording alternative overrides (catalog ID to replacement track)
+│   ├── version_override.rs # Recording alternative overrides (catalog ID to replacement track)
+│   └── videos.rs      # Music-video ordering and visibility policy for catalog results
 └── infra/             # Ports and adapters: real I/O and deterministic test stubs
     ├── atomic_file.rs # Crash-safe atomic file persistence and stale temp file cleanup
     ├── audio*.rs      # AudioBackend port, Rodio dual-sink crossfade, rubato resampler, DSP filters

@@ -24,8 +24,8 @@ impl SlintAppState {
             .map_or(Err(CatalogError::Transport), |c| c.category_shelves(trimmed, params));
         match res {
             Ok(shelves) => {
-                let is_empty = shelves.is_empty();
-                self.category_shelves = shelves;
+                self.category_shelves = crate::domain::apply_shelf_policy(shelves, self.songs_only);
+                let is_empty = self.category_shelves.is_empty();
                 self.category_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
             }
             Err(_) => {
@@ -107,5 +107,34 @@ mod tests {
         assert_eq!(state.category_phase, ViewPhase::Error);
         assert_eq!(state.category_shelves.len(), 1);
         assert_eq!(state.category_shelves[0].title, "Previous");
+    }
+
+    #[test]
+    fn category_hides_music_videos_when_the_option_is_enabled() {
+        use crate::domain::{MusicVideoType, SearchResult, Shelf, Track};
+        use crate::slint_shell::test_support::{MockLibraryCatalog, wrap_mock_catalog};
+
+        let shelf = Shelf {
+            title: "Songs".to_owned(),
+            items: vec![
+                SearchResult::Track(
+                    Track::new("v1", "Video", "Artist").with_video_type(MusicVideoType::Omv),
+                ),
+                SearchResult::Track(
+                    Track::new("s1", "Song", "Artist").with_video_type(MusicVideoType::Atv),
+                ),
+            ],
+        };
+        let catalog = MockLibraryCatalog::default().with_category(Ok(vec![shelf]));
+        let mut state = test_wired();
+        state.songs_only = true;
+        state.catalog = wrap_mock_catalog(catalog);
+
+        state.open_category("id", None, "Title");
+
+        let expected = SearchResult::Track(
+            Track::new("s1", "Song", "Artist").with_video_type(MusicVideoType::Atv),
+        );
+        assert_eq!(state.category_shelves[0].items, vec![expected]);
     }
 }

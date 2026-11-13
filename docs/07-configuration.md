@@ -186,11 +186,12 @@ The configuration file uses JSON serialization with atomic replacement:
     decoded with the bundled libopus and falls back through `[141, 140, 250, 139]`. Note that itag 141
     (~256 kbps AAC) requires a Premium session. yt-dlp uses selector
     `"bestaudio[ext=webm][acodec=opus]/bestaudio[ext=m4a]/bestaudio/best"`.
-- **Prefer Songs Over Videos (`songs_only`)**:
-  - `false`: Search results and autoplay radio retain both official tracks and music videos (default).
-  - `true`: Search results and autoplay radio drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks
-    (`ATV`) and unknown types. If dropping music videos would remove every track from a result list, the fallback
-    preserves the original list unfiltered so playback and autoplay do not stall.
+- **Hide Music Videos (`songs_only`)**:
+  - `false`: Catalog browse surfaces retain music videos, ranked after audio tracks (default).
+  - `true`: Search results, Explore and category shelves, remote album/playlist/artist track lists, and autoplay radio
+    drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks (`ATV`) and unknown types. A list
+    composed only of music videos becomes empty instead of falling back to videos. The playback queue, locally saved
+    playlists, import matching, and the audio version picker are not filtered.
 - **Autoplay Continuation (`autoplay_enabled`)**:
   - `false`: Playback ends when the current queue reaches the end (default).
   - `true`: When enabled, the queue keeps going with catalog radio recommendations after the last track.
