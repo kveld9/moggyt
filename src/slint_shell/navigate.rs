@@ -87,10 +87,22 @@ pub(crate) fn open_named_detail_async(
     });
 }
 
+/// Artist name of the track under the queue cursor, trimmed.
+///
+/// Returns `None` when nothing is playing or the artist field is blank.
+pub(crate) fn current_artist_query(state: &SlintAppState) -> Option<String> {
+    let artist = state.queue.current()?.artist.trim();
+    if artist.is_empty() {
+        return None;
+    }
+    Some(artist.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::domain::{Album, Artist, Playlist, Track};
+    use crate::slint_shell::test_support::test_wired;
 
     #[test]
     fn first_container_id_picks_the_first_matching_kind() {
@@ -110,5 +122,18 @@ mod tests {
     fn first_container_id_returns_the_first_playlist() {
         let items = vec![SearchResult::Playlist(Playlist::new("pl1", "List", 3, None))];
         assert_eq!(first_container_id(&items, DetailKind::Playlist), Some("pl1".to_owned()));
+    }
+
+    #[test]
+    fn current_artist_query_returns_the_trimmed_artist_of_the_current_track() {
+        let mut state = test_wired();
+        assert_eq!(current_artist_query(&state), None);
+
+        state.queue.push(Track::new("t1", "Title", "  Artist Name  "));
+        assert_eq!(current_artist_query(&state), Some("Artist Name".to_owned()));
+
+        state.queue.push(Track::new("t2", "Title", "   "));
+        state.queue.advance();
+        assert_eq!(current_artist_query(&state), None);
     }
 }

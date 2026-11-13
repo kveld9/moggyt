@@ -398,6 +398,41 @@ mod tests {
     }
 
     #[test]
+    fn resolve_subject_reads_the_current_track_on_the_player_bar() {
+        let mut state = test_wired();
+        let empty = ContextTarget { surface: ContextSurface::PlayerBar, index: 0 };
+        assert_eq!(resolve_subject(&state, empty), None);
+
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        state.queue.advance();
+
+        let target = ContextTarget { surface: ContextSurface::PlayerBar, index: 0 };
+        assert_eq!(
+            resolve_subject(&state, target),
+            Some(ContextSubject::Track(Track::new("t2", "Track 2", "Artist 2")))
+        );
+    }
+
+    #[test]
+    fn apply_action_play_now_on_player_bar_restarts_the_current_track() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("a", "Title A", "Artist A"));
+        state.queue.push(Track::new("b", "Title B", "Artist B"));
+        state.queue.advance();
+        let page_before = state.page;
+        let current = state.queue.current().cloned().expect("current track");
+
+        let target = ContextTarget { surface: ContextSurface::PlayerBar, index: 0 };
+        let follow_up = apply_action(&mut state, target, ContextAction::PlayNow, current);
+
+        assert_eq!(follow_up, FollowUp::StartPlayback);
+        assert_eq!(state.queue.len(), 2);
+        assert_eq!(state.queue.cursor(), 1);
+        assert_eq!(state.page, page_before);
+    }
+
+    #[test]
     fn apply_action_play_now_on_detail_pushes_and_opens_now_playing() {
         let mut state = test_wired();
         assert_eq!(state.queue.len(), 0);

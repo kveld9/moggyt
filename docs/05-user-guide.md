@@ -336,6 +336,9 @@ Users can customize the player bar appearance and element visibility under **Set
 ### Transport and Playback Controls
 
 - **Track Info**: displays `title - artist` of the track under the cursor, or `Queue empty` when empty.
+- **Track Info actions**: clicking the artist name opens that artist's detail page, resolved by name
+  against the catalog off the UI thread. Right-clicking the artwork, the track title, or the artist
+  name opens the same track context menu used by track rows.
 - **Playback Controls**:
   - `Previous`: skips to previous track in the queue and starts playback.
   - `Play` / `Pause`: toggles between playing and paused audio states.
@@ -366,8 +369,8 @@ Users can customize the player bar appearance and element visibility under **Set
 Track rows across the app expose a right-click context menu rendered as a themed popup anchored at
 the pointer:
 
-- **Track lists**: `Search` results, detail track listings, the queue panel, and the Now Playing
-  `Up next` list.
+- **Track lists**: `Search` results, detail track listings, the queue panel, the Now Playing
+  `Up next` list, and the player bar artwork, title, or artist line.
 - **Play**: queues the track and starts playback on it immediately.
 - **Play next**: inserts the track immediately after the current queue position, leaving the
   current playback untouched.

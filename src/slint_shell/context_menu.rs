@@ -186,7 +186,9 @@ pub fn resolve_subject(state: &SlintAppState, target: ContextTarget) -> Option<C
         ContextSurface::Search | ContextSurface::Explore | ContextSurface::Category => {
             item_subject(state, target)
         }
-        ContextSurface::Detail | ContextSurface::Queue => track_subject(state, target),
+        ContextSurface::Detail | ContextSurface::Queue | ContextSurface::PlayerBar => {
+            track_subject(state, target)
+        }
         ContextSurface::DetailCard => detail_card_subject(state, target.index),
         ContextSurface::LibraryPlaylist | ContextSurface::LibraryAlbum => {
             library_subject(state, target)
@@ -210,6 +212,7 @@ fn track_subject(state: &SlintAppState, target: ContextTarget) -> Option<Context
     let track = match target.surface {
         ContextSurface::Detail => state.detail.as_ref()?.tracks.get(target.index)?,
         ContextSurface::Queue => state.queue.tracks().get(target.index)?,
+        ContextSurface::PlayerBar => state.queue.current()?,
         _ => return None,
     };
     Some(ContextSubject::Track(track.clone()))
@@ -341,14 +344,16 @@ fn album_query(track: &Track) -> String {
 }
 
 fn play_now(state: &mut SlintAppState, target: ContextTarget, track: Track) -> FollowUp {
-    if target.surface == ContextSurface::Queue {
-        state.play_track_at_index_in_memory(target.index);
-        return FollowUp::StartPlayback;
+    match target.surface {
+        ContextSurface::PlayerBar => state.play_track_at_index_in_memory(state.queue.cursor()),
+        ContextSurface::Queue => state.play_track_at_index_in_memory(target.index),
+        _ => {
+            state.queue.push(track);
+            let index = state.queue.len().saturating_sub(1);
+            state.play_track_at_index_in_memory(index);
+            state.page = SlintPage::NowPlaying;
+        }
     }
-    state.queue.push(track);
-    let index = state.queue.len().saturating_sub(1);
-    state.play_track_at_index_in_memory(index);
-    state.page = SlintPage::NowPlaying;
     FollowUp::StartPlayback
 }
 
