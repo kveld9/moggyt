@@ -1,8 +1,7 @@
 //! Home carousel shelf response parser for browse payloads.
 
-use super::catalog_parse_common::{
-    best_thumbnail, classify_home_item, item_artist_id, parse_two_row,
-};
+use super::catalog_parse_album::album_credits;
+use super::catalog_parse_common::{best_thumbnail, classify_home_item, parse_two_row};
 use crate::domain::{SearchResult, Shelf};
 use serde_json::Value;
 
@@ -35,7 +34,7 @@ fn parse_carousel_item(item: &Value) -> Option<SearchResult> {
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let id = browse_id?;
     let thumb = best_thumbnail(renderer);
-    Some(classify_home_item(&id, &title, &subtitle, thumb, item_artist_id(renderer)))
+    Some(classify_home_item(&id, &title, &subtitle, thumb, &album_credits(renderer)))
 }
 
 fn parse_carousel_shelf(shelf: &Value) -> Option<Shelf> {

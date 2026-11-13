@@ -1,9 +1,10 @@
 //! Search response parser for tracks and heterogeneous shelves.
 
 use super::catalog_model::{RawAlbum, RawArtist, RawPlaylist, RawTrack, SearchHits};
+use super::catalog_parse_album::{album_credits, is_type_label};
 use super::catalog_parse_common::{
-    best_thumbnail, browse_of, browse_page_type, flex_text, item_artist_id, music_video_type,
-    parse_duration_secs, parse_runs_duration, parse_two_row, watch_video_id,
+    best_thumbnail, browse_of, browse_page_type, flex_text, music_video_type, parse_duration_secs,
+    parse_runs_duration, parse_two_row, watch_video_id,
 };
 use crate::domain::SearchFilter;
 use serde_json::Value;
@@ -173,13 +174,17 @@ fn dispatch_two_row(category: SearchFilter, renderer: &Value, hits: &mut SearchH
     let id = browse_id.unwrap_or_default();
     let thumb_url = best_thumbnail(renderer);
     match category {
-        SearchFilter::Albums => hits.albums.push(RawAlbum {
-            browse_id: id,
-            title,
-            artist: subtitle,
-            thumb_url,
-            artist_id: item_artist_id(renderer),
-        }),
+        SearchFilter::Albums => {
+            let credits = album_credits(renderer);
+            hits.albums.push(RawAlbum {
+                browse_id: id,
+                title,
+                artist: credits.artist.unwrap_or(subtitle),
+                thumb_url,
+                artist_id: credits.artist_id,
+                release_type: credits.release_type,
+            });
+        }
         SearchFilter::Artists => {
             hits.artists.push(RawArtist { browse_id: id, name: title, thumb_url })
         }
@@ -257,27 +262,6 @@ fn artist_of(renderer: &Value) -> String {
     stripped.trim_end().to_owned()
 }
 
-/// Item-type labels the catalog prepends to the metadata column.
-const TYPE_LABELS: &[&str] = &[
-    "album",
-    "artist",
-    "artista",
-    "cancion",
-    "canci\u{f3}n",
-    "episode",
-    "episodio",
-    "lista de reproduccion",
-    "lista de reproducci\u{f3}n",
-    "perfil",
-    "playlist",
-    "podcast",
-    "p\u{f3}dcast",
-    "profile",
-    "song",
-    "video",
-    "v\u{ed}deo",
-];
-
 /// Resolves a track row artist from the metadata column.
 ///
 /// The column is prefixed with the item type and suffixed with the duration, so both
@@ -296,11 +280,6 @@ fn strip_type_prefix(raw: &str) -> &str {
 fn strip_duration_suffix(raw: &str) -> &str {
     let Some((head, tail)) = raw.rsplit_once('\u{2022}') else { return raw };
     if is_clock_duration(tail.trim()) { head.trim() } else { raw }
-}
-
-fn is_type_label(raw: &str) -> bool {
-    let lowered = raw.trim().to_lowercase();
-    TYPE_LABELS.contains(&lowered.as_str())
 }
 
 fn is_clock_duration(raw: &str) -> bool {
@@ -385,13 +364,17 @@ fn dispatch_category(
     };
     let thumb_url = best_thumbnail(renderer);
     match cat {
-        SearchFilter::Albums => hits.albums.push(RawAlbum {
-            browse_id,
-            title,
-            artist,
-            thumb_url,
-            artist_id: item_artist_id(renderer),
-        }),
+        SearchFilter::Albums => {
+            let credits = album_credits(renderer);
+            hits.albums.push(RawAlbum {
+                browse_id,
+                title,
+                artist: credits.artist.unwrap_or(artist),
+                thumb_url,
+                artist_id: credits.artist_id,
+                release_type: credits.release_type,
+            });
+        }
         SearchFilter::Artists => hits.artists.push(RawArtist { browse_id, name: title, thumb_url }),
         SearchFilter::Playlists => hits.playlists.push(RawPlaylist { browse_id, title, thumb_url }),
         _ => dispatch_bare_track(renderer, title, artist, hits),

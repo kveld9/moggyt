@@ -51,6 +51,8 @@ The search view accepts queries for tracks, artists, and albums, and maintains a
   Idle state with the recent-search list.
 - **Zero hits**: a query with no matches shows an empty-results message. A failed catalog request
   shows an error message instead of an empty list.
+- **Shelf cards**: album and single cards show the release type followed by the credited artist
+  under the title (`Single • Toosii`); artist and playlist cards show their own label.
 
 ### Detail Page
 

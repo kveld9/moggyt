@@ -63,7 +63,13 @@
                                         "text": " • "
                                       },
                                       {
-                                        "text": "Test Artist"
+                                        "text": "Test Artist",
+                                        "navigationEndpoint": {
+                                          "browseEndpoint": {
+                                            "browseId": "UC_test_artist",
+                                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                          }
+                                        }
                                       },
                                       {
                                         "text": " • "

@@ -1,8 +1,7 @@
 //! Library browse response parser for playlists, albums, and liked tracks.
 
-use super::catalog_parse_common::{
-    best_thumbnail, item_artist_id, parse_track_count, parse_two_row,
-};
+use super::catalog_parse_album::{album_credits, apply_credits};
+use super::catalog_parse_common::{best_thumbnail, parse_track_count, parse_two_row};
 use super::catalog_parse_detail::detail_sections;
 use crate::domain::{Album, Playlist};
 use serde_json::Value;
@@ -49,7 +48,8 @@ fn parse_library_album_item(item: &Value) -> Option<Album> {
     let (title, subtitle, browse_id) = parse_two_row(renderer)?;
     let id = browse_id?;
     let thumb_url = best_thumbnail(renderer);
-    Some(Album::new(&id, &title, &subtitle, thumb_url).with_artist_id(item_artist_id(renderer)))
+    let credits = album_credits(renderer);
+    Some(apply_credits(Album::new(&id, &title, &subtitle, thumb_url), &credits))
 }
 
 /// Parses saved albums from catalog API browse response payload.
@@ -122,8 +122,9 @@ mod tests {
         assert_eq!(albums.len(), 1);
         assert_eq!(
             albums[0],
-            Album::new("MPREb_saved", "Saved Album", "Album", None)
+            Album::new("MPREb_saved", "Saved Album", "Album Artist", None)
                 .with_artist_id(Some("UC_saved_artist".to_owned()))
+                .with_release_type(Some("Album".to_owned()))
         );
     }
 }

@@ -46,7 +46,7 @@ impl From<&SearchResult> for SearchRow {
                 id: album.id.clone(),
                 kind: "album".to_string(),
                 title: album.title.clone(),
-                subtitle: album.artist.clone(),
+                subtitle: album.caption(),
                 album: String::new(),
                 duration: String::new(),
                 artwork_url: album.artwork.clone(),
@@ -179,6 +179,16 @@ mod tests {
         assert_eq!(row_playlist.album, "");
         assert_eq!(row_playlist.duration, "");
         assert_eq!(row_playlist.artwork_url.as_deref(), Some("https://artwork.local/p1"));
+    }
+
+    #[test]
+    fn test_search_row_album_caption_uses_release_type() {
+        let album = Album::new("a1", "Call Me", "Toosii", None)
+            .with_release_type(Some("Single".to_owned()));
+        let row = SearchRow::from(&SearchResult::Album(album));
+        assert_eq!(row.subtitle, "Single \u{2022} Toosii");
+        assert_eq!(row.kind, "album");
+        assert_eq!(row.title, "Call Me");
     }
 
     #[test]
