@@ -255,7 +255,7 @@ export component PlayerCenterControls inherits VerticalLayout {
             maximum: max(1, root.duration-secs);
             value: root.duration-secs > 0 ? min(root.position-secs, root.duration-secs) : 0;
             enabled: root.duration-secs > 0;
-            changed(val) => {
+            committed(val) => {
                 root.seek-to(round(val));
             }
         }

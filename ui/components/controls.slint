@@ -7,7 +7,11 @@ export component ThemedSlider inherits Rectangle {
     in property <bool> enabled: true;
     /// Extra vertical hit band in pixels added above and below the visible track.
     in property <length> hit-slack: 0px;
+    /// Live value while the pointer interacts with the slider: on press and on every drag step.
     callback changed(float);
+    /// Final value, emitted once when the pointer is released. Use it for expensive commits
+    /// such as seeking, so a single gesture produces a single action.
+    callback committed(float);
 
     min-height: 20px;
     vertical-stretch: 0;
@@ -18,7 +22,12 @@ export component ThemedSlider inherits Rectangle {
 
     property <float> clamped-val: max(root.minimum, min(root.maximum, root.value));
     property <float> range: max(1, root.maximum - root.minimum);
-    property <float> ratio: (root.clamped-val - root.minimum) / root.range;
+    // Rendered value: the pointer preview while dragging, the bound value otherwise. The
+    // bound `value` is never assigned from here, so the caller's binding keeps driving it.
+    property <bool> is-dragging: false;
+    property <float> drag-val: 0;
+    property <float> shown-val: root.is-dragging ? root.drag-val : root.clamped-val;
+    property <float> ratio: (root.shown-val - root.minimum) / root.range;
 
     // Fixed thumb anchor: the knob grows toward 16px on interaction but stays centered
     // inside this anchor, so the anchor geometry never changes. Half of it is the inset
@@ -27,6 +36,11 @@ export component ThemedSlider inherits Rectangle {
     property <length> knob-inset: root.knob-anchor / 2;
     // Knob center travel range: the track and the value mapping share this length.
     property <length> track-length: clamp(root.width - root.knob-anchor, 1px, root.width);
+
+    // Maps a pointer x to the value under it, using the same geometry as the knob.
+    pure function value-at(pos: length) -> float {
+        return root.minimum + clamp((pos - root.knob-inset) / root.track-length, 0.0, 1.0) * root.range;
+    }
 
     // Track background: inset by the knob radius at both ends.
     Rectangle {
@@ -77,27 +91,25 @@ export component ThemedSlider inherits Rectangle {
         y: -root.hit-slack;
         height: parent.height + 2 * root.hit-slack;
         enabled: root.enabled;
-        property <bool> is-dragging: false;
 
         pointer-event(event) => {
             if (!root.enabled || event.button != PointerEventButton.left) {
                 return;
             }
             if (event.kind == PointerEventKind.down) {
-                self.is-dragging = true;
-                let r = clamp((self.mouse-x - root.knob-inset) / root.track-length, 0.0, 1.0);
-                root.value = root.minimum + r * root.range;
-                root.changed(root.value);
-            } else if (event.kind == PointerEventKind.up) {
-                self.is-dragging = false;
+                root.is-dragging = true;
+                root.drag-val = root.value-at(self.mouse-x);
+                root.changed(root.drag-val);
+            } else if (event.kind == PointerEventKind.up && root.is-dragging) {
+                root.is-dragging = false;
+                root.committed(root.drag-val);
             }
         }
 
         moved => {
-            if (self.is-dragging && root.enabled) {
-                let r = clamp((self.mouse-x - root.knob-inset) / root.track-length, 0.0, 1.0);
-                root.value = root.minimum + r * root.range;
-                root.changed(root.value);
+            if (root.is-dragging && root.enabled) {
+                root.drag-val = root.value-at(self.mouse-x);
+                root.changed(root.drag-val);
             }
         }
     }
