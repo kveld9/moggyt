@@ -154,9 +154,13 @@ mod tests {
     }
 
     impl crate::infra::PrefixFetcher for CountingPrefixFetcher {
-        fn fetch_prefix(&self, _url: &str, _max_bytes: usize) -> Option<Vec<u8>> {
+        fn fetch_prefix(
+            &self,
+            _url: &str,
+            _max_bytes: usize,
+        ) -> Option<crate::infra::PrefetchedPrefix> {
             *self.calls.lock().unwrap() += 1;
-            Some(vec![0xAA; 512])
+            Some(crate::infra::PrefetchedPrefix { bytes: vec![0xAA; 512], total_len: None })
         }
     }
 

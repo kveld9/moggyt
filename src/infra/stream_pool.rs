@@ -316,7 +316,9 @@ impl<T: RangeTransport> BlockPool<T> {
     /// Splits `prefix` into block-sized chunks and stores them as blocks starting
     /// at index 0 without any transport call. If a block already exists, existing
     /// bytes are preserved. Prefixes longer than `PREFETCH_BYTES` are truncated.
-    pub fn seed_prefetched(&mut self, mut prefix: Vec<u8>) {
+    /// `total_len` records the remote stream length when the prefetch learned it,
+    /// so the seeded pool can answer end-relative seeks before its first fetch.
+    pub fn seed_prefetched(&mut self, mut prefix: Vec<u8>, total_len: Option<u64>) {
         if prefix.is_empty() {
             return;
         }
@@ -324,12 +326,15 @@ impl<T: RangeTransport> BlockPool<T> {
         if prefix.len() > max_bytes {
             prefix.truncate(max_bytes);
         }
-        self.store_seed_blocks(&prefix);
+        self.store_seed_blocks(&prefix, total_len);
     }
 
-    fn store_seed_blocks(&self, prefix: &[u8]) {
+    fn store_seed_blocks(&self, prefix: &[u8], total_len: Option<u64>) {
         let block_bytes = self.block_bytes;
         let mut state = self.coord.state.lock().unwrap();
+        if state.total_len.is_none() {
+            state.total_len = total_len;
+        }
         let mut offset = 0;
         let mut block_idx = 0u64;
         while offset < prefix.len() {
@@ -648,7 +653,7 @@ mod tests {
         let requests = Arc::clone(&transport.requests);
         let mut pool = BlockPool::new(transport, 16);
         let prefix = payload[..32].to_vec();
-        pool.seed_prefetched(prefix);
+        pool.seed_prefetched(prefix, Some(48));
 
         let mut output = Vec::new();
         let mut buf = [0u8; 16];
@@ -695,5 +700,14 @@ mod tests {
         assert!(state.blocks.contains_key(&40));
         assert!(!state.blocks.contains_key(&100));
         assert!(!state.have.contains(&100));
+    }
+
+    #[test]
+    fn seed_prefetched_records_total_len() {
+        let transport = FakePoolTransport::new(vec![0u8; 32]);
+        let mut pool = BlockPool::new(transport, 16);
+        pool.seed_prefetched(vec![1u8; 16], Some(32));
+
+        assert_eq!(pool.total_len(), Some(32));
     }
 }

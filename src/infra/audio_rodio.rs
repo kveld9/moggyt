@@ -17,6 +17,7 @@ use super::opus_source::{OpusWebmSource, is_opus_webm, sniff_webm_header};
 use super::stream::{AudioQuality, ResolvedStream};
 use super::stream_chain::StreamChain;
 use super::stream_disk_cache::StreamDiskCache;
+use super::stream_prefetch_cache::PrefetchedPrefix;
 use super::stream_reqwest::open_audio_stream_with_prefix;
 
 /// Maps an integer volume level (0..=100, clamped) to an amplitude scaling factor (0.0..=1.0).
@@ -166,7 +167,7 @@ impl RodioBackend {
         &self,
         url: &str,
         track_id: &str,
-        prefix: Option<Vec<u8>>,
+        prefix: Option<PrefetchedPrefix>,
         mime_type: Option<&str>,
         target_rate: u32,
     ) -> anyhow::Result<Box<dyn Source<Item = f32> + Send>> {

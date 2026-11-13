@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use super::innertube_stream::{FallbackReason, InnertubeResolver};
 use super::stream::{AudioQuality, RangeResponse, RangeTransport, ResolvedStream, StreamResolver};
-use super::stream_prefetch_cache::{PREFETCH_BYTES, StreamPrefetchCache};
+use super::stream_prefetch_cache::{PREFETCH_BYTES, PrefetchedPrefix, StreamPrefetchCache};
 use super::stream_reqwest::ReqwestRangeTransport;
 use super::stream_url_cache::{ResolverSource, StreamUrlCache};
 use super::ytdlp::YtDlpResolver;
@@ -34,7 +34,7 @@ impl PrimaryStreamResolver for InnertubeResolver {
 
 /// Fetches the leading bytes of a resolved stream URL for next-track prefetch.
 pub trait PrefixFetcher: Send + Sync {
-    fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<Vec<u8>>;
+    fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<PrefetchedPrefix>;
 }
 
 /// Real HTTP prefix fetcher used by the production chain.
@@ -54,11 +54,11 @@ fn open_prefix_transport(url: &str) -> Option<ReqwestRangeTransport> {
 fn prefix_from_response(
     response: std::io::Result<RangeResponse>,
     max_bytes: usize,
-) -> Option<Vec<u8>> {
+) -> Option<PrefetchedPrefix> {
     match response {
-        Ok(RangeResponse::Partial { mut data, .. }) => {
+        Ok(RangeResponse::Partial { mut data, total_len }) => {
             data.truncate(max_bytes);
-            Some(data)
+            Some(PrefetchedPrefix { bytes: data, total_len })
         }
         Ok(RangeResponse::Full(_)) => {
             tracing::debug!("prefix fetch received full response instead of range");
@@ -72,7 +72,7 @@ fn prefix_from_response(
 }
 
 impl PrefixFetcher for HttpPrefixFetcher {
-    fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<Vec<u8>> {
+    fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<PrefetchedPrefix> {
         let mut transport = open_prefix_transport(url)?;
         prefix_from_response(transport.fetch_range(0, max_bytes), max_bytes)
     }
@@ -82,7 +82,7 @@ impl PrefixFetcher for HttpPrefixFetcher {
 struct NoopPrefixFetcher;
 
 impl PrefixFetcher for NoopPrefixFetcher {
-    fn fetch_prefix(&self, _url: &str, _max_bytes: usize) -> Option<Vec<u8>> {
+    fn fetch_prefix(&self, _url: &str, _max_bytes: usize) -> Option<PrefetchedPrefix> {
         None
     }
 }
@@ -279,8 +279,8 @@ impl StreamChain {
         self
     }
 
-    /// Removes and returns prefetched audio bytes for `url` from the cache.
-    pub fn take_prefetched(&self, url: &str) -> Option<Vec<u8>> {
+    /// Removes and returns the prefetched prefix for `url` from the cache.
+    pub fn take_prefetched(&self, url: &str) -> Option<PrefetchedPrefix> {
         self.prefetch_cache.take(url)
     }
 
@@ -331,10 +331,10 @@ impl StreamChain {
     }
 
     fn fetch_and_cache_prefix(&self, url: &str) -> bool {
-        let Some(bytes) = self.prefix_fetcher.fetch_prefix(url, PREFETCH_BYTES) else {
+        let Some(prefix) = self.prefix_fetcher.fetch_prefix(url, PREFETCH_BYTES) else {
             return false;
         };
-        self.prefetch_cache.insert(url, bytes);
+        self.prefetch_cache.insert(url, prefix);
         true
     }
 
@@ -585,20 +585,20 @@ mod tests {
     }
 
     struct FakePrefixFetcher {
-        bytes: Mutex<Option<Vec<u8>>>,
+        prefix: Mutex<Option<PrefetchedPrefix>>,
         calls: Mutex<Vec<(String, usize)>>,
     }
 
     impl FakePrefixFetcher {
-        fn new(bytes: Vec<u8>) -> Self {
-            Self { bytes: Mutex::new(Some(bytes)), calls: Mutex::new(Vec::new()) }
+        fn new(prefix: PrefetchedPrefix) -> Self {
+            Self { prefix: Mutex::new(Some(prefix)), calls: Mutex::new(Vec::new()) }
         }
     }
 
     impl PrefixFetcher for FakePrefixFetcher {
-        fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<Vec<u8>> {
+        fn fetch_prefix(&self, url: &str, max_bytes: usize) -> Option<PrefetchedPrefix> {
             self.calls.lock().unwrap().push((url.to_string(), max_bytes));
-            self.bytes.lock().unwrap().clone()
+            self.prefix.lock().unwrap().clone()
         }
     }
 
@@ -607,7 +607,10 @@ mod tests {
         let stream = ResolvedStream::from_url("https://primary.test/v-prefix");
         let primary = Arc::new(FakePrimary::new(Ok(stream)));
         let fallback = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
-        let fetcher = Arc::new(FakePrefixFetcher::new(vec![0xAA; PREFETCH_BYTES]));
+        let fetcher = Arc::new(FakePrefixFetcher::new(PrefetchedPrefix {
+            bytes: vec![0xAA; PREFETCH_BYTES],
+            total_len: Some(9_000),
+        }));
         let chain = StreamChain::with_primary(primary, fallback)
             .with_prefix_fetcher(Arc::clone(&fetcher) as Arc<dyn PrefixFetcher>);
 
@@ -617,13 +620,19 @@ mod tests {
         assert_eq!(calls[0], ("https://primary.test/v-prefix".to_string(), PREFETCH_BYTES));
 
         let prefetched = chain.take_prefetched("https://primary.test/v-prefix");
-        assert_eq!(prefetched, Some(vec![0xAA; PREFETCH_BYTES]));
+        assert_eq!(
+            prefetched,
+            Some(PrefetchedPrefix { bytes: vec![0xAA; PREFETCH_BYTES], total_len: Some(9_000) })
+        );
     }
 
     #[test]
     fn prefetch_prefix_skips_blank_and_unresolved() {
         let fallback = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
-        let fetcher = Arc::new(FakePrefixFetcher::new(vec![0xAA; 100]));
+        let fetcher = Arc::new(FakePrefixFetcher::new(PrefetchedPrefix {
+            bytes: vec![0xAA; 100],
+            total_len: None,
+        }));
         let chain = StreamChain::from_ytdlp(fallback)
             .with_prefix_fetcher(Arc::clone(&fetcher) as Arc<dyn PrefixFetcher>);
 
@@ -649,13 +658,29 @@ mod tests {
         let stream = ResolvedStream::from_url("https://primary.test/v-single");
         let primary = Arc::new(FakePrimary::new(Ok(stream)));
         let fallback = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
-        let fetcher = Arc::new(FakePrefixFetcher::new(vec![1, 2, 3]));
+        let fetcher = Arc::new(FakePrefixFetcher::new(PrefetchedPrefix {
+            bytes: vec![1, 2, 3],
+            total_len: None,
+        }));
         let chain = StreamChain::with_primary(primary, fallback)
             .with_prefix_fetcher(Arc::clone(&fetcher) as Arc<dyn PrefixFetcher>);
 
         assert!(chain.prefetch_prefix("v-single"));
-        assert_eq!(chain.take_prefetched("https://primary.test/v-single"), Some(vec![1, 2, 3]));
+        assert_eq!(
+            chain.take_prefetched("https://primary.test/v-single"),
+            Some(PrefetchedPrefix { bytes: vec![1, 2, 3], total_len: None })
+        );
         assert_eq!(chain.take_prefetched("https://primary.test/v-single"), None);
+    }
+
+    #[test]
+    fn prefix_from_response_keeps_total_len() {
+        let response: std::io::Result<RangeResponse> =
+            Ok(RangeResponse::Partial { data: vec![7, 8, 9], total_len: Some(1_024) });
+
+        let prefix = prefix_from_response(response, 2).expect("partial response yields a prefix");
+        assert_eq!(prefix.bytes, vec![7, 8]);
+        assert_eq!(prefix.total_len, Some(1_024));
     }
 
     #[test]

@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 use super::stream::RangeTransport;
 use super::stream_pool::{BlockPool, STREAM_BLOCK_BYTES};
+use super::stream_prefetch_cache::PrefetchedPrefix;
 
 /// Default chunk size for streaming range requests (256 KiB alias of `STREAM_BLOCK_BYTES`).
 pub const DEFAULT_STREAM_CHUNK_SIZE: usize = STREAM_BLOCK_BYTES;
@@ -69,9 +70,9 @@ impl<T: RangeTransport> RangeReader<T> {
         self
     }
 
-    /// Seeds the underlying block pool with prefetched audio bytes.
-    pub fn with_prefetched(mut self, prefix: Vec<u8>) -> Self {
-        self.pool.seed_prefetched(prefix);
+    /// Seeds the underlying block pool with a prefetched prefix and its known length.
+    pub fn with_prefetched(mut self, prefix: PrefetchedPrefix) -> Self {
+        self.pool.seed_prefetched(prefix.bytes, prefix.total_len);
         self
     }
 
@@ -372,7 +373,9 @@ mod tests {
         let transport = FakeRangeTransport::new(payload.clone());
         let requests = Arc::clone(&transport.requests);
         let prefix = payload[..16].to_vec();
-        let mut reader = RangeReader::new(transport).with_chunk_size(8).with_prefetched(prefix);
+        let mut reader = RangeReader::new(transport)
+            .with_chunk_size(8)
+            .with_prefetched(PrefetchedPrefix { bytes: prefix, total_len: Some(16) });
 
         let mut output = Vec::new();
         let mut buf = [0u8; 4];
@@ -389,5 +392,29 @@ mod tests {
             prefix_reqs.is_empty(),
             "seeded blocks must not trigger transport requests: {prefix_reqs:?}"
         );
+    }
+
+    #[test]
+    fn prefetched_prefix_with_total_len_enables_end_seek() {
+        let payload = vec![0u8; 64];
+        let transport = FakeRangeTransport::new(payload);
+        let mut reader = RangeReader::new(transport)
+            .with_chunk_size(16)
+            .with_prefetched(PrefetchedPrefix { bytes: vec![7u8; 16], total_len: Some(64) });
+
+        assert_eq!(reader.pool.total_len(), Some(64));
+        assert_eq!(reader.seek(SeekFrom::End(0)).unwrap(), 64);
+    }
+
+    #[test]
+    fn prefetched_prefix_without_total_len_keeps_end_seek_unsupported() {
+        let payload = vec![0u8; 64];
+        let transport = FakeRangeTransport::new(payload);
+        let mut reader = RangeReader::new(transport)
+            .with_chunk_size(16)
+            .with_prefetched(PrefetchedPrefix { bytes: vec![7u8; 16], total_len: None });
+
+        assert_eq!(reader.pool.total_len(), None);
+        assert!(reader.seek(SeekFrom::End(0)).is_err());
     }
 }
