@@ -10,7 +10,9 @@ use std::time::Instant;
 
 use anyhow::Context;
 
-use super::stream::{AudioQuality, StreamResolver, audio_quality_format};
+use super::stream::{
+    AudioQuality, StreamResolver, audio_quality_degraded_format, audio_quality_format,
+};
 use super::stream_url_cache::StreamUrlCache;
 
 /// Update interval for checking yt-dlp release freshness (3 days in seconds).
@@ -51,12 +53,12 @@ pub fn format_args(video_id: &str) -> Vec<String> {
 
 /// Formats the CLI arguments passed to yt-dlp for extracting the audio URL with a quality preference.
 pub fn format_args_with_quality(video_id: &str, quality: AudioQuality) -> Vec<String> {
-    vec![
-        "-f".to_string(),
-        audio_quality_format(quality).to_string(),
-        "-g".to_string(),
-        watch_url(video_id),
-    ]
+    format_args_with_selector(video_id, audio_quality_format(quality))
+}
+
+/// Formats the CLI arguments passed to yt-dlp for extracting the audio URL with an explicit selector.
+pub fn format_args_with_selector(video_id: &str, selector: &str) -> Vec<String> {
+    vec!["-f".to_string(), selector.to_string(), "-g".to_string(), watch_url(video_id)]
 }
 
 /// Returns the platform-specific release binary asset name for yt-dlp standalone releases.
@@ -195,7 +197,26 @@ impl YtDlpResolver {
     }
 
     fn extract_url(&self, video_id: &str) -> anyhow::Result<String> {
-        let output = spawn_ytdlp(&self.binary, video_id, self.quality)?;
+        let selector = audio_quality_format(self.quality);
+        match spawn_ytdlp(&self.binary, video_id, selector) {
+            Ok(output) => extract_stream_url(&output.stdout),
+            Err(err) => self.extract_url_degraded(video_id, err),
+        }
+    }
+
+    fn extract_url_degraded(
+        &self,
+        video_id: &str,
+        primary_err: anyhow::Error,
+    ) -> anyhow::Result<String> {
+        let Some(selector) = audio_quality_degraded_format(self.quality) else {
+            return Err(primary_err);
+        };
+        tracing::warn!(
+            video_id = %video_id,
+            "audio quality tier unavailable; falling back to the best available audio"
+        );
+        let output = spawn_ytdlp(&self.binary, video_id, selector)?;
         extract_stream_url(&output.stdout)
     }
 }
@@ -211,11 +232,11 @@ fn validate_video_id(video_id: &str) -> anyhow::Result<&str> {
 fn spawn_ytdlp(
     binary: &Path,
     video_id: &str,
-    quality: AudioQuality,
+    selector: &str,
 ) -> anyhow::Result<std::process::Output> {
     let output = std::process::Command::new(binary)
         .arg("--no-playlist")
-        .args(format_args_with_quality(video_id, quality))
+        .args(format_args_with_selector(video_id, selector))
         .output()
         .with_context(|| format!("failed to spawn yt-dlp at {binary:?}"))?;
 
@@ -566,10 +587,7 @@ mod tests {
     #[test]
     fn format_args_with_quality_table() {
         for (q, expected_fmt) in [
-            (
-                AudioQuality::Compact,
-                "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
-            ),
+            (AudioQuality::Compact, "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]"),
             (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
             (
                 AudioQuality::High,
