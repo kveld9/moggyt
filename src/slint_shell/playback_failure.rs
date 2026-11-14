@@ -74,4 +74,34 @@ mod tests {
         assert_eq!(toasts.len(), 1);
         assert_eq!(toasts[0].text, failure_message(state.locale, "Caprichosa"));
     }
+
+    #[test]
+    fn successful_completion_syncs_queue_cursor_into_window() {
+        let Ok(window) = MoggytWindow::new() else {
+            return;
+        };
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "One", "Artist"));
+        state.queue.push(Track::new("t2", "Two", "Artist"));
+        state.queue.advance();
+        let generation = state.play_generation;
+
+        apply_play_track_completion(
+            &window,
+            &mut state,
+            PlayTrackResult {
+                generation,
+                track_id: "t2".into(),
+                title: "Two".into(),
+                artist: "Artist".into(),
+                success: true,
+                lyrics_lines: Vec::new(),
+                cover_data: None,
+                presence: PresenceSnapshot::new("Two", "Artist", true),
+            },
+        );
+
+        assert_eq!(window.get_queue_selected_index(), 1);
+        assert_eq!(window.get_active_track_title().as_str(), "Two");
+    }
 }

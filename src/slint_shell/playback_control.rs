@@ -15,7 +15,7 @@ use crate::slint_shell::format::current_unix_secs;
 use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_worker::PlayTrackResult;
 use crate::slint_shell::state::SlintAppState;
-use crate::slint_shell::sync::observe_playback_phase;
+use crate::slint_shell::sync::{observe_playback_phase, sync_window};
 use crate::slint_shell::{LyricLineData, MoggytWindow, PlayerUi};
 
 /// Playback start record: when the track started and which track it was.
@@ -373,7 +373,6 @@ pub fn apply_play_track_completion(
         window.global::<PlayerUi>().set_is_playing(false);
         return;
     }
-    window.global::<PlayerUi>().set_is_playing(true);
     state.lyrics_lines = res.lyrics_lines;
     state.lyrics_key = Some((res.artist.clone(), res.title.clone()));
 
@@ -413,6 +412,8 @@ pub fn apply_play_track_completion(
         state.queue.tracks().iter().find(|t| t.id == res.track_id).cloned().map(StartedPlay::now);
     state.last_skip_target = None;
     state.cached_skip_ranges = None;
+    sync_window(window, state);
+    window.global::<PlayerUi>().set_is_playing(true);
 }
 
 #[cfg(test)]

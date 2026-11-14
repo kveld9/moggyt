@@ -1,12 +1,12 @@
 import { Labels } from "../labels.slint";
 import { PlaybackUi, Theme, TrackRowData } from "../theme.slint";
-import { TrackRow } from "./rows.slint";
-import { ContextSurface } from "./context_menu.slint";
+import { QueueList } from "./queue_list.slint";
 import { IconClose, IconTrash } from "../icons.slint";
 
 export component QueuePanel inherits Rectangle {
     in property <[TrackRowData]> tracks: [];
     in property <int> selected-index: -1;
+    in property <bool> open: false;
     property <bool> clear-confirm-open: false;
     callback track-selected(int);
     callback close-panel();
@@ -103,26 +103,12 @@ export component QueuePanel inherits Rectangle {
             }
         }
 
-        if root.tracks.length > 0 : flick := Flickable {
+        if root.tracks.length > 0 : QueueList {
             vertical-stretch: 1;
-
-            VerticalLayout {
-                spacing: 8px;
-                alignment: start;
-
-                for track in root.tracks : TrackRow {
-                    title: track.title;
-                    artist: track.artist;
-                    album: track.album;
-                    duration: track.duration;
-                    kind: track.kind;
-                    index: track.index;
-                    surface: ContextSurface.queue;
-                    cover: track.cover;
-                    is-active: track.index == root.selected-index;
-                    clicked => { root.track-selected(track.index); }
-                }
-            }
+            tracks: root.tracks;
+            selected-index: root.selected-index;
+            open: root.open;
+            track-selected(idx) => { root.track-selected(idx); }
         }
     }
 

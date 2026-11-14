@@ -86,6 +86,8 @@ The collapsible right-side queue panel manages the ordered list of upcoming trac
 
 - Opened and closed from the queue icon in the player bar, docking on the right at 340px.
 - Lists the queued tracks in order with the active track highlighted.
+- Opens scrolled so the active track is the first visible row; previously played tracks stay
+  reachable by scrolling up.
 - Displays the queued track count badge on the queue icon in the player bar.
 - Shows an empty-state text (`The queue is empty.`) when nothing is queued.
 - Clicking a track row plays that track immediately and leaves the queue panel open.
@@ -115,8 +117,9 @@ The Now Playing view presents a full two-column playback dashboard:
 - **Right Card**: a rounded surface card equipped with `Lyrics` and `Up next` tabs.
   - **Lyrics Tab**: displays synchronized lyrics with active-line accenting and word-level sung/rest
     highlighting when available, or an empty state hint when lyrics are missing.
-  - **Up Next Tab**: lists all queued tracks with active track highlighting; clicking a row jumps
-    directly to that queue position. Displays an empty state message when the queue has no tracks.
+  - **Up Next Tab**: lists all queued tracks with active track highlighting; the active track stays
+    as the first visible row and off-screen rows are virtualized. Clicking a row jumps directly to
+    that queue position. Displays an empty state message when the queue has no tracks.
 
 ### Library Page
 

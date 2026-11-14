@@ -1,0 +1,52 @@
+import { ListView } from "std-widgets.slint";
+import { TrackRowData } from "../theme.slint";
+import { TrackRow } from "./rows.slint";
+import { ContextSurface } from "./context_menu.slint";
+
+// Virtualized queue rows. The active track is scrolled to the first visible row
+// whenever it changes, the panel opens, or the list is first instantiated.
+export component QueueList inherits ListView {
+    in property <[TrackRowData]> tracks: [];
+    in property <int> selected-index: -1;
+    in property <bool> open: true;
+    callback track-selected(int);
+
+    property <length> row-height: 64px;
+
+    content-height: root.tracks.length * root.row-height;
+    vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+    horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+    mouse-drag-pan-enabled: true;
+
+    // Puts the active row at the top of the viewport. The ScrollView clamps the
+    // value near the end of the list, where scrolling past the last row is impossible.
+    public function scroll-to-current() {
+        if root.selected-index >= 0 {
+            root.content-y = -root.selected-index * root.row-height;
+        }
+    }
+
+    init => { root.scroll-to-current(); }
+    changed selected-index => { root.scroll-to-current(); }
+    changed open => { if (root.open) { root.scroll-to-current(); } }
+
+    for track in root.tracks : Rectangle {
+        width: parent.width;
+        height: root.row-height;
+
+        TrackRow {
+            y: 0;
+            width: parent.width;
+            title: track.title;
+            artist: track.artist;
+            album: track.album;
+            duration: track.duration;
+            kind: track.kind;
+            index: track.index;
+            surface: ContextSurface.queue;
+            cover: track.cover;
+            is-active: track.index == root.selected-index;
+            clicked => { root.track-selected(track.index); }
+        }
+    }
+}
