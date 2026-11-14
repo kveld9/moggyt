@@ -420,4 +420,83 @@ mod tests {
         assert!(hits.albums.is_empty());
         assert!(hits.tracks.is_empty());
     }
+
+    #[test]
+    fn parse_search_all_promotes_the_catalog_top_card_artist() {
+        let hits = parse_search_all(&fixture_json("catalog_search_top_card.json"));
+        assert_eq!(
+            (hits.tracks.len(), hits.albums.len(), hits.artists.len(), hits.playlists.len()),
+            (1, 0, 1, 1)
+        );
+        check_artist(&hits.artists[0], "UCQUG_S5I9bEBd2LXSj9W_2g", "Los del Bohio");
+        check_lh3(hits.artists[0].thumb_url.as_deref(), "card-artist-thumb");
+        let results = crate::infra::catalog_live::LiveCatalog::map_hits(hits, SearchFilter::All);
+        let top = crate::domain::best_match("Los del Bohio", &results).expect("top result");
+        assert_eq!(crate::domain::entity_name(&top), "Los del Bohio");
+        assert!(matches!(top, crate::domain::SearchResult::Artist(_)));
+    }
+
+    #[test]
+    fn parse_search_all_parses_top_card_album_credits() {
+        let artist_run = serde_json::json!({
+            "text": "Bad Bunny",
+            "navigationEndpoint": { "browseEndpoint": {
+                "browseId": "UC_bunny",
+                "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                    }
+                }
+            } }
+        });
+        let card = serde_json::json!({"musicCardShelfRenderer": {
+            "title": { "runs": [{ "text": "Un Verano Sin Ti", "navigationEndpoint": {
+                "browseEndpoint": {
+                    "browseId": "MPREb_un_verano",
+                    "pageType": "MUSIC_PAGE_TYPE_ALBUM"
+                }
+            } }] },
+            "subtitle": { "runs": [
+                { "text": "Album" },
+                { "text": " \u{2022} " },
+                artist_run,
+                { "text": " \u{2022} " },
+                { "text": "2022" }
+            ] }
+        }});
+
+        let hits = parse_search_all(&tabbed_sections(vec![card]));
+        assert_eq!(hits.albums.len(), 1);
+        check_album(&hits.albums[0], "MPREb_un_verano", "Un Verano Sin Ti", "Bad Bunny");
+        assert_eq!(hits.albums[0].artist_id.as_deref(), Some("UC_bunny"));
+        assert_eq!(hits.albums[0].release_type.as_deref(), Some("Album"));
+    }
+
+    #[test]
+    fn parse_search_all_parses_top_card_playlist_and_skips_video_cards() {
+        let playlist = serde_json::json!({"musicCardShelfRenderer": {
+            "title": { "runs": [{ "text": "Bachata Essentials", "navigationEndpoint": {
+                "browseEndpoint": {
+                    "browseId": "VL_playlist_card",
+                    "pageType": "MUSIC_PAGE_TYPE_PLAYLIST"
+                }
+            } }] },
+            "subtitle": { "runs": [
+                { "text": "Playlist" },
+                { "text": " \u{2022} " },
+                { "text": "Creator" }
+            ] }
+        }});
+        let video = serde_json::json!({"musicCardShelfRenderer": {
+            "title": { "runs": [{ "text": "Celoso", "navigationEndpoint": {
+                "watchEndpoint": { "videoId": "vid-card" }
+            } }] },
+            "subtitle": { "runs": [{ "text": "Video" }] }
+        }});
+
+        let hits = parse_search_all(&tabbed_sections(vec![playlist, video]));
+        assert_eq!(hits.playlists.len(), 1);
+        check_playlist(&hits.playlists[0], "VL_playlist_card", "Bachata Essentials");
+        assert!(hits.tracks.is_empty(), "video cards stay in the flat result list");
+    }
 }
