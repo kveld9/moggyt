@@ -35,10 +35,19 @@ pub fn apply_shelf_policy(shelves: Vec<Shelf>, hide_videos: bool) -> Vec<Shelf> 
         .collect()
 }
 
-/// Drops music videos from a remote detail track list when `hide_videos` is set.
+/// Drops music videos from every track list a remote detail exposes when `hide_videos` is set.
+///
+/// The complete playback list (`Detail::queue_tracks`) is filtered like the displayed
+/// tracklist; when it ends up empty it is removed so playback falls back to `Detail::tracks`.
 pub fn apply_detail_policy(mut detail: Detail, hide_videos: bool) -> Detail {
     if hide_videos {
         detail.tracks.retain(|track| !track.is_music_video());
+        if let Some(tracks) = detail.queue_tracks.as_mut() {
+            tracks.retain(|track| !track.is_music_video());
+        }
+        if detail.queue_tracks.as_ref().is_some_and(Vec::is_empty) {
+            detail.queue_tracks = None;
+        }
     }
     detail
 }
@@ -132,5 +141,42 @@ mod tests {
         assert_eq!(hidden.tracks, vec![song("s1")]);
         let kept = apply_detail_policy(detail, false);
         assert_eq!(kept.tracks, vec![video("v1"), song("s1")]);
+    }
+
+    #[test]
+    fn apply_detail_policy_filters_the_complete_playback_list() {
+        let detail = Detail::new(DetailKind::Artist, "Artist", "", vec![song("s1")])
+            .with_queue_tracks(vec![video("v1"), song("s1"), song("s2")]);
+
+        let hidden = apply_detail_policy(detail, true);
+
+        let queued: Vec<&str> =
+            hidden.playback_tracks().iter().map(|track| track.id.as_str()).collect();
+        assert_eq!(queued, vec!["s1", "s2"]);
+        assert_eq!(hidden.tracks.len(), 1);
+    }
+
+    #[test]
+    fn apply_detail_policy_drops_an_all_video_playback_list_for_the_fallback() {
+        let detail = Detail::new(DetailKind::Artist, "Artist", "", vec![song("s1")])
+            .with_queue_tracks(vec![video("v1")]);
+
+        let hidden = apply_detail_policy(detail, true);
+
+        assert!(hidden.queue_tracks.is_none());
+        let fallback: Vec<&str> =
+            hidden.playback_tracks().iter().map(|track| track.id.as_str()).collect();
+        assert_eq!(fallback, vec!["s1"]);
+    }
+
+    #[test]
+    fn apply_detail_policy_keeps_the_playback_list_when_videos_are_visible() {
+        let detail = Detail::new(DetailKind::Artist, "Artist", "", vec![song("s1")])
+            .with_queue_tracks(vec![video("v1"), song("s1")]);
+        let expected = detail.queue_tracks.clone();
+
+        let kept = apply_detail_policy(detail, false);
+
+        assert_eq!(kept.queue_tracks, expected);
     }
 }
