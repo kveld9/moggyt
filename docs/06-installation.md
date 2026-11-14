@@ -27,7 +27,8 @@ Official builds are distributed as GitHub Releases for Linux and Windows x86_64:
 | Linux | `.AppImage` | Standalone portable executable bundle |
 | Linux | `.deb` | Debian and Ubuntu binary package |
 | Linux | `moggyt-*-linux.tar.gz` | Standalone portable tarball |
-| Linux (Arch) | `moggyt-bin` | Arch Linux PKGBUILD repackaging release tarball (AUR pending) |
+| Linux (Arch) | `moggyt-bin` | Arch Linux PKGBUILD repackaging the release tarball (AUR pending) |
+| Linux (Arch) | `moggyt` | Arch Linux PKGBUILD building the tagged source archive (AUR pending) |
 | Windows | `.exe` (NSIS) | Windows 64-bit installer |
 | Windows | `moggyt-*-windows.zip` | Portable zip archive |
 
@@ -40,9 +41,15 @@ Release binaries are not digitally signed in v1. Operating systems may present s
 
 ## Installing on Arch Linux
 
-Arch Linux packaging is available via `packaging/arch/moggyt-bin`. Note that `moggyt-bin` is not yet published on the
-AUR; installing via AUR helpers (`yay -S moggyt-bin` or `paru -S moggyt-bin`) is not supported until AUR submission is
-completed.
+Two PKGBUILDs are maintained in the repository:
+
+| Package | Source | Build cost |
+| --- | --- | --- |
+| `moggyt-bin` | Official release tarball | Seconds (download and repack) |
+| `moggyt` | Tagged source archive | Minutes (full Rust release build) |
+
+Neither package is published on the AUR yet; AUR helpers (`yay -S moggyt-bin` or `paru -S moggyt`) are not
+supported until submission is completed. Build them from a clone.
 
 1. Install build tools:
 
@@ -50,11 +57,11 @@ completed.
 sudo pacman -S --needed base-devel git
 ```
 
-1. Clone the repository and navigate to the package directory:
+1. Clone the repository and enter the package directory:
 
 ```bash
 git clone https://github.com/kveld9/moggyt.git
-cd moggyt/packaging/arch/moggyt-bin
+cd moggyt/packaging/arch/moggyt-bin   # or packaging/arch/moggyt for a source build
 ```
 
 1. Build and install the package:
@@ -63,9 +70,22 @@ cd moggyt/packaging/arch/moggyt-bin
 makepkg -si
 ```
 
-`makepkg -si` downloads the official release tarball, verifies SHA-256 sums, builds the native `.pkg.tar.zst` package
-locally, auto-resolves runtime dependencies (`alsa-lib`, `libayatana-appindicator`), and installs `/usr/bin/moggyt`
-along with the desktop launcher entry (`/usr/share/applications/moggyt.desktop`).
+`moggyt-bin` downloads the official release tarball, verifies every SHA-256 sum, and repacks it locally. `moggyt`
+fetches the tagged source archive and compiles the release profile with `cargo build --release --frozen`; add
+`rust`, `cargo`, `cmake`, and `pkgconf` to the `pacman` line above for that variant.
+
+Both packages resolve the runtime dependencies (`alsa-lib`, `libayatana-appindicator`), install `/usr/bin/moggyt`,
+the desktop entry (`/usr/share/applications/moggyt.desktop`), the hicolor launcher icons at 16, 32, 48, 64, 128 and
+256 px, the Matugen theme template, and the license files under `/usr/share/licenses/`.
+
+A source build lacks the Last.fm API credentials that upstream CI injects at compile time. Export them before
+running `makepkg` to enable scrobbling; without them the build succeeds with Last.fm support disabled:
+
+```bash
+export MOGGYT_LASTFM_API_KEY=...
+export MOGGYT_LASTFM_SECRET=...
+makepkg -si
+```
 
 To update to future releases, pull the latest changes and rebuild:
 

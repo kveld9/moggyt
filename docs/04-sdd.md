@@ -475,7 +475,8 @@ CI builds on `ubuntu-latest` and `windows-latest` only. Artifacts: `.AppImage` a
 NSIS `.exe` (x64) for Windows. No signing in v1, so the docs explain the expected SmartScreen and quarantine prompts.
 `Cargo.lock` stays committed. V1 auto-update is check-plus-link to the Releases page; silent self-update is
 deferred to v2.
-Arch Linux is served via `packaging/arch/moggyt-bin` PKGBUILD (`-bin`, repackages release tarball).
+Arch Linux is served by two PKGBUILDs: `packaging/arch/moggyt-bin` repackages the release tarball and
+`packaging/arch/moggyt` builds the tagged source archive.
 
 ## 11 Security and privacy
 
