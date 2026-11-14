@@ -181,7 +181,9 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.
   - `"compact"`: Low-bandwidth audio stream using InnerTube itag 139 (AAC ~49 kbps, 22.05 kHz) or yt-dlp selector
-    `"bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best"`.
+    `"bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]"`, which keeps every candidate stream at or below 64 kbps.
+  - When no stream at or below 64 kbps exists, the yt-dlp adapter retries with the best available audio and logs
+    the degradation instead of silently widening the tier.
   - `"standard"`: Balanced audio stream using InnerTube itag 140 (AAC ~130 kbps, 44.1 kHz) or yt-dlp selector
     `"bestaudio[ext=m4a]/bestaudio/best"` (default).
   - `"high"`: Highest available audio stream. InnerTube prefers itag 251 (Opus in WebM, ~130 kbps, 48 kHz)

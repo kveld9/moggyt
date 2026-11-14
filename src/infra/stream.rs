@@ -21,12 +21,24 @@ pub enum AudioQuality {
 /// [`AudioQuality::High`] prefers Opus in WebM (itag 251, ~130 kbps, 48 kHz) decoded
 /// via libopus through [`OpusWebmSource`], with AAC m4a and unconstrained audio as
 /// fallbacks. [`AudioQuality::Standard`] uses AAC m4a (~130 kbps), and
-/// [`AudioQuality::Compact`] constrains bitrate to <=64 kbps.
+/// [`AudioQuality::Compact`] keeps every candidate stream at or below 64 kbps.
 pub const fn audio_quality_format(quality: AudioQuality) -> &'static str {
     match quality {
-        AudioQuality::Compact => "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
+        AudioQuality::Compact => "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]",
         AudioQuality::Standard => "bestaudio[ext=m4a]/bestaudio/best",
         AudioQuality::High => "bestaudio[ext=webm][acodec=opus]/bestaudio[ext=m4a]/bestaudio/best",
+    }
+}
+
+/// Returns the degraded selector for a tier whose strict selector matched nothing.
+///
+/// Only [`AudioQuality::Compact`] has one: when no stream at or below 64 kbps is
+/// available, the yt-dlp adapter retries with the best available audio and logs the
+/// degradation, instead of hiding an over-cap stream inside the tier selector.
+pub const fn audio_quality_degraded_format(quality: AudioQuality) -> Option<&'static str> {
+    match quality {
+        AudioQuality::Compact => Some("bestaudio"),
+        AudioQuality::Standard | AudioQuality::High => None,
     }
 }
 
@@ -111,10 +123,7 @@ mod tests {
     #[test]
     fn audio_quality_format_mapping_table() {
         let cases = [
-            (
-                AudioQuality::Compact,
-                "bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best",
-            ),
+            (AudioQuality::Compact, "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]"),
             (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
             (
                 AudioQuality::High,
@@ -124,6 +133,17 @@ mod tests {
         for (quality, expected) in cases {
             assert_eq!(audio_quality_format(quality), expected);
         }
+    }
+
+    #[test]
+    fn compact_selector_caps_every_candidate_at_64_kbps() {
+        let compact = audio_quality_format(AudioQuality::Compact);
+        for candidate in compact.split('/') {
+            assert!(candidate.contains("abr<=64"), "candidate {candidate} exceeds the cap");
+        }
+        assert_eq!(audio_quality_degraded_format(AudioQuality::Compact), Some("bestaudio"));
+        assert_eq!(audio_quality_degraded_format(AudioQuality::Standard), None);
+        assert_eq!(audio_quality_degraded_format(AudioQuality::High), None);
     }
 
     #[test]
@@ -137,7 +157,7 @@ mod tests {
 
     #[test]
     fn audio_quality_prefers_m4a_before_unconstrained_fallback() {
-        for quality in [AudioQuality::Compact, AudioQuality::Standard, AudioQuality::High] {
+        for quality in [AudioQuality::Standard, AudioQuality::High] {
             let format = audio_quality_format(quality);
             let selectors: Vec<&str> = format.split('/').collect();
             let first_unconstrained = selectors
