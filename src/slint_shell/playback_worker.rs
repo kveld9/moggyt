@@ -298,7 +298,7 @@ pub fn execute_seek<A: AudioBackend>(position_secs: u64, audio: &Arc<Mutex<A>>) 
     }
 }
 
-pub use super::worker_catalog::{execute_search, resolve_search};
+pub use super::worker_catalog::{execute_search, fetch_detail, resolve_search};
 
 /// Executes blocking detail lookup off the UI thread.
 pub fn execute_detail<C: Catalog>(
@@ -307,13 +307,7 @@ pub fn execute_detail<C: Catalog>(
     kind: DetailKind,
     catalog: &Arc<Mutex<C>>,
 ) -> (u64, Result<Option<Detail>, CatalogError>) {
-    let trimmed = browse_id.trim();
-    if trimmed.is_empty() {
-        return (generation, Ok(None));
-    }
-    let res =
-        catalog.lock().map_err(|_| CatalogError::Transport).and_then(|c| c.detail(trimmed, kind));
-    (generation, res)
+    (generation, fetch_detail(browse_id, kind, catalog))
 }
 
 type PlaylistResult = Result<Vec<crate::domain::Playlist>, CatalogError>;

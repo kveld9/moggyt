@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::domain::{DetailCardKind, DetailKind, is_local_playlist_id};
+use crate::domain::{Detail, DetailCardKind, DetailKind, is_local_playlist_id};
 use crate::slint_shell::callbacks::with_window_state;
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::import_callbacks::{current_store, reload_local_library};
@@ -189,7 +189,8 @@ fn enqueue_detail_tracks(
         return st.queue.len();
     };
     let start_idx = st.queue.len();
-    for track in &detail.tracks {
+    let tracks = detail.playback_tracks();
+    for track in tracks {
         request_queue_track_cover(
             track.artwork.as_deref(),
             st.play_generation,
@@ -197,13 +198,27 @@ fn enqueue_detail_tracks(
             tx,
         );
     }
-    for track in detail.tracks {
-        st.queue.push(track);
+    for track in tracks {
+        st.queue.push(track.clone());
     }
     start_idx
 }
 
-/// Enqueues the open detail container and moves the cursor to `idx` inside the appended block.
+/// Resolves the playback-list index for a displayed track row.
+///
+/// Artist pages display the popular-songs shelf while the queue carries the complete
+/// songs list, so the row is matched by track id before falling back to its position.
+fn playback_index_for_row(detail: &Detail, row: usize) -> Option<usize> {
+    let track = detail.tracks.get(row)?;
+    let playback = detail.playback_tracks();
+    if let Some(index) = playback.iter().position(|candidate| candidate.id == track.id) {
+        return Some(index);
+    }
+    (row < playback.len()).then_some(row)
+}
+
+/// Enqueues the open detail container's playback list and moves the cursor to `idx` inside the
+/// appended block.
 ///
 /// Returns the absolute queue index of the selected track, or `None` when no detail is open
 /// or the index does not address a track.
@@ -212,12 +227,9 @@ fn enqueue_detail_at_row(
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
     idx: usize,
 ) -> Option<usize> {
-    let track_count = st.detail.as_ref()?.tracks.len();
-    if idx >= track_count {
-        return None;
-    }
+    let offset = playback_index_for_row(st.detail.as_ref()?, idx)?;
     let start = enqueue_detail_tracks(st, tx);
-    let target = start + idx;
+    let target = start + offset;
     st.play_track_at_index_in_memory(target);
     Some(target)
 }
@@ -375,6 +387,68 @@ mod tests {
         let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
         assert_eq!(ids, vec!["old", "a1", "a2"]);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("a2"));
+    }
+
+    fn artist_detail_with_full_songs_list() -> Detail {
+        let shelf = vec![Track::new("t1", "One", "Artist"), Track::new("t2", "Two", "Artist")];
+        let complete = vec![
+            Track::new("t0", "Zero", "Artist"),
+            Track::new("t1", "One", "Artist"),
+            Track::new("t2", "Two", "Artist"),
+            Track::new("t3", "Three", "Artist"),
+        ];
+        Detail::new(DetailKind::Artist, "Artist", "", shelf).with_queue_tracks(complete)
+    }
+
+    #[test]
+    fn test_detail_play_queues_the_full_artist_songs_list() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.detail = Some(artist_detail_with_full_songs_list());
+
+        let start = enqueue_detail_tracks(&mut state, &tx);
+        state.play_track_at_index_in_memory(start);
+
+        let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["t0", "t1", "t2", "t3"]);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t0"));
+    }
+
+    #[test]
+    fn test_detail_track_row_matches_the_full_list_track_id() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.detail = Some(artist_detail_with_full_songs_list());
+
+        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 1), Some(2));
+        assert_eq!(state.queue.len(), 4);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+    }
+
+    #[test]
+    fn test_detail_track_row_falls_back_to_its_position_when_unmatched() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        let shelf = vec![Track::new("shelf-only", "Shelf", "Artist")];
+        let complete = vec![Track::new("t1", "One", "Artist"), Track::new("t2", "Two", "Artist")];
+        state.detail =
+            Some(Detail::new(DetailKind::Artist, "Artist", "", shelf).with_queue_tracks(complete));
+
+        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 0), Some(0));
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+    }
+
+    #[test]
+    fn test_detail_shuffle_uses_the_full_artist_songs_list() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.detail = Some(artist_detail_with_full_songs_list());
+
+        shuffle_detail_into_queue(&mut state, &tx);
+
+        assert_eq!(state.queue.len(), 4);
+        assert_eq!(state.unshuffled_tracks.as_ref().map(Vec::len), Some(4));
+        assert_eq!(state.queue.cursor(), 0);
     }
 
     #[test]

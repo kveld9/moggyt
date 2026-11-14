@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::domain::{LyricsSnippet, SearchQuery, SearchResult, Shelf};
+use crate::domain::{Detail, DetailKind, LyricsSnippet, SearchQuery, SearchResult, Shelf};
 use crate::i18n::{Locale, tr};
 use crate::infra::{Catalog, CatalogError};
 
@@ -41,10 +41,122 @@ pub fn execute_search<C: Catalog>(
     (generation, query.text().to_string(), shelves)
 }
 
+/// Loads a detail view and attaches the complete songs list to artist pages.
+///
+/// The extra songs request is best effort: when the list is unavailable the popular
+/// shelf stays playable and the degradation is logged as a warning.
+pub fn fetch_detail<C: Catalog>(
+    browse_id: &str,
+    kind: DetailKind,
+    catalog: &Arc<Mutex<C>>,
+) -> Result<Option<Detail>, CatalogError> {
+    let trimmed = browse_id.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let guard = catalog.lock().map_err(|_| CatalogError::Transport)?;
+    let detail = guard.detail(trimmed, kind)?;
+    Ok(attach_artist_songs(&*guard, detail, kind))
+}
+
+/// Returns `detail` with the full artist songs list attached as its playback list.
+fn attach_artist_songs<C: Catalog>(
+    catalog: &C,
+    detail: Option<Detail>,
+    kind: DetailKind,
+) -> Option<Detail> {
+    let detail = detail?;
+    if kind != DetailKind::Artist {
+        return Some(detail);
+    }
+    let Some(songs_id) = detail.artist.as_ref().and_then(|page| page.songs_more_id.clone()) else {
+        return Some(detail);
+    };
+    let tracks = match catalog.detail(&songs_id, DetailKind::Playlist) {
+        Ok(Some(songs)) => songs.tracks,
+        Ok(None) => Vec::new(),
+        Err(err) => {
+            tracing::warn!(%songs_id, %err, "artist songs list unavailable; using the shelf");
+            Vec::new()
+        }
+    };
+    Some(detail.with_queue_tracks(tracks))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{ArtistPage, Track};
     use crate::slint_shell::test_support::MockLibraryCatalog;
+
+    fn artist_detail(tracks: Vec<Track>) -> Detail {
+        let page = ArtistPage {
+            songs_title: "Popular songs".to_owned(),
+            songs_more_id: Some("VLsongs".to_owned()),
+            sections: Vec::new(),
+        };
+        Detail::new(DetailKind::Artist, "Artist", "", tracks).with_artist_page(page)
+    }
+
+    #[test]
+    fn fetch_detail_attaches_the_complete_artist_songs_list() {
+        let shelf = vec![Track::new("t1", "One", "Artist")];
+        let songs = Detail::new(
+            DetailKind::Playlist,
+            "Top songs",
+            "",
+            vec![Track::new("t1", "One", "Artist"), Track::new("t2", "Two", "Artist")],
+        );
+        let catalog = MockLibraryCatalog::default()
+            .with_detail_by_id("UCartist", artist_detail(shelf))
+            .with_detail_by_id("VLsongs", songs);
+        let catalog = Arc::new(Mutex::new(catalog));
+
+        let detail = fetch_detail("UCartist", DetailKind::Artist, &catalog);
+
+        let detail = detail.expect("detail ok").expect("detail present");
+        let ids: Vec<&str> = detail.playback_tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["t1", "t2"]);
+        assert_eq!(detail.tracks.len(), 1, "the shelf still feeds the page row list");
+    }
+
+    #[test]
+    fn fetch_detail_keeps_the_popular_shelf_when_the_songs_list_is_missing() {
+        let shelf = vec![Track::new("t1", "One", "Artist")];
+        let catalog =
+            MockLibraryCatalog::default().with_detail_by_id("UCartist", artist_detail(shelf));
+        let catalog = Arc::new(Mutex::new(catalog));
+
+        let detail = fetch_detail("UCartist", DetailKind::Artist, &catalog);
+
+        let detail = detail.expect("detail ok").expect("detail present");
+        let ids: Vec<&str> = detail.playback_tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["t1"]);
+        assert!(detail.queue_tracks.is_none());
+    }
+
+    #[test]
+    fn fetch_detail_does_not_request_songs_for_non_artist_details() {
+        let album =
+            Detail::new(DetailKind::Album, "Album", "", vec![Track::new("a1", "Track", "Artist")]);
+        let catalog = MockLibraryCatalog::default().with_detail_by_id("MPREalbum", album);
+        let catalog = Arc::new(Mutex::new(catalog));
+
+        let detail = fetch_detail("MPREalbum", DetailKind::Album, &catalog);
+
+        let detail = detail.expect("detail ok").expect("detail present");
+        assert!(detail.queue_tracks.is_none());
+        assert_eq!(detail.playback_tracks().len(), 1);
+    }
+
+    #[test]
+    fn fetch_detail_blank_browse_id_returns_none() {
+        let catalog = Arc::new(Mutex::new(MockLibraryCatalog::default()));
+
+        let detail = fetch_detail("   ", DetailKind::Artist, &catalog);
+
+        assert!(detail.expect("no transport error").is_none());
+    }
 
     #[test]
     fn test_resolve_search_plain_query_delegates_to_catalog() {

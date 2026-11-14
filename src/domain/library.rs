@@ -244,6 +244,9 @@ pub struct Detail {
     /// Total playback duration in seconds the server reports (playlists only).
     pub total_duration_secs: Option<u32>,
     pub tracks: Vec<Track>,
+    /// Complete playback list when the container exposes one beyond [`Detail::tracks`]
+    /// (artist pages expose the full songs list behind their "Show all" action).
+    pub queue_tracks: Option<Vec<Track>>,
     /// Artist-page sections; `None` for albums and playlists.
     pub artist: Option<ArtistPage>,
 }
@@ -259,6 +262,7 @@ impl Detail {
             track_count: None,
             total_duration_secs: None,
             tracks,
+            queue_tracks: None,
             artist: None,
         }
     }
@@ -283,6 +287,21 @@ impl Detail {
     pub fn with_total_duration_secs(mut self, secs: u32) -> Self {
         self.total_duration_secs = Some(secs);
         self
+    }
+
+    /// Sets the complete playback list used by play, shuffle, and track-row selection.
+    ///
+    /// An empty list is ignored so [`Detail::playback_tracks`] keeps returning the
+    /// displayed tracklist.
+    pub fn with_queue_tracks(mut self, tracks: Vec<Track>) -> Self {
+        self.queue_tracks = (!tracks.is_empty()).then_some(tracks);
+        self
+    }
+
+    /// Returns the tracks a play action enqueues: the complete list when the container
+    /// carries one, otherwise the displayed tracklist.
+    pub fn playback_tracks(&self) -> &[Track] {
+        self.queue_tracks.as_deref().unwrap_or(&self.tracks)
     }
 
     pub fn with_artist_page(mut self, page: ArtistPage) -> Self {
@@ -326,6 +345,20 @@ mod tests {
             .with_total_duration_secs(13620);
         assert_eq!(counted.track_count, Some(64));
         assert_eq!(counted.total_duration_secs, Some(13620));
+    }
+
+    #[test]
+    fn detail_playback_tracks_prefers_the_complete_queue_list() {
+        let shelf = vec![Track::new("t1", "One", "Artist")];
+        let complete = vec![Track::new("t1", "One", "Artist"), Track::new("t2", "Two", "Artist")];
+        let detail = Detail::new(DetailKind::Artist, "Artist", "", shelf.clone());
+
+        assert_eq!(detail.playback_tracks(), shelf.as_slice());
+        assert_eq!(
+            detail.clone().with_queue_tracks(complete.clone()).playback_tracks(),
+            complete.as_slice()
+        );
+        assert_eq!(detail.with_queue_tracks(Vec::new()).playback_tracks(), shelf.as_slice());
     }
 
     #[test]

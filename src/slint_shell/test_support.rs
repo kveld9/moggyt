@@ -3,6 +3,7 @@
 //!
 //! Hexagonal invariant: in-memory stubs only; zero network, zero audio hardware, zero async.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
@@ -103,6 +104,8 @@ pub struct MockLibraryCatalog {
     pub search_res: Result<Vec<Track>, CatalogError>,
     pub search_filtered_res: Result<Vec<SearchResult>, CatalogError>,
     pub detail_res: Result<Option<Detail>, CatalogError>,
+    /// Per-browse-id details; when empty, `detail_res` answers every request.
+    pub detail_by_id: HashMap<String, Detail>,
     pub radio_res: Result<Vec<Track>, CatalogError>,
     pub explore_res: Result<Vec<Shelf>, CatalogError>,
     pub category_res: Result<Vec<Shelf>, CatalogError>,
@@ -116,6 +119,7 @@ impl Default for MockLibraryCatalog {
             search_res: Ok(Vec::new()),
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
+            detail_by_id: HashMap::new(),
             radio_res: Ok(Vec::new()),
             explore_res: Ok(Vec::new()),
             category_res: Ok(Vec::new()),
@@ -134,6 +138,7 @@ impl MockLibraryCatalog {
             search_res: Ok(Vec::new()),
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
+            detail_by_id: HashMap::new(),
             radio_res: Ok(Vec::new()),
             explore_res: Ok(Vec::new()),
             category_res: Ok(Vec::new()),
@@ -152,6 +157,11 @@ impl MockLibraryCatalog {
 
     pub fn with_detail(mut self, res: Result<Option<Detail>, CatalogError>) -> Self {
         self.detail_res = res;
+        self
+    }
+
+    pub fn with_detail_by_id(mut self, id: &str, detail: Detail) -> Self {
+        self.detail_by_id.insert(id.to_owned(), detail);
         self
     }
 
@@ -201,8 +211,14 @@ impl Catalog for MockLibraryCatalog {
     fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
         self.albums_res.clone()
     }
-    fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
-        self.detail_res.clone()
+    fn detail(&self, id: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
+        if let Some(detail) = self.detail_by_id.get(id) {
+            return Ok(Some(detail.clone()));
+        }
+        if self.detail_by_id.is_empty() {
+            return self.detail_res.clone();
+        }
+        Ok(None)
     }
 }
 
