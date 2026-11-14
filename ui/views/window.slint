@@ -305,6 +305,7 @@ export component MoggytWindow inherits Window {
                         height: parent.height;
                         tracks: root.queue-tracks;
                         selected-index: root.queue-selected-index;
+                        open: root.queue-panel-open;
                         track-selected(idx) => { root.queue-track-selected(idx); }
                         close-panel => { root.close-queue-panel(); }
                     }

@@ -4,8 +4,7 @@ import { ThemedSlider } from "../components/controls.slint";
 import { SettingsModeButton } from "../components/settings_rows.slint";
 import { VinylDeck } from "../components/vinyl_deck.slint";
 import { PlayerCenterControls } from "../components/player_controls.slint";
-import { TrackRow } from "../components/rows.slint";
-import { ContextSurface } from "../components/context_menu.slint";
+import { QueueList } from "../components/queue_list.slint";
 import { IconHeart, IconSpeaker, IconSpeakerMuted } from "../icons.slint";
 import { VersionFixUi } from "version_fix.slint";
 
@@ -318,26 +317,11 @@ export component NowPlayingView inherits HorizontalLayout {
                 }
             }
 
-            if root.active-tab == 1 && root.queue-tracks.length > 0 : Flickable {
+            if root.active-tab == 1 && root.queue-tracks.length > 0 : QueueList {
                 vertical-stretch: 1;
-
-                VerticalLayout {
-                    spacing: 8px;
-                    alignment: start;
-
-                    for track in root.queue-tracks : TrackRow {
-                        title: track.title;
-                        artist: track.artist;
-                        album: track.album;
-                        duration: track.duration;
-                        kind: track.kind;
-                        index: track.index;
-                        surface: ContextSurface.queue;
-                        cover: track.cover;
-                        is-active: track.index == root.queue-selected-index;
-                        clicked => { root.queue-track-selected(track.index); }
-                    }
-                }
+                tracks: root.queue-tracks;
+                selected-index: root.queue-selected-index;
+                track-selected(idx) => { root.queue-track-selected(idx); }
             }
         }
     }
