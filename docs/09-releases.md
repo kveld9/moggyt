@@ -38,14 +38,19 @@ Release assets by shipment status:
 | `moggyt-*-x86_64.AppImage` | Linux | GitHub Releases | Shipped |
 | `moggyt-*-setup.exe` | Windows 64-bit | GitHub Releases (NSIS installer) | Planned |
 
-Linux tarballs, .deb packages, AppImages, the Windows installer and the Arch package include `THIRD_PARTY_NOTICES.md`.
+Linux tarballs from v1.4.0 onward, .deb packages, AppImages, and the Windows installer include
+`THIRD_PARTY_NOTICES.md`. The v1.3.0 tarball predates that change, so `moggyt-bin` fetches the file from the repository.
 
 ### Arch Linux Packaging
 
-The repository maintains an Arch Linux package specification in `packaging/arch/moggyt-bin/PKGBUILD`. It downloads and
-repackages the official pre-compiled Linux release tarball into `/usr/bin/moggyt`, provides a standard desktop
-entry, and installs the Matugen theme template at `/usr/share/moggyt/matugen/moggyt-theme.json`. Submission to
-the Arch User Repository (AUR) is scheduled following public release stabilization.
+The repository maintains two Arch Linux package specifications:
+
+- `packaging/arch/moggyt-bin/PKGBUILD` downloads and repackages the official pre-compiled Linux release tarball.
+- `packaging/arch/moggyt/PKGBUILD` builds the tagged source archive with `cargo build --release --frozen`.
+
+Both install `/usr/bin/moggyt`, the desktop entry, the hicolor launcher icons (16 to 256 px), the Matugen theme
+template at `/usr/share/moggyt/matugen/moggyt-theme.json`, and the license files under `/usr/share/licenses/`.
+Submission to the Arch User Repository (AUR) is scheduled following public release stabilization.
 
 ## Code Signing Policy
 
