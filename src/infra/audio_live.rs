@@ -1,18 +1,15 @@
 //! Dual-mode audio backend providing hardware playback with fallback to an in-memory stub.
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use super::audio::{AudioBackend, AudioError, AudioStub};
-use super::audio_rodio::RodioBackend;
 use super::stream::AudioQuality;
 use super::stream_chain::StreamChain;
-use super::stream_disk_cache::StreamDiskCache;
 
 /// Dual-mode audio backend: hardware playback with graceful fallback to an in-memory stub.
 pub enum LiveAudio {
     /// Live rodio backend connected to audio hardware.
-    Live(RodioBackend),
+    Live(Box<dyn AudioBackend + Send>),
     /// Muted fallback storing state in memory when hardware or dependencies are unavailable.
     Muted(AudioStub),
 }
@@ -26,13 +23,6 @@ impl LiveAudio {
     /// Returns whether this backend is actively backed by audio hardware.
     pub fn is_live(&self) -> bool {
         matches!(self, Self::Live(_))
-    }
-
-    /// Configures or clears the backing stream disk cache on live hardware.
-    pub fn set_stream_cache(&mut self, cache: Option<Arc<StreamDiskCache>>) {
-        if let Self::Live(backend) = self {
-            backend.set_stream_cache(cache);
-        }
     }
 }
 
@@ -90,6 +80,10 @@ impl AudioBackend for LiveAudio {
 
     fn position_secs(&self) -> u64 {
         delegate_audio!(self, position_secs)
+    }
+
+    fn duration_secs(&self) -> u64 {
+        delegate_audio!(self, duration_secs)
     }
 
     fn is_playing(&self) -> bool {
@@ -189,5 +183,58 @@ mod tests {
         assert_eq!(res, Err(AudioError::Unavailable));
         assert!(!audio.is_playing());
         assert_eq!(audio.last_requested(), None);
+    }
+
+    struct ReportedAudio {
+        stub: AudioStub,
+    }
+
+    impl AudioBackend for ReportedAudio {
+        fn play(&mut self, track_id: &str) -> Result<(), AudioError> {
+            self.stub.play(track_id)
+        }
+
+        fn pause(&mut self) {
+            self.stub.pause();
+        }
+
+        fn resume_play(&mut self) {
+            self.stub.resume_play();
+        }
+
+        fn seek(&mut self, position_secs: u64) {
+            self.stub.seek(position_secs);
+        }
+
+        fn set_volume(&mut self, volume: u8) {
+            self.stub.set_volume(volume);
+        }
+
+        fn volume(&self) -> u8 {
+            self.stub.volume()
+        }
+
+        fn position_secs(&self) -> u64 {
+            self.stub.position_secs()
+        }
+
+        fn is_playing(&self) -> bool {
+            self.stub.is_playing()
+        }
+
+        fn last_requested(&self) -> Option<&str> {
+            self.stub.last_requested()
+        }
+
+        fn duration_secs(&self) -> u64 {
+            213
+        }
+    }
+
+    #[test]
+    fn live_audio_forwards_the_reported_track_duration() {
+        let live = LiveAudio::Live(Box::new(ReportedAudio { stub: AudioStub::new() }));
+        assert_eq!(live.duration_secs(), 213);
+        assert_eq!(LiveAudio::muted().duration_secs(), 0);
     }
 }

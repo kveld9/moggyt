@@ -94,7 +94,7 @@ pub fn init_rodio_backend(
 #[allow(clippy::cognitive_complexity)]
 pub fn init_live_audio(data_dir: &Path, stream_cache: Option<Arc<StreamDiskCache>>) -> LiveAudio {
     match init_rodio_backend(data_dir, stream_cache) {
-        Ok(backend) => LiveAudio::Live(backend),
+        Ok(backend) => LiveAudio::Live(Box::new(backend)),
         Err(err) => {
             tracing::warn!("audio initialization failed; running with muted stub: {err:#}");
             LiveAudio::muted()
