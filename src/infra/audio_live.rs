@@ -90,6 +90,14 @@ impl AudioBackend for LiveAudio {
         delegate_audio!(self, is_playing)
     }
 
+    fn is_paused(&self) -> bool {
+        delegate_audio!(self, is_paused)
+    }
+
+    fn is_empty(&self) -> bool {
+        delegate_audio!(self, is_empty)
+    }
+
     fn last_requested(&self) -> Option<&str> {
         delegate_audio!(self, last_requested)
     }
@@ -187,6 +195,9 @@ mod tests {
 
     struct ReportedAudio {
         stub: AudioStub,
+        playing: bool,
+        paused: bool,
+        empty: bool,
     }
 
     impl AudioBackend for ReportedAudio {
@@ -219,7 +230,15 @@ mod tests {
         }
 
         fn is_playing(&self) -> bool {
-            self.stub.is_playing()
+            self.playing
+        }
+
+        fn is_paused(&self) -> bool {
+            self.paused
+        }
+
+        fn is_empty(&self) -> bool {
+            self.empty
         }
 
         fn last_requested(&self) -> Option<&str> {
@@ -231,10 +250,48 @@ mod tests {
         }
     }
 
+    fn reported_audio(paused: bool, empty: bool) -> ReportedAudio {
+        ReportedAudio { stub: AudioStub::new(), playing: false, paused, empty }
+    }
+
     #[test]
     fn live_audio_forwards_the_reported_track_duration() {
-        let live = LiveAudio::Live(Box::new(ReportedAudio { stub: AudioStub::new() }));
+        let live = LiveAudio::Live(Box::new(reported_audio(false, false)));
         assert_eq!(live.duration_secs(), 213);
         assert_eq!(LiveAudio::muted().duration_secs(), 0);
+    }
+
+    #[test]
+    fn live_audio_forwards_pause_and_drained_sink_facts() {
+        let paused = LiveAudio::Live(Box::new(reported_audio(true, false)));
+        assert!(paused.is_paused());
+        assert!(!paused.is_empty());
+
+        let drained = LiveAudio::Live(Box::new(reported_audio(false, true)));
+        assert!(!drained.is_paused());
+        assert!(drained.is_empty());
+    }
+
+    #[test]
+    fn drained_live_backend_maps_to_the_ended_event() {
+        use crate::domain::{PlaybackEvent, PlaybackFacts};
+
+        let mut stub = AudioStub::new();
+        stub.play("track-ended").expect("stub play");
+        let live = LiveAudio::Live(Box::new(ReportedAudio {
+            stub,
+            playing: false,
+            paused: false,
+            empty: true,
+        }));
+        let facts = PlaybackFacts {
+            has_track: true,
+            is_empty: live.is_empty(),
+            is_paused: live.is_paused(),
+            is_playing: live.is_playing(),
+            position_secs: live.position_secs(),
+            duration_secs: live.duration_secs(),
+        };
+        assert_eq!(facts.event(), Some(PlaybackEvent::Ended));
     }
 }
