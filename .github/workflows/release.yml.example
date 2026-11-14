@@ -204,8 +204,8 @@ jobs:
           ./linuxdeploy.AppImage \
             --appdir AppDir \
             -e target/release/moggyt \
-            -d packaging/appimage/moggyt.desktop \
-            -i packaging/appimage/moggyt.png \
+            -d packaging/linux/moggyt.desktop \
+            -i packaging/icons/hicolor/256x256/apps/moggyt.png \
             "${EXTRA_LIBS[@]}"
 
           ARCH=x86_64 ./appimagetool.AppImage AppDir "dist/moggyt-${VERSION}-x86_64.AppImage"
