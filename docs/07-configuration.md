@@ -180,14 +180,17 @@ The configuration file uses JSON serialization with atomic replacement:
     10 GB) on load. Setting to `0` disables stream caching on disk.
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.
-  - `"compact"`: Low-bandwidth audio stream using InnerTube itag 139 (AAC ~50 kbps) or yt-dlp selector
+  - `"compact"`: Low-bandwidth audio stream using InnerTube itag 139 (AAC ~49 kbps, 22.05 kHz) or yt-dlp selector
     `"bestaudio[ext=m4a][abr<=64]/bestaudio[ext=m4a]/bestaudio/best"`.
   - `"standard"`: Balanced audio stream using InnerTube itag 140 (AAC ~130 kbps, 44.1 kHz) or yt-dlp selector
     `"bestaudio[ext=m4a]/bestaudio/best"` (default).
-  - `"high"`: Highest available audio stream. InnerTube prefers itag 251 (Opus in WebM, ~136 kbps, 48 kHz)
+  - `"high"`: Highest available audio stream. InnerTube prefers itag 251 (Opus in WebM, ~130 kbps, 48 kHz)
     decoded with the bundled libopus and falls back through `[141, 140, 250, 139]`. Note that itag 141
     (~256 kbps AAC) requires a Premium session. yt-dlp uses selector
     `"bestaudio[ext=webm][acodec=opus]/bestaudio[ext=m4a]/bestaudio/best"`.
+  - Without a Premium session YouTube reports both the Standard AAC stream and the High Opus stream as
+    `AUDIO_QUALITY_MEDIUM`; only itag 141 reaches `AUDIO_QUALITY_HIGH`, so High selects the Opus codec and
+    its 48 kHz output rather than additional bitrate.
 - **Hide Music Videos (`songs_only`)**:
   - `false`: Catalog browse surfaces retain music videos, ranked after audio tracks (default).
   - `true`: Search results, Explore and category shelves, remote album/playlist/artist track lists, and autoplay radio

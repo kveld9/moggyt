@@ -155,9 +155,9 @@ mod tests {
         assert_eq!(es.sleep_timer_end_of_track_label, "Fin de la canción");
         assert_eq!(es.audio_quality_label, "Calidad de audio");
         assert_eq!(es.audio_quality_hint_label, "Se aplica desde la siguiente canción");
-        assert_eq!(es.audio_quality_low_label, "Baja (<=64 kbps)");
-        assert_eq!(es.audio_quality_standard_label, "Estándar (~128 kbps)");
-        assert_eq!(es.audio_quality_high_label, "Alta (AAC máx ~130 kbps)");
+        assert_eq!(es.audio_quality_low_label, "Baja (AAC ~49 kbps, 22 kHz)");
+        assert_eq!(es.audio_quality_standard_label, "Estándar (AAC ~130 kbps, 44 kHz)");
+        assert_eq!(es.audio_quality_high_label, "Alta (Opus ~130 kbps, 48 kHz)");
         assert_eq!(es.songs_only_label, "Ocultar videoclips");
         assert_eq!(es.autoplay_label, "Reproducción automática de similares");
         assert_eq!(es.crossfade, "Fundido cruzado");
@@ -340,9 +340,9 @@ mod tests {
         assert_eq!(en.sleep_timer_end_of_track_label, "End of track");
         assert_eq!(en.audio_quality_label, "Audio quality");
         assert_eq!(en.audio_quality_hint_label, "Applies from the next track");
-        assert_eq!(en.audio_quality_low_label, "Low (<=64 kbps)");
-        assert_eq!(en.audio_quality_standard_label, "Standard (~128 kbps)");
-        assert_eq!(en.audio_quality_high_label, "High (AAC max ~130 kbps)");
+        assert_eq!(en.audio_quality_low_label, "Low (AAC ~49 kbps, 22 kHz)");
+        assert_eq!(en.audio_quality_standard_label, "Standard (AAC ~130 kbps, 44 kHz)");
+        assert_eq!(en.audio_quality_high_label, "High (Opus ~130 kbps, 48 kHz)");
         assert_eq!(en.songs_only_label, "Hide music videos");
         assert_eq!(en.autoplay_label, "Autoplay similar tracks");
         assert_eq!(en.crossfade, "Crossfade");
