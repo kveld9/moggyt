@@ -178,6 +178,8 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Stream Cache Quota (`stream_cache_limit_mb`)**:
   - Integer maximum disk budget in megabytes for the audio stream cache (default `512`). Clamped to `0..=10240` (up to
     10 GB) on load. Setting to `0` disables stream caching on disk.
+  - Cache entries are keyed by track ID and audio quality, so changing the quality preference never replays a
+    stream cached for a different tier.
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.
   - `"compact"`: Low-bandwidth audio stream using InnerTube itag 139 (AAC ~49 kbps, 22.05 kHz) or yt-dlp selector

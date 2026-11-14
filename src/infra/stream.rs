@@ -16,6 +16,17 @@ pub enum AudioQuality {
     High,
 }
 
+impl AudioQuality {
+    /// Stable lowercase tag used in cache file names; matches the persisted `snake_case` name.
+    pub const fn tag(self) -> &'static str {
+        match self {
+            Self::Compact => "compact",
+            Self::Standard => "standard",
+            Self::High => "high",
+        }
+    }
+}
+
 /// Maps an [`AudioQuality`] preference to yt-dlp format selector (SDD Q-3).
 ///
 /// [`AudioQuality::High`] prefers Opus in WebM (itag 251, ~130 kbps, 48 kHz) decoded
@@ -187,6 +198,7 @@ mod tests {
         ] {
             let serialized = serde_json::to_string(&quality).expect("serialization succeeds");
             assert_eq!(serialized, json_str);
+            assert_eq!(format!("\"{}\"", quality.tag()), json_str);
             let deserialized: AudioQuality =
                 serde_json::from_str(json_str).expect("deserialization succeeds");
             assert_eq!(deserialized, quality);
