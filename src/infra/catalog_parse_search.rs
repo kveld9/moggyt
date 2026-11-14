@@ -402,6 +402,20 @@ fn dispatch_bare(renderer: &Value, hits: &mut SearchHits) {
     }
 }
 
+/// Routes the catalog's own top-result card into the hit buckets.
+///
+/// The catalog promotes one entity above the flat result list and omits it from that list, so
+/// skipping the card hides the entity from search: an artist that only exists there is never
+/// ranked, and an unrelated hit wins the promoted card.
+///
+/// Track cards stay out on purpose: they point at music videos that the flat list already
+/// ranks with the music-video penalty.
+fn dispatch_card(card: &Value, hits: &mut SearchHits) {
+    let Some(category) = browse_page_type(card).and_then(page_type_category) else { return };
+    let Some((title, _, _)) = parse_two_row(card) else { return };
+    dispatch_category(category, card, title, String::new(), hits);
+}
+
 fn collect_item_or_shelf_all(item: &Value, hits: &mut SearchHits) {
     if let Some(shelf) = item.get("musicShelfRenderer") {
         collect_shelf(shelf, hits);
@@ -411,7 +425,9 @@ fn collect_item_or_shelf_all(item: &Value, hits: &mut SearchHits) {
 }
 
 fn collect_section_all(section: &Value, hits: &mut SearchHits) {
-    if let Some(shelf) = section.get("musicShelfRenderer") {
+    if let Some(card) = section.get("musicCardShelfRenderer") {
+        dispatch_card(card, hits);
+    } else if let Some(shelf) = section.get("musicShelfRenderer") {
         collect_shelf(shelf, hits);
     } else if let Some(items) =
         section.pointer("/itemSectionRenderer/contents").and_then(Value::as_array)
