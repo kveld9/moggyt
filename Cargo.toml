@@ -43,7 +43,13 @@ priority = "optional"
 depends = "$auto, libasound2, libayatana-appindicator3-1"
 assets = [
     ["target/release/moggyt", "usr/bin/", "755"],
-    ["packaging/deb/moggyt.desktop", "usr/share/applications/", "644"],
+    ["packaging/linux/moggyt.desktop", "usr/share/applications/", "644"],
+    ["packaging/icons/hicolor/16x16/apps/moggyt.png", "usr/share/icons/hicolor/16x16/apps/", "644"],
+    ["packaging/icons/hicolor/32x32/apps/moggyt.png", "usr/share/icons/hicolor/32x32/apps/", "644"],
+    ["packaging/icons/hicolor/48x48/apps/moggyt.png", "usr/share/icons/hicolor/48x48/apps/", "644"],
+    ["packaging/icons/hicolor/64x64/apps/moggyt.png", "usr/share/icons/hicolor/64x64/apps/", "644"],
+    ["packaging/icons/hicolor/128x128/apps/moggyt.png", "usr/share/icons/hicolor/128x128/apps/", "644"],
+    ["packaging/icons/hicolor/256x256/apps/moggyt.png", "usr/share/icons/hicolor/256x256/apps/", "644"],
     ["THIRD_PARTY_NOTICES.md", "usr/share/doc/moggyt/", "644"],
 ]
 extended-description = """\
