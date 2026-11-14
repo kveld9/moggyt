@@ -108,7 +108,7 @@ Playback stream resolution is layered (`stream_chain.rs`):
    ("Sign in to confirm you're not a bot"). The failure reason is logged once per
    cause and playback continues through the sidecar.
 
-Opus in WebM (itag 251, ~136 kbps, 48 kHz) is decoded via libopus through `opus_source.rs`
+Opus in WebM (itag 251, ~130 kbps, 48 kHz) is decoded via libopus through `opus_source.rs`
 using Symphonia for container demuxing. For `High` quality, InnerTube resolution prefers
 itag 251 and falls back to AAC formats (141, 140, 250, 139) when Opus is unavailable;
 the yt-dlp sidecar selector for `High` similarly prefers WebM Opus before AAC and

@@ -43,21 +43,21 @@ pub const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) App
 /// HTTP transport timeout for stream resolution requests in seconds.
 pub const REQUEST_TIMEOUT_SECS: u64 = 8;
 
-/// Adaptive format itag for low-bitrate AAC (~50 kbps).
+/// Adaptive format itag for low-bitrate AAC (~49 kbps).
 pub const ITAG_AAC_COMPACT: u32 = 139;
 
 /// Adaptive format itag for medium-bitrate AAC (~130 kbps).
 pub const ITAG_AAC_STANDARD: u32 = 140;
 
-/// Adaptive format itag for high-quality Opus (~136 kbps, 48 kHz).
+/// Adaptive format itag for high-quality Opus (~130 kbps, 48 kHz).
 pub const ITAG_OPUS_HIGH: u32 = 251;
 
 const ORIGIN: &str = "https://www.youtube.com";
 
 /// Selects the preferred InnerTube itag for the given audio quality.
 ///
-/// Returns 139 (AAC ~50 kbps) for [`AudioQuality::Compact`], 140 (AAC ~130 kbps)
-/// for [`AudioQuality::Standard`], and 251 (Opus ~136 kbps) for [`AudioQuality::High`].
+/// Returns 139 (AAC ~49 kbps) for [`AudioQuality::Compact`], 140 (AAC ~130 kbps)
+/// for [`AudioQuality::Standard`], and 251 (Opus ~130 kbps) for [`AudioQuality::High`].
 pub const fn select_itag(quality: AudioQuality) -> u32 {
     match quality {
         AudioQuality::Compact => ITAG_AAC_COMPACT,

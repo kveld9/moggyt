@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 pub use super::stream_stub::StreamStub;
 
-/// Audio stream quality preference: Compact (<=64k), Standard (default), High (highest available AAC).
+/// Audio stream quality preference: Compact (<=64 kbps), Standard (AAC ~130 kbps, default), High (Opus 48 kHz preferred).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AudioQuality {
@@ -18,9 +18,9 @@ pub enum AudioQuality {
 
 /// Maps an [`AudioQuality`] preference to yt-dlp format selector (SDD Q-3).
 ///
-/// [`AudioQuality::High`] prefers Opus in WebM (itag 251, ~136 kbps, 48 kHz) decoded
+/// [`AudioQuality::High`] prefers Opus in WebM (itag 251, ~130 kbps, 48 kHz) decoded
 /// via libopus through [`OpusWebmSource`], with AAC m4a and unconstrained audio as
-/// fallbacks. [`AudioQuality::Standard`] uses AAC m4a (~128-130 kbps), and
+/// fallbacks. [`AudioQuality::Standard`] uses AAC m4a (~130 kbps), and
 /// [`AudioQuality::Compact`] constrains bitrate to <=64 kbps.
 pub const fn audio_quality_format(quality: AudioQuality) -> &'static str {
     match quality {
