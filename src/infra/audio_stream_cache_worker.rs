@@ -3,6 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use super::stream::AudioQuality;
 use super::stream_disk_cache::StreamDiskCache;
 
 pub(crate) fn download_stream_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
@@ -16,10 +17,15 @@ pub(crate) fn download_stream_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
 
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-pub(crate) fn cache_download_worker(cache: Arc<StreamDiskCache>, track_id: &str, url: &str) {
+pub(crate) fn cache_download_worker(
+    cache: Arc<StreamDiskCache>,
+    track_id: &str,
+    quality: AudioQuality,
+    url: &str,
+) {
     match download_stream_bytes(url) {
         Ok(data) => {
-            if let Err(err) = cache.put(track_id, &data) {
+            if let Err(err) = cache.put(track_id, quality, &data) {
                 tracing::warn!(track_id = %track_id, error = ?err, "failed to cache stream to disk");
             }
         }

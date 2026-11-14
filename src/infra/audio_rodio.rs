@@ -313,7 +313,7 @@ impl RodioBackend {
     }
 
     fn cached_source(&self, track_id: &str) -> Option<Box<dyn Source<Item = f32> + Send>> {
-        let path = self.stream_cache.as_ref()?.get(track_id)?;
+        let path = self.stream_cache.as_ref()?.get(track_id, self.quality())?;
         Self::decode_cached_file(&path, track_id, self.output_sample_rate()).ok()
     }
 
@@ -337,14 +337,15 @@ impl RodioBackend {
         let Some(cache) = self.stream_cache.clone() else {
             return;
         };
-        if cache.max_bytes() == 0 || cache.get(track_id).is_some() {
+        let quality = self.quality();
+        if cache.max_bytes() == 0 || cache.get(track_id, quality).is_some() {
             return;
         }
         let track_id = track_id.to_string();
         let url = url.to_string();
         std::thread::Builder::new()
             .name("stream-cache-download".to_string())
-            .spawn(move || cache_download_worker(cache, &track_id, &url))
+            .spawn(move || cache_download_worker(cache, &track_id, quality, &url))
             .ok();
     }
 
@@ -410,7 +411,9 @@ impl AudioBackend for RodioBackend {
     }
 
     fn has_cached_stream(&self, track_id: &str) -> bool {
-        self.stream_cache.as_ref().is_some_and(|cache| cache.get(track_id).is_some())
+        self.stream_cache
+            .as_ref()
+            .is_some_and(|cache| cache.get(track_id, self.quality()).is_some())
     }
 
     fn pause(&mut self) {
@@ -683,7 +686,9 @@ mod tests {
             std::env::temp_dir().join(format!("moggyt-test-backend-cache-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);
         let cache = Arc::new(StreamDiskCache::new(&temp_dir, 1024 * 1024).expect("cache init"));
-        cache.put("cached-track-1", &MINIMAL_WAV_HEADER).expect("put wav in cache");
+        cache
+            .put("cached-track-1", AudioQuality::Standard, &MINIMAL_WAV_HEADER)
+            .expect("put wav in cache");
 
         let Some(mut backend) = test_backend() else {
             let _ = std::fs::remove_dir_all(&temp_dir);
@@ -709,7 +714,9 @@ mod tests {
             std::env::temp_dir().join(format!("moggyt-test-cached-stream-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);
         let cache = Arc::new(StreamDiskCache::new(&temp_dir, 1024 * 1024).expect("cache init"));
-        cache.put("cached-track-1", &MINIMAL_WAV_HEADER).expect("put wav in cache");
+        cache
+            .put("cached-track-1", AudioQuality::Standard, &MINIMAL_WAV_HEADER)
+            .expect("put wav in cache");
 
         let mut backend =
             match RodioBackend::with_cache("/definitely/missing/binary/yt-dlp", Some(cache)) {

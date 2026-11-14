@@ -4,11 +4,13 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 
+use super::stream::AudioQuality;
+
 static TMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// Computes the cache filename for an audio stream track ID.
-pub fn stream_file_name(track_id: &str) -> String {
-    format!("{}.stream", super::cover_disk::fnv1a_hex(track_id))
+/// Computes the cache filename for a track ID at a specific audio quality.
+pub fn stream_file_name(track_id: &str, quality: AudioQuality) -> String {
+    format!("{}.{}.stream", super::cover_disk::fnv1a_hex(track_id), quality.tag())
 }
 
 #[derive(Debug)]
@@ -43,12 +45,13 @@ impl StreamDiskCache {
         self.max_bytes
     }
 
-    /// Returns the cached stream file path if present and valid, touching mtime for LRU freshness.
-    pub fn get(&self, track_id: &str) -> Option<PathBuf> {
+    /// Returns the cached stream file path for the given quality if present and valid,
+    /// touching mtime for LRU freshness.
+    pub fn get(&self, track_id: &str, quality: AudioQuality) -> Option<PathBuf> {
         if self.max_bytes == 0 {
             return None;
         }
-        let path = self.dir.join(stream_file_name(track_id));
+        let path = self.dir.join(stream_file_name(track_id, quality));
         if !path.is_file() {
             return None;
         }
@@ -76,9 +79,15 @@ impl StreamDiskCache {
         Ok(())
     }
 
-    /// Atomically writes stream data to disk, prunes expired entries, and returns the cached path.
-    pub fn put(&self, track_id: &str, data: &[u8]) -> std::io::Result<PathBuf> {
-        let file_name = stream_file_name(track_id);
+    /// Atomically writes stream data for the given quality to disk, prunes expired entries,
+    /// and returns the cached path.
+    pub fn put(
+        &self,
+        track_id: &str,
+        quality: AudioQuality,
+        data: &[u8],
+    ) -> std::io::Result<PathBuf> {
+        let file_name = stream_file_name(track_id, quality);
         let dest = self.dir.join(&file_name);
         if self.max_bytes == 0 {
             self.prune_lru()?;
@@ -201,10 +210,10 @@ mod tests {
         assert_eq!(cache.total_size(), 0);
 
         let data = b"audio stream payload test 1234567890";
-        let path = cache.put("track-1", data).expect("put track-1");
+        let path = cache.put("track-1", AudioQuality::Standard, data).expect("put track-1");
         assert!(path.is_file());
 
-        let retrieved = cache.get("track-1").expect("get track-1");
+        let retrieved = cache.get("track-1", AudioQuality::Standard).expect("get track-1");
         assert_eq!(retrieved, path);
         let read_bytes = std::fs::read(&retrieved).expect("read file");
         assert_eq!(read_bytes, data);
@@ -216,12 +225,12 @@ mod tests {
         let (_guard, dir) = unique_temp_dir("stream-lru");
         let cache = StreamDiskCache::new(&dir, 100).expect("cache init");
 
-        cache.put("track-a", &[1; 40]).expect("put track-a");
-        cache.put("track-b", &[2; 40]).expect("put track-b");
+        cache.put("track-a", AudioQuality::Standard, &[1; 40]).expect("put track-a");
+        cache.put("track-b", AudioQuality::Standard, &[2; 40]).expect("put track-b");
         assert_eq!(cache.total_size(), 80);
 
-        let path_a = cache.get("track-a").expect("get track-a");
-        let path_b = cache.get("track-b").expect("get track-b");
+        let path_a = cache.get("track-a", AudioQuality::Standard).expect("get track-a");
+        let path_b = cache.get("track-b", AudioQuality::Standard).expect("get track-b");
 
         // Set track-b to be older than track-a
         let older = SystemTime::now() - Duration::from_secs(60);
@@ -233,15 +242,15 @@ mod tests {
         file_a.set_modified(newer).expect("set modified a");
 
         // Now put track-c (40 bytes), total would be 120 > 100 quota
-        cache.put("track-c", &[3; 40]).expect("put track-c");
+        cache.put("track-c", AudioQuality::Standard, &[3; 40]).expect("put track-c");
 
         // track-b should have been evicted (oldest mtime)
-        assert!(cache.get("track-b").is_none());
+        assert!(cache.get("track-b", AudioQuality::Standard).is_none());
         assert!(!path_b.is_file());
 
         // track-a and track-c should remain
-        assert!(cache.get("track-a").is_some());
-        assert!(cache.get("track-c").is_some());
+        assert!(cache.get("track-a", AudioQuality::Standard).is_some());
+        assert!(cache.get("track-c", AudioQuality::Standard).is_some());
         assert_eq!(cache.total_size(), 80);
     }
 
@@ -251,9 +260,11 @@ mod tests {
         let cache = StreamDiskCache::new(&dir, 0).expect("cache init");
         assert_eq!(cache.max_bytes(), 0);
 
-        let path = cache.put("track-zero", &[42; 64]).expect("put with zero quota");
+        let path = cache
+            .put("track-zero", AudioQuality::Standard, &[42; 64])
+            .expect("put with zero quota");
         assert!(!path.is_file());
-        assert!(cache.get("track-zero").is_none());
+        assert!(cache.get("track-zero", AudioQuality::Standard).is_none());
         assert_eq!(cache.total_size(), 0);
     }
 
@@ -262,14 +273,14 @@ mod tests {
         let (_guard, dir) = unique_temp_dir("stream-clear");
         let cache = StreamDiskCache::new(&dir, 1024).expect("cache init");
 
-        cache.put("track-x", &[1; 30]).expect("put x");
-        cache.put("track-y", &[2; 40]).expect("put y");
+        cache.put("track-x", AudioQuality::Standard, &[1; 30]).expect("put x");
+        cache.put("track-y", AudioQuality::Standard, &[2; 40]).expect("put y");
         assert_eq!(cache.total_size(), 70);
 
         cache.clear().expect("clear");
         assert_eq!(cache.total_size(), 0);
-        assert!(cache.get("track-x").is_none());
-        assert!(cache.get("track-y").is_none());
+        assert!(cache.get("track-x", AudioQuality::Standard).is_none());
+        assert!(cache.get("track-y", AudioQuality::Standard).is_none());
     }
 
     #[test]
@@ -291,5 +302,19 @@ mod tests {
             .filter(|e| e.file_name().to_string_lossy().contains(".tmp."))
             .collect();
         assert!(entries.is_empty(), "temporary files must be removed on error");
+    }
+
+    #[test]
+    fn entries_are_namespaced_by_audio_quality() {
+        let (_guard, dir) = unique_temp_dir("stream-quality");
+        let cache = StreamDiskCache::new(&dir, 1024).expect("cache init");
+
+        let standard = cache.put("t", AudioQuality::Standard, &[7; 32]).expect("put");
+        assert!(cache.get("t", AudioQuality::Standard).is_some());
+        assert!(cache.get("t", AudioQuality::High).is_none());
+
+        let high = cache.put("t", AudioQuality::High, &[8; 32]).expect("put");
+        assert_ne!(standard, high);
+        assert_eq!(cache.total_size(), 64);
     }
 }
