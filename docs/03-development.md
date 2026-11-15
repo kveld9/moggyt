@@ -10,6 +10,7 @@
 ```bash
 cargo run                                  # run the app (Slint window)
 cargo test --all-features                  # full suite
+cargo test --all-features -- --ignored     # opt-in tests that need an OS keyring and D-Bus
 cargo fmt --all -- --check                 # formatting (CI fails on drift)
 cargo clippy --all-targets --all-features -- -D warnings
 ./scripts/check-repo.sh                    # repo standards and modularity audit
