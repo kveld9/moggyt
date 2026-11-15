@@ -155,9 +155,9 @@ mod tests {
         assert_eq!(es.sleep_timer_end_of_track_label, "Fin de la canción");
         assert_eq!(es.audio_quality_label, "Calidad de audio");
         assert_eq!(es.audio_quality_hint_label, "Se aplica desde la siguiente canción");
-        assert_eq!(es.audio_quality_low_label, "Baja (AAC ~49 kbps, 22 kHz)");
-        assert_eq!(es.audio_quality_standard_label, "Estándar (AAC ~130 kbps, 44 kHz)");
-        assert_eq!(es.audio_quality_high_label, "Alta (Opus ~130 kbps, 48 kHz)");
+        assert_eq!(es.audio_quality_low_label, "Baja (AAC 49 kbps)");
+        assert_eq!(es.audio_quality_standard_label, "Estándar (AAC 130 kbps)");
+        assert_eq!(es.audio_quality_high_label, "Alta (Opus 130 kbps)");
         assert_eq!(es.songs_only_label, "Ocultar videoclips");
         assert_eq!(es.autoplay_label, "Reproducción automática de similares");
         assert_eq!(es.crossfade, "Fundido cruzado");
@@ -340,9 +340,9 @@ mod tests {
         assert_eq!(en.sleep_timer_end_of_track_label, "End of track");
         assert_eq!(en.audio_quality_label, "Audio quality");
         assert_eq!(en.audio_quality_hint_label, "Applies from the next track");
-        assert_eq!(en.audio_quality_low_label, "Low (AAC ~49 kbps, 22 kHz)");
-        assert_eq!(en.audio_quality_standard_label, "Standard (AAC ~130 kbps, 44 kHz)");
-        assert_eq!(en.audio_quality_high_label, "High (Opus ~130 kbps, 48 kHz)");
+        assert_eq!(en.audio_quality_low_label, "Low (AAC 49 kbps)");
+        assert_eq!(en.audio_quality_standard_label, "Standard (AAC 130 kbps)");
+        assert_eq!(en.audio_quality_high_label, "High (Opus 130 kbps)");
         assert_eq!(en.songs_only_label, "Hide music videos");
         assert_eq!(en.autoplay_label, "Autoplay similar tracks");
         assert_eq!(en.crossfade, "Crossfade");
@@ -477,5 +477,28 @@ mod tests {
             es.custom_theme_empty_hint,
             "Coloca archivos JSON de tema en el directorio de temas o custom-theme.json dentro del directorio de configuración"
         );
+    }
+
+    const MAX_AUDIO_QUALITY_LABEL_CHARS: usize = 26;
+
+    #[test]
+    fn audio_quality_labels_fit_the_segmented_control_width() {
+        // Three equal segments inside the playback panel at the 800 px window minimum.
+        // Rendered offscreen at that width, 26 characters fit at 13 px semibold; a longer
+        // label pushes the third button outside the panel.
+        for locale in [Locale::English, Locale::Spanish] {
+            let labels = StaticLabels::resolve(locale, None);
+            let labels = [
+                labels.audio_quality_low_label,
+                labels.audio_quality_standard_label,
+                labels.audio_quality_high_label,
+            ];
+            for label in labels {
+                assert!(
+                    label.chars().count() <= MAX_AUDIO_QUALITY_LABEL_CHARS,
+                    "audio quality label '{label}' exceeds the segmented control budget"
+                );
+            }
+        }
     }
 }
