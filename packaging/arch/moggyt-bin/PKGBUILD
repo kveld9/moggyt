@@ -1,14 +1,11 @@
 # Maintainer: kveld9 <https://github.com/kveld9/moggyt>
 #
 # moggyt-bin repackages the official release tarball for Arch Linux.
-# Bump policy: update pkgver, refresh the shared asset hashes, run updpkgsums,
-# and regenerate .SRCINFO via:
-#   makepkg --printsrcinfo > .SRCINFO
+# Bump policy: update pkgver, refresh the shared asset hashes, and run updpkgsums.
 #
 # The desktop entry, launcher icons, license, and third-party notices are
 # fetched from commit 4252313 because the v1.3.0 release tarball predates them.
 # Repoint those URLs to `v${pkgver}` once a release ships the assets in the tarball.
-# AUR submission deferred until release stabilization.
 
 pkgname=moggyt-bin
 pkgver=1.3.0

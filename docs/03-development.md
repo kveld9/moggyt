@@ -302,12 +302,8 @@ guessing; every rule here was verified against a build or the official documenta
 ## Packaging (Arch Linux)
 
 Arch packaging lives under `packaging/arch/`: `moggyt-bin` repackages the release tarball and `moggyt` builds the
-tagged source archive. Regenerate the metadata whenever the PKGBUILD changes and commit both together:
-
-```bash
-cd packaging/arch/<package>
-makepkg --printsrcinfo > .SRCINFO
-```
+tagged source archive. Both are built and installed locally from a clone with `makepkg -si`; the project does not
+publish to any package archive.
 
 Any PKGBUILD that compiles Rust sets `options=('!lto')`. The global `lto` option in `makepkg.conf` compiles C
 dependencies such as `ring` as LTO bitcode, which `rust-lld` cannot resolve at link time; the Rust release profile

@@ -51,7 +51,7 @@ The repository maintains two Arch Linux package specifications:
 
 Both install `/usr/bin/moggyt`, the desktop entry, the hicolor launcher icons (16 to 256 px), the Matugen theme
 template at `/usr/share/moggyt/matugen/moggyt-theme.json`, and the license files under `/usr/share/licenses/`.
-Submission to the Arch User Repository (AUR) is scheduled following public release stabilization.
+Both are built and installed locally from a clone; the project does not publish to any package archive.
 
 ## Code Signing Policy
 
