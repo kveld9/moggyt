@@ -38,8 +38,9 @@ Release assets by shipment status:
 | `moggyt-*-x86_64.AppImage` | Linux | GitHub Releases | Shipped |
 | `moggyt-*-setup.exe` | Windows 64-bit | GitHub Releases (NSIS installer) | Planned |
 
-Linux tarballs from v1.4.0 onward, .deb packages, AppImages, and the Windows installer include
-`THIRD_PARTY_NOTICES.md`. The v1.3.0 tarball predates that change, so `moggyt-bin` fetches the file from the repository.
+Linux tarballs released after v1.3.0, .deb packages, AppImages, and the Windows installer include
+`THIRD_PARTY_NOTICES.md`. The v1.3.0 tarball predates that change, so both Arch packages fetch the file from the
+repository.
 
 ### Arch Linux Packaging
 

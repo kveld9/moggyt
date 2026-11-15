@@ -298,3 +298,27 @@ guessing; every rule here was verified against a build or the official documenta
   translated labels render literally. Use it for icon-only actions whose meaning is not carried by
   a visible label.
   Source: <https://docs.slint.dev/docs/slint/reference/window/tooltip/>.
+
+## Packaging (Arch Linux)
+
+Arch packaging lives under `packaging/arch/`: `moggyt-bin` repackages the release tarball and `moggyt` builds the
+tagged source archive. Regenerate the metadata whenever the PKGBUILD changes and commit both together:
+
+```bash
+cd packaging/arch/<package>
+makepkg --printsrcinfo > .SRCINFO
+```
+
+Any PKGBUILD that compiles Rust sets `options=('!lto')`. The global `lto` option in `makepkg.conf` compiles C
+dependencies such as `ring` as LTO bitcode, which `rust-lld` cannot resolve at link time; the Rust release profile
+keeps its own thin LTO.
+
+Build the package before committing a packaging change:
+
+```bash
+makepkg -ef --nodeps --noconfirm
+```
+
+`--nodeps` is only needed when the Rust toolchain comes from rustup instead of pacman. Shared assets (desktop entry,
+hicolor icons, license, notices) stay pinned to an immutable commit while the current release archives predate them;
+repoint those `source=` entries to `v${pkgver}` once a release ships them.
