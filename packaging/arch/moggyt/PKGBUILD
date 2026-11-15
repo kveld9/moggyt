@@ -7,8 +7,8 @@
 # enable it; without them the build succeeds with Last.fm support disabled.
 #
 # The desktop entry, launcher icons, license, and third-party notices are fetched
-# from the repository because the v1.3.0 source archive predates them. Switch those
-# URLs from `main` to `v${pkgver}` once a release ships the assets in the archive.
+# from commit 4252313 because the v1.3.0 source archive predates them. Repoint those
+# URLs to `v${pkgver}` once a release ships the assets in the archive.
 #
 # No check() function: upstream CI runs the full test suite, and a second
 # test-profile build roughly doubles the build time for this package.
@@ -33,16 +33,16 @@ options=('!lto')
 _icons=(16 32 48 64 128 256)
 source=(
   "$pkgname-$pkgver.tar.gz::https://github.com/kveld9/moggyt/archive/refs/tags/v$pkgver.tar.gz"
-  "moggyt.desktop::https://raw.githubusercontent.com/kveld9/moggyt/main/packaging/linux/moggyt.desktop"
+  "moggyt.desktop::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/linux/moggyt.desktop"
   "moggyt-theme.json::https://raw.githubusercontent.com/kveld9/moggyt/v${pkgver}/packaging/matugen/moggyt-theme.json"
-  "THIRD_PARTY_NOTICES.md::https://raw.githubusercontent.com/kveld9/moggyt/main/THIRD_PARTY_NOTICES.md"
-  "LICENSE::https://raw.githubusercontent.com/kveld9/moggyt/main/LICENSE"
-  "moggyt-16.png::https://raw.githubusercontent.com/kveld9/moggyt/main/packaging/icons/hicolor/16x16/apps/moggyt.png"
-  "moggyt-32.png::https://raw.githubusercontent.com/kveld9/moggyt/main/packaging/icons/hicolor/32x32/apps/moggyt.png"
-  "moggyt-48.png::https://raw.githubusercontent.com/kveld9/moggyt/main/packaging/icons/hicolor/48x48/apps/moggyt.png"
-  "moggyt-64.png::https://raw.githubusercontent.com/kveld9/moggyt/main/packaging/icons/hicolor/64x64/apps/moggyt.png"
-  "moggyt-128.png::https://raw.githubusercontent.com/kveld9/moggyt/main/packaging/icons/hicolor/128x128/apps/moggyt.png"
-  "moggyt-256.png::https://raw.githubusercontent.com/kveld9/moggyt/main/packaging/icons/hicolor/256x256/apps/moggyt.png"
+  "THIRD_PARTY_NOTICES.md::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/THIRD_PARTY_NOTICES.md"
+  "LICENSE::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/LICENSE"
+  "moggyt-16.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/16x16/apps/moggyt.png"
+  "moggyt-32.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/32x32/apps/moggyt.png"
+  "moggyt-48.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/48x48/apps/moggyt.png"
+  "moggyt-64.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/64x64/apps/moggyt.png"
+  "moggyt-128.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/128x128/apps/moggyt.png"
+  "moggyt-256.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/256x256/apps/moggyt.png"
 )
 sha256sums=(
   '14ce41ac9637ea86e60b65ac6417978a836b61ccb5816490235b4d95f692bffa'
