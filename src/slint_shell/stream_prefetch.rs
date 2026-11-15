@@ -207,4 +207,31 @@ mod tests {
 
         assert_eq!(fetcher.call_count(), 1);
     }
+
+    #[test]
+    fn spawn_stream_prefetch_works_through_a_boxed_backend() {
+        let resolver = YtDlpResolver::new("/definitely/missing/binary/yt-dlp");
+        let video_id = "boxed-prefetch-id";
+        resolver.cache().insert(
+            video_id,
+            AudioQuality::Standard,
+            "https://googlevideo.test/boxed".into(),
+            std::time::Instant::now(),
+        );
+        let chain = StreamChain::from_ytdlp(resolver.clone());
+        let backend: Box<dyn AudioBackend + Send> =
+            Box::new(MockPrefetchBackend { chain, has_cached: false });
+        let audio = Arc::new(Mutex::new(backend));
+
+        let handle = spawn_stream_prefetch(Some(video_id.into()), &audio)
+            .expect("prefetch thread spawned through the boxed backend");
+        handle.join().expect("prefetch thread join succeeds");
+
+        assert!(
+            resolver
+                .cache()
+                .get(video_id, AudioQuality::Standard, std::time::Instant::now())
+                .is_some()
+        );
+    }
 }
