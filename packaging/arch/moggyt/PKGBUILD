@@ -12,9 +12,6 @@
 #
 # No check() function: upstream CI runs the full test suite, and a second
 # test-profile build roughly doubles the build time for this package.
-#
-# Regenerate .SRCINFO via:
-#   makepkg --printsrcinfo > .SRCINFO
 
 pkgname=moggyt
 pkgver=1.3.0

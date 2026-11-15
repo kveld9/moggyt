@@ -33,7 +33,7 @@
 #   native Debian packages (.deb) via cargo-deb, and standalone Linux AppImage bundles (.AppImage)
 #   via linuxdeploy and appimagetool.
 #   TODO:
-#     - Arch Linux packaging: Maintain PKGBUILD in packaging/arch/moggyt-bin (AUR publish deferred; no credentials in v1).
+#     - Arch Linux packaging: Maintain the PKGBUILDs in packaging/arch (built and installed locally from a clone).
 #     - Code signing & Attestations: Integrate Authenticode signing for Windows
 #       and GitHub Artifact Attestations via actions/attest-build-provenance.
 # ==============================================================================

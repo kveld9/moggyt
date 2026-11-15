@@ -27,8 +27,8 @@ Official builds are distributed as GitHub Releases for Linux and Windows x86_64:
 | Linux | `.AppImage` | Standalone portable executable bundle |
 | Linux | `.deb` | Debian and Ubuntu binary package |
 | Linux | `moggyt-*-linux.tar.gz` | Standalone portable tarball |
-| Linux (Arch) | `moggyt-bin` | Arch Linux PKGBUILD repackaging the release tarball (AUR pending) |
-| Linux (Arch) | `moggyt` | Arch Linux PKGBUILD building the tagged source archive (AUR pending) |
+| Linux (Arch) | `moggyt-bin` | Arch Linux PKGBUILD repackaging the release tarball (built from a clone) |
+| Linux (Arch) | `moggyt` | Arch Linux PKGBUILD building the tagged source archive (built from a clone) |
 | Windows | `.exe` (NSIS) | Windows 64-bit installer |
 | Windows | `moggyt-*-windows.zip` | Portable zip archive |
 
@@ -48,8 +48,8 @@ Two PKGBUILDs are maintained in the repository:
 | `moggyt-bin` | Official release tarball | Seconds (download and repack) |
 | `moggyt` | Tagged source archive | Minutes (full Rust release build) |
 
-Neither package is published on the AUR yet; AUR helpers (`yay -S moggyt-bin` or `paru -S moggyt`) are not
-supported until submission is completed. Build them from a clone.
+Both packages are built and installed locally from a clone; the project does not publish them to any package
+archive.
 
 1. Install build tools:
 
