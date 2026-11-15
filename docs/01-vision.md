@@ -14,10 +14,11 @@ Web-based YouTube Music clients consume too much memory and depend on the browse
 - Hexagonal architecture: `Catalog`, `AudioBackend`, `StreamResolver`, `LyricsSource`, `CoverCache`, `SessionStore`,
   `SettingsStore`, `PlaylistStore`, `PlayLogStore`, `SkipStore`, `VersionOverrideStore`, `Scrobbler`, `Presence`,
   and `Updater` ports.
-- Robust adapters: InnerTube VisionOS stream resolver with `yt-dlp` sidecar fallback, `rodio` dual-sink crossfade
-  and DSP pipeline (rubato resampling, libopus decoding, loudness normalization, skip-silence), LRCLIB + lrc.red
-  lyrics cascade, Last.fm scrobbling, Discord Rich Presence, MPRIS/SMTC media keys, system tray, OS keyring
-  credentials, and zero-key Spotify playlist/album import.
+- Robust adapters: InnerTube VisionOS stream resolver with `yt-dlp` sidecar fallback, `rodio`
+  sample-continuous gapless hand-off, dual-sink crossfade, and DSP pipeline (rubato resampling,
+  libopus decoding, loudness normalization, skip-silence), LRCLIB + lrc.red lyrics cascade, Last.fm
+  scrobbling, Discord Rich Presence, MPRIS/SMTC media keys, system tray, OS keyring credentials, and
+  zero-key Spotify playlist/album import.
 - Local library and playlist management with in-place mutation (rename, reorder, delete) and atomic JSON persistence.
 
 ## Out of scope (for now)

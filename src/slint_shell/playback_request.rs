@@ -19,6 +19,7 @@ impl SlintAppState {
     /// Marks the phase as `Resolving` so a track that already reached `Ended` cannot advance
     /// the queue again before the new stream starts.
     pub fn begin_play_request(&mut self) -> Option<PlayTrackRequest> {
+        self.gapless.reset();
         let track = self.queue.current().cloned()?;
         if self.on_track_changing_sleep_timer(&track.id) {
             return None;
@@ -28,28 +29,39 @@ impl SlintAppState {
         let generation = self.play_generation;
         self.maybe_scrobble_current();
 
-        let next_track = self.queue.peek_next().filter(|next| next.id != track.id);
-        let prefetch_lyrics = next_track.as_ref().map(|next| LyricsPrefetch {
+        let prefetch = self.queue.peek_next().filter(|next| next.id != track.id).cloned();
+        Some(self.build_play_request(&track, generation, false, prefetch.as_ref()))
+    }
+
+    /// Builds a play request for `track`, prefetching lyrics and stream for `prefetch`.
+    fn build_play_request(
+        &self,
+        track: &crate::domain::Track,
+        generation: u64,
+        gapless: bool,
+        prefetch: Option<&crate::domain::Track>,
+    ) -> PlayTrackRequest {
+        let prefetch_lyrics = prefetch.map(|next| LyricsPrefetch {
             artist: next.artist.clone(),
             title: next.title.clone(),
             duration_secs: next.duration_secs,
         });
         let prefetch_stream_id =
-            next_track.map(|next| self.version_overrides.resolve(&next.id).to_owned());
-
-        Some(PlayTrackRequest {
+            prefetch.map(|next| self.version_overrides.resolve(&next.id).to_owned());
+        PlayTrackRequest {
             generation,
             track_id: self.version_overrides.resolve(&track.id).to_owned(),
-            title: track.title,
-            artist: track.artist,
-            artwork_url: track.artwork,
+            title: track.title.clone(),
+            artist: track.artist.clone(),
+            artwork_url: track.artwork.clone(),
             duration_secs: track.duration_secs,
             hi_res_covers: self.hi_res_covers,
             crossfade_seconds: self.crossfade_seconds,
             lyric_overrides: self.lyric_overrides.clone(),
             prefetch_lyrics,
             prefetch_stream_id,
-        })
+            gapless,
+        }
     }
 
     /// Dispatches a play request to the background worker or test synchronous fallback.
@@ -68,6 +80,17 @@ impl SlintAppState {
         };
         self.send_play_request(req);
         true
+    }
+
+    /// Builds a preload request for the next queue track without advancing the queue.
+    ///
+    /// The request keeps the current play generation, is not scrobbled, and does not change
+    /// the playback phase: the backend appends the decoded track behind the active one and
+    /// the UI adopts it only when the backend reports the sample boundary.
+    pub fn begin_gapless_request(&mut self) -> Option<PlayTrackRequest> {
+        let next = self.queue.peek_next()?.clone();
+        let following = self.queue.tracks().get(self.queue.cursor().saturating_add(2)).cloned();
+        Some(self.build_play_request(&next, self.play_generation, true, following.as_ref()))
     }
 
     #[cfg(test)]
@@ -214,5 +237,45 @@ mod tests {
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
         state.continue_autoplay_if_ended();
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+    }
+
+    #[test]
+    fn gapless_request_targets_the_next_track_without_transitioning() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        state.queue.push(Track::new("t3", "Track 3", "Artist 3"));
+        let generation = state.play_generation;
+        let phase = state.playback_phase;
+
+        let req = state.begin_gapless_request().expect("preload request");
+
+        assert_eq!(req.track_id, "t2");
+        assert!(req.gapless);
+        assert_eq!(req.generation, generation, "the preload does not bump the generation");
+        assert_eq!(state.play_generation, generation);
+        assert_eq!(state.playback_phase, phase);
+        assert_eq!(req.prefetch_stream_id.as_deref(), Some("t3"));
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+    }
+
+    #[test]
+    fn gapless_request_without_next_track_is_none() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("only", "Only", "Artist"));
+        assert!(state.begin_gapless_request().is_none());
+    }
+
+    #[test]
+    fn regular_play_request_clears_the_gapless_latch() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        state.gapless.mark_armed("t2");
+        assert!(!state.gapless.is_free());
+
+        let _ = state.request_current_play();
+
+        assert!(state.gapless.is_free());
     }
 }

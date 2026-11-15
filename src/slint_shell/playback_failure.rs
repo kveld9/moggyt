@@ -65,6 +65,7 @@ mod tests {
                 lyrics_lines: Vec::new(),
                 cover_data: None,
                 presence: PresenceSnapshot::new("Caprichosa", "Santa Fe Klan", false),
+                gapless: false,
             },
         );
 
@@ -98,6 +99,7 @@ mod tests {
                 lyrics_lines: Vec::new(),
                 cover_data: None,
                 presence: PresenceSnapshot::new("Two", "Artist", true),
+                gapless: false,
             },
         );
 
