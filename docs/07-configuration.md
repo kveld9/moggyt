@@ -187,6 +187,8 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Cover Cache Quota (`cover_cache_limit_mb`)**:
   - Integer maximum disk budget in megabytes for the cover art cache (default `256`). Clamped to `0..=10240` on load.
     Setting to `0` disables disk caching for artwork while keeping the in-memory layer.
+  - Selectable in Settings > Playback (Off, 64 MB, 128 MB, 256 MB, 512 MB, 1 GB). Changes apply immediately; lowering
+    the quota prunes the oldest files.
   - Files are evicted by least-recently-used modification timestamp when the quota is exceeded.
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.

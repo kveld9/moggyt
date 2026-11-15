@@ -89,6 +89,8 @@ pub struct StaticLabels {
     pub crossfade_hint: &'static str,
     pub stream_cache: &'static str,
     pub stream_cache_hint: &'static str,
+    pub cover_cache: &'static str,
+    pub cover_cache_hint: &'static str,
     pub section_integrations: &'static str,
     pub discord_presence_label: &'static str,
     pub discord_presence_hint_label: &'static str,
@@ -296,6 +298,8 @@ impl StaticLabels {
             crossfade_hint: tr(locale, "Smooth transition between tracks"),
             stream_cache: tr(locale, "Stream Cache Limit"),
             stream_cache_hint: tr(locale, "Disk space quota for offline stream cache"),
+            cover_cache: tr(locale, "Cover Cache Limit"),
+            cover_cache_hint: tr(locale, "Disk space quota for cached cover art"),
             section_integrations: tr(locale, "Integrations"),
             discord_presence_label: tr(locale, "Discord Rich Presence"),
             discord_presence_hint_label: tr(
@@ -506,6 +510,8 @@ impl StaticLabels {
         labels.set_crossfade_hint_label(self.crossfade_hint.into());
         labels.set_stream_cache_label(self.stream_cache.into());
         labels.set_stream_cache_hint_label(self.stream_cache_hint.into());
+        labels.set_cover_cache_label(self.cover_cache.into());
+        labels.set_cover_cache_hint_label(self.cover_cache_hint.into());
         labels.set_section_integrations_label(self.section_integrations.into());
         labels.set_discord_presence_label(self.discord_presence_label.into());
         labels.set_discord_presence_hint_label(self.discord_presence_hint_label.into());

@@ -178,6 +178,15 @@ pub(crate) fn wire_settings_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    window.on_cover_cache_limit_selected(move |mb| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        handle_cover_cache_limit_selection(&mut st, mb);
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
     window.on_content_width_changed(move |width| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
@@ -239,10 +248,16 @@ pub(crate) fn handle_stream_cache_limit_selection(state: &mut SlintAppState, mb:
     state.set_stream_cache_limit_mb(mb.clamp(0, 10240) as u32);
 }
 
+/// Handles cover cache limit selection, clamping to [0, 10240] MB and applying it live.
+pub(crate) fn handle_cover_cache_limit_selection(state: &mut SlintAppState, mb: i32) {
+    state.set_cover_cache_limit_mb(mb.clamp(0, 10240) as u32);
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        handle_crossfade_change, handle_playback_speed_selection, handle_sleep_timer_selection,
+        handle_cover_cache_limit_selection, handle_crossfade_change,
+        handle_playback_speed_selection, handle_sleep_timer_selection,
         handle_stream_cache_limit_selection,
     };
     use crate::domain::{TimerPreset, Track};
@@ -299,6 +314,26 @@ mod tests {
         handle_stream_cache_limit_selection(&mut state, 20000);
         assert_eq!(state.stream_cache_limit_mb, 10240);
         assert_eq!(state.settings_store.load().stream_cache_limit_mb, 10240);
+    }
+
+    #[test]
+    fn test_cover_cache_limit_selection_callback_path() {
+        let mut state = test_wired();
+        assert_eq!(state.cover_cache_limit_mb, 256);
+
+        handle_cover_cache_limit_selection(&mut state, 512);
+        assert_eq!(state.cover_cache_limit_mb, 512);
+        assert_eq!(state.settings_store.load().cover_cache_limit_mb, 512);
+
+        // Clamping negative to 0
+        handle_cover_cache_limit_selection(&mut state, -100);
+        assert_eq!(state.cover_cache_limit_mb, 0);
+        assert_eq!(state.settings_store.load().cover_cache_limit_mb, 0);
+
+        // Clamping above 10240 to 10240
+        handle_cover_cache_limit_selection(&mut state, 20000);
+        assert_eq!(state.cover_cache_limit_mb, 10240);
+        assert_eq!(state.settings_store.load().cover_cache_limit_mb, 10240);
     }
 
     #[test]

@@ -182,6 +182,7 @@ pub fn persist_state_on_exit(state: &mut SlintAppState) -> anyhow::Result<()> {
 pub(crate) fn apply_persisted_settings(state: &mut SlintAppState, settings: &Settings) {
     state.crossfade_seconds = settings.crossfade_seconds;
     state.stream_cache_limit_mb = settings.stream_cache_limit_mb;
+    state.cover_cache_limit_mb = settings.cover_cache_limit_mb;
     state.hi_res_covers = settings.hi_res_covers;
     state.songs_only = settings.songs_only;
     state.detail_compact_tracks = settings.detail_compact_tracks;
@@ -321,6 +322,7 @@ mod tests {
             detail_compact_tracks: true,
             crossfade_seconds: 4,
             stream_cache_limit_mb: 64,
+            cover_cache_limit_mb: 128,
             player_bar_show_volume: false,
             theme: crate::domain::ThemeId::Matugen,
             locale: crate::i18n::Locale::Spanish,
@@ -335,6 +337,7 @@ mod tests {
         assert!(state.detail_compact_tracks);
         assert_eq!(state.crossfade_seconds, 4);
         assert_eq!(state.stream_cache_limit_mb, 64);
+        assert_eq!(state.cover_cache_limit_mb, 128);
         assert!(!state.player_bar.show_volume);
         assert_eq!(state.theme, crate::domain::ThemeId::Matugen);
         assert_eq!(state.locale, crate::i18n::Locale::Spanish);

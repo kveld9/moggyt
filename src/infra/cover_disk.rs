@@ -192,6 +192,13 @@ impl CoverCache for DiskCoverCache {
             }
         }
     }
+
+    fn set_limit(&mut self, max_bytes: u64) {
+        self.max_bytes = max_bytes;
+        if let Err(err) = self.prune_lru() {
+            tracing::warn!(error = %err, "failed to prune cover cache after quota change");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -326,6 +333,19 @@ mod tests {
         assert_eq!(cache.total_size(), 40);
         cache.put(url, vec![2; 10]);
         assert_eq!(cache.total_size(), 10);
+    }
+
+    #[test]
+    fn set_limit_prunes_immediately() {
+        let (dir, _guard) = unique_temp_path("quota-set-limit");
+        let mut cache = DiskCoverCache::with_limit(&dir, 100).expect("valid dir");
+        cache.put("https://example.com/a.jpg", vec![1; 40]);
+        cache.put("https://example.com/b.jpg", vec![2; 40]);
+        assert_eq!(cache.total_size(), 80);
+
+        cache.set_limit(40);
+        assert_eq!(cache.max_bytes(), 40);
+        assert!(cache.total_size() <= 40);
     }
 
     #[test]

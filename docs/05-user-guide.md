@@ -326,6 +326,8 @@ Playback options can be configured under **Settings -> Playback**:
   this option disabled.
 - **Autoplay similar tracks**: Appends similar tracks when the queue ends. It is off by default; when enabled,
   playback continues with catalog radio recommendations after the last track.
+- **Cover cache limit**: selects the disk budget for cached cover art (Off, 64 MB, 128 MB, 256 MB, 512 MB,
+  1 GB). Lowering the limit prunes the oldest covers immediately.
 
 ## Persistent Player Bar
 

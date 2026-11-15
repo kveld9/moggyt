@@ -7,6 +7,9 @@ pub const CAPACITY: usize = 64;
 pub trait CoverCache {
     fn get(&self, url: &str) -> Option<Vec<u8>>;
     fn put(&mut self, url: &str, bytes: Vec<u8>);
+
+    /// Updates the disk quota when the implementation has one; the memory tier ignores it.
+    fn set_limit(&mut self, _max_bytes: u64) {}
 }
 
 #[derive(Debug, Default)]

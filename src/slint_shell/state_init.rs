@@ -106,6 +106,7 @@ impl SlintAppState {
             last_crossfaded_track: None,
             gapless: Default::default(),
             stream_cache_limit_mb: 512,
+            cover_cache_limit_mb: 256,
             hi_res_covers: false,
             songs_only: false,
             detail_compact_tracks: false,

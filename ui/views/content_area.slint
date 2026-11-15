@@ -62,6 +62,7 @@ export component ContentArea inherits Rectangle {
     in property <int> active-audio-quality-index: 1;
     in property <int> crossfade-seconds: 0;
     in property <int> stream-cache-limit-mb: 512;
+    in property <int> cover-cache-limit-mb: 256;
     in property <bool> songs-only: false;
     in-out property <string> settings-cookie-text: "";
     in property <string> app-version: "0.1.0";
@@ -112,6 +113,7 @@ export component ContentArea inherits Rectangle {
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
+    callback cover-cache-limit-selected(int);
     callback songs-only-toggled();
     callback back-pressed();
     callback player-bar-mode-selected(int);
@@ -307,6 +309,7 @@ export component ContentArea inherits Rectangle {
                 active-audio-quality-index: root.active-audio-quality-index;
                 crossfade-seconds: root.crossfade-seconds;
                 stream-cache-limit-mb: root.stream-cache-limit-mb;
+                cover-cache-limit-mb: root.cover-cache-limit-mb;
                 songs-only: root.songs-only;
                 player-bar-mode: root.player-bar-mode;
                 player-bar-show-artwork: root.player-bar-show-artwork;
@@ -325,6 +328,7 @@ export component ContentArea inherits Rectangle {
                 audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
                 crossfade-changed(secs) => { root.crossfade-changed(secs); }
                 stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
+                cover-cache-limit-selected(mb) => { root.cover-cache-limit-selected(mb); }
                 songs-only-toggled => { root.songs-only-toggled(); }
                 sign-in-submitted(t) => { root.sign-in-submitted(t); }
                 sign-out => { root.sign-out(); }

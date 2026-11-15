@@ -41,6 +41,7 @@ export component MoggytWindow inherits Window {
     in-out property <int> active-audio-quality-index: 1;
     in-out property <int> crossfade-seconds: 0;
     in-out property <int> stream-cache-limit-mb: 512;
+    in-out property <int> cover-cache-limit-mb: 256;
     in-out property <bool> songs-only: false;
     in-out property <string> settings-cookie-text: "";
     in-out property <string> app-version: "0.1.0";
@@ -133,6 +134,7 @@ export component MoggytWindow inherits Window {
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
+    callback cover-cache-limit-selected(int);
     callback songs-only-toggled();
     callback shortcut-pressed(string, bool) -> bool;
     callback query-submitted(string);
@@ -248,6 +250,7 @@ export component MoggytWindow inherits Window {
                     active-audio-quality-index: root.active-audio-quality-index;
                     crossfade-seconds: root.crossfade-seconds;
                     stream-cache-limit-mb: root.stream-cache-limit-mb;
+                    cover-cache-limit-mb: root.cover-cache-limit-mb;
                     songs-only: root.songs-only;
                     player-bar-mode: root.player-bar-mode;
                     player-bar-show-artwork: root.player-bar-show-artwork;
@@ -287,6 +290,7 @@ export component MoggytWindow inherits Window {
                     audio-quality-selected(idx) => { root.audio-quality-selected(idx); }
                     crossfade-changed(secs) => { root.crossfade-changed(secs); }
                     stream-cache-limit-selected(mb) => { root.stream-cache-limit-selected(mb); }
+                    cover-cache-limit-selected(mb) => { root.cover-cache-limit-selected(mb); }
                     songs-only-toggled => { root.songs-only-toggled(); }
                     back-pressed => { root.back-pressed(); }
                     player-bar-mode-selected(idx) => { root.player-bar-mode-selected(idx); }
