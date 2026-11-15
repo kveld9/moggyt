@@ -102,17 +102,19 @@ pub fn init_live_audio(data_dir: &Path, stream_cache: Option<Arc<StreamDiskCache
     }
 }
 
-/// Initializes the disk cover cache in `data_dir/covers`, falling back to a temporary directory.
+/// Initializes the disk cover cache in `data_dir/covers` with a quota derived from
+/// `limit_mb`, falling back to a temporary directory.
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-pub fn init_cover_cache(data_dir: &Path) -> DiskCoverCache {
+pub fn init_cover_cache(data_dir: &Path, limit_mb: u32) -> DiskCoverCache {
+    let max_bytes = u64::from(limit_mb) * 1024 * 1024;
     let primary = data_dir.join("covers");
-    if let Ok(cache) = DiskCoverCache::new(&primary) {
+    if let Ok(cache) = DiskCoverCache::with_limit(&primary, max_bytes) {
         return cache;
     }
     tracing::warn!("primary cover cache failed at '{}'; using temp fallback", primary.display());
     let fallback = std::env::temp_dir().join("moggyt-covers-fallback");
-    DiskCoverCache::new(&fallback).unwrap_or_else(|err| {
+    DiskCoverCache::with_limit(&fallback, max_bytes).unwrap_or_else(|err| {
         tracing::error!("fallback cover cache failed at '{}': {err:#}", fallback.display());
         eprintln!("Fatal: failed to initialize cover cache: {err}");
         std::process::exit(1);

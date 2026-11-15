@@ -78,7 +78,7 @@ fn main() -> anyhow::Result<()> {
     let catalog = LiveCatalog::new();
     let session = KeyringSessionStore::moggyt();
     let lyrics = CachedLyrics::new(LyricsCascade::new(LrcRedClient::new(), LrclibClient::new()));
-    let covers = init_cover_cache(&data_dir);
+    let covers = init_cover_cache(&data_dir, settings.cover_cache_limit_mb);
     let play_log_store = DiskPlayLogStore::new(data_dir.clone());
 
     let lyric_overrides = Some(LyricOverrideDir::new(config_dir.join("lyrics")));
