@@ -26,6 +26,9 @@ Artwork thumbnails displayed in the `Now Playing` page are cached on local stora
   (`<hash>.cover`, 16-char lowercase hex).
 - **Memory LRU**: an in-memory cache layer retains recent textures to prevent redundant disk reads and UI thread
   stalls.
+- **Eviction Policy**: least-recently-used (LRU) based on file modification timestamp. When the total size of cached
+  `.cover` files exceeds `cover_cache_limit_mb`, the oldest files are pruned until usage falls within the configured
+  quota. Setting the quota to `0` disables the disk tier; the in-memory layer keeps working.
 
 ## Audio Stream Disk Cache
 
@@ -119,6 +122,7 @@ The configuration file uses JSON serialization with atomic replacement:
   "volume": 100,
   "crossfade_seconds": 0,
   "stream_cache_limit_mb": 512,
+  "cover_cache_limit_mb": 256,
   "quality": "standard",
   "songs_only": false,
   "autoplay_enabled": false,
@@ -180,6 +184,10 @@ The configuration file uses JSON serialization with atomic replacement:
     10 GB) on load. Setting to `0` disables stream caching on disk.
   - Cache entries are keyed by track ID and audio quality, so changing the quality preference never replays a
     stream cached for a different tier.
+- **Cover Cache Quota (`cover_cache_limit_mb`)**:
+  - Integer maximum disk budget in megabytes for the cover art cache (default `256`). Clamped to `0..=10240` on load.
+    Setting to `0` disables disk caching for artwork while keeping the in-memory layer.
+  - Files are evicted by least-recently-used modification timestamp when the quota is exceeded.
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.
   - `"compact"`: Low-bandwidth audio stream using InnerTube itag 139 (AAC ~49 kbps, 22.05 kHz) or yt-dlp selector

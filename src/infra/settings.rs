@@ -48,6 +48,9 @@ const fn default_crossfade_seconds() -> u32 {
 const fn default_stream_cache_limit_mb() -> u32 {
     512
 }
+const fn default_cover_cache_limit_mb() -> u32 {
+    256
+}
 
 /// Persistent user settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,6 +81,9 @@ pub struct Settings {
     /// Disk cache size limit for audio streams in megabytes (0..=10240, 0 = disabled).
     #[serde(default = "default_stream_cache_limit_mb")]
     pub stream_cache_limit_mb: u32,
+    /// Disk cache size limit for cover art in megabytes (0..=10240, 0 = disabled).
+    #[serde(default = "default_cover_cache_limit_mb")]
+    pub cover_cache_limit_mb: u32,
     /// Preferred audio streaming quality.
     #[serde(default)]
     pub quality: AudioQuality,
@@ -171,6 +177,7 @@ impl Default for Settings {
             playback_speed: 1.0,
             crossfade_seconds: 0,
             stream_cache_limit_mb: 512,
+            cover_cache_limit_mb: 256,
             quality: AudioQuality::Standard,
             discord_presence_enabled: false,
             lastfm_api_key: String::new(),
@@ -218,6 +225,7 @@ impl Settings {
         self.playback_speed = clamp_speed(self.playback_speed);
         self.crossfade_seconds = clamp_crossfade_seconds(self.crossfade_seconds);
         self.stream_cache_limit_mb = self.stream_cache_limit_mb.min(10240);
+        self.cover_cache_limit_mb = self.cover_cache_limit_mb.min(10240);
     }
 }
 

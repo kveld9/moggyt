@@ -482,6 +482,19 @@ mod tests {
     }
 
     #[test]
+    fn test_cover_cache_limit_mb_serde_defaults_and_clamp() {
+        let defaulted: Settings = serde_json::from_str("{}").expect("deserialize empty");
+        assert_eq!(defaulted.cover_cache_limit_mb, 256);
+        let explicit: Settings =
+            serde_json::from_str(r#"{"cover_cache_limit_mb": 128}"#).expect("deserialize explicit");
+        assert_eq!(explicit.cover_cache_limit_mb, 128);
+
+        let mut settings = Settings { cover_cache_limit_mb: 20000, ..Settings::default() };
+        settings.sanitize();
+        assert_eq!(settings.cover_cache_limit_mb, 10240);
+    }
+
+    #[test]
     fn test_custom_theme_name_serde_defaults_and_explicit_deserialization() {
         let explicit: Settings = serde_json::from_str(r#"{"custom_theme_name": "rose-pine"}"#)
             .expect("deserialize explicit");
