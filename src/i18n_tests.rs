@@ -209,9 +209,9 @@ mod tests {
         let keys = [
             "Audio quality",
             "Applies from the next track",
-            "Low (AAC ~49 kbps, 22 kHz)",
-            "Standard (AAC ~130 kbps, 44 kHz)",
-            "High (Opus ~130 kbps, 48 kHz)",
+            "Low (AAC 49 kbps)",
+            "Standard (AAC 130 kbps)",
+            "High (Opus 130 kbps)",
         ];
         for key in keys {
             let en = tr(Locale::English, key);
