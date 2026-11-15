@@ -132,6 +132,16 @@ pub fn browse_body(browse_id: &str, locale: Locale) -> Value {
     browse_body_with_params(browse_id, None, locale)
 }
 
+/// Builds the minimal WEB_REMIX browse payload that follows a track-list continuation.
+pub fn continuation_body(token: &str, locale: Locale) -> Value {
+    serde_json::json!({
+        "context": {
+            "client": client_context(locale),
+        },
+        "continuation": token,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -71,12 +71,13 @@ The detail view displays full tracklistings for an album, artist, or playlist:
   and tightens row height. The button then reads `Cover view` and restores the default layout. The choice is
   persisted in `settings.json`.
 - **Artist sections**: artist pages show the popular-songs heading and its top tracks, a `Show all` action
-  that opens the complete songs list, and the server-provided `Albums`, `Singles and EPs`, and similar-artist
+  that opens the catalog's songs list, and the server-provided `Albums`, `Singles and EPs`, and similar-artist
   rows. Album and single cards open the album page; similar-artist cards open that artist's page.
 - **Playback**: `Play` appends the whole collection to the playback queue and starts at its first track.
   Clicking a track row appends the collection and starts at that row, so `Next` continues through the
-  listed tracks. On an artist page, `Play`, `Shuffle`, and a track-row click use the artist's complete
-  songs list in catalog order, not only the popular rows shown, so playback continues past them.
+  listed tracks. On an artist page, `Play`, `Shuffle`, and a track-row click use the artist's songs list in
+  catalog order, not only the popular rows shown, so playback continues past them; long lists follow up to
+  three catalog pages (about 300 tracks), while the `Show all` page still lists the first page.
 - **Navigation**: click `Back` to close the detail view and return to the previous page.
 - Home shelf items in the `Search` page provide an `Open` button to navigate directly to their detail view.
 

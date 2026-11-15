@@ -182,6 +182,16 @@ impl Catalog for LiveCatalog {
         self.client.detail(browse_id, kind)
     }
 
+    /// Returns the detail view following track-list continuation pages up to `max_pages`.
+    fn detail_paginated(
+        &self,
+        browse_id: &str,
+        kind: DetailKind,
+        max_pages: usize,
+    ) -> Result<Option<Detail>, CatalogError> {
+        self.client.detail_paginated(browse_id, kind, max_pages)
+    }
+
     fn set_session_cookies(&mut self, cookies: Option<&str>) {
         self.set_session_cookies(cookies);
     }

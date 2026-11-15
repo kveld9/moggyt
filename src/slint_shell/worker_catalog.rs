@@ -6,6 +6,9 @@ use crate::domain::{Detail, DetailKind, LyricsSnippet, SearchQuery, SearchResult
 use crate::i18n::{Locale, tr};
 use crate::infra::{Catalog, CatalogError};
 
+/// Pages followed for an artist songs list (the catalog returns about 100 tracks per page).
+const ARTIST_SONGS_MAX_PAGES: usize = 3;
+
 /// Routes a lyrics-fragment query to the lyrics resolver, any other query to the catalog.
 pub fn resolve_search<C: Catalog>(
     catalog: &C,
@@ -72,7 +75,8 @@ fn attach_artist_songs<C: Catalog>(
     let Some(songs_id) = detail.artist.as_ref().and_then(|page| page.songs_more_id.clone()) else {
         return Some(detail);
     };
-    let tracks = match catalog.detail(&songs_id, DetailKind::Playlist) {
+    let songs = catalog.detail_paginated(&songs_id, DetailKind::Playlist, ARTIST_SONGS_MAX_PAGES);
+    let tracks = match songs {
         Ok(Some(songs)) => songs.tracks,
         Ok(None) => Vec::new(),
         Err(err) => {
@@ -118,6 +122,34 @@ mod tests {
         let ids: Vec<&str> = detail.playback_tracks().iter().map(|t| t.id.as_str()).collect();
         assert_eq!(ids, vec!["t1", "t2"]);
         assert_eq!(detail.tracks.len(), 1, "the shelf still feeds the page row list");
+    }
+
+    #[test]
+    fn fetch_detail_follows_artist_songs_pages_within_the_cap() {
+        let shelf = vec![Track::new("t1", "One", "Artist")];
+        let songs = Detail::new(
+            DetailKind::Playlist,
+            "Top songs",
+            "",
+            vec![
+                Track::new("t1", "One", "Artist"),
+                Track::new("t2", "Two", "Artist"),
+                Track::new("t3", "Three", "Artist"),
+            ],
+        );
+        let catalog = MockLibraryCatalog::default()
+            .with_detail_by_id("UCartist", artist_detail(shelf))
+            .with_paginated_detail_by_id("VLsongs", songs);
+        let catalog = Arc::new(Mutex::new(catalog));
+
+        let detail = fetch_detail("UCartist", DetailKind::Artist, &catalog);
+
+        let detail = detail.expect("detail ok").expect("detail present");
+        let ids: Vec<&str> = detail.playback_tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["t1", "t2", "t3"]);
+        let calls = catalog.lock().expect("catalog lock").paginated_calls.clone();
+        let calls = calls.lock().expect("calls lock").clone();
+        assert_eq!(calls, vec![("VLsongs".to_owned(), ARTIST_SONGS_MAX_PAGES)]);
     }
 
     #[test]

@@ -71,6 +71,19 @@ pub trait Catalog {
     /// Returns detail view for `browse_id` and `kind` (Ok(None) on blank id).
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError>;
 
+    /// Returns the detail view following track-list continuation pages up to `max_pages`.
+    ///
+    /// Adapters without pagination support return the first page, matching
+    /// [`Catalog::detail`].
+    fn detail_paginated(
+        &self,
+        browse_id: &str,
+        kind: DetailKind,
+        _max_pages: usize,
+    ) -> Result<Option<Detail>, CatalogError> {
+        self.detail(browse_id, kind)
+    }
+
     /// Updates the session cookies used for authenticated catalog requests.
     ///
     /// Default implementation is a no-op for anonymous catalogs or stubs.
