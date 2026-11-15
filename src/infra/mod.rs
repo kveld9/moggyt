@@ -22,6 +22,7 @@ pub mod catalog_model;
 pub mod catalog_parse_album;
 pub mod catalog_parse_artist;
 pub mod catalog_parse_common;
+pub mod catalog_parse_continuation;
 pub mod catalog_parse_detail;
 pub mod catalog_parse_explore;
 pub mod catalog_parse_home;

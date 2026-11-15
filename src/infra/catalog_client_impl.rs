@@ -4,6 +4,7 @@ use super::catalog::CatalogError;
 use super::catalog_client::parse_search_all;
 use super::catalog_live::{LiveCatalog, raw_to_track};
 use super::catalog_model::{RawTrack, SearchHits};
+use super::catalog_parse_continuation::parse_paginated_detail;
 use super::catalog_parse_detail::parse_detail_all;
 use super::catalog_parse_explore::parse_explore_all;
 use super::catalog_parse_home::parse_home_all;
@@ -13,7 +14,8 @@ use super::catalog_parse_search::parse_search_tracks;
 use super::catalog_requests::{
     CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
     LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_body_with_params,
-    browse_url, next_body, next_url, search_body, search_body_with_params, search_filter_params,
+    browse_url, continuation_body, next_body, next_url, search_body, search_body_with_params,
+    search_filter_params,
 };
 use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
 use crate::i18n::Locale;
@@ -324,6 +326,40 @@ impl CatalogClient {
         }
         let payload = self.detail_payload(trimmed).map_err(|_| CatalogError::Transport)?;
         parse_detail_all(&payload, kind).map(Some).ok_or(CatalogError::Malformed)
+    }
+
+    /// Queries the browse endpoint for `browse_id` and merges its track-list continuation
+    /// pages up to `max_pages`.
+    pub fn detail_paginated(
+        &self,
+        browse_id: &str,
+        kind: DetailKind,
+        max_pages: usize,
+    ) -> Result<Option<Detail>, CatalogError> {
+        let trimmed = browse_id.trim();
+        if trimmed.is_empty() {
+            return Ok(None);
+        }
+        if trimmed == HISTORY_BROWSE_ID && !self.is_authenticated() {
+            return Err(CatalogError::Unauthenticated);
+        }
+        let payload = self.detail_payload(trimmed).map_err(|_| CatalogError::Transport)?;
+        Ok(parse_paginated_detail(&payload, kind, max_pages, |token| {
+            self.continuation_payload(token).ok()
+        }))
+    }
+
+    /// Executes a browse request that follows a track-list continuation token.
+    fn continuation_payload(&self, token: &str) -> anyhow::Result<Value> {
+        let url = browse_url();
+        let body = continuation_body(token, self.locale);
+        let response = self.client.post(&url).json(&body).send()?;
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!("CatalogClient continuation request failed with status: {status}");
+        }
+        let payload: Value = response.json()?;
+        Ok(payload)
     }
 
     /// Executes authenticated browse request for `browse_id`.

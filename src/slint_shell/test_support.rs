@@ -106,6 +106,10 @@ pub struct MockLibraryCatalog {
     pub detail_res: Result<Option<Detail>, CatalogError>,
     /// Per-browse-id details; when empty, `detail_res` answers every request.
     pub detail_by_id: HashMap<String, Detail>,
+    /// Per-browse-id merged details returned by `detail_paginated`.
+    pub paginated_detail_by_id: HashMap<String, Detail>,
+    /// `(browse_id, max_pages)` pairs requested through `detail_paginated`.
+    pub paginated_calls: Arc<Mutex<Vec<(String, usize)>>>,
     pub radio_res: Result<Vec<Track>, CatalogError>,
     pub explore_res: Result<Vec<Shelf>, CatalogError>,
     pub category_res: Result<Vec<Shelf>, CatalogError>,
@@ -120,6 +124,8 @@ impl Default for MockLibraryCatalog {
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
             detail_by_id: HashMap::new(),
+            paginated_detail_by_id: HashMap::new(),
+            paginated_calls: Arc::new(Mutex::new(Vec::new())),
             radio_res: Ok(Vec::new()),
             explore_res: Ok(Vec::new()),
             category_res: Ok(Vec::new()),
@@ -139,6 +145,8 @@ impl MockLibraryCatalog {
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
             detail_by_id: HashMap::new(),
+            paginated_detail_by_id: HashMap::new(),
+            paginated_calls: Arc::new(Mutex::new(Vec::new())),
             radio_res: Ok(Vec::new()),
             explore_res: Ok(Vec::new()),
             category_res: Ok(Vec::new()),
@@ -162,6 +170,11 @@ impl MockLibraryCatalog {
 
     pub fn with_detail_by_id(mut self, id: &str, detail: Detail) -> Self {
         self.detail_by_id.insert(id.to_owned(), detail);
+        self
+    }
+
+    pub fn with_paginated_detail_by_id(mut self, id: &str, detail: Detail) -> Self {
+        self.paginated_detail_by_id.insert(id.to_owned(), detail);
         self
     }
 
@@ -219,6 +232,21 @@ impl Catalog for MockLibraryCatalog {
             return self.detail_res.clone();
         }
         Ok(None)
+    }
+
+    fn detail_paginated(
+        &self,
+        browse_id: &str,
+        kind: DetailKind,
+        max_pages: usize,
+    ) -> Result<Option<Detail>, CatalogError> {
+        if let Ok(mut calls) = self.paginated_calls.lock() {
+            calls.push((browse_id.to_owned(), max_pages));
+        }
+        if let Some(detail) = self.paginated_detail_by_id.get(browse_id) {
+            return Ok(Some(detail.clone()));
+        }
+        self.detail(browse_id, kind)
     }
 }
 
