@@ -36,6 +36,7 @@ export component PlaybackSettings inherits VerticalLayout {
 
                 HorizontalLayout {
                     alignment: space-between;
+                    spacing: 12px;
 
                     Text {
                         text: Labels.audio-quality-label;
@@ -49,6 +50,7 @@ export component PlaybackSettings inherits VerticalLayout {
                         color: Theme.secondary;
                         font-size: 12px;
                         vertical-alignment: center;
+                        overflow: elide;
                     }
                 }
 
