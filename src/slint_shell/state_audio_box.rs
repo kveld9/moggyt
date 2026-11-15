@@ -78,6 +78,15 @@ impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
     fn speed(&self) -> f32 {
         (**self).speed()
     }
+    fn stream_prefetcher(&self) -> Option<crate::infra::StreamChain> {
+        (**self).stream_prefetcher()
+    }
+    fn has_cached_stream(&self, track_id: &str) -> bool {
+        (**self).has_cached_stream(track_id)
+    }
+    fn set_session_cookies(&mut self, cookies: Option<&str>) {
+        (**self).set_session_cookies(cookies);
+    }
 }
 
 #[cfg(test)]
@@ -87,11 +96,28 @@ mod tests {
 
     use super::*;
     use crate::domain::StartedGapless;
+    use crate::infra::{StreamChain, YtDlpResolver};
 
-    #[derive(Default)]
     struct RecordingAudio {
         crossfade_secs: Arc<AtomicU64>,
         gapless_id: Arc<Mutex<Option<String>>>,
+        prefetcher: StreamChain,
+        cached_track: &'static str,
+        cookies: Arc<Mutex<Option<String>>>,
+    }
+
+    impl RecordingAudio {
+        fn new() -> Self {
+            Self {
+                crossfade_secs: Arc::new(AtomicU64::new(0)),
+                gapless_id: Arc::new(Mutex::new(None)),
+                prefetcher: StreamChain::from_ytdlp(YtDlpResolver::new(
+                    "/definitely/missing/binary/yt-dlp",
+                )),
+                cached_track: "cached-track",
+                cookies: Arc::new(Mutex::new(None)),
+            }
+        }
     }
 
     impl AudioBackend for RecordingAudio {
@@ -144,11 +170,23 @@ mod tests {
         fn last_requested(&self) -> Option<&str> {
             None
         }
+
+        fn stream_prefetcher(&self) -> Option<StreamChain> {
+            Some(self.prefetcher.clone())
+        }
+
+        fn has_cached_stream(&self, track_id: &str) -> bool {
+            track_id == self.cached_track
+        }
+
+        fn set_session_cookies(&mut self, cookies: Option<&str>) {
+            *self.cookies.lock().unwrap() = cookies.map(str::to_owned);
+        }
     }
 
     #[test]
     fn boxed_backend_forwards_crossfade_and_gapless() {
-        let recorder = RecordingAudio::default();
+        let recorder = RecordingAudio::new();
         let crossfade = Arc::clone(&recorder.crossfade_secs);
         let gapless = Arc::clone(&recorder.gapless_id);
         let mut boxed: Box<dyn AudioBackend + Send> = Box::new(recorder);
@@ -160,5 +198,27 @@ mod tests {
         let started = boxed.take_started_gapless().expect("started track forwarded");
         assert_eq!(started.track_id, "next");
         assert_eq!(*gapless.lock().unwrap(), None, "slot consumed through the box");
+    }
+
+    /// Runs the calls through a generic bound, which is the dispatch path that uses this
+    /// blanket impl instead of method lookup on the trait object.
+    fn generic_port_calls<A: AudioBackend>(audio: &mut A) -> (bool, bool) {
+        let has_prefetcher = audio.stream_prefetcher().is_some();
+        let cached = audio.has_cached_stream("cached-track");
+        audio.set_session_cookies(Some("SAPISID=forwarded"));
+        (has_prefetcher, cached)
+    }
+
+    #[test]
+    fn boxed_backend_forwards_prefetch_and_session_helpers() {
+        let recorder = RecordingAudio::new();
+        let cookies = Arc::clone(&recorder.cookies);
+        let mut boxed: Box<dyn AudioBackend + Send> = Box::new(recorder);
+
+        let (has_prefetcher, cached) = generic_port_calls(&mut boxed);
+
+        assert!(has_prefetcher, "stream prefetcher forwarded through the blanket impl");
+        assert!(cached, "cached-stream probe forwarded through the blanket impl");
+        assert_eq!(cookies.lock().unwrap().as_deref(), Some("SAPISID=forwarded"));
     }
 }
