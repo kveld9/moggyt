@@ -9,13 +9,12 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 
 use super::sync::set_lyrics_highlight;
 use crate::domain::{PlaybackPhase, Track};
-use crate::infra::{AudioBackend, AudioQuality, Catalog};
-use crate::slint_shell::covers::request_queue_track_cover;
+use crate::infra::{AudioBackend, AudioQuality};
 use crate::slint_shell::format::current_unix_secs;
 use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_worker::PlayTrackResult;
 use crate::slint_shell::state::SlintAppState;
-use crate::slint_shell::sync::{observe_playback_phase, sync_window};
+use crate::slint_shell::sync::sync_window;
 use crate::slint_shell::{LyricLineData, MoggytWindow, PlayerUi};
 
 /// Playback start record: when the track started and which track it was.
@@ -233,131 +232,6 @@ impl SlintAppState {
         if target > current_pos && !already_skipped {
             self.last_skip_target = Some((track.id.clone(), target));
             audio.seek(target as u64);
-        }
-    }
-
-    fn enqueue_radio_recommendations(&mut self, recs: Vec<Track>) {
-        let worker_tx = self.worker_tx.clone();
-        let generation = self.play_generation;
-        for track in recs {
-            if !self.queue.tracks().iter().any(|t| t.id == track.id) {
-                if let Some(ref tx) = worker_tx {
-                    request_queue_track_cover(
-                        track.artwork.as_deref(),
-                        generation,
-                        &self.search_covers,
-                        tx,
-                    );
-                }
-                self.queue.push(track);
-            }
-        }
-    }
-
-    fn fetch_autoplay_radio(&self, current_id: &str) -> Option<Vec<Track>> {
-        let Ok(catalog) = self.catalog.lock() else {
-            tracing::warn!("failed to fetch autoplay radio: catalog lock poisoned");
-            return None;
-        };
-        match catalog.radio(current_id) {
-            Ok(tracks) => Some(tracks),
-            Err(err) => {
-                tracing::warn!("failed to fetch autoplay radio: {err}");
-                None
-            }
-        }
-    }
-
-    fn append_autoplay_radio(&mut self, current_id: &str) {
-        let Some(recs) = self.fetch_autoplay_radio(current_id) else {
-            return;
-        };
-        let filtered = if self.songs_only { crate::domain::retain_songs(recs) } else { recs };
-        self.enqueue_radio_recommendations(filtered);
-    }
-
-    fn track_remaining_secs(&self, audio: &dyn AudioBackend) -> Option<u64> {
-        let dur = self.queue.current()?.duration_secs? as u64;
-        let pos = audio.position_secs();
-        (dur > pos).then(|| dur - pos)
-    }
-
-    fn can_crossfade_track(&self, track_id: &str) -> bool {
-        if self.last_crossfaded_track.as_deref() == Some(track_id) {
-            return false;
-        }
-        self.queue.peek_next().is_some() || self.autoplay
-    }
-
-    fn crossfade_candidate(&self, audio: &dyn AudioBackend) -> Option<(String, bool)> {
-        let remaining = self.track_remaining_secs(audio)?;
-        if remaining > self.crossfade_seconds as u64 {
-            return None;
-        }
-        let current_id = &self.queue.current()?.id;
-        if !self.can_crossfade_track(current_id) {
-            return None;
-        }
-        Some((current_id.clone(), self.queue.peek_next().is_some()))
-    }
-
-    fn handle_playing_crossfade(&self, audio: &dyn AudioBackend) -> Option<(String, bool)> {
-        if self.crossfade_seconds == 0 {
-            return None;
-        }
-        self.crossfade_candidate(audio)
-    }
-
-    fn execute_crossfade(&mut self, current_id: String, has_next: bool) {
-        self.last_crossfaded_track = Some(current_id.clone());
-        if !has_next && self.autoplay {
-            self.append_autoplay_radio(&current_id);
-        }
-        self.next_track();
-    }
-
-    fn advance_ended_playback(&mut self) {
-        if self.playback_phase != PlaybackPhase::Ended {
-            return;
-        }
-        if self.queue.peek_next().is_some() {
-            self.next_track();
-            return;
-        }
-        if !self.autoplay {
-            self.maybe_scrobble_current();
-            return;
-        }
-        let Some(current) = self.queue.current() else {
-            return;
-        };
-        let current_id = current.id.clone();
-        self.append_autoplay_radio(&current_id);
-        self.queue.advance();
-        self.request_current_play();
-    }
-
-    /// Advances queue or appends radio recommendations when active track ends or reaches crossfade boundary.
-    ///
-    /// Pausing never advances playback; only the `Ended` phase advances to the next track.
-    pub fn continue_autoplay_if_ended(&mut self) {
-        observe_playback_phase(self);
-        if self.queue.is_empty() {
-            return;
-        }
-        if self.playback_phase == PlaybackPhase::Ended {
-            self.advance_ended_playback();
-            return;
-        }
-        if self.playback_phase == PlaybackPhase::Playing {
-            let candidate = if let Ok(audio) = self.audio.try_lock() {
-                self.handle_playing_crossfade(&**audio)
-            } else {
-                None
-            };
-            if let Some((id, has_next)) = candidate {
-                self.execute_crossfade(id, has_next);
-            }
         }
     }
 }
@@ -607,11 +481,13 @@ mod tests {
         state.queue.push(Track::new("no-cf-2", "Track 2", "Artist").with_duration(120));
 
         state.play_track_at_index(0);
-        // Seek to 98s (2s left): with crossfade_seconds == 0, audio is still playing so no advance
+        // Seek to 98s (2s left): with crossfade_seconds == 0 the cursor must not advance;
+        // the gapless hand-off only preloads the next track behind the active sink.
         state.audio.lock().unwrap().seek(98);
         state.continue_autoplay_if_ended();
         assert_eq!(state.queue.cursor(), 0);
-        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("no-cf-1"));
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("no-cf-1"));
+        assert_eq!(state.audio.lock().unwrap().last_requested(), Some("no-cf-2"));
     }
 
     #[test]

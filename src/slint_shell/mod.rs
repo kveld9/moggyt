@@ -68,6 +68,7 @@ pub mod page;
 pub mod platform;
 pub mod play_log;
 pub mod playback;
+pub mod playback_advance;
 pub mod playback_control;
 pub mod playback_failure;
 #[cfg(test)]
@@ -88,6 +89,7 @@ pub mod state;
 #[cfg(test)]
 #[path = "state_artist_tests.rs"]
 mod state_artist_tests;
+mod state_audio_box;
 pub mod state_init;
 pub mod state_lyrics;
 pub mod state_search;

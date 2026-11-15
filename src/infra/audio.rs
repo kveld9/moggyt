@@ -2,6 +2,7 @@
 
 use super::stream::AudioQuality;
 use super::stream_chain::StreamChain;
+use crate::domain::{GaplessSlot, StartedGapless};
 
 /// Clamps a playback speed factor to the valid `0.5..=2.0` range.
 ///
@@ -51,6 +52,23 @@ pub trait AudioBackend {
     ) -> Result<(), AudioError> {
         self.play(track_id)
     }
+    /// Decodes a track and appends it behind the active one so it starts sample-continuously
+    /// when the active track ends, with no silence and no overlap.
+    ///
+    /// Success means the source is queued behind an active sink. Backends without gapless
+    /// support report an error so the caller falls back to the regular end-of-track path.
+    fn play_gapless(&mut self, _track_id: &str) -> Result<(), AudioError> {
+        Err(AudioError::Playback("gapless playback is not supported".to_string()))
+    }
+    /// Returns the appended track once it crossed the sample boundary and became audible.
+    ///
+    /// The caller adopts it as the active track; while it is still queued this returns `None`.
+    fn take_started_gapless(&mut self) -> Option<crate::domain::StartedGapless> {
+        None
+    }
+    /// Test hook: simulates the active track ending so an armed gapless source becomes audible.
+    #[cfg(test)]
+    fn finish_gapless(&mut self) {}
     fn pause(&mut self);
     fn resume_play(&mut self);
     fn seek(&mut self, position_secs: u64);
@@ -115,6 +133,10 @@ pub struct AudioStub {
     skip_silence: bool,
     loudness_normalization: bool,
     session_cookies: Option<String>,
+    /// Next-track slot appended behind the active track.
+    gapless: GaplessSlot,
+    /// Simulated sink depth: two sources while an armed track waits behind the active one.
+    gapless_sounds: usize,
 }
 
 impl Default for AudioStub {
@@ -130,6 +152,8 @@ impl Default for AudioStub {
             skip_silence: false,
             loudness_normalization: false,
             session_cookies: None,
+            gapless: GaplessSlot::default(),
+            gapless_sounds: 0,
         }
     }
 }
@@ -170,6 +194,8 @@ impl AudioStub {
 
 impl AudioBackend for AudioStub {
     fn play(&mut self, track_id: &str) -> Result<(), AudioError> {
+        self.gapless.reset();
+        self.gapless_sounds = 0;
         if self.fail_plays {
             return Err(AudioError::Unavailable);
         }
@@ -185,6 +211,31 @@ impl AudioBackend for AudioStub {
         _duration: std::time::Duration,
     ) -> Result<(), AudioError> {
         self.play(track_id)
+    }
+
+    fn play_gapless(&mut self, track_id: &str) -> Result<(), AudioError> {
+        if !self.playing {
+            return Err(AudioError::Playback(
+                "gapless preload requires an active sink".to_string(),
+            ));
+        }
+        self.gapless.arm(track_id.to_owned(), None);
+        self.gapless_sounds = 2;
+        self.last_requested = Some(track_id.to_owned());
+        Ok(())
+    }
+
+    fn take_started_gapless(&mut self) -> Option<StartedGapless> {
+        let started = self.gapless.observe(self.gapless_sounds)?;
+        self.gapless_sounds = 1;
+        self.last_requested = Some(started.track_id.clone());
+        self.position_secs = 0;
+        Some(started)
+    }
+
+    #[cfg(test)]
+    fn finish_gapless(&mut self) {
+        self.gapless_sounds = 1;
     }
 
     fn pause(&mut self) {
@@ -392,5 +443,39 @@ mod tests {
         assert_eq!(audio.session_cookies(), None);
         audio.set_session_cookies(None);
         assert_eq!(audio.session_cookies(), None);
+    }
+
+    #[test]
+    fn audio_stub_gapless_arms_only_with_an_active_sink() {
+        let mut audio = AudioStub::new();
+        assert_eq!(
+            audio.play_gapless("pre"),
+            Err(AudioError::Playback("gapless preload requires an active sink".to_string()))
+        );
+        assert_eq!(audio.gapless.state(), crate::domain::GaplessState::Idle);
+
+        assert_eq!(audio.play("current"), Ok(()));
+        audio.seek(57);
+        assert_eq!(audio.play_gapless("next"), Ok(()));
+        assert_eq!(audio.gapless.state(), crate::domain::GaplessState::Armed);
+        assert_eq!(audio.last_requested(), Some("next"));
+        assert_eq!(audio.position_secs(), 57, "the active track keeps its position");
+        assert_eq!(audio.take_started_gapless(), None, "still queued behind the active track");
+
+        audio.finish_gapless();
+        let started = audio.take_started_gapless().expect("armed track became audible");
+        assert_eq!(started.track_id, "next");
+        assert_eq!(audio.position_secs(), 0);
+        assert_eq!(audio.gapless.state(), crate::domain::GaplessState::Idle);
+    }
+
+    #[test]
+    fn audio_stub_explicit_play_clears_the_gapless_slot() {
+        let mut audio = AudioStub::new();
+        assert_eq!(audio.play("current"), Ok(()));
+        assert_eq!(audio.play_gapless("next"), Ok(()));
+        assert_eq!(audio.play("explicit"), Ok(()));
+        assert_eq!(audio.gapless.state(), crate::domain::GaplessState::Idle);
+        assert_eq!(audio.take_started_gapless(), None);
     }
 }

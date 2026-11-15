@@ -52,7 +52,7 @@ src/
 │   └── videos.rs      # Music-video ordering and visibility policy for catalog results
 └── infra/             # Ports and adapters: real I/O and deterministic test stubs
     ├── atomic_file.rs # Crash-safe atomic file persistence and stale temp file cleanup
-    ├── audio*.rs      # AudioBackend port, Rodio dual-sink crossfade, rubato resampler, DSP filters
+    ├── audio*.rs      # AudioBackend port, gapless hand-off, Rodio dual-sink crossfade, resampler, DSP
     ├── catalog*.rs    # Catalog port, InnerTube client, endpoint parsers (artist, detail, explore, home, search)
     ├── cover*.rs      # CoverCache port, memory LRU, and disk-backed cache
     ├── innertube_stream.rs # Direct audio stream URL resolution (VISIONOS client, Opus/AAC itags)

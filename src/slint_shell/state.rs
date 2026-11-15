@@ -15,7 +15,7 @@ use crate::domain::{
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
-    AudioBackend, AudioError, Catalog, CatalogError, CoverCache, CustomThemeFile, DesktopPresence,
+    AudioBackend, Catalog, CatalogError, CoverCache, CustomThemeFile, DesktopPresence,
     DeviceIdentityMonitor, DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource,
     MediaKeyAction, OutputDeviceWatch, PlayLogStore, QueueStore, ReleaseInfo, Scrobbler,
     SessionStore, SettingsStore, SkipProvider, SkipStore, TrayAction, TrayHandle, decode_cover,
@@ -126,6 +126,8 @@ pub struct SlintAppState {
     pub autoplay: bool,
     pub crossfade_seconds: u32,
     pub last_crossfaded_track: Option<String>,
+    /// Sample-continuous hand-off latch: armed preload and its pending result.
+    pub gapless: crate::slint_shell::playback_advance::GaplessUi,
     pub stream_cache_limit_mb: u32,
     pub hi_res_covers: bool,
     pub songs_only: bool,
@@ -544,63 +546,6 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     }
     fn set_locale(&mut self, l: Locale) {
         (**self).set_locale(l);
-    }
-}
-
-impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
-    fn play(&mut self, id: &str) -> Result<(), AudioError> {
-        (**self).play(id)
-    }
-    fn pause(&mut self) {
-        (**self).pause();
-    }
-    fn resume_play(&mut self) {
-        (**self).resume_play();
-    }
-    fn seek(&mut self, pos: u64) {
-        (**self).seek(pos);
-    }
-    fn set_volume(&mut self, v: u8) {
-        (**self).set_volume(v);
-    }
-    fn volume(&self) -> u8 {
-        (**self).volume()
-    }
-    fn position_secs(&self) -> u64 {
-        (**self).position_secs()
-    }
-    fn is_playing(&self) -> bool {
-        (**self).is_playing()
-    }
-    fn is_paused(&self) -> bool {
-        (**self).is_paused()
-    }
-    fn is_empty(&self) -> bool {
-        (**self).is_empty()
-    }
-    fn duration_secs(&self) -> u64 {
-        (**self).duration_secs()
-    }
-    fn last_requested(&self) -> Option<&str> {
-        (**self).last_requested()
-    }
-    fn set_quality(&mut self, q: crate::infra::AudioQuality) {
-        (**self).set_quality(q);
-    }
-    fn quality(&self) -> crate::infra::AudioQuality {
-        (**self).quality()
-    }
-    fn set_skip_silence(&mut self, on: bool) {
-        (**self).set_skip_silence(on);
-    }
-    fn set_loudness_normalization(&mut self, on: bool) {
-        (**self).set_loudness_normalization(on);
-    }
-    fn set_speed(&mut self, s: f32) {
-        (**self).set_speed(s);
-    }
-    fn speed(&self) -> f32 {
-        (**self).speed()
     }
 }
 

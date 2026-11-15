@@ -10,7 +10,8 @@ Fast, lightweight desktop audio player with no web engine or Electron overhead.
 
 ## Highlights
 
-- **Audio Engine**: Dual-sink Rodio playback with gapless crossfade support and automated `yt-dlp` stream resolution.
+- **Audio Engine**: Dual-sink Rodio playback with sample-continuous gapless hand-off, optional crossfade,
+  and automated `yt-dlp` stream resolution.
 - **Interface**: Lightweight declarative Slint GUI with native theme support, system tray, and media keys (MPRIS/SMTC).
 - **Synced Lyrics & Scrobbling**: Real-time synchronized lyrics via LRCLIB with dynamic offset timing, Last.fm
   scrobbling, and Discord Rich Presence.

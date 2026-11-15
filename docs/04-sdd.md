@@ -69,11 +69,13 @@ Extended backlog requirements (milestones and port mappings):
    - BYOK translation cache: SHA-256 hash of text and target language as key, GZIP-compressed, 2 MiB memory
      LRU (deferred to v1.1+).
 3. **Playback DSP pipeline ordering** (`AudioBackend` port; v1.1 / V2):
-   - DSP execution sequence: gapless playback -> crossfade (dual-sink volume ramp, 0..=15s configurable)
+   - DSP execution sequence: gapless hand-off (next track appended behind the active sink) -> crossfade
+     (dual-sink volume ramp, 0..=15s configurable)
      -> skip-silence -> -14 LUFS loudness normalization -> 10-band EQ with EQ profile import (V2)
      -> playback rate adjustment (0.5x-2.0x, live rate-only resampling; pitch preservation out of scope)
      -> sleep timer (presets + stop-after-track) -> per-network stream quality ceiling (Wi-Fi vs metered).
-   - Playback rate adjustment (0.5x-2.0x, rate-only, pitch preservation out of scope) and crossfade
+   - Gapless hand-off (the next queue track is decoded and appended behind the active sink when at most
+     3 seconds remain, and the queue cursor advances only at the sample boundary) and crossfade
      (dual-sink volume ramp, configurable `crossfade_seconds` in Settings) are live; sleep
      timer, persistent queue, skip-silence, and loudness normalization are v1.1 candidates;
      remainder V2.

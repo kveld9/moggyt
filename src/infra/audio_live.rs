@@ -50,6 +50,17 @@ impl AudioBackend for LiveAudio {
         }
     }
 
+    fn play_gapless(&mut self, track_id: &str) -> Result<(), AudioError> {
+        match self {
+            Self::Live(backend) => backend.play_gapless(track_id),
+            Self::Muted(_) => Err(AudioError::Unavailable),
+        }
+    }
+
+    fn take_started_gapless(&mut self) -> Option<crate::domain::StartedGapless> {
+        delegate_audio!(self, take_started_gapless)
+    }
+
     fn pause(&mut self) {
         delegate_audio!(self, pause);
     }

@@ -104,6 +104,7 @@ impl SlintAppState {
             autoplay: false,
             crossfade_seconds: 0,
             last_crossfaded_track: None,
+            gapless: Default::default(),
             stream_cache_limit_mb: 512,
             hi_res_covers: false,
             songs_only: false,

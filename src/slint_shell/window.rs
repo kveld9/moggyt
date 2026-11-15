@@ -368,7 +368,12 @@ pub(crate) fn spawn_playback_worker(
                         let _ = dispatch_to_ui(move || {
                             let Some(win) = w.upgrade() else { return };
                             with_ui_state(|st| {
-                                if st.should_apply_play_result(res.generation) {
+                                if !st.should_apply_play_result(res.generation) {
+                                    return;
+                                }
+                                if res.gapless {
+                                    st.on_gapless_preload_result(res);
+                                } else {
                                     apply_play_track_completion(&win, st, res);
                                 }
                             });
@@ -435,7 +440,15 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
         state.drain_media_keys();
         state.poll_sponsor_ranges();
         state.check_auto_skip();
-        state.continue_autoplay_if_ended();
+        if let Some(result) = state.continue_autoplay_if_ended() {
+            apply_play_track_completion(&win, &mut state, result);
+            let paused = state.audio.lock().map(|audio| audio.is_paused()).unwrap_or(false);
+            if paused {
+                state.pause_play_ledger();
+                state.sync_presence_playing(false);
+            }
+            sync_window(&win, &mut state);
+        }
         state.poll_sleep_timer();
         apply_custom_theme_if_changed(&win, &mut state);
         drain_updater_check(&win, &mut state);

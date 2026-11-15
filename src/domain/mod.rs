@@ -4,6 +4,7 @@
 //! randomness stay behind ports in `crate::infra` or parameters.
 
 mod artist_match;
+mod gapless;
 mod library;
 mod listening_stats;
 mod local_playlist;
@@ -23,6 +24,9 @@ mod videos;
 
 pub use artist_match::{
     TOPIC_CHANNEL_SUFFIX, artist_score, split_source_artists, strip_topic_suffix,
+};
+pub use gapless::{
+    GAPLESS_ARM_SECS, GaplessFact, GaplessSlot, GaplessState, StartedGapless, should_arm,
 };
 pub use library::{
     Album, Artist, ArtistPage, Detail, DetailCard, DetailCardKind, DetailKind, DetailSection,
