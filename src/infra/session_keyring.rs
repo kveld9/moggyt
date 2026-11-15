@@ -370,6 +370,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires an OS keyring (Secret Service) and D-Bus; run with --ignored"]
     fn keyring_session_store_provider_tolerance_lifecycle() {
         let mut store = KeyringSessionStore::new("moggyt-test", "moggyt-test-probe");
         store.clear();
