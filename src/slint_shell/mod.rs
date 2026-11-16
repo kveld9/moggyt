@@ -94,6 +94,7 @@ pub mod state_init;
 pub mod state_lyrics;
 pub mod state_search;
 pub mod state_session;
+mod state_settings;
 pub mod stats;
 pub mod stream_prefetch;
 pub mod sync;

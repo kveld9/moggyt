@@ -9,9 +9,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::domain::{
-    Album, Detail, DetailKind, Palette, PlaybackPhase, PlaybackQueue, PlayerBarMode, Playlist,
-    RecentSearches, SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer,
-    ThemeId, Track, extract_playlist_id,
+    Album, Detail, DetailKind, Palette, PlaybackPhase, PlaybackQueue, Playlist, RecentSearches,
+    SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer, ThemeId, Track,
+    extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
@@ -194,29 +194,6 @@ impl SlintAppState {
         self.settings_store.clear_health();
         self.queue_store.clear_health();
     }
-    /// Updates active UI theme and persists preference to disk settings store.
-    pub fn set_theme(&mut self, theme: ThemeId) {
-        self.theme = theme;
-        let mut settings = self.settings_store.load();
-        settings.theme = theme;
-        let _ = self.settings_store.save(&settings);
-    }
-
-    /// Toggles the compact detail track list preference and persists it to disk.
-    pub fn toggle_detail_compact_tracks(&mut self) {
-        self.detail_compact_tracks = !self.detail_compact_tracks;
-        let mut settings = self.settings_store.load();
-        settings.detail_compact_tracks = self.detail_compact_tracks;
-        let _ = self.settings_store.save(&settings);
-    }
-
-    /// Sets or clears the preset accent override and persists it.
-    pub fn set_accent_override(&mut self, accent: Option<[u8; 3]>) {
-        self.accent_override = accent;
-        let mut settings = self.settings_store.load();
-        settings.accent_override = accent.map(crate::domain::format_hex_rgb);
-        let _ = self.settings_store.save(&settings);
-    }
 
     /// Stores the current playback phase; this is the only assignment site.
     ///
@@ -228,52 +205,6 @@ impl SlintAppState {
         }
         tracing::info!(from = ?self.playback_phase, to = ?phase, "playback phase changed");
         self.playback_phase = phase;
-    }
-
-    /// Updates the crossfade duration setting and persists preference to disk settings store.
-    pub fn set_crossfade_seconds(&mut self, seconds: u32) {
-        let clamped = crate::infra::clamp_crossfade_seconds(seconds);
-        self.crossfade_seconds = clamped;
-        let mut settings = self.settings_store.load();
-        settings.crossfade_seconds = clamped;
-        let _ = self.settings_store.save(&settings);
-    }
-
-    /// Updates the stream cache size limit and persists preference to disk settings store.
-    pub fn set_stream_cache_limit_mb(&mut self, limit_mb: u32) {
-        let clamped = limit_mb.min(10240);
-        self.stream_cache_limit_mb = clamped;
-        let mut settings = self.settings_store.load();
-        settings.stream_cache_limit_mb = clamped;
-        let _ = self.settings_store.save(&settings);
-    }
-
-    /// Updates the cover cache size limit, applies it to the live disk cache, and persists it.
-    pub fn set_cover_cache_limit_mb(&mut self, limit_mb: u32) {
-        let clamped = limit_mb.min(10240);
-        self.cover_cache_limit_mb = clamped;
-        if let Ok(mut covers) = self.covers.lock() {
-            covers.set_limit(u64::from(clamped) * 1024 * 1024);
-        }
-        let mut settings = self.settings_store.load();
-        settings.cover_cache_limit_mb = clamped;
-        let _ = self.settings_store.save(&settings);
-    }
-
-    /// Updates the player bar layout mode and persists to settings store.
-    pub fn set_player_bar_mode(&mut self, mode: PlayerBarMode) {
-        self.player_bar.mode = mode;
-        let mut settings = self.settings_store.load();
-        self.player_bar.apply_to_settings(&mut settings);
-        let _ = self.settings_store.save(&settings);
-    }
-
-    /// Toggles an individual player bar element option by index and persists to settings store.
-    pub fn toggle_player_bar_option(&mut self, index: i32) {
-        self.player_bar = self.player_bar.toggled(index);
-        let mut settings = self.settings_store.load();
-        self.player_bar.apply_to_settings(&mut settings);
-        let _ = self.settings_store.save(&settings);
     }
 
     /// Cycles to the next playback speed preset and persists preference.
@@ -458,7 +389,7 @@ impl SlintAppState {
         Some(fetched)
     }
 
-    fn cover_max_px(&self) -> u32 {
+    pub(crate) fn cover_max_px(&self) -> u32 {
         if self.hi_res_covers { 1024 } else { 512 }
     }
 
@@ -692,63 +623,11 @@ mod tests {
     }
 
     #[test]
-    fn test_settings_persist_to_store_and_state() {
-        let mut state = test_wired();
-        assert_eq!(state.theme, ThemeId::White);
-        state.set_theme(ThemeId::BlackOled);
-        assert_eq!(state.settings_store.load().theme, ThemeId::BlackOled);
-        state.set_theme(ThemeId::Mono);
-        assert_eq!(state.settings_store.load().theme, ThemeId::Mono);
-        assert_eq!(state.player_bar.mode, PlayerBarMode::Classic);
-        state.set_player_bar_mode(PlayerBarMode::Floating);
-        assert_eq!(state.settings_store.load().player_bar_mode, PlayerBarMode::Floating);
-        state.set_player_bar_mode(PlayerBarMode::Classic);
-        assert_eq!(state.settings_store.load().player_bar_mode, PlayerBarMode::Classic);
-        assert!(state.player_bar.show_artwork && !state.player_bar.show_skip_seconds);
-        state.toggle_player_bar_option(0);
-        assert!(!state.settings_store.load().player_bar_show_artwork);
-        state.toggle_player_bar_option(4);
-        assert!(state.settings_store.load().player_bar_show_skip_seconds);
-        assert!(!state.detail_compact_tracks);
-        state.toggle_detail_compact_tracks();
-        assert!(state.detail_compact_tracks);
-        assert!(state.settings_store.load().detail_compact_tracks);
-        state.hi_res_covers = false;
-        assert_eq!(state.cover_max_px(), 512);
-        state.hi_res_covers = true;
-        assert_eq!(state.cover_max_px(), 1024);
-        state.set_crossfade_seconds(5);
-        assert_eq!(state.settings_store.load().crossfade_seconds, 5);
-        state.set_crossfade_seconds(20);
-        assert_eq!(state.settings_store.load().crossfade_seconds, 15);
-        state.set_stream_cache_limit_mb(1024);
-        assert_eq!(state.settings_store.load().stream_cache_limit_mb, 1024);
-        state.set_stream_cache_limit_mb(20000);
-        assert_eq!(state.settings_store.load().stream_cache_limit_mb, 10240);
-        state.set_cover_cache_limit_mb(128);
-        assert_eq!(state.cover_cache_limit_mb, 128);
-        assert_eq!(state.settings_store.load().cover_cache_limit_mb, 128);
-        state.set_cover_cache_limit_mb(20000);
-        assert_eq!(state.cover_cache_limit_mb, 10240);
-    }
-
-    #[test]
     fn test_cover_bytes_or_fetch_cache_hit() {
         let state = test_wired();
         state.covers.lock().unwrap().put("https://example.com/art.jpg", vec![1, 2, 3]);
         let cached =
             SlintAppState::cover_bytes_or_fetch(&state.covers, "https://example.com/art.jpg");
         assert_eq!(cached, Some(vec![1, 2, 3]));
-    }
-
-    #[test]
-    fn test_accent_override_persists_to_store_and_state() {
-        let mut state = test_wired();
-        state.set_accent_override(Some([0x12, 0x34, 0x56]));
-        assert_eq!(state.accent_override, Some([0x12, 0x34, 0x56]));
-        assert_eq!(state.settings_store.load().accent_override.as_deref(), Some("#123456"));
-        state.set_accent_override(None);
-        assert_eq!(state.accent_override, None);
-        assert_eq!(state.settings_store.load().accent_override, None);
     }
 }
