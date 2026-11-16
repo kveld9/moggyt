@@ -123,6 +123,12 @@ export component StyledInputField inherits Rectangle {
     callback accepted(string);
     callback edited(string);
 
+    min-width: 0px;
+    horizontal-stretch: 1;
+    // Intrinsic height follows the input's line; rows that provide a height (32px, 36px)
+    // still stretch the field, and the content cannot inflate the minimum.
+    min-height: input.preferred-height;
+    preferred-height: input.preferred-height;
     border-radius: 8px;
     border-width: 1px;
     border-color: input.has-focus ? Theme.accent : Theme.border;
@@ -130,26 +136,45 @@ export component StyledInputField inherits Rectangle {
     animate border-color { duration: 150ms; easing: ease-in-out; }
     forward-focus: input;
 
+    TouchArea {
+        clicked => { input.focus(); }
+    }
+
     HorizontalLayout {
         padding-left: 10px;
         padding-right: 10px;
-        alignment: start;
 
-        input := TextInput {
+        input-area := Rectangle {
             horizontal-stretch: 1;
-            text <=> root.text;
-            input-type: root.input-type;
-            color: Theme.text;
-            vertical-alignment: center;
-            accepted => { root.accepted(self.text); }
-            edited => { root.edited(self.text); }
+            min-width: 0px;
+            preferred-width: 0px;
+            clip: true;
+
+            input := TextInput {
+                x: 0;
+                width: max(parent.width, self.preferred-width);
+                text <=> root.text;
+                input-type: root.input-type;
+                single-line: true;
+                color: Theme.text;
+                vertical-alignment: center;
+                cursor-position-changed(pos) => {
+                    if (pos.x + self.x < 0px) {
+                        self.x = -pos.x;
+                    } else if (pos.x + self.x > parent.width - self.text-cursor-width) {
+                        self.x = parent.width - pos.x - self.text-cursor-width;
+                    }
+                }
+                accepted => { root.accepted(self.text); }
+                edited => { root.edited(self.text); }
+            }
         }
     }
 
     if root.text == "" && !input.has-focus : Text {
         x: 10px;
         y: 0;
-        width: parent.width - 20px;
+        width: max(0px, parent.width - 20px);
         height: parent.height;
         text: root.placeholder-text;
         color: Theme.secondary;
