@@ -270,4 +270,65 @@ mod tests {
         assert_eq!(provisioned, binary);
         assert!(sub_dir.is_dir());
     }
+
+    #[test]
+    fn format_unavailable_matches_only_the_ytdlp_message() {
+        let unavailable =
+            "ERROR: [youtube] x: Requested format is not available. Use --list-formats";
+        assert!(is_format_unavailable(unavailable));
+        assert!(!is_format_unavailable("failed to spawn yt-dlp at /missing/binary"));
+        assert!(!is_format_unavailable("ERROR: [youtube] x: Unable to download webpage"));
+    }
+
+    #[cfg(unix)]
+    const STUB_TIER_UNAVAILABLE: &str = r#"#!/bin/sh
+for arg in "$@"; do
+  if [ "$arg" = "bestaudio" ]; then
+    echo "https://stream.local/fallback"
+    exit 0
+  fi
+done
+echo "ERROR: [youtube] x: Requested format is not available. Use --list-formats" >&2
+exit 1
+"#;
+
+    #[cfg(unix)]
+    const STUB_NETWORK_FAILURE: &str = r#"#!/bin/sh
+for arg in "$@"; do
+  if [ "$arg" = "bestaudio" ]; then
+    echo "https://stream.local/fallback"
+    exit 0
+  fi
+done
+echo "ERROR: [youtube] x: Unable to download webpage" >&2
+exit 1
+"#;
+
+    #[cfg(unix)]
+    fn stub_compact_resolver(dir: &Path, script: &str) -> YtDlpResolver {
+        let binary = dir.join("yt-dlp");
+        std::fs::write(&binary, script).expect("write stub sidecar");
+        set_executable_permissions(&binary).expect("chmod stub sidecar");
+        let mut resolver = YtDlpResolver::new(binary);
+        resolver.set_quality(AudioQuality::Compact);
+        resolver
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn compact_retries_with_best_audio_when_the_selector_has_no_format() {
+        let (_guard, dir) = test_temp_dir("degrade-unavailable");
+        let resolver = stub_compact_resolver(&dir, STUB_TIER_UNAVAILABLE);
+        let url = resolver.extract_url("dQw4w9WgXcQ").expect("degraded retry resolves");
+        assert_eq!(url, "https://stream.local/fallback");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn network_failure_does_not_trigger_the_degraded_retry() {
+        let (_guard, dir) = test_temp_dir("degrade-network");
+        let resolver = stub_compact_resolver(&dir, STUB_NETWORK_FAILURE);
+        let err = resolver.extract_url("dQw4w9WgXcQ").expect_err("network failure propagates");
+        assert!(err.to_string().contains("Unable to download webpage"));
+    }
 }
