@@ -35,7 +35,7 @@ prepare() {
 
 build() {
   cd "$pkgname-$pkgver"
-  cargo build --release --frozen
+  MOGGYT_VERSION="$pkgver" cargo build --release --frozen
 }
 
 package() {

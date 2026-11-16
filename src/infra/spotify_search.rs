@@ -270,7 +270,7 @@ impl SpotifySongSearch {
     pub fn new() -> Self {
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(SEARCH_TIMEOUT_SECS))
-            .user_agent(format!("moggyt/{}", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!("moggyt/{}", super::app_version()))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
         Self { client }

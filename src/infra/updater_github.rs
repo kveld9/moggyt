@@ -77,7 +77,7 @@ impl GithubUpdater {
     }
 
     pub fn current_version() -> &'static str {
-        env!("CARGO_PKG_VERSION")
+        super::app_version()
     }
 
     #[must_use]
@@ -167,7 +167,7 @@ mod tests {
         );
         let default_updater = GithubUpdater::new();
         assert_eq!(default_updater.owner_repo(), UPDATE_OWNER_REPO);
-        assert_eq!(GithubUpdater::current_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(GithubUpdater::current_version(), crate::infra::app_version());
 
         let custom = GithubUpdater::with_owner_repo("custom/repo");
         assert_eq!(custom.owner_repo(), "custom/repo");

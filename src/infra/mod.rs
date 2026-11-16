@@ -4,6 +4,7 @@
 //! (catalog API, rodio/gstreamer) implement these traits later
 //! without touching `domain` or `app`.
 
+mod app_version;
 mod atomic_file;
 mod audio;
 mod audio_device;
@@ -88,6 +89,7 @@ mod updater_github;
 mod version_store;
 mod ytdlp;
 
+pub use app_version::app_version;
 pub use atomic_file::{TEMP_FILE_MAX_AGE, sweep_stale_temp_files, write_atomic};
 pub use audio::{AudioBackend, AudioError, AudioStub, NullAudio, clamp_speed};
 pub use audio_device::{

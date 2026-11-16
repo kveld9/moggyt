@@ -127,6 +127,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build release binary
+        env:
+          MOGGYT_VERSION: ${{ needs.semver.outputs.version }}
         run: cargo build --release --locked
 
       - name: Package portable release archive
