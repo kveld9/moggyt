@@ -193,7 +193,10 @@ The configuration file uses JSON serialization with atomic replacement:
 - **Audio Quality (`quality`)**:
   - Selectable in Settings > Playback and applies from the next track.
   - `"compact"`: Low-bandwidth audio stream using InnerTube itag 139 (AAC ~49 kbps, 22.05 kHz) or yt-dlp selector
-    `"bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]"`, which keeps every candidate stream at or below 64 kbps.
+    `"bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]/bestaudio[protocol*=m3u8]"`, which keeps every bitrate-capped
+    candidate at or below 64 kbps.
+  - Live HLS audio reports no `abr`, so the 64 kbps cap cannot be enforced there: the trailing `protocol*=m3u8` clause
+    selects the live stream inside the same yt-dlp run instead of paying a failing pass first.
   - When yt-dlp reports that the selector matched no format (`Requested format is not available`), the adapter
     retries with the best available audio and logs the degradation instead of silently widening the tier. Any other
     failure (spawn, network, bot check) propagates unchanged and is not retried.

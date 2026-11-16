@@ -30,12 +30,17 @@ impl AudioQuality {
 /// Maps an [`AudioQuality`] preference to yt-dlp format selector (SDD Q-3).
 ///
 /// [`AudioQuality::High`] prefers Opus in WebM (itag 251, ~130 kbps, 48 kHz) decoded
-/// via libopus through [`OpusWebmSource`], with AAC m4a and unconstrained audio as
-/// fallbacks. [`AudioQuality::Standard`] uses AAC m4a (~130 kbps), and
-/// [`AudioQuality::Compact`] keeps every candidate stream at or below 64 kbps.
+/// via libopus through [`OpusWebmSource`], with AAC m4a and unconstrained audio as fallbacks.
+/// [`AudioQuality::Standard`] uses AAC m4a (~130 kbps), and
+/// [`AudioQuality::Compact`] keeps every bitrate-capped candidate at or below 64 kbps.
+/// Live HLS audio reports no `abr`, so Compact carries an explicit m3u8 clause: the cap
+/// cannot be enforced there, and resolving it inside the selector avoids a second
+/// yt-dlp extraction.
 pub const fn audio_quality_format(quality: AudioQuality) -> &'static str {
     match quality {
-        AudioQuality::Compact => "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]",
+        AudioQuality::Compact => {
+            "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]/bestaudio[protocol*=m3u8]"
+        }
         AudioQuality::Standard => "bestaudio[ext=m4a]/bestaudio/best",
         AudioQuality::High => "bestaudio[ext=webm][acodec=opus]/bestaudio[ext=m4a]/bestaudio/best",
     }
@@ -134,7 +139,10 @@ mod tests {
     #[test]
     fn audio_quality_format_mapping_table() {
         let cases = [
-            (AudioQuality::Compact, "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]"),
+            (
+                AudioQuality::Compact,
+                "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]/bestaudio[protocol*=m3u8]",
+            ),
             (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
             (
                 AudioQuality::High,
@@ -147,11 +155,15 @@ mod tests {
     }
 
     #[test]
-    fn compact_selector_caps_every_candidate_at_64_kbps() {
+    fn compact_selector_bounds_every_candidate() {
         let compact = audio_quality_format(AudioQuality::Compact);
-        for candidate in compact.split('/') {
+        let candidates: Vec<&str> = compact.split('/').collect();
+        assert_eq!(candidates.len(), 3);
+        for candidate in &candidates[..2] {
             assert!(candidate.contains("abr<=64"), "candidate {candidate} exceeds the cap");
         }
+        assert!(candidates[2].contains("protocol*=m3u8"), "last clause must target live HLS");
+        assert!(!compact.split('/').any(|candidate| candidate.trim() == "bestaudio"));
         assert_eq!(audio_quality_degraded_format(AudioQuality::Compact), Some("bestaudio"));
         assert_eq!(audio_quality_degraded_format(AudioQuality::Standard), None);
         assert_eq!(audio_quality_degraded_format(AudioQuality::High), None);
