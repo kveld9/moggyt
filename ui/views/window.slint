@@ -1,9 +1,9 @@
 import { Theme, TrackRowData, ShelfData, TopResultData, ExploreShelfData, LibraryItemData, LyricLineData, ImportRowData, ImportAlternativeData, DetailSectionData } from "../theme.slint";
 import { Sidebar } from "../components/sidebar.slint";
-import { PlayerBar } from "../components/player_bar.slint";
-import { QueuePanel } from "../components/queue_panel.slint";
 import { ShortcutScope } from "../components/shortcut_scope.slint";
 import { ContentArea } from "./content_area.slint";
+import { PlayerBarHost } from "./player_bar_host.slint";
+import { QueuePanelHost } from "./queue_panel_host.slint";
 import { ImportOverlay } from "import_overlay.slint";
 import { ContextMenuLayer } from "../components/context_menu.slint";
 import { PresetMenuLayer } from "../components/preset_menu.slint";
@@ -300,49 +300,32 @@ export component MoggytWindow inherits Window {
                     persistence-dismiss-text: root.persistence-dismiss-text;
                     persistence-error-dismissed => { root.persistence-error-dismissed(); }
                 }
-                Rectangle {
-                    width: root.queue-panel-open ? 340px : 0px;
-                    clip: true;
-                    animate width { duration: 180ms; easing: ease-in-out; }
-                    QueuePanel {
-                        width: 340px;
-                        height: parent.height;
-                        tracks: root.queue-tracks;
-                        selected-index: root.queue-selected-index;
-                        open: root.queue-panel-open;
-                        track-selected(idx) => { root.queue-track-selected(idx); }
-                        close-panel => { root.close-queue-panel(); }
-                    }
+                QueuePanelHost {
+                    open: root.queue-panel-open;
+                    tracks: root.queue-tracks;
+                    selected-index: root.queue-selected-index;
+                    track-selected(idx) => { root.queue-track-selected(idx); }
+                    close-panel => { root.close-queue-panel(); }
                 }
             }
-            Rectangle {
-                vertical-stretch: 0;
-                background: transparent;
-                height: root.player-bar-mode == 1 ? 92px : 72px;
-                PlayerBar {
-                    mode: root.player-bar-mode;
-                    show-artwork: root.player-bar-show-artwork;
-                    show-like: root.player-bar-show-like;
-                    show-shuffle: root.player-bar-show-shuffle;
-                    show-repeat: root.player-bar-show-repeat;
-                    show-skip-seconds: root.player-bar-show-skip-seconds;
-                    show-queue: root.player-bar-show-queue;
-                    show-volume: root.player-bar-show-volume;
-                    show-timer: root.player-bar-show-timer;
-                    show-speed: root.player-bar-show-speed;
-                    width: root.player-bar-mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
-                    height: 72px;
-                    x: (parent.width - self.width) / 2;
-                    y: root.player-bar-mode == 1 ? 8px : 0px;
-                    active-track-title: root.active-track-title;
-                    active-track-artist: root.active-track-artist;
-                    cover: root.now-playing-cover;
-                    queue-count: root.queue-count;
-                    queue-button-text: root.queue-button-text;
-
-                    is-queue-open: root.queue-panel-open;
-                    toggle-queue-panel => { root.toggle-queue-panel(); }
-                }
+            PlayerBarHost {
+                mode: root.player-bar-mode;
+                show-artwork: root.player-bar-show-artwork;
+                show-like: root.player-bar-show-like;
+                show-shuffle: root.player-bar-show-shuffle;
+                show-repeat: root.player-bar-show-repeat;
+                show-skip-seconds: root.player-bar-show-skip-seconds;
+                show-queue: root.player-bar-show-queue;
+                show-volume: root.player-bar-show-volume;
+                show-timer: root.player-bar-show-timer;
+                show-speed: root.player-bar-show-speed;
+                active-track-title: root.active-track-title;
+                active-track-artist: root.active-track-artist;
+                cover: root.now-playing-cover;
+                queue-count: root.queue-count;
+                queue-button-text: root.queue-button-text;
+                is-queue-open: root.queue-panel-open;
+                toggle-queue-panel => { root.toggle-queue-panel(); }
             }
         }
     }

@@ -1,0 +1,50 @@
+import { PlayerBar } from "../components/player_bar.slint";
+
+// Host that owns the classic/floating geometry of the bottom player bar.
+export component PlayerBarHost inherits Rectangle {
+    in property <int> mode: 0;
+    in property <bool> show-artwork: true;
+    in property <bool> show-like: true;
+    in property <bool> show-shuffle: true;
+    in property <bool> show-repeat: true;
+    in property <bool> show-skip-seconds: false;
+    in property <bool> show-queue: true;
+    in property <bool> show-volume: true;
+    in property <bool> show-timer: true;
+    in property <bool> show-speed: true;
+    in property <string> active-track-title: "";
+    in property <string> active-track-artist: "";
+    in property <image> cover;
+    in property <int> queue-count: 0;
+    in property <string> queue-button-text: "Queue";
+    in property <bool> is-queue-open: false;
+    callback toggle-queue-panel();
+
+    vertical-stretch: 0;
+    background: transparent;
+    height: root.mode == 1 ? 92px : 72px;
+
+    PlayerBar {
+        mode: root.mode;
+        show-artwork: root.show-artwork;
+        show-like: root.show-like;
+        show-shuffle: root.show-shuffle;
+        show-repeat: root.show-repeat;
+        show-skip-seconds: root.show-skip-seconds;
+        show-queue: root.show-queue;
+        show-volume: root.show-volume;
+        show-timer: root.show-timer;
+        show-speed: root.show-speed;
+        width: root.mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
+        height: 72px;
+        x: (parent.width - self.width) / 2;
+        y: root.mode == 1 ? 8px : 0px;
+        active-track-title: root.active-track-title;
+        active-track-artist: root.active-track-artist;
+        cover: root.cover;
+        queue-count: root.queue-count;
+        queue-button-text: root.queue-button-text;
+        is-queue-open: root.is-queue-open;
+        toggle-queue-panel => { root.toggle-queue-panel(); }
+    }
+}
