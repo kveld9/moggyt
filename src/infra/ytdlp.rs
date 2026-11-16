@@ -200,7 +200,10 @@ impl YtDlpResolver {
         let selector = audio_quality_format(self.quality);
         match spawn_ytdlp(&self.binary, video_id, selector) {
             Ok(output) => extract_stream_url(&output.stdout),
-            Err(err) => self.extract_url_degraded(video_id, err),
+            Err(err) if is_format_unavailable(&err.to_string()) => {
+                self.extract_url_degraded(video_id, err)
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -214,7 +217,7 @@ impl YtDlpResolver {
         };
         tracing::warn!(
             video_id = %video_id,
-            "audio quality tier unavailable; falling back to the best available audio"
+            "no stream matches the compact tier; retrying with the best available audio"
         );
         let output = spawn_ytdlp(&self.binary, video_id, selector)?;
         extract_stream_url(&output.stdout)
@@ -227,6 +230,14 @@ fn validate_video_id(video_id: &str) -> anyhow::Result<&str> {
         anyhow::bail!("cannot resolve audio url for blank video id");
     }
     Ok(trimmed)
+}
+
+/// Returns whether a yt-dlp failure means the requested format selector matched nothing.
+///
+/// yt-dlp prints this message when `-f` selects no available stream. A spawn error, a network
+/// failure, or a bot check must propagate instead of triggering the degraded retry.
+fn is_format_unavailable(stderr: &str) -> bool {
+    stderr.contains("Requested format is not available")
 }
 
 fn spawn_ytdlp(
