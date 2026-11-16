@@ -75,7 +75,10 @@ mod tests {
     #[test]
     fn format_args_with_quality_table() {
         for (q, expected_fmt) in [
-            (AudioQuality::Compact, "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]"),
+            (
+                AudioQuality::Compact,
+                "bestaudio[ext=m4a][abr<=64]/bestaudio[abr<=64]/bestaudio[protocol*=m3u8]",
+            ),
             (AudioQuality::Standard, "bestaudio[ext=m4a]/bestaudio/best"),
             (
                 AudioQuality::High,
