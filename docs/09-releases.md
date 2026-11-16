@@ -26,6 +26,24 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 The release pipeline validates the tag format (`^v[0-9]+\.[0-9]+\.[0-9]+$`), derives the package version, builds
 distribution artifacts across platforms, generates SHA-256 checksums, and publishes the release to GitHub Releases.
 
+### Arch Linux Packaging Bump
+
+After the release workflow finishes publishing artifacts, update the Arch Linux package definitions:
+
+1. Set `pkgver` to the new version in `packaging/arch/moggyt-bin/PKGBUILD` and `packaging/arch/moggyt/PKGBUILD`.
+1. Reset `pkgrel=1` in both files.
+1. Run `updpkgsums` in each directory so the checksum hashes match the published artifacts:
+
+```bash
+(cd packaging/arch/moggyt-bin && updpkgsums)
+(cd packaging/arch/moggyt && updpkgsums)
+```
+
+1. Commit the updated PKGBUILDs and open a PR.
+
+When this step is skipped, `makepkg -si` silently installs the previous release because `pkgver` remains pinned to
+the older release.
+
 ## Distribution Artifacts
 
 Release assets by shipment status:
@@ -38,9 +56,9 @@ Release assets by shipment status:
 | `moggyt-*-x86_64.AppImage` | Linux | GitHub Releases | Shipped |
 | `moggyt-*-setup.exe` | Windows 64-bit | GitHub Releases (NSIS installer) | Planned |
 
-Linux tarballs released after v1.3.0, .deb packages, AppImages, and the Windows installer include
-`THIRD_PARTY_NOTICES.md`. The v1.3.0 tarball predates that change, so both Arch packages fetch the file from the
-repository.
+The Linux release tarball now also ships `LICENSE`, the desktop entry, the hicolor launcher icons, and the Matugen
+theme template alongside `THIRD_PARTY_NOTICES.md`. This payload applies to tarballs built after v1.4.0 (the v1.4.0
+tarball predates it and carries the binary plus third-party notices only).
 
 ### Arch Linux Packaging
 
@@ -49,9 +67,11 @@ The repository maintains two Arch Linux package specifications:
 - `packaging/arch/moggyt-bin/PKGBUILD` downloads and repackages the official pre-compiled Linux release tarball.
 - `packaging/arch/moggyt/PKGBUILD` builds the tagged source archive with `cargo build --release --frozen`.
 
-Both install `/usr/bin/moggyt`, the desktop entry, the hicolor launcher icons (16 to 256 px), the Matugen theme
-template at `/usr/share/moggyt/matugen/moggyt-theme.json`, and the license files under `/usr/share/licenses/`.
-Both are built and installed locally from a clone; the project does not publish to any package archive.
+`moggyt` installs them from the tag archive (single source); `moggyt-bin` takes the binary and third-party notices from
+the release tarball and the remaining assets from the matching source archive, so no commit pin is involved. Both
+install `/usr/bin/moggyt`, the desktop entry, the hicolor launcher icons (16 to 256 px), the Matugen theme template at
+`/usr/share/moggyt/matugen/moggyt-theme.json`, and the license files under `/usr/share/licenses/`. Both are built and
+installed locally from a clone; the project does not publish to any package archive.
 
 ## Code Signing Policy
 
