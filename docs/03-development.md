@@ -299,6 +299,15 @@ guessing; every rule here was verified against a build or the official documenta
   translated labels render literally. Use it for icon-only actions whose meaning is not carried by
   a visible label.
   Source: <https://docs.slint.dev/docs/slint/reference/window/tooltip/>.
+- A `Text` reports its full single-line width as `min-width` unless `overflow: elide` (or `wrap`)
+  is set. Without one of them a narrow container cannot shrink the row: the segmented control pushed
+  its third button outside the settings panel once the content area dropped to about 260px with the
+  queue panel open, and the audio quality title collided with its hint. With `overflow: elide` the
+  `min-width` becomes zero and the label truncates with an ellipsis at the available width, while
+  `preferred-width` keeps the full text width, so wide layouts are unchanged (pixel-identical render
+  at the 552px content minimum). Give a `space-between` header a small `spacing` when its trailing
+  text can elide, otherwise the two texts touch once there is no room left.
+  Source: <https://docs.slint.dev/docs/slint/reference/elements/text/>.
 
 ## Packaging (Arch Linux)
 
