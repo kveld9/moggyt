@@ -14,7 +14,8 @@
 #   - workflow_dispatch: Manual release execution from the Actions tab.
 #
 # Release Artifacts:
-#   - moggyt-<version>-linux.tar.gz: Portable tarball containing the Linux binary (x86_64).
+#   - moggyt-<version>-linux.tar.gz: Portable tarball containing the Linux binary (x86_64), the desktop
+#     entry, the hicolor launcher icons, and the Matugen theme template.
 #   - moggyt-<version>-windows.zip: Portable zip containing the Windows binary (x86_64).
 #   - moggyt_<version>_amd64.deb: Debian/Ubuntu package with automated dependency resolution.
 #   - moggyt-<version>-x86_64.AppImage: Standalone portable AppImage bundle for Linux (x86_64).
@@ -136,7 +137,17 @@ jobs:
           if [ "${{ runner.os }}" = "Windows" ]; then
             (cd target/release && 7z a "../../dist/moggyt-${VERSION}-windows.zip" moggyt.exe)
           else
-            tar -czf "dist/moggyt-${VERSION}-linux.tar.gz" -C target/release moggyt
+            STAGE="$RUNNER_TEMP/moggyt-${VERSION}-linux"
+            mkdir -p "$STAGE"
+            cp target/release/moggyt "$STAGE/"
+            cp packaging/linux/moggyt.desktop "$STAGE/"
+            cp packaging/matugen/moggyt-theme.json "$STAGE/"
+            for size in 16 32 48 64 128 256; do
+              cp "packaging/icons/hicolor/${size}x${size}/apps/moggyt.png" "$STAGE/moggyt-${size}.png"
+            done
+            tar -czf "dist/moggyt-${VERSION}-linux.tar.gz" -C "$STAGE" \
+              moggyt moggyt.desktop moggyt-theme.json \
+              moggyt-16.png moggyt-32.png moggyt-48.png moggyt-64.png moggyt-128.png moggyt-256.png
           fi
 
       - name: Install NSIS

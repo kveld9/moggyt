@@ -94,6 +94,9 @@ git pull
 makepkg -si
 ```
 
+Each PKGBUILD pins `pkgver` to a released version. A fresh release requires bumping `pkgver` and re-running
+`updpkgsums` before `makepkg -si`; see [docs/09-releases.md](09-releases.md) for the procedure.
+
 ## Installing on Linux from AppImage
 
 The standalone `moggyt-*-x86_64.AppImage` bundles user-space dependencies, including ALSA and Ayatana AppIndicator
@@ -129,8 +132,9 @@ chmod +x moggyt-*-x86_64.AppImage
 
 ## Installing on Linux from Portable Tarball
 
-Unlike the Arch package (`makepkg -si` auto-resolves `alsa-lib` and `libayatana-appindicator`),
-the portable tarball ships only the `moggyt` binary. Install the runtime libraries first:
+Unlike the Arch package (`makepkg -si` auto-resolves `alsa-lib` and `libayatana-appindicator`), the portable tarball
+also ships the desktop entry, the hicolor launcher icons, the Matugen theme template, the license, and
+third-party notices, and the runtime libraries are still needed. Install them first:
 
 - Debian/Ubuntu: `sudo apt install libasound2 libayatana-appindicator3-1`
 - Arch Linux: `sudo pacman -S --needed alsa-lib libayatana-appindicator`

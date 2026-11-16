@@ -1,15 +1,17 @@
 # Maintainer: kveld9 <https://github.com/kveld9/moggyt>
 #
 # moggyt-bin repackages the official release tarball for Arch Linux.
-# Bump policy: update pkgver, refresh the shared asset hashes, and run updpkgsums.
+# Bump policy: set pkgver, reset pkgrel to 1, refresh the hashes with `updpkgsums`.
 #
-# The desktop entry, launcher icons, license, and third-party notices are
-# fetched from commit 4252313 because the v1.3.0 release tarball predates them.
-# Repoint those URLs to `v${pkgver}` once a release ships the assets in the tarball.
+# The release tarball carries the binary and third-party notices only. The desktop
+# entry, launcher icons, Matugen template, and license come from the matching source
+# archive, so both URLs are derived from pkgver and no commit pin is needed.
+# Once a release ships the full payload in the tarball, delete the source-archive
+# entry, its hash, and the `_repo` prefix below.
 
 pkgname=moggyt-bin
-pkgver=1.3.0
-pkgrel=2
+pkgver=1.4.0
+pkgrel=1
 pkgdesc="Native YouTube Music client (Slint)"
 arch=('x86_64')
 url="https://github.com/kveld9/moggyt"
@@ -18,46 +20,30 @@ depends=('alsa-lib' 'libayatana-appindicator')
 provides=('moggyt')
 conflicts=('moggyt')
 _icons=(16 32 48 64 128 256)
+_repo="$pkgname-$pkgver.tar.gz"
 source=(
   "https://github.com/kveld9/moggyt/releases/download/v${pkgver}/moggyt-${pkgver}-linux.tar.gz"
-  "moggyt.desktop::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/linux/moggyt.desktop"
-  "moggyt-theme.json::https://raw.githubusercontent.com/kveld9/moggyt/v${pkgver}/packaging/matugen/moggyt-theme.json"
-  "THIRD_PARTY_NOTICES.md::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/THIRD_PARTY_NOTICES.md"
-  "LICENSE::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/LICENSE"
-  "moggyt-16.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/16x16/apps/moggyt.png"
-  "moggyt-32.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/32x32/apps/moggyt.png"
-  "moggyt-48.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/48x48/apps/moggyt.png"
-  "moggyt-64.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/64x64/apps/moggyt.png"
-  "moggyt-128.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/128x128/apps/moggyt.png"
-  "moggyt-256.png::https://raw.githubusercontent.com/kveld9/moggyt/42523131e5532c0f44e6c70bd44257ab2f1b9f0e/packaging/icons/hicolor/256x256/apps/moggyt.png"
+  "$_repo::https://github.com/kveld9/moggyt/archive/refs/tags/v${pkgver}.tar.gz"
 )
 sha256sums=(
-  'e245274e5c5c2364248c94d4d61988df63d89a21472860fc528196b878a76611'
-  '3058459e90d6b95804146ca46cf67e2c38eda3c95bf966ad4d166eccf7f1d975'
-  '0e9ed656921ad7dccedd817b63c2458767806ddbe128bb61fa543ab0b1079336'
-  '0e2ffacffd103e45be4aece935580433c3511d5eaeb28f408c67dc3ab6bab53c'
-  '9bd3e622c335ec8f1ef6f59e87749a7a18ce3f72566430a976a15e9000e206bc'
-  '337b82384be9749d655e3d62bb38cdb9518f42a153d64ad91b31e968662d7c7d'
-  '5d1c3311988b939e55abd9c8a14aba772f793bd4641d5f5ad3b642a0f562922e'
-  'be537f54a633fa5913e10823fbe122ddaa26e61a6c4ac923f99ae2e1cd0fb53f'
-  '234e0ea93a919fe4f54cb1d84597ac71e94fc78e6b308b7ec7f4bb9f84d988a3'
-  '8d1faed8bfcc2c921afeee9561672b277a257f3faf4dd43a3299cf1fd6030c3e'
-  '16a70423088f563ed6dacade0cb2b4d712c0df7f0f7349947e6ed0b6b8232b0d'
+  '511214c890a079fac66fb31aab3b944886689e117fdf3229d71cefed431831bb'
+  '5b6839317266463653a4464566f19134b1abab35f35c4b626d916369c4c21e68'
 )
 
 package() {
+  local src="${srcdir}/moggyt-${pkgver}"
   install -Dm755 "${srcdir}/moggyt" "${pkgdir}/usr/bin/moggyt"
-  install -Dm644 "${srcdir}/moggyt.desktop" \
-    "${pkgdir}/usr/share/applications/moggyt.desktop"
-  install -Dm644 "${srcdir}/moggyt-theme.json" \
-    "${pkgdir}/usr/share/moggyt/matugen/moggyt-theme.json"
-  install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
   install -Dm644 "${srcdir}/THIRD_PARTY_NOTICES.md" \
     "${pkgdir}/usr/share/licenses/${pkgname}/THIRD_PARTY_NOTICES.md"
+  install -Dm644 "${src}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 "${src}/packaging/linux/moggyt.desktop" \
+    "${pkgdir}/usr/share/applications/moggyt.desktop"
+  install -Dm644 "${src}/packaging/matugen/moggyt-theme.json" \
+    "${pkgdir}/usr/share/moggyt/matugen/moggyt-theme.json"
 
   local size
   for size in "${_icons[@]}"; do
-    install -Dm644 "${srcdir}/moggyt-${size}.png" \
+    install -Dm644 "${src}/packaging/icons/hicolor/${size}x${size}/apps/moggyt.png" \
       "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/moggyt.png"
   done
 }
