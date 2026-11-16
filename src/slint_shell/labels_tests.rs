@@ -164,6 +164,8 @@ mod tests {
         assert_eq!(es.crossfade_hint, "Transición suave entre temas");
         assert_eq!(es.stream_cache, "Límite de caché de streams");
         assert_eq!(es.stream_cache_hint, "Espacio en disco para la caché de audio");
+        assert_eq!(es.cover_cache, "Límite de caché de carátulas");
+        assert_eq!(es.cover_cache_hint, "Espacio en disco para la caché de carátulas");
         assert_eq!(es.section_integrations, "Integraciones");
         assert_eq!(es.discord_presence_label, "Discord Rich Presence");
         assert_eq!(
@@ -349,6 +351,8 @@ mod tests {
         assert_eq!(en.crossfade_hint, "Smooth transition between tracks");
         assert_eq!(en.stream_cache, "Stream Cache Limit");
         assert_eq!(en.stream_cache_hint, "Disk space quota for offline stream cache");
+        assert_eq!(en.cover_cache, "Cover Cache Limit");
+        assert_eq!(en.cover_cache_hint, "Disk space quota for cached cover art");
         assert_eq!(en.section_integrations, "Integrations");
         assert_eq!(en.discord_presence_label, "Discord Rich Presence");
         assert_eq!(

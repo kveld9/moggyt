@@ -129,6 +129,7 @@ pub struct SlintAppState {
     /// Sample-continuous hand-off latch: armed preload and its pending result.
     pub gapless: crate::slint_shell::playback_advance::GaplessUi,
     pub stream_cache_limit_mb: u32,
+    pub cover_cache_limit_mb: u32,
     pub hi_res_covers: bool,
     pub songs_only: bool,
     /// Whether detail track lists render in compact mode without cover thumbnails.
@@ -244,6 +245,18 @@ impl SlintAppState {
         self.stream_cache_limit_mb = clamped;
         let mut settings = self.settings_store.load();
         settings.stream_cache_limit_mb = clamped;
+        let _ = self.settings_store.save(&settings);
+    }
+
+    /// Updates the cover cache size limit, applies it to the live disk cache, and persists it.
+    pub fn set_cover_cache_limit_mb(&mut self, limit_mb: u32) {
+        let clamped = limit_mb.min(10240);
+        self.cover_cache_limit_mb = clamped;
+        if let Ok(mut covers) = self.covers.lock() {
+            covers.set_limit(u64::from(clamped) * 1024 * 1024);
+        }
+        let mut settings = self.settings_store.load();
+        settings.cover_cache_limit_mb = clamped;
         let _ = self.settings_store.save(&settings);
     }
 
@@ -712,6 +725,11 @@ mod tests {
         assert_eq!(state.settings_store.load().stream_cache_limit_mb, 1024);
         state.set_stream_cache_limit_mb(20000);
         assert_eq!(state.settings_store.load().stream_cache_limit_mb, 10240);
+        state.set_cover_cache_limit_mb(128);
+        assert_eq!(state.cover_cache_limit_mb, 128);
+        assert_eq!(state.settings_store.load().cover_cache_limit_mb, 128);
+        state.set_cover_cache_limit_mb(20000);
+        assert_eq!(state.cover_cache_limit_mb, 10240);
     }
 
     #[test]

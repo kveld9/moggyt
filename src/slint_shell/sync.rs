@@ -175,6 +175,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.global::<PlaybackUi>().set_autoplay_enabled(state.autoplay);
     window.set_crossfade_seconds(state.crossfade_seconds as i32);
     window.set_stream_cache_limit_mb(state.stream_cache_limit_mb as i32);
+    window.set_cover_cache_limit_mb(state.cover_cache_limit_mb as i32);
     window.set_signed_in(state.signed_in);
     window.set_app_version(GithubUpdater::current_version().into());
     sync_update_status(window, state);

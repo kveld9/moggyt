@@ -7,11 +7,13 @@ export component PlaybackSettings inherits VerticalLayout {
     in property <int> active-audio-quality-index: 1;
     in property <int> crossfade-seconds: 0;
     in property <int> stream-cache-limit-mb: 512;
+    in property <int> cover-cache-limit-mb: 256;
     in property <bool> songs-only: false;
 
     callback audio-quality-selected(int);
     callback crossfade-changed(int);
     callback stream-cache-limit-selected(int);
+    callback cover-cache-limit-selected(int);
     callback songs-only-toggled();
 
     spacing: 10px;
@@ -189,6 +191,80 @@ export component PlaybackSettings inherits VerticalLayout {
                         label: "5 GB";
                         is-active: root.stream-cache-limit-mb == 5120;
                         clicked => { root.stream-cache-limit-selected(5120); }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+
+            VerticalLayout {
+                spacing: 12px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: Labels.cover-cache-label;
+                        color: Theme.text;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: root.cover-cache-limit-mb == 0 ? "Off" : (root.cover-cache-limit-mb >= 1024 ? ((root.cover-cache-limit-mb / 1024) + " GB") : (root.cover-cache-limit-mb + " MB"));
+                        color: root.cover-cache-limit-mb != 0 ? Theme.accent : Theme.secondary;
+                        font-size: 13px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: Labels.cover-cache-hint-label;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    SettingsModeButton {
+                        label: "Off";
+                        is-active: root.cover-cache-limit-mb == 0;
+                        clicked => { root.cover-cache-limit-selected(0); }
+                    }
+
+                    SettingsModeButton {
+                        label: "64 MB";
+                        is-active: root.cover-cache-limit-mb == 64;
+                        clicked => { root.cover-cache-limit-selected(64); }
+                    }
+
+                    SettingsModeButton {
+                        label: "128 MB";
+                        is-active: root.cover-cache-limit-mb == 128;
+                        clicked => { root.cover-cache-limit-selected(128); }
+                    }
+
+                    SettingsModeButton {
+                        label: "256 MB";
+                        is-active: root.cover-cache-limit-mb == 256;
+                        clicked => { root.cover-cache-limit-selected(256); }
+                    }
+
+                    SettingsModeButton {
+                        label: "512 MB";
+                        is-active: root.cover-cache-limit-mb == 512;
+                        clicked => { root.cover-cache-limit-selected(512); }
+                    }
+
+                    SettingsModeButton {
+                        label: "1 GB";
+                        is-active: root.cover-cache-limit-mb == 1024;
+                        clicked => { root.cover-cache-limit-selected(1024); }
                     }
                 }
             }
