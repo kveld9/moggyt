@@ -1,0 +1,25 @@
+import { QueuePanel } from "../components/queue_panel.slint";
+import { TrackRowData } from "../theme.slint";
+
+// Width-animated host for the right-side queue panel.
+export component QueuePanelHost inherits Rectangle {
+    in property <bool> open: false;
+    in property <[TrackRowData]> tracks: [];
+    in property <int> selected-index: -1;
+    callback track-selected(int);
+    callback close-panel();
+
+    width: root.open ? 340px : 0px;
+    clip: true;
+    animate width { duration: 180ms; easing: ease-in-out; }
+
+    QueuePanel {
+        width: 340px;
+        height: parent.height;
+        tracks: root.tracks;
+        selected-index: root.selected-index;
+        open: root.open;
+        track-selected(idx) => { root.track-selected(idx); }
+        close-panel => { root.close-panel(); }
+    }
+}
