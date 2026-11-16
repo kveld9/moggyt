@@ -11,7 +11,7 @@
 # test-profile build roughly doubles the build time for this package.
 
 pkgname=moggyt
-pkgver=1.4.0
+pkgver=1.4.1
 pkgrel=1
 pkgdesc="Native YouTube Music client (Slint)"
 arch=('x86_64')
@@ -26,7 +26,7 @@ conflicts=('moggyt-bin')
 options=('!lto')
 _icons=(16 32 48 64 128 256)
 source=("$pkgname-$pkgver.tar.gz::https://github.com/kveld9/moggyt/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('5b6839317266463653a4464566f19134b1abab35f35c4b626d916369c4c21e68')
+sha256sums=('a473a931d252bf13f5c97998344cb69b008f72ba405beb8ebb590c52b10ae722')
 
 prepare() {
   cd "$pkgname-$pkgver"
