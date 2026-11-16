@@ -308,6 +308,16 @@ guessing; every rule here was verified against a build or the official documenta
   at the 552px content minimum). Give a `space-between` header a small `spacing` when its trailing
   text can elide, otherwise the two texts touch once there is no room left.
   Source: <https://docs.slint.dev/docs/slint/reference/elements/text/>.
+- A `TextInput` advertises its own text width as its preferred width, and that value propagates
+  through every enclosing layout up to the enclosing `Flickable`: pasting a long value (a session
+  cookie) widens the whole content column and pushes right-side controls out of the window. Bound
+  the field instead: put the input in a `clip: true` wrapper with `horizontal-stretch: 1`,
+  `min-width: 0px` and `preferred-width: 0px`, give the input `x: 0` (an explicit `x` or `y` stops
+  its constraints from reaching the parent) and `width: max(parent.width, self.preferred-width)`,
+  and translate its `x` from `cursor-position-changed` so the caret stays visible while the text
+  scrolls. A `Rectangle` has no pointer handling, so cover the field with a `TouchArea` that calls
+  `focus()` on the input; otherwise only the thin text line accepts the click.
+  Source: <https://docs.slint.dev/latest/docs/slint/reference/keyboard-input/textinput/>.
 
 ## Packaging (Arch Linux)
 
