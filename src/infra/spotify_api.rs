@@ -54,7 +54,7 @@ impl SpotifyApiClient {
     pub fn new(credentials: SpotifyCredentials) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(API_TIMEOUT_SECS))
-            .user_agent(format!("moggyt/{}", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!("moggyt/{}", super::app_version()))
             .build()
             .unwrap_or_else(|_| Client::new());
         Self { client, credentials }

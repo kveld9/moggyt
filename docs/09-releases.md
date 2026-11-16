@@ -26,6 +26,22 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 The release pipeline validates the tag format (`^v[0-9]+\.[0-9]+\.[0-9]+$`), derives the package version, builds
 distribution artifacts across platforms, generates SHA-256 checksums, and publishes the release to GitHub Releases.
 
+### Version Reported by the Binary
+
+`Cargo.toml` keeps a static placeholder version. The version the running binary reports, in the About panel, the
+update check, and outbound user agents, comes from the pushed tag instead: `build.rs` resolves `MOGGYT_VERSION`
+and injects it at compile time.
+
+Resolution order, first match wins:
+
+1. `MOGGYT_VERSION`, set by the release workflow from the tag and by the Arch source PKGBUILD from `pkgver`.
+1. The newest reachable `v*` tag, for local development builds.
+1. `CARGO_PKG_VERSION`, for source archives that carry no git history.
+
+The `v` prefix is stripped, so a `v1.4.0` tag reports `1.4.0` and the update check never offers the running
+release as an update. Release builds must set `MOGGYT_VERSION`, because CI checkouts are shallow and carry no
+tags.
+
 ### Arch Linux Packaging Bump
 
 After the release workflow finishes publishing artifacts, update the Arch Linux package definitions:

@@ -128,6 +128,7 @@ jobs:
         env:
           MOGGYT_LASTFM_API_KEY: ${{ secrets.MOGGYT_LASTFM_API_KEY }}
           MOGGYT_LASTFM_SECRET: ${{ secrets.MOGGYT_LASTFM_SECRET }}
+          MOGGYT_VERSION: ${{ needs.semver.outputs.version }}
         run: cargo build --release --locked
 
       - name: Package portable release archive
