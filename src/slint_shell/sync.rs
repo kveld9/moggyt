@@ -336,6 +336,7 @@ fn library_song_rows(state: &SlintAppState) -> Vec<TrackRowData> {
 
 /// Synchronizes library collections and detail view models with Slint window.
 pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppState) {
+    window.set_library_session_expired(state.library_phase == ViewPhase::Expired);
     let playlist_rows = chunk_card_rows(playlist_cards(state), state.explore_columns);
     window.set_library_playlist_rows(ModelRc::new(VecModel::from(playlist_rows)));
 
