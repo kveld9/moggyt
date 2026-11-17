@@ -252,6 +252,8 @@ pub struct Detail {
     pub kind: DetailKind,
     pub title: String,
     pub subtitle: String,
+    /// Release label shown above an album title (release type and year), when reported.
+    pub container_label: Option<String>,
     pub description: Option<String>,
     pub artwork: Option<String>,
     /// Track count the server reports for the whole container (playlists only).
@@ -276,6 +278,7 @@ impl Detail {
             kind,
             title: title.to_owned(),
             subtitle: subtitle.to_owned(),
+            container_label: None,
             description: None,
             artwork: None,
             track_count: None,
@@ -286,6 +289,13 @@ impl Detail {
             queue_tracks: None,
             artist: None,
         }
+    }
+
+    /// Sets the container release label (release type and year), ignoring blank strings.
+    pub fn with_container_label(mut self, label: impl Into<String>) -> Self {
+        let l = label.into();
+        self.container_label = if l.trim().is_empty() { None } else { Some(l) };
+        self
     }
 
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
@@ -353,10 +363,16 @@ mod tests {
         assert_eq!(detail.kind, DetailKind::Album);
         assert_eq!(detail.title, "Title");
         assert_eq!(detail.subtitle, "Subtitle");
+        assert_eq!(detail.container_label, None);
         assert_eq!(detail.description, None);
         assert_eq!(detail.artwork, None);
         assert_eq!(detail.tracks, tracks);
         assert_eq!(detail.artist, None);
+
+        let labeled = detail.clone().with_container_label("Single \u{2022} 2026");
+        assert_eq!(labeled.container_label.as_deref(), Some("Single \u{2022} 2026"));
+        let blank_labeled = labeled.with_container_label("   ");
+        assert_eq!(blank_labeled.container_label, None);
 
         let enriched = detail
             .with_description("A collection of tracks.")

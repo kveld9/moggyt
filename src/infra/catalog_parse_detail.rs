@@ -1,5 +1,6 @@
 //! Detail view response parser for albums, artists, and playlists.
 
+use super::catalog_parse_album_header::{AlbumHeader, album_header};
 use super::catalog_parse_artist::parse_artist_page;
 use super::catalog_parse_common::best_thumbnail;
 pub use super::catalog_parse_detail_track::{build_detail_track, detail_artist, detail_title};
@@ -8,7 +9,7 @@ use super::catalog_parse_playlist::{PlaylistMeta, playlist_meta};
 use crate::domain::{Detail, DetailKind, PlaylistPrivacy, Track};
 use serde_json::Value;
 
-fn detail_header_node(value: &Value) -> Option<&Value> {
+pub(super) fn detail_header_node(value: &Value) -> Option<&Value> {
     const PATHS: &[&str] = &[
         "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicEditablePlaylistDetailHeaderRenderer/header/musicResponsiveHeaderRenderer",
         "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicEditablePlaylistDetailHeaderRenderer/header/musicDetailHeaderRenderer",
@@ -57,6 +58,21 @@ fn playlist_meta_for(value: &Value, kind: DetailKind) -> PlaylistMeta {
         return PlaylistMeta::default();
     }
     playlist_meta(detail_header_node(value))
+}
+
+/// Resolves album header metadata; other container kinds carry none.
+fn album_header_for(value: &Value, kind: DetailKind) -> AlbumHeader {
+    if kind != DetailKind::Album {
+        return AlbumHeader::default();
+    }
+    album_header(value)
+}
+
+fn resolve_detail_subtitle(value: &Value, meta: &PlaylistMeta, album: &AlbumHeader) -> String {
+    if let Some(artists) = &album.artists {
+        return artists.clone();
+    }
+    meta.author.clone().unwrap_or_else(|| detail_header_subtitle(value))
 }
 
 fn detail_header_title(value: &Value) -> String {
@@ -120,7 +136,7 @@ fn detail_header_subtitle(value: &Value) -> String {
     String::new()
 }
 
-fn join_runs(runs: &[Value]) -> Option<String> {
+pub(super) fn join_runs(runs: &[Value]) -> Option<String> {
     let mut text = String::new();
     for run in runs {
         if let Some(t) = run.get("text").and_then(Value::as_str) {
@@ -296,13 +312,37 @@ fn fill_missing_track_artwork(mut detail: Detail) -> Detail {
     detail
 }
 
+/// Fills album tracks without an artist with the header credit line.
+fn fill_missing_album_track_artists(mut detail: Detail, artists: Option<&str>) -> Detail {
+    let Some(artist) = artists else {
+        return detail;
+    };
+    if artist.trim().is_empty() {
+        return detail;
+    }
+    for track in &mut detail.tracks {
+        if track.artist.trim().is_empty() {
+            track.artist = artist.to_owned();
+        }
+    }
+    detail
+}
+
+fn apply_album_header(mut detail: Detail, album: &AlbumHeader) -> Detail {
+    if let Some(label) = &album.container_label {
+        detail = detail.with_container_label(label);
+    }
+    fill_missing_album_track_artists(detail, album.artists.as_deref())
+}
+
 /// Parses a detail view from catalog API browse response payload at a specified epoch timestamp.
 ///
 /// Returns `None` when neither a header title nor any valid track items are found.
 pub fn parse_detail_all_at(value: &Value, kind: DetailKind, now_secs: i64) -> Option<Detail> {
     let title = resolve_detail_title(value);
     let meta = playlist_meta_for(value, kind);
-    let subtitle = meta.author.clone().unwrap_or_else(|| detail_header_subtitle(value));
+    let album = album_header_for(value, kind);
+    let subtitle = resolve_detail_subtitle(value, &meta, &album);
     let tracks = collect_detail_tracks(value, now_secs);
     if title.is_empty() && tracks.is_empty() {
         return None;
@@ -319,6 +359,7 @@ pub fn parse_detail_all_at(value: &Value, kind: DetailKind, now_secs: i64) -> Op
     }
     let detail = apply_playlist_privacy(detail, value, kind);
     let detail = fill_missing_track_artwork(with_optional_detail_fields(detail, value));
+    let detail = apply_album_header(detail, &album);
     if kind == DetailKind::Artist {
         return Some(detail.with_artist_page(parse_artist_page(value)));
     }

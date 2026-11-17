@@ -21,6 +21,7 @@ pub mod catalog_client_impl;
 mod catalog_live;
 pub mod catalog_model;
 pub mod catalog_parse_album;
+pub mod catalog_parse_album_header;
 pub mod catalog_parse_artist;
 pub mod catalog_parse_common;
 pub mod catalog_parse_continuation;
