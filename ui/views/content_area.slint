@@ -44,6 +44,7 @@ export component ContentArea inherits Rectangle {
     in property <[ExploreCardRow]> library-album-rows: [];
     in property <[ExploreCardRow]> library-artist-rows: [];
     in property <[TrackRowData]> library-song-rows: [];
+    in property <[ExploreCardRow]> library-podcast-rows: [];
     in property <int> library-filter: 0;
     in property <bool> detail-has-detail: false;
     in property <bool> detail-has-artwork: false;
@@ -104,6 +105,7 @@ export component ContentArea inherits Rectangle {
     callback album-selected(int);
     callback artist-selected(int);
     callback library-song-selected(int);
+    callback podcast-selected(int);
     callback library-chip-selected(int);
     callback detail-track-selected(int);
     callback detail-play();
@@ -279,10 +281,12 @@ export component ContentArea inherits Rectangle {
                 album-rows: root.library-album-rows;
                 artist-rows: root.library-artist-rows;
                 song-rows: root.library-song-rows;
+                podcast-rows: root.library-podcast-rows;
                 playlist-selected(idx) => { root.playlist-selected(idx); }
                 album-selected(idx) => { root.album-selected(idx); }
                 artist-selected(idx) => { root.artist-selected(idx); }
                 song-selected(idx) => { root.library-song-selected(idx); }
+                podcast-selected(idx) => { root.podcast-selected(idx); }
                 chip-selected(idx) => { root.library-chip-selected(idx); }
                 import-requested() => { root.library-import-requested(); }
                 open-settings() => { root.open-settings(); }

@@ -94,6 +94,7 @@ pub struct SlintAppState {
     pub library_songs: Vec<Track>,
     pub library_albums: Vec<Album>,
     pub library_artists: Vec<Artist>,
+    pub library_podcasts: Vec<Playlist>,
     pub(crate) library_filter: LibraryFilter,
     pub detail: Option<Detail>,
     pub detail_return: SlintPage,
@@ -264,12 +265,14 @@ impl SlintAppState {
                 songs: c.library_songs(),
                 albums: c.saved_albums(),
                 artists: c.library_artists(),
+                podcasts: c.library_podcasts(),
             },
             Err(_) => LibraryFetch {
                 playlists: Err(CatalogError::Transport),
                 songs: Err(CatalogError::Transport),
                 albums: Err(CatalogError::Transport),
                 artists: Err(CatalogError::Transport),
+                podcasts: Err(CatalogError::Transport),
             },
         };
         self.apply_library_outcome(fetch);
@@ -502,6 +505,9 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     }
     fn library_songs(&self) -> Result<Vec<Track>, CatalogError> {
         (**self).library_songs()
+    }
+    fn library_podcasts(&self) -> Result<Vec<Playlist>, CatalogError> {
+        (**self).library_podcasts()
     }
     fn detail(&self, id: &str, k: DetailKind) -> Result<Option<Detail>, CatalogError> {
         (**self).detail(id, k)

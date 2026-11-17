@@ -75,6 +75,9 @@ pub trait Catalog {
     /// Returns songs in the user's library.
     fn library_songs(&self) -> Result<Vec<Track>, CatalogError>;
 
+    /// Returns podcasts saved to the user's library.
+    fn library_podcasts(&self) -> Result<Vec<Playlist>, CatalogError>;
+
     /// Returns detail view for `browse_id` and `kind` (Ok(None) on blank id).
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError>;
 
@@ -135,6 +138,9 @@ mod tests {
             Ok(Vec::new())
         }
         fn library_songs(&self) -> Result<Vec<Track>, CatalogError> {
+            Ok(Vec::new())
+        }
+        fn library_podcasts(&self) -> Result<Vec<Playlist>, CatalogError> {
             Ok(Vec::new())
         }
         fn detail(

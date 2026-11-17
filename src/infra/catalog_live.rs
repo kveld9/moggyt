@@ -187,6 +187,11 @@ impl Catalog for LiveCatalog {
         self.client.library_songs()
     }
 
+    /// Returns saved podcasts.
+    fn library_podcasts(&self) -> Result<Vec<Playlist>, CatalogError> {
+        self.client.library_podcasts()
+    }
+
     /// Returns detail view for `browse_id` and `kind`.
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         self.client.detail(browse_id, kind)

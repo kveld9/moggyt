@@ -195,6 +195,10 @@ impl Catalog for CatalogStub {
         Ok(Vec::new())
     }
 
+    fn library_podcasts(&self) -> Result<Vec<Playlist>, CatalogError> {
+        Ok(Vec::new())
+    }
+
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         let trimmed = browse_id.trim();
         if trimmed.is_empty() {

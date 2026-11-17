@@ -193,7 +193,8 @@ pub fn resolve_subject(state: &SlintAppState, target: ContextTarget) -> Option<C
         ContextSurface::DetailCard => detail_card_subject(state, target.index),
         ContextSurface::LibraryPlaylist
         | ContextSurface::LibraryAlbum
-        | ContextSurface::LibraryArtist => library_subject(state, target),
+        | ContextSurface::LibraryArtist
+        | ContextSurface::LibraryPodcast => library_subject(state, target),
     }
 }
 
@@ -237,6 +238,10 @@ fn library_subject(state: &SlintAppState, target: ContextTarget) -> Option<Conte
         ContextSurface::LibraryArtist => {
             let artist = state.library_artists.get(target.index)?;
             Some(container_subject(&artist.id, DetailKind::Artist, None))
+        }
+        ContextSurface::LibraryPodcast => {
+            let podcast = state.library_podcasts.get(target.index)?;
+            Some(container_subject(&podcast.id, DetailKind::Playlist, None))
         }
         _ => None,
     }
