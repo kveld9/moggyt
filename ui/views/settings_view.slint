@@ -13,6 +13,7 @@ export component SettingsView inherits VerticalLayout {
     in property <[string]> custom-theme-names: [];
     in property <string> active-custom-theme-name: "";
     in property <bool> signed-in: false;
+    in property <bool> session-expired: false;
     in-out property <string> cookie-text: "";
     in property <string> app-version: "0.1.0";
     in property <string> update-status-text: "Up to date";
@@ -79,6 +80,7 @@ export component SettingsView inherits VerticalLayout {
 
     session-panel := SessionSettings {
         signed-in: root.signed-in;
+        session-expired: root.session-expired;
         cookie-text <=> root.cookie-text;
         sign-in-submitted(text) => { root.sign-in-submitted(text); }
         sign-out => { root.sign-out(); }

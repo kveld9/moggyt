@@ -184,6 +184,7 @@ mod tests {
         assert_eq!(es.section_session, "Sesión");
         assert_eq!(es.status_signed_in, "Estado: Sesión iniciada");
         assert_eq!(es.status_anonymous, "Estado: Anónimo");
+        assert_eq!(es.status_session_expired, "Estado: Sesión vencida");
         assert_eq!(es.section_about, "Acerca de");
         assert_eq!(es.about_author, "Desarrollado por kveld9");
         assert_eq!(es.about_tagline, "Cliente nativo de YouTube Music escrito en Rust");
@@ -375,6 +376,7 @@ mod tests {
         assert_eq!(en.section_session, "Session");
         assert_eq!(en.status_signed_in, "Status: Signed in");
         assert_eq!(en.status_anonymous, "Status: Anonymous");
+        assert_eq!(en.status_session_expired, "Status: Session expired");
         assert_eq!(en.section_about, "About");
         assert_eq!(en.about_author, "Developed by kveld9");
         assert_eq!(en.about_tagline, "Native YouTube Music client written in Rust");

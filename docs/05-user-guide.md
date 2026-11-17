@@ -133,7 +133,8 @@ the Settings page, not here:
   `Your session expired. Paste fresh cookies in Settings.` next to the same `Open settings` button
   instead of empty sections. Pasted cookies replace the stored session and reload the library.
 - **Authentication**: handled in `Settings` > `Session`, where the cookie string is pasted, stored in the
-  OS credential store (keyring), and cleared on sign-out.
+  OS credential store (keyring), and cleared on sign-out. The paste field stays available while signed in, so
+  rejected cookies can be replaced without signing out; a rejected session shows `Status: Session expired`.
 - **Updates Section**:
   - Displays current update status (`Never checked`, `moggyt is up to date`, `Update available: <version>`, or
     `Update check failed (offline?)`).

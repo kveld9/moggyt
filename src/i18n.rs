@@ -336,6 +336,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Standard (AAC 130 kbps)", "Estándar (AAC 130 kbps)"),
     ("Stats", "Estadísticas"),
     ("Status: Anonymous", "Estado: Anónimo"),
+    ("Status: Session expired", "Estado: Sesión vencida"),
     ("Status: Signed in", "Estado: Sesión iniciada"),
     ("Stream Cache Limit", "Límite de caché de streams"),
     ("Swap", "Cambiar"),

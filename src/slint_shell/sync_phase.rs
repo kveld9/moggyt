@@ -27,12 +27,12 @@ fn is_rejected<T>(result: &Result<T, CatalogError>) -> bool {
 pub(crate) fn library_failure_phase(
     playlists: &Result<Vec<Playlist>, CatalogError>,
     albums: &Result<Vec<Album>, CatalogError>,
+    signed_in: bool,
 ) -> ViewPhase {
-    if is_rejected(playlists) || is_rejected(albums) {
-        ViewPhase::Expired
-    } else {
-        ViewPhase::Error
+    if !is_rejected(playlists) && !is_rejected(albums) {
+        return ViewPhase::Error;
     }
+    if signed_in { ViewPhase::Expired } else { ViewPhase::Empty }
 }
 
 impl SlintAppState {
@@ -42,7 +42,7 @@ impl SlintAppState {
         playlists: Result<Vec<Playlist>, CatalogError>,
         albums: Result<Vec<Album>, CatalogError>,
     ) {
-        let failure = library_failure_phase(&playlists, &albums);
+        let failure = library_failure_phase(&playlists, &albums, self.signed_in);
         match (playlists, albums) {
             (Ok(playlists), Ok(albums)) => {
                 let is_empty = playlists.is_empty() && albums.is_empty();
@@ -151,6 +151,7 @@ mod tests {
         use crate::slint_shell::test_support::test_wired;
 
         let mut state = test_wired();
+        state.signed_in = true;
         let empty_playlists: Result<Vec<crate::domain::Playlist>, CatalogError> = Ok(Vec::new());
         let empty_albums: Result<Vec<crate::domain::Album>, CatalogError> = Ok(Vec::new());
         state.apply_library_outcome(
@@ -169,7 +170,16 @@ mod tests {
         let playlists: Result<Vec<crate::domain::Playlist>, CatalogError> =
             Err(CatalogError::Transport);
         let albums: Result<Vec<crate::domain::Album>, CatalogError> = Ok(Vec::new());
-        assert_eq!(library_failure_phase(&playlists, &albums), ViewPhase::Error);
+        assert_eq!(library_failure_phase(&playlists, &albums, true), ViewPhase::Error);
+    }
+
+    #[test]
+    fn library_phase_ignores_rejection_when_signed_out() {
+        let playlists: Result<Vec<crate::domain::Playlist>, CatalogError> =
+            Err(CatalogError::Unauthenticated);
+        let albums: Result<Vec<crate::domain::Album>, CatalogError> = Ok(Vec::new());
+        assert_eq!(library_failure_phase(&playlists, &albums, false), ViewPhase::Empty);
+        assert_eq!(library_failure_phase(&playlists, &albums, true), ViewPhase::Expired);
     }
 
     #[test]
