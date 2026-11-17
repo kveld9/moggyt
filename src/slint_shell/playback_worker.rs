@@ -44,6 +44,7 @@ use crate::infra::{
     AudioBackend, AudioError, COVER_HIRES_MAX_PX, COVER_MAX_PX, Catalog, CatalogError, CoverCache,
     LyricLine, LyricOverrideDir, LyricsSource, Scrobbler, decode_cover, fetch_artwork,
 };
+use crate::slint_shell::library_fetch::LibraryFetch;
 use crate::slint_shell::platform::{CoverArtData, PresenceSnapshot};
 
 /// Target track metadata for background lyrics prefetching.
@@ -320,18 +321,25 @@ pub fn execute_detail<C: Catalog>(
     (generation, fetch_detail(browse_id, kind, catalog))
 }
 
-type PlaylistResult = Result<Vec<crate::domain::Playlist>, CatalogError>;
-type AlbumResult = Result<Vec<crate::domain::Album>, CatalogError>;
-
-/// Refreshes playlists and saved albums from catalog off the UI thread.
+/// Refreshes every library section from catalog off the UI thread.
 pub fn execute_refresh_library<C: Catalog>(
     generation: u64,
     catalog: &Arc<Mutex<C>>,
-) -> (u64, PlaylistResult, AlbumResult) {
+) -> (u64, LibraryFetch) {
     let guard = catalog.lock();
-    let playlists = guard.as_ref().map(|c| c.playlists()).unwrap_or(Err(CatalogError::Transport));
-    let albums = guard.as_ref().map(|c| c.saved_albums()).unwrap_or(Err(CatalogError::Transport));
-    (generation, playlists, albums)
+    let fetch = guard
+        .as_ref()
+        .map(|c| LibraryFetch {
+            playlists: c.playlists(),
+            albums: c.saved_albums(),
+            artists: c.library_artists(),
+        })
+        .unwrap_or(LibraryFetch {
+            playlists: Err(CatalogError::Transport),
+            albums: Err(CatalogError::Transport),
+            artists: Err(CatalogError::Transport),
+        });
+    (generation, fetch)
 }
 
 #[cfg(test)]

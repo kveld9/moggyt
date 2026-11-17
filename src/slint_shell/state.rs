@@ -9,9 +9,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::domain::{
-    Album, Detail, DetailKind, Palette, PlaybackPhase, PlaybackQueue, Playlist, RecentSearches,
-    SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer, ThemeId, Track,
-    extract_playlist_id,
+    Album, Artist, Detail, DetailKind, Palette, PlaybackPhase, PlaybackQueue, Playlist,
+    RecentSearches, SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer,
+    ThemeId, Track, extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
@@ -24,6 +24,7 @@ use crate::infra::{
 use crate::slint_shell::auto_skip::{SponsorFetchOutcome, SponsorRangeState};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
+use crate::slint_shell::library_fetch::LibraryFetch;
 use crate::slint_shell::library_filter::LibraryFilter;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::platform::rgba_to_image;
@@ -91,6 +92,7 @@ pub struct SlintAppState {
     pub search_top_result: Option<SearchResult>,
     pub library_playlists: Vec<Playlist>,
     pub library_albums: Vec<Album>,
+    pub library_artists: Vec<Artist>,
     pub(crate) library_filter: LibraryFilter,
     pub detail: Option<Detail>,
     pub detail_return: SlintPage,
@@ -253,13 +255,21 @@ impl SlintAppState {
         self.explore_loaded = true;
     }
 
-    /// Refreshes playlists, saved albums, and followed artists from catalog.
+    /// Refreshes library playlists, saved albums, and followed artists from catalog.
     pub fn refresh_library(&mut self) {
-        let (playlists, albums) = match self.catalog.lock() {
-            Ok(c) => (c.playlists(), c.saved_albums()),
-            Err(_) => (Err(CatalogError::Transport), Err(CatalogError::Transport)),
+        let fetch = match self.catalog.lock() {
+            Ok(c) => LibraryFetch {
+                playlists: c.playlists(),
+                albums: c.saved_albums(),
+                artists: c.library_artists(),
+            },
+            Err(_) => LibraryFetch {
+                playlists: Err(CatalogError::Transport),
+                albums: Err(CatalogError::Transport),
+                artists: Err(CatalogError::Transport),
+            },
         };
-        self.apply_library_outcome(playlists, albums);
+        self.apply_library_outcome(fetch);
     }
 
     /// Submits search query to catalog and wraps hits in a shelf.
@@ -483,6 +493,9 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     }
     fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
         (**self).saved_albums()
+    }
+    fn library_artists(&self) -> Result<Vec<Artist>, CatalogError> {
+        (**self).library_artists()
     }
     fn detail(&self, id: &str, k: DetailKind) -> Result<Option<Detail>, CatalogError> {
         (**self).detail(id, k)

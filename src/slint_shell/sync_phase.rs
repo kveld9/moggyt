@@ -2,9 +2,9 @@
 //!
 //! Hexagonal invariant: pure in-memory phase projections; no I/O.
 
-use crate::domain::{Album, Playlist};
 use crate::infra::CatalogError;
 use crate::slint_shell::MoggytWindow;
+use crate::slint_shell::library_fetch::LibraryFetch;
 use crate::slint_shell::state::SlintAppState;
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 
@@ -19,39 +19,30 @@ fn derive_library_phase(state: &SlintAppState) -> ViewPhase {
     }
 }
 
-fn is_rejected<T>(result: &Result<T, CatalogError>) -> bool {
-    matches!(result, Err(error) if *error == CatalogError::Unauthenticated)
-}
-
 /// Classifies a failed library query: a rejected session is distinct from a transport error.
-pub(crate) fn library_failure_phase(
-    playlists: &Result<Vec<Playlist>, CatalogError>,
-    albums: &Result<Vec<Album>, CatalogError>,
-    signed_in: bool,
-) -> ViewPhase {
-    if !is_rejected(playlists) && !is_rejected(albums) {
-        return ViewPhase::Error;
+pub(crate) fn library_failure_phase(error: CatalogError, signed_in: bool) -> ViewPhase {
+    match error {
+        CatalogError::Unauthenticated if !signed_in => ViewPhase::Empty,
+        CatalogError::Unauthenticated => ViewPhase::Expired,
+        CatalogError::Transport | CatalogError::Malformed => ViewPhase::Error,
     }
-    if signed_in { ViewPhase::Expired } else { ViewPhase::Empty }
 }
 
 impl SlintAppState {
     /// Applies library query outcomes to state, setting phase and preserving data on error.
-    pub(crate) fn apply_library_outcome(
-        &mut self,
-        playlists: Result<Vec<Playlist>, CatalogError>,
-        albums: Result<Vec<Album>, CatalogError>,
-    ) {
-        let failure = library_failure_phase(&playlists, &albums, self.signed_in);
-        match (playlists, albums) {
-            (Ok(playlists), Ok(albums)) => {
-                let is_empty = playlists.is_empty() && albums.is_empty();
-                self.library_playlists = playlists;
-                self.library_albums = albums;
+    pub(crate) fn apply_library_outcome(&mut self, fetch: LibraryFetch) {
+        match fetch.into_sections() {
+            Ok(sections) => {
+                let is_empty = sections.playlists.is_empty()
+                    && sections.albums.is_empty()
+                    && sections.artists.is_empty();
+                self.library_playlists = sections.playlists;
+                self.library_albums = sections.albums;
+                self.library_artists = sections.artists;
                 self.library_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
             }
-            _ => {
-                self.library_phase = failure;
+            Err(error) => {
+                self.library_phase = library_failure_phase(error, self.signed_in);
             }
         }
     }
@@ -152,34 +143,31 @@ mod tests {
 
         let mut state = test_wired();
         state.signed_in = true;
-        let empty_playlists: Result<Vec<crate::domain::Playlist>, CatalogError> = Ok(Vec::new());
-        let empty_albums: Result<Vec<crate::domain::Album>, CatalogError> = Ok(Vec::new());
-        state.apply_library_outcome(
-            Err(CatalogError::Unauthenticated),
-            Err(CatalogError::Unauthenticated),
-        );
+        state.apply_library_outcome(LibraryFetch {
+            playlists: Err(CatalogError::Unauthenticated),
+            albums: Err(CatalogError::Unauthenticated),
+            artists: Err(CatalogError::Unauthenticated),
+        });
         assert_eq!(state.library_phase, ViewPhase::Expired);
         observe_view_phases(&mut state);
         assert_eq!(state.library_phase, ViewPhase::Expired, "derivation must preserve Expired");
-        state.apply_library_outcome(empty_playlists, empty_albums);
+        state.apply_library_outcome(LibraryFetch {
+            playlists: Ok(Vec::new()),
+            albums: Ok(Vec::new()),
+            artists: Ok(Vec::new()),
+        });
         assert_eq!(state.library_phase, ViewPhase::Empty);
     }
 
     #[test]
     fn library_phase_error_for_transport_failure() {
-        let playlists: Result<Vec<crate::domain::Playlist>, CatalogError> =
-            Err(CatalogError::Transport);
-        let albums: Result<Vec<crate::domain::Album>, CatalogError> = Ok(Vec::new());
-        assert_eq!(library_failure_phase(&playlists, &albums, true), ViewPhase::Error);
+        assert_eq!(library_failure_phase(CatalogError::Transport, true), ViewPhase::Error);
     }
 
     #[test]
     fn library_phase_ignores_rejection_when_signed_out() {
-        let playlists: Result<Vec<crate::domain::Playlist>, CatalogError> =
-            Err(CatalogError::Unauthenticated);
-        let albums: Result<Vec<crate::domain::Album>, CatalogError> = Ok(Vec::new());
-        assert_eq!(library_failure_phase(&playlists, &albums, false), ViewPhase::Empty);
-        assert_eq!(library_failure_phase(&playlists, &albums, true), ViewPhase::Expired);
+        assert_eq!(library_failure_phase(CatalogError::Unauthenticated, false), ViewPhase::Empty);
+        assert_eq!(library_failure_phase(CatalogError::Unauthenticated, true), ViewPhase::Expired);
     }
 
     #[test]

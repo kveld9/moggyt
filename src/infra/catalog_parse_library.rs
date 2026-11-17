@@ -2,10 +2,10 @@
 
 use super::catalog_parse_album::{album_credits, apply_credits};
 use super::catalog_parse_common::{
-    best_thumbnail, browse_id, parse_track_count, parse_two_row, two_row_title,
+    best_thumbnail, browse_id, flex_text, parse_track_count, parse_two_row, two_row_title,
 };
 use super::catalog_parse_detail::detail_sections;
-use crate::domain::{Album, Playlist};
+use crate::domain::{Album, Artist, Playlist};
 use serde_json::Value;
 
 /// Renderer keys whose payload wraps a deeper library node or an item array.
@@ -113,6 +113,23 @@ fn parse_library_album_item(item: &Value) -> Option<Album> {
 /// Parses saved albums from catalog API browse response payload.
 pub fn parse_library_albums(value: &Value) -> Vec<Album> {
     collect_library_items(value).into_iter().filter_map(parse_library_album_item).collect()
+}
+
+fn parse_library_artist_item(item: &Value) -> Option<Artist> {
+    let renderer = item.get("musicResponsiveListItemRenderer").unwrap_or(item);
+    let id = renderer.pointer("/navigationEndpoint/browseEndpoint/browseId")?.as_str()?.trim();
+    if id.is_empty() {
+        return None;
+    }
+    let name = flex_text(renderer, 0)?;
+    let subscribers = flex_text(renderer, 1);
+    let artwork = best_thumbnail(renderer);
+    Some(Artist::new(id, &name, artwork).with_subscribers(subscribers))
+}
+
+/// Parses followed artists from catalog API browse response payload.
+pub fn parse_library_artists(value: &Value) -> Vec<Artist> {
+    collect_library_items(value).into_iter().filter_map(parse_library_artist_item).collect()
 }
 
 /// Returns true when the catalog answered with an anonymous library page.
@@ -244,6 +261,40 @@ mod tests {
                 .with_artist_id(Some("UC_saved_artist".to_owned()))
                 .with_release_type(Some("Album".to_owned()))
         );
+    }
+
+    #[test]
+    fn parse_library_artists_reads_the_shelf_items() {
+        let payload = serde_json::json!({ "sectionListRenderer": { "contents": [{
+            "musicShelfRenderer": { "contents": [{
+                "musicResponsiveListItemRenderer": {
+                    "thumbnail": { "musicThumbnailRenderer": { "thumbnail": { "thumbnails": [
+                        { "url": "https://yt3.example.test/artist=w120", "width": 120, "height": 120 }
+                    ] } } },
+                    "flexColumns": [
+                        { "musicResponsiveListItemFlexColumnRenderer": { "text": {
+                            "runs": [{ "text": "Followed Artist" }]
+                        } } },
+                        { "musicResponsiveListItemFlexColumnRenderer": { "text": {
+                            "runs": [{ "text": "1.49 K subscribers" }]
+                        } } }
+                    ],
+                    "navigationEndpoint": { "browseEndpoint": {
+                        "browseId": "UC_followed",
+                        "browseEndpointContextSupportedConfigs": {
+                            "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_ARTIST" }
+                        }
+                    } }
+                }
+            }] }
+        }] } });
+
+        let artists = parse_library_artists(&payload);
+        assert_eq!(artists.len(), 1);
+        assert_eq!(artists[0].id, "UC_followed");
+        assert_eq!(artists[0].name, "Followed Artist");
+        assert_eq!(artists[0].subscribers.as_deref(), Some("1.49 K subscribers"));
+        assert!(artists[0].artwork.is_some());
     }
 
     #[test]

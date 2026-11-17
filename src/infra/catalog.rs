@@ -1,7 +1,8 @@
 //! Catalog port and deterministic stub (no network).
 
 use crate::domain::{
-    Album, Detail, DetailKind, LyricsSnippet, Playlist, SearchQuery, SearchResult, Shelf, Track,
+    Album, Artist, Detail, DetailKind, LyricsSnippet, Playlist, SearchQuery, SearchResult, Shelf,
+    Track,
 };
 
 /// Failure of a catalog request at the port boundary.
@@ -68,6 +69,9 @@ pub trait Catalog {
     /// Returns albums saved to the user's library.
     fn saved_albums(&self) -> Result<Vec<Album>, CatalogError>;
 
+    /// Returns artists the user follows.
+    fn library_artists(&self) -> Result<Vec<Artist>, CatalogError>;
+
     /// Returns detail view for `browse_id` and `kind` (Ok(None) on blank id).
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError>;
 
@@ -122,6 +126,9 @@ mod tests {
             Ok(Vec::new())
         }
         fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
+            Ok(Vec::new())
+        }
+        fn library_artists(&self) -> Result<Vec<Artist>, CatalogError> {
             Ok(Vec::new())
         }
         fn detail(

@@ -6,7 +6,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
+use crate::domain::{
+    Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
+};
 use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, AudioError, AudioStub, Catalog, CatalogError, CatalogStub, LrclibStub,
@@ -86,6 +88,10 @@ impl Catalog for LocaleTrackingCatalog {
         Ok(Vec::new())
     }
 
+    fn library_artists(&self) -> Result<Vec<Artist>, CatalogError> {
+        Ok(Vec::new())
+    }
+
     fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         Ok(None)
     }
@@ -101,6 +107,7 @@ impl Catalog for LocaleTrackingCatalog {
 pub struct MockLibraryCatalog {
     pub playlists_res: Result<Vec<Playlist>, CatalogError>,
     pub albums_res: Result<Vec<Album>, CatalogError>,
+    pub artists_res: Result<Vec<Artist>, CatalogError>,
     pub search_res: Result<Vec<Track>, CatalogError>,
     pub search_filtered_res: Result<Vec<SearchResult>, CatalogError>,
     pub detail_res: Result<Option<Detail>, CatalogError>,
@@ -120,6 +127,7 @@ impl Default for MockLibraryCatalog {
         Self {
             playlists_res: Ok(Vec::new()),
             albums_res: Ok(Vec::new()),
+            artists_res: Ok(Vec::new()),
             search_res: Ok(Vec::new()),
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
@@ -141,6 +149,7 @@ impl MockLibraryCatalog {
         Self {
             playlists_res: playlists,
             albums_res: albums,
+            artists_res: Ok(Vec::new()),
             search_res: Ok(Vec::new()),
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
@@ -223,6 +232,9 @@ impl Catalog for MockLibraryCatalog {
     }
     fn saved_albums(&self) -> Result<Vec<Album>, CatalogError> {
         self.albums_res.clone()
+    }
+    fn library_artists(&self) -> Result<Vec<Artist>, CatalogError> {
+        self.artists_res.clone()
     }
     fn detail(&self, id: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
         if let Some(detail) = self.detail_by_id.get(id) {
