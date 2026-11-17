@@ -129,6 +129,9 @@ the Settings page, not here:
 
 - **Not signed in**: shows `Sign in from Settings to load your library.` next to an `Open settings`
   button that switches to the Settings page, and hides the playlist and album sections.
+- **Session expired**: when YouTube rejects the stored cookies, the page shows
+  `Your session expired. Paste fresh cookies in Settings.` next to the same `Open settings` button
+  instead of empty sections. Pasted cookies replace the stored session and reload the library.
 - **Authentication**: handled in `Settings` > `Session`, where the cookie string is pasted, stored in the
   OS credential store (keyring), and cleared on sign-out.
 - **Updates Section**:

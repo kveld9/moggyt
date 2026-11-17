@@ -6,6 +6,7 @@ import { IconLibrary } from "../icons.slint";
 
 export component LibraryView inherits VerticalLayout {
     in property <bool> signed-in: false;
+    in property <bool> session-expired: false;
     in property <[LibraryItemData]> playlists: [];
     in property <[LibraryItemData]> albums: [];
     callback playlist-selected(int);
@@ -15,7 +16,7 @@ export component LibraryView inherits VerticalLayout {
     spacing: 16px;
     alignment: start;
 
-    if !root.signed-in : VerticalLayout {
+    if !root.signed-in || root.session-expired : VerticalLayout {
         alignment: center;
         padding-top: 48px;
         padding-bottom: 48px;
@@ -35,7 +36,9 @@ export component LibraryView inherits VerticalLayout {
             }
 
             Text {
-                text: Labels.library-signed-out-hint;
+                text: root.session-expired
+                    ? Labels.library-session-expired-hint
+                    : Labels.library-signed-out-hint;
                 color: Theme.secondary;
                 font-size: 14px;
                 horizontal-alignment: center;
@@ -68,7 +71,7 @@ export component LibraryView inherits VerticalLayout {
         }
     }
 
-    if root.signed-in : HorizontalLayout {
+    if root.signed-in && !root.session-expired : HorizontalLayout {
         alignment: end;
 
         Rectangle {
@@ -93,7 +96,7 @@ export component LibraryView inherits VerticalLayout {
         }
     }
 
-    if root.signed-in : VerticalLayout {
+    if root.signed-in && !root.session-expired : VerticalLayout {
         spacing: 6px;
         Text { text: Labels.section-playlists-label; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.playlists.length == 0 : Text { text: Labels.empty-playlists-text; color: Theme.secondary; font-size: 13px; }
@@ -107,7 +110,7 @@ export component LibraryView inherits VerticalLayout {
         }
     }
 
-    if root.signed-in : VerticalLayout {
+    if root.signed-in && !root.session-expired : VerticalLayout {
         spacing: 6px;
         Text { text: Labels.section-albums-label; color: Theme.text; font-size: 16px; font-weight: 700; }
         if root.albums.length == 0 : Text { text: Labels.empty-albums-text; color: Theme.secondary; font-size: 13px; }

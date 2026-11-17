@@ -29,7 +29,7 @@ use crate::slint_shell::player_bar::mode_to_index;
 use crate::slint_shell::search::{SearchRow, format_duration};
 use crate::slint_shell::state::{PersistenceError, PersistenceStore, SlintAppState};
 use crate::slint_shell::theme::{apply_palette, theme_to_index};
-use crate::slint_shell::view_phase::ViewId;
+use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{
     DetailUi, LibraryItemData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow,
     PlaybackUi, PlayerUi, ShelfData, SleepTimerUi, TrackRowData,
@@ -92,6 +92,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_stream_cache_limit_mb(state.stream_cache_limit_mb as i32);
     window.set_cover_cache_limit_mb(state.cover_cache_limit_mb as i32);
     window.set_signed_in(state.signed_in);
+    window.set_library_session_expired(state.library_phase == ViewPhase::Expired);
     window.set_app_version(GithubUpdater::current_version().into());
     sync_update_status(window, state);
 

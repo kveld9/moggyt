@@ -9,6 +9,7 @@ pub enum ViewPhase {
     Ready,
     Empty,
     Error,
+    Expired,
 }
 
 /// Identifier for primary navigation container views.
@@ -30,6 +31,7 @@ impl ViewPhase {
             ViewPhase::Ready => 2,
             ViewPhase::Empty => 3,
             ViewPhase::Error => 4,
+            ViewPhase::Expired => 5,
         }
     }
 
@@ -63,6 +65,7 @@ mod tests {
         assert_eq!(ViewPhase::Ready.to_index(), 2);
         assert_eq!(ViewPhase::Empty.to_index(), 3);
         assert_eq!(ViewPhase::Error.to_index(), 4);
+        assert_eq!(ViewPhase::Expired.to_index(), 5);
     }
 
     #[test]
@@ -73,6 +76,7 @@ mod tests {
             ViewPhase::Ready,
             ViewPhase::Empty,
             ViewPhase::Error,
+            ViewPhase::Expired,
         ];
 
         for next in all_phases {
@@ -105,7 +109,8 @@ mod tests {
         assert_eq!(ViewPhase::Error.transition(ViewPhase::Ready), ViewPhase::Ready);
         assert_eq!(ViewPhase::Error.transition(ViewPhase::Empty), ViewPhase::Empty);
 
-        let settled_phases = [ViewPhase::Ready, ViewPhase::Empty, ViewPhase::Error];
+        let settled_phases =
+            [ViewPhase::Ready, ViewPhase::Empty, ViewPhase::Error, ViewPhase::Expired];
         for current in settled_phases {
             for next in all_phases {
                 assert_eq!(current.transition(next), next);

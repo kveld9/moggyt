@@ -123,6 +123,10 @@ mod tests {
             es.library_signed_out_hint,
             "Inicia sesión desde Ajustes para cargar tu biblioteca."
         );
+        assert_eq!(
+            es.library_session_expired_hint,
+            "Tu sesión venció. Pegá cookies nuevas en Ajustes."
+        );
         assert_eq!(es.open_settings_label, "Abrir ajustes");
         assert_eq!(es.section_playlists, "Listas de reproducción");
         assert_eq!(es.empty_playlists, "No hay listas de reproducción.");
@@ -310,6 +314,10 @@ mod tests {
         assert_eq!(en.session_signed_in_hint, "Signed in: library unlocked");
         assert_eq!(en.sign_out, "Sign out");
         assert_eq!(en.library_signed_out_hint, "Sign in from Settings to load your library.");
+        assert_eq!(
+            en.library_session_expired_hint,
+            "Your session expired. Paste fresh cookies in Settings."
+        );
         assert_eq!(en.open_settings_label, "Open settings");
         assert_eq!(en.section_playlists, "Playlists");
         assert_eq!(en.empty_playlists, "No playlists found.");
