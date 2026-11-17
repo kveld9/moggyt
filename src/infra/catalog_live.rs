@@ -192,6 +192,11 @@ impl Catalog for LiveCatalog {
         self.client.library_podcasts()
     }
 
+    /// Returns followed profiles.
+    fn library_profiles(&self) -> Result<Vec<Artist>, CatalogError> {
+        self.client.library_profiles()
+    }
+
     /// Returns detail view for `browse_id` and `kind`.
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         self.client.detail(browse_id, kind)

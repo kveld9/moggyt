@@ -194,7 +194,8 @@ pub fn resolve_subject(state: &SlintAppState, target: ContextTarget) -> Option<C
         ContextSurface::LibraryPlaylist
         | ContextSurface::LibraryAlbum
         | ContextSurface::LibraryArtist
-        | ContextSurface::LibraryPodcast => library_subject(state, target),
+        | ContextSurface::LibraryPodcast
+        | ContextSurface::LibraryProfile => library_subject(state, target),
     }
 }
 
@@ -242,6 +243,10 @@ fn library_subject(state: &SlintAppState, target: ContextTarget) -> Option<Conte
         ContextSurface::LibraryPodcast => {
             let podcast = state.library_podcasts.get(target.index)?;
             Some(container_subject(&podcast.id, DetailKind::Playlist, None))
+        }
+        ContextSurface::LibraryProfile => {
+            let profile = state.library_profiles.get(target.index)?;
+            Some(container_subject(&profile.id, DetailKind::Artist, None))
         }
         _ => None,
     }

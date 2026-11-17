@@ -368,6 +368,17 @@ fn wire_library_callbacks(
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
     let tx = worker_tx.clone();
+    window.on_profile_selected(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        if let Some(profile) = st.library_profiles.get(idx as usize).cloned() {
+            open_detail_async(&win, &mut st, &profile.id, DetailKind::Artist, &tx);
+        }
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_podcast_selected(move |idx| {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();

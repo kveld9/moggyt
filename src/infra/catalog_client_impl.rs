@@ -10,16 +10,16 @@ use super::catalog_parse_explore::parse_explore_all;
 use super::catalog_parse_home::parse_home_all;
 use super::catalog_parse_library::{
     parse_library_albums, parse_library_artists, parse_library_playlists, parse_library_podcasts,
-    parse_library_songs, payload_is_logged_out,
+    parse_library_profiles, parse_library_songs, payload_is_logged_out,
 };
 use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::parse_search_tracks;
 use super::catalog_requests::{
     CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
     LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_ARTISTS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID,
-    LIBRARY_PODCASTS_BROWSE_ID, LIBRARY_SONGS_BROWSE_ID, browse_body, browse_body_with_params,
-    browse_url, continuation_body, next_body, next_url, search_body, search_body_with_params,
-    search_filter_params,
+    LIBRARY_PODCASTS_BROWSE_ID, LIBRARY_PROFILES_BROWSE_ID, LIBRARY_SONGS_BROWSE_ID, browse_body,
+    browse_body_with_params, browse_url, continuation_body, next_body, next_url, search_body,
+    search_body_with_params, search_filter_params,
 };
 use crate::domain::{
     Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
@@ -500,6 +500,18 @@ impl CatalogClient {
             .map_err(|_| CatalogError::Transport)?;
         let podcasts = parse_library_podcasts(&payload);
         validate_library_payload(podcasts, &payload)
+    }
+
+    /// Queries the browse endpoint for the user's followed profiles.
+    pub fn library_profiles(&self) -> Result<Vec<Artist>, CatalogError> {
+        if !self.is_authenticated() {
+            return Err(CatalogError::Unauthenticated);
+        }
+        let payload = self
+            .library_browse_payload(LIBRARY_PROFILES_BROWSE_ID)
+            .map_err(|_| CatalogError::Transport)?;
+        let profiles = parse_library_profiles(&payload);
+        validate_library_payload(profiles, &payload)
     }
 
     /// Converts this catalog API client into a [`LiveCatalog`] adapter.

@@ -293,6 +293,22 @@ fn artist_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
         .collect()
 }
 
+fn profile_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
+    state
+        .library_profiles
+        .iter()
+        .enumerate()
+        .map(|(index, profile)| ExploreCardData {
+            index: index as i32,
+            title: profile.name.clone().into(),
+            subtitle: profile.subscribers.clone().unwrap_or_default().into(),
+            has_cover: profile.artwork.is_some(),
+            cover: resolve_row_cover_image(profile.artwork.as_deref(), &state.search_covers),
+            tile_color: tile_color_for(&profile.name),
+        })
+        .collect()
+}
+
 fn podcast_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
     state
         .library_podcasts
@@ -331,6 +347,9 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
 
     let podcast_rows = chunk_card_rows(podcast_cards(state), state.explore_columns);
     window.set_library_podcast_rows(ModelRc::new(VecModel::from(podcast_rows)));
+
+    let profile_rows = chunk_card_rows(profile_cards(state), state.explore_columns);
+    window.set_library_profile_rows(ModelRc::new(VecModel::from(profile_rows)));
 
     window.set_library_song_rows(ModelRc::new(VecModel::from(library_song_rows(state))));
 

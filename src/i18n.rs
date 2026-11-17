@@ -221,6 +221,8 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("No artists found.", "No se encontraron artistas."),
     ("No liked songs.", "No hay canciones que te gusten."),
     ("No podcasts found.", "No se encontraron podcasts."),
+    ("No profiles found.", "No se encontraron perfiles."),
+    ("Profiles", "Perfiles"),
     ("No alternatives found", "No se encontraron alternativas"),
     ("No artist found", "No se encontró el artista"),
     ("No cover", "Sin portada"),

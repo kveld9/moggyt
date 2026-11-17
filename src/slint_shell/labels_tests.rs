@@ -99,6 +99,8 @@ mod tests {
         assert_eq!(es.filter_albums, "Álbumes");
         assert_eq!(es.filter_artists, "Artistas");
         assert_eq!(es.filter_podcasts, "Podcasts");
+        assert_eq!(es.filter_profiles, "Perfiles");
+        assert_eq!(es.empty_profiles, "No se encontraron perfiles.");
         assert_eq!(es.filter_playlists, "Listas de reproducción");
         assert_eq!(es.search_empty, "No se encontraron resultados.");
         assert_eq!(es.recent_searches_title, "Búsquedas recientes");
@@ -301,6 +303,8 @@ mod tests {
         assert_eq!(en.filter_albums, "Albums");
         assert_eq!(en.filter_artists, "Artists");
         assert_eq!(en.filter_podcasts, "Podcasts");
+        assert_eq!(en.filter_profiles, "Profiles");
+        assert_eq!(en.empty_profiles, "No profiles found.");
         assert_eq!(en.filter_playlists, "Playlists");
         assert_eq!(en.search_empty, "No results found.");
         assert_eq!(en.recent_searches_title, "Recent searches");

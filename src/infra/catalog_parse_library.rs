@@ -132,6 +132,11 @@ pub fn parse_library_artists(value: &Value) -> Vec<Artist> {
     collect_library_items(value).into_iter().filter_map(parse_library_artist_item).collect()
 }
 
+/// Parses followed profiles (channels) from catalog API browse response payload.
+pub fn parse_library_profiles(value: &Value) -> Vec<Artist> {
+    collect_library_items(value).into_iter().filter_map(parse_library_artist_item).collect()
+}
+
 /// Parses library podcasts from catalog API browse response payload.
 ///
 /// The podcasts grid opens with the catalog's "Add podcast" card, which carries no
@@ -321,6 +326,38 @@ mod tests {
         assert_eq!(artists[0].name, "Followed Artist");
         assert_eq!(artists[0].subscribers.as_deref(), Some("1.49 K subscribers"));
         assert!(artists[0].artwork.is_some());
+    }
+
+    #[test]
+    fn parse_library_profiles_reads_the_channel_shelf() {
+        let payload = serde_json::json!({ "sectionListRenderer": { "contents": [{
+            "musicShelfRenderer": { "contents": [{
+                "musicResponsiveListItemRenderer": {
+                    "thumbnail": { "musicThumbnailRenderer": { "thumbnail": { "thumbnails": [
+                        { "url": "https://yt3.example.test/channel=w120", "width": 120, "height": 120 }
+                    ] } } },
+                    "flexColumns": [
+                        { "musicResponsiveListItemFlexColumnRenderer": { "text": {
+                            "runs": [{ "text": "Followed Profile" }]
+                        } } },
+                        { "musicResponsiveListItemFlexColumnRenderer": { "text": {
+                            "runs": [{ "text": "149 K subscribers" }]
+                        } } }
+                    ],
+                    "navigationEndpoint": { "browseEndpoint": {
+                        "browseId": "UC_profile",
+                        "browseEndpointContextSupportedConfigs": {
+                            "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL" }
+                        }
+                    } }
+                }
+            }] }
+        }] } });
+        let profiles = parse_library_profiles(&payload);
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].id, "UC_profile");
+        assert_eq!(profiles[0].name, "Followed Profile");
+        assert_eq!(profiles[0].subscribers.as_deref(), Some("149 K subscribers"));
     }
 
     #[test]
