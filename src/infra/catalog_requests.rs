@@ -25,6 +25,9 @@ pub const LIBRARY_SONGS_BROWSE_ID: &str = "FEmusic_liked_videos";
 /// Library podcasts browse identifier for YouTube Music.
 pub const LIBRARY_PODCASTS_BROWSE_ID: &str = "FEmusic_library_non_music_audio_list";
 
+/// Library profiles (followed channels) browse identifier for YouTube Music.
+pub const LIBRARY_PROFILES_BROWSE_ID: &str = "FEmusic_library_non_music_audio_channels_list";
+
 /// Browse id of the signed-in account's listening history.
 pub const HISTORY_BROWSE_ID: &str = "FEmusic_history";
 

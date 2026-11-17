@@ -300,7 +300,8 @@ fn apply_async_library_outcome(
                 && sections.songs.is_empty()
                 && sections.albums.is_empty()
                 && sections.artists.is_empty()
-                && sections.podcasts.is_empty();
+                && sections.podcasts.is_empty()
+                && sections.profiles.is_empty();
             state.library_playlists = with_history_entry(
                 merge_local_library(&sections.playlists, &local),
                 state.signed_in,
@@ -310,6 +311,7 @@ fn apply_async_library_outcome(
             state.library_albums = sections.albums;
             state.library_artists = sections.artists;
             state.library_podcasts = sections.podcasts;
+            state.library_profiles = sections.profiles;
             state.library_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
             true
         }
@@ -706,6 +708,7 @@ mod tests {
                 albums: Err(CatalogError::Transport),
                 artists: Err(CatalogError::Transport),
                 podcasts: Err(CatalogError::Transport),
+                profiles: Err(CatalogError::Transport),
             },
         );
         assert!(!applied_stale);
@@ -721,6 +724,7 @@ mod tests {
                 albums: Err(CatalogError::Transport),
                 artists: Err(CatalogError::Transport),
                 podcasts: Err(CatalogError::Transport),
+                profiles: Err(CatalogError::Transport),
             },
         );
         assert!(!applied_err);
@@ -736,6 +740,7 @@ mod tests {
                 albums: Ok(Vec::new()),
                 artists: Ok(Vec::new()),
                 podcasts: Ok(Vec::new()),
+                profiles: Ok(Vec::new()),
             },
         ));
         assert_eq!(state.library_phase, ViewPhase::Empty);

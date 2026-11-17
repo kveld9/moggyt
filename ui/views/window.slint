@@ -63,10 +63,9 @@ export component MoggytWindow inherits Window {
     in-out property <[LyricLineData]> lyrics-lines: [];
     in-out property <int> active-lyric-index: -1;
     in-out property <[ExploreCardRow]> library-playlist-rows: [];
-    in-out property <[ExploreCardRow]> library-album-rows: [];
-    in-out property <[ExploreCardRow]> library-artist-rows: [];
-    in-out property <[TrackRowData]> library-song-rows: [];
-    in-out property <[ExploreCardRow]> library-podcast-rows: []; in-out property <int> library-filter: 0;
+    in-out property <[ExploreCardRow]> library-album-rows: []; in-out property <[ExploreCardRow]> library-artist-rows: [];
+    in-out property <[TrackRowData]> library-song-rows: []; in-out property <[ExploreCardRow]> library-podcast-rows: [];
+    in-out property <[ExploreCardRow]> library-profile-rows: []; in-out property <int> library-filter: 0;
     in-out property <bool> detail-has-detail: false;
     in-out property <bool> detail-has-artwork: false;
     in-out property <string> detail-title: "";
@@ -157,7 +156,7 @@ export component MoggytWindow inherits Window {
     callback album-selected(int);
     callback artist-selected(int);
     callback library-song-selected(int);
-    callback podcast-selected(int);
+    callback podcast-selected(int); callback profile-selected(int);
     callback library-chip-selected(int);
     callback detail-track-selected(int);
     callback detail-play();
@@ -224,7 +223,7 @@ export component MoggytWindow inherits Window {
                     library-album-rows: root.library-album-rows;
                     library-artist-rows: root.library-artist-rows;
                     library-song-rows: root.library-song-rows;
-                    library-podcast-rows: root.library-podcast-rows;
+                    library-podcast-rows: root.library-podcast-rows; library-profile-rows: root.library-profile-rows;
                     library-filter: root.library-filter;
                     library-session-expired: root.library-session-expired;
                     detail-has-detail: root.detail-has-detail;
@@ -292,6 +291,7 @@ export component MoggytWindow inherits Window {
                     artist-selected(idx) => { root.artist-selected(idx); }
                     library-song-selected(idx) => { root.library-song-selected(idx); }
                     podcast-selected(idx) => { root.podcast-selected(idx); }
+                    profile-selected(idx) => { root.profile-selected(idx); }
                     library-chip-selected(idx) => { root.library-chip-selected(idx); }
                     detail-track-selected(idx) => { root.detail-track-selected(idx); }
                     detail-play => { root.detail-play(); }

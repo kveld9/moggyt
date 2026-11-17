@@ -11,6 +11,7 @@ pub struct LibraryFetch {
     pub albums: Result<Vec<Album>, CatalogError>,
     pub artists: Result<Vec<Artist>, CatalogError>,
     pub podcasts: Result<Vec<Playlist>, CatalogError>,
+    pub profiles: Result<Vec<Artist>, CatalogError>,
 }
 
 /// Successful library contents with every section resolved.
@@ -21,6 +22,7 @@ pub(crate) struct LibrarySections {
     pub albums: Vec<Album>,
     pub artists: Vec<Artist>,
     pub podcasts: Vec<Playlist>,
+    pub profiles: Vec<Artist>,
 }
 
 impl LibraryFetch {
@@ -32,6 +34,7 @@ impl LibraryFetch {
             albums: self.albums?,
             artists: self.artists?,
             podcasts: self.podcasts?,
+            profiles: self.profiles?,
         })
     }
 }
@@ -40,25 +43,16 @@ impl LibraryFetch {
 mod tests {
     use super::*;
 
-    fn fetch(
-        playlists: Result<Vec<Playlist>, CatalogError>,
-        songs: Result<Vec<Track>, CatalogError>,
-        albums: Result<Vec<Album>, CatalogError>,
-        artists: Result<Vec<Artist>, CatalogError>,
-        podcasts: Result<Vec<Playlist>, CatalogError>,
-    ) -> LibraryFetch {
-        LibraryFetch { playlists, songs, albums, artists, podcasts }
-    }
-
     #[test]
     fn into_sections_collects_every_section() {
-        let sections = fetch(
-            Ok(vec![Playlist::new("p1", "Mix", 2, None)]),
-            Ok(vec![Track::new("t1", "Song", "Artist")]),
-            Ok(Vec::new()),
-            Ok(vec![Artist::new("a1", "Artist", None)]),
-            Ok(Vec::new()),
-        )
+        let sections = LibraryFetch {
+            playlists: Ok(vec![Playlist::new("p1", "Mix", 2, None)]),
+            songs: Ok(vec![Track::new("t1", "Song", "Artist")]),
+            albums: Ok(Vec::new()),
+            artists: Ok(vec![Artist::new("a1", "Artist", None)]),
+            podcasts: Ok(Vec::new()),
+            profiles: Ok(Vec::new()),
+        }
         .into_sections()
         .expect("sections");
         assert_eq!(sections.playlists.len(), 1);
@@ -68,13 +62,14 @@ mod tests {
 
     #[test]
     fn into_sections_reports_the_first_failure() {
-        let error = fetch(
-            Ok(Vec::new()),
-            Ok(Vec::new()),
-            Err(CatalogError::Unauthenticated),
-            Err(CatalogError::Transport),
-            Ok(Vec::new()),
-        )
+        let error = LibraryFetch {
+            playlists: Ok(Vec::new()),
+            songs: Ok(Vec::new()),
+            albums: Err(CatalogError::Unauthenticated),
+            artists: Err(CatalogError::Transport),
+            podcasts: Ok(Vec::new()),
+            profiles: Ok(Vec::new()),
+        }
         .into_sections()
         .expect_err("failure");
         assert_eq!(error, CatalogError::Unauthenticated);

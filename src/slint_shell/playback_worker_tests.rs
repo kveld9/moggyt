@@ -167,6 +167,9 @@ impl Catalog for VideoTrackSearchCatalog {
     fn library_podcasts(&self) -> Result<Vec<crate::domain::Playlist>, CatalogError> {
         Ok(Vec::new())
     }
+    fn library_profiles(&self) -> Result<Vec<crate::domain::Artist>, CatalogError> {
+        Ok(Vec::new())
+    }
     fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
         Ok(None)
     }
@@ -236,6 +239,9 @@ impl Catalog for BadgeVideoSearchCatalog {
         Ok(Vec::new())
     }
     fn library_podcasts(&self) -> Result<Vec<crate::domain::Playlist>, CatalogError> {
+        Ok(Vec::new())
+    }
+    fn library_profiles(&self) -> Result<Vec<crate::domain::Artist>, CatalogError> {
         Ok(Vec::new())
     }
     fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {

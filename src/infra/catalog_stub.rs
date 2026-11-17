@@ -199,6 +199,10 @@ impl Catalog for CatalogStub {
         Ok(Vec::new())
     }
 
+    fn library_profiles(&self) -> Result<Vec<Artist>, CatalogError> {
+        Ok(Vec::new())
+    }
+
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         let trimmed = browse_id.trim();
         if trimmed.is_empty() {
