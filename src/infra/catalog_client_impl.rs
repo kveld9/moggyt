@@ -8,7 +8,9 @@ use super::catalog_parse_continuation::parse_paginated_detail;
 use super::catalog_parse_detail::parse_detail_all;
 use super::catalog_parse_explore::parse_explore_all;
 use super::catalog_parse_home::parse_home_all;
-use super::catalog_parse_library::{parse_library_albums, parse_library_playlists};
+use super::catalog_parse_library::{
+    parse_library_albums, parse_library_playlists, payload_is_logged_out,
+};
 use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::parse_search_tracks;
 use super::catalog_requests::{
@@ -65,6 +67,13 @@ fn validate_library_result<T>(items: Vec<T>, payload: &Value) -> Result<Vec<T>, 
     } else {
         Err(CatalogError::Malformed)
     }
+}
+
+fn validate_library_payload<T>(items: Vec<T>, payload: &Value) -> Result<Vec<T>, CatalogError> {
+    if payload_is_logged_out(payload) {
+        return Err(CatalogError::Unauthenticated);
+    }
+    validate_library_result(items, payload)
 }
 
 fn has_search_section(value: &Value) -> bool {
@@ -387,7 +396,7 @@ impl CatalogClient {
             .library_browse_payload(LIBRARY_PLAYLISTS_BROWSE_ID)
             .map_err(|_| CatalogError::Transport)?;
         let playlists = parse_library_playlists(&payload);
-        validate_library_result(playlists, &payload)
+        validate_library_payload(playlists, &payload)
     }
 
     /// Queries the browse endpoint for user's saved albums.
@@ -399,7 +408,7 @@ impl CatalogClient {
             .library_browse_payload(LIBRARY_ALBUMS_BROWSE_ID)
             .map_err(|_| CatalogError::Transport)?;
         let albums = parse_library_albums(&payload);
-        validate_library_result(albums, &payload)
+        validate_library_payload(albums, &payload)
     }
 
     /// Converts this catalog API client into a [`LiveCatalog`] adapter.
@@ -483,6 +492,21 @@ mod tests {
             validate_library_result(malformed_playlists, &malformed_payload),
             Err(CatalogError::Malformed)
         );
+    }
+
+    #[test]
+    fn logged_out_library_payload_is_unauthenticated() {
+        let raw = include_str!("../../tests/fixtures/catalog_library_logged_out.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+
+        let playlists = parse_library_playlists(&payload);
+        assert_eq!(
+            validate_library_payload(playlists, &payload),
+            Err(CatalogError::Unauthenticated)
+        );
+
+        let albums = parse_library_albums(&payload);
+        assert_eq!(validate_library_payload(albums, &payload), Err(CatalogError::Unauthenticated));
     }
 
     #[test]

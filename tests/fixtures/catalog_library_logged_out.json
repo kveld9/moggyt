@@ -1,0 +1,77 @@
+{
+  "responseContext": {
+    "visitorData": "CgtZWGRSTnkyS3YwNCjSoe7XBjIKCgJBUhIEGgAgCw%3D%3D",
+    "serviceTrackingParams": [
+      {
+        "service": "GFEEDBACK",
+        "params": [
+          { "key": "browse_id", "value": "FEmusic_liked_playlists" },
+          { "key": "browse_id_prefix", "value": "" },
+          { "key": "logged_in", "value": "0" }
+        ]
+      },
+      {
+        "service": "CSI",
+        "params": [
+          { "key": "c", "value": "WEB_REMIX" },
+          { "key": "cver", "value": "1.20251022.01.00" },
+          { "key": "yt_li", "value": "0" }
+        ]
+      }
+    ],
+    "responseId": "IhMI0fGstNGNmAMVk0xIAB1ukyoX"
+  },
+  "contents": {
+    "singleColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "selected": true,
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "itemSectionRenderer": {
+                      "contents": [
+                        {
+                          "messageRenderer": {
+                            "text": {
+                              "runs": [{ "text": "Looking for what you liked?" }]
+                            },
+                            "icon": { "iconType": "LIKE" },
+                            "button": {
+                              "buttonRenderer": {
+                                "style": "STYLE_DEFAULT",
+                                "isDisabled": false,
+                                "text": {
+                                  "runs": [{ "text": "Sign in" }]
+                                },
+                                "navigationEndpoint": {
+                                  "signInEndpoint": { "hack": true }
+                                }
+                              }
+                            },
+                            "subtext": {
+                              "messageSubtextRenderer": {
+                                "text": {
+                                  "runs": [
+                                    { "text": "Sign in to listen to your favorite songs" }
+                                  ]
+                                }
+                              }
+                            },
+                            "style": { "value": "RENDER_STYLE_VERTICAL_CENTERED" }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
