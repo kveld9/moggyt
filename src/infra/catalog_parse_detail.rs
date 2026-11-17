@@ -1,9 +1,9 @@
 //! Detail view response parser for albums, artists, and playlists.
 
 use super::catalog_parse_artist::parse_artist_page;
-use super::catalog_parse_common::{
-    best_thumbnail, flex_text, music_video_type, panel_artist, parse_duration_secs, watch_video_id,
-};
+use super::catalog_parse_common::best_thumbnail;
+pub use super::catalog_parse_detail_track::{build_detail_track, detail_artist, detail_title};
+use super::catalog_parse_detail_track::{build_detail_track_at, now_epoch_secs};
 use super::catalog_parse_playlist::{PlaylistMeta, playlist_meta};
 use crate::domain::{Detail, DetailKind, PlaylistPrivacy, Track};
 use serde_json::Value;
@@ -202,67 +202,6 @@ fn detail_header_artwork(value: &Value) -> Option<String> {
     best_thumbnail(header)
 }
 
-fn detail_video_id(renderer: &Value) -> Option<String> {
-    if let Some(id) = renderer.get("videoId").and_then(Value::as_str) {
-        let trimmed = id.trim();
-        if !trimmed.is_empty() {
-            return Some(trimmed.to_owned());
-        }
-    }
-    watch_video_id(renderer)
-}
-
-/// Extracts track title from a detail item renderer.
-pub fn detail_title(renderer: &Value) -> Option<String> {
-    flex_text(renderer, 0).or_else(|| {
-        let text = renderer.pointer("/title/runs/0/text")?.as_str()?.trim();
-        if text.is_empty() { None } else { Some(text.to_owned()) }
-    })
-}
-
-/// Extracts artist name from a detail item renderer.
-pub fn detail_artist(renderer: &Value) -> String {
-    if let Some(artist) = flex_text(renderer, 1) {
-        return artist;
-    }
-    panel_artist(renderer)
-}
-
-fn detail_duration(renderer: &Value) -> Option<u32> {
-    const PATHS: &[&str] = &[
-        "/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/runs/0/text",
-        "/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text/simpleText",
-        "/lengthText/runs/0/text",
-        "/lengthText/simpleText",
-    ];
-    for path in PATHS {
-        if let Some(raw) = renderer.pointer(path).and_then(Value::as_str) {
-            if let Some(secs) = parse_duration_secs(raw) {
-                return Some(secs);
-            }
-        }
-    }
-    None
-}
-
-/// Constructs a domain Track from a detail item renderer.
-pub fn build_detail_track(renderer: &Value) -> Option<Track> {
-    let video_id = detail_video_id(renderer)?;
-    let title = detail_title(renderer)?;
-    let artist = detail_artist(renderer);
-    let mut track = Track::new(&video_id, &title, &artist);
-    if let Some(dur) = detail_duration(renderer) {
-        track = track.with_duration(dur);
-    }
-    if let Some(video_type) = music_video_type(renderer) {
-        track = track.with_video_type(video_type);
-    }
-    if let Some(thumb) = best_thumbnail(renderer) {
-        track = track.with_artwork(thumb);
-    }
-    Some(track)
-}
-
 /// Extracts section list array from a detail browse payload.
 pub fn detail_sections(value: &Value) -> Option<&[Value]> {
     const CANDIDATES: &[&str] = &[
@@ -275,21 +214,25 @@ pub fn detail_sections(value: &Value) -> Option<&[Value]> {
         .find_map(|path| value.pointer(path).and_then(Value::as_array).map(Vec::as_slice))
 }
 
-/// Collects tracks from a shelf contents array.
-pub fn collect_shelf_tracks(shelf: &Value, out: &mut Vec<Track>) {
+fn collect_shelf_tracks_at(shelf: &Value, now_secs: i64, out: &mut Vec<Track>) {
     let Some(contents) = shelf.get("contents").and_then(Value::as_array) else {
         return;
     };
     for item in contents {
         let renderer = item.get("musicResponsiveListItemRenderer").unwrap_or(item);
-        if let Some(track) = build_detail_track(renderer) {
+        if let Some(track) = build_detail_track_at(renderer, now_secs) {
             out.push(track);
         }
     }
 }
 
+/// Collects tracks from a shelf contents array.
+pub fn collect_shelf_tracks(shelf: &Value, out: &mut Vec<Track>) {
+    collect_shelf_tracks_at(shelf, now_epoch_secs(), out);
+}
+
 /// Collects all tracks from detail browse sections or shelves.
-pub fn collect_detail_tracks(value: &Value) -> Vec<Track> {
+pub fn collect_detail_tracks(value: &Value, now_secs: i64) -> Vec<Track> {
     let mut tracks = Vec::new();
     if let Some(sections) = detail_sections(value) {
         for section in sections {
@@ -297,7 +240,7 @@ pub fn collect_detail_tracks(value: &Value) -> Vec<Track> {
                 .get("musicShelfRenderer")
                 .or_else(|| section.get("musicPlaylistShelfRenderer"));
             if let Some(s) = shelf {
-                collect_shelf_tracks(s, &mut tracks);
+                collect_shelf_tracks_at(s, now_secs, &mut tracks);
             }
         }
         if !tracks.is_empty() {
@@ -307,10 +250,10 @@ pub fn collect_detail_tracks(value: &Value) -> Vec<Track> {
     let direct_shelf =
         value.get("musicShelfRenderer").or_else(|| value.get("musicPlaylistShelfRenderer"));
     if let Some(s) = direct_shelf {
-        collect_shelf_tracks(s, &mut tracks);
+        collect_shelf_tracks_at(s, now_secs, &mut tracks);
         return tracks;
     }
-    collect_shelf_tracks(value, &mut tracks);
+    collect_shelf_tracks_at(value, now_secs, &mut tracks);
     tracks
 }
 
@@ -353,14 +296,14 @@ fn fill_missing_track_artwork(mut detail: Detail) -> Detail {
     detail
 }
 
-/// Parses a detail view (album, artist, or playlist) from catalog API browse response payload.
+/// Parses a detail view from catalog API browse response payload at a specified epoch timestamp.
 ///
 /// Returns `None` when neither a header title nor any valid track items are found.
-pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
+pub fn parse_detail_all_at(value: &Value, kind: DetailKind, now_secs: i64) -> Option<Detail> {
     let title = resolve_detail_title(value);
     let meta = playlist_meta_for(value, kind);
     let subtitle = meta.author.clone().unwrap_or_else(|| detail_header_subtitle(value));
-    let tracks = collect_detail_tracks(value);
+    let tracks = collect_detail_tracks(value, now_secs);
     if title.is_empty() && tracks.is_empty() {
         return None;
     }
@@ -380,6 +323,13 @@ pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
         return Some(detail.with_artist_page(parse_artist_page(value)));
     }
     Some(detail)
+}
+
+/// Parses a detail view (album, artist, or playlist) from catalog API browse response payload.
+///
+/// Returns `None` when neither a header title nor any valid track items are found.
+pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
+    parse_detail_all_at(value, kind, now_epoch_secs())
 }
 
 #[cfg(test)]
