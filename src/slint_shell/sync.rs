@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::{PlaybackFacts, SearchFilter, Track, is_local_playlist_id};
+use crate::domain::{DetailKind, PlaybackFacts, SearchFilter, Track, is_local_playlist_id};
 use crate::i18n::{Locale, tr};
 use crate::infra::{GithubUpdater, StoreHealth};
 use crate::slint_shell::audio_snapshot::sync_audio_snapshot;
@@ -86,6 +86,9 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     let player = window.global::<PlayerUi>();
     sync_audio_snapshot(window, state);
     window.set_songs_only(state.songs_only);
+    let playlist_table = state.detail.as_ref().is_some_and(|d| d.kind == DetailKind::Playlist)
+        && state.detail_request.as_ref().is_some_and(|(id, _)| !is_local_playlist_id(id));
+    window.global::<DetailUi>().set_playlist_table(playlist_table);
     window.global::<DetailUi>().set_compact_tracks(state.detail_compact_tracks);
     window.global::<PlaybackUi>().set_autoplay_enabled(state.autoplay);
     window.set_crossfade_seconds(state.crossfade_seconds as i32);
@@ -201,6 +204,7 @@ pub(crate) fn sync_shelves_and_queue(window: &MoggytWindow, state: &SlintAppStat
                 title: row.title.into(),
                 artist: row.subtitle.into(),
                 album: row.album.into(),
+                added: "".into(),
                 duration: row.duration.into(),
                 kind: row.kind.into(),
                 cover: cover_img,
@@ -513,6 +517,7 @@ pub(crate) fn track_to_row_data(
         title: track.title.clone().into(),
         artist: track.artist.clone().into(),
         album: track.album.clone().unwrap_or_default().into(),
+        added: track.added_label.clone().unwrap_or_default().into(),
         duration: format_duration(track.duration_secs).into(),
         kind: "track".into(),
         cover,
@@ -667,5 +672,12 @@ mod tests {
         );
 
         assert_eq!(persistence_error_text(Locale::English, None), "");
+    }
+
+    #[test]
+    fn test_track_to_row_data_carries_added_label() {
+        let track = Track::new("t1", "Title", "Artist").with_added("1 week ago", 1_700_000_000);
+        let row = track_to_row_data(0, &track, &HashMap::new());
+        assert_eq!(row.added.as_str(), "1 week ago");
     }
 }

@@ -1,0 +1,14 @@
+export global LocalEditUi {
+    in-out property <bool> is-local: false;
+    in-out property <string> rename-text: "";
+    callback rename-submitted(string);
+    callback delete-requested();
+    callback remove-track-requested(int);
+    callback move-track-requested(int, int);
+}
+
+export global DetailUi {
+    in-out property <bool> compact-tracks: false;
+    in-out property <bool> playlist-table: false;
+    callback compact-toggled();
+}

@@ -1,25 +1,12 @@
 import { Labels } from "../labels.slint";
 import { Theme, TrackRowData, DetailSectionData } from "../theme.slint";
-import { TrackRow } from "../components/rows.slint";
+import { DetailUi, LocalEditUi } from "../components/detail_ui.slint";
+import { DetailTracks } from "./detail_tracks.slint";
 import { ViewModeToggle } from "../components/view_mode_toggle.slint";
 import { ContextSurface } from "../components/context_menu.slint";
 import { DetailTile } from "../components/cards.slint";
 import { StyledInputField } from "../components/controls.slint";
 import { IconPlay, IconShuffle } from "../icons.slint";
-
-export global LocalEditUi {
-    in-out property <bool> is-local: false;
-    in-out property <string> rename-text: "";
-    callback rename-submitted(string);
-    callback delete-requested();
-    callback remove-track-requested(int);
-    callback move-track-requested(int, int);
-}
-
-export global DetailUi {
-    in-out property <bool> compact-tracks: false;
-    callback compact-toggled();
-}
 
 export component DetailView inherits VerticalLayout {
     in property <bool> has-detail: false;
@@ -322,21 +309,9 @@ export component DetailView inherits VerticalLayout {
             }
         }
 
-        for track in root.tracks : TrackRow {
-            title: track.title;
-            artist: track.artist;
-            album: track.album;
-            duration: track.duration;
-            kind: track.kind;
-            index: track.index;
-            surface: ContextSurface.detail;
-            cover: track.cover;
-            show-remove: LocalEditUi.is-local;
-            compact: DetailUi.compact-tracks;
-            clicked => { root.track-selected(track.index); }
-            remove-requested => { LocalEditUi.remove-track-requested(track.index); }
-            move-up-requested => { LocalEditUi.move-track-requested(track.index, track.index - 1); }
-            move-down-requested => { LocalEditUi.move-track-requested(track.index, track.index + 1); }
+        DetailTracks {
+            tracks: root.tracks;
+            track-selected(idx) => { root.track-selected(idx); }
         }
 
         if root.is-artist && root.has-songs-more : HorizontalLayout {

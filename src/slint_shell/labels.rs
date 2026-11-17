@@ -63,6 +63,12 @@ pub struct StaticLabels {
     pub shuffle_button: &'static str,
     pub compact_view: &'static str,
     pub cover_view: &'static str,
+    pub column_index: &'static str,
+    pub column_title: &'static str,
+    pub column_artist: &'static str,
+    pub column_album: &'static str,
+    pub column_date_added: &'static str,
+    pub column_duration: &'static str,
     pub empty_songs: &'static str,
     pub show_all: &'static str,
     pub show_more: &'static str,
@@ -283,6 +289,12 @@ impl StaticLabels {
             shuffle_button: tr(locale, "Shuffle"),
             compact_view: tr(locale, "Compact view"),
             cover_view: tr(locale, "Cover view"),
+            column_index: tr(locale, "#"),
+            column_title: tr(locale, "Title"),
+            column_artist: tr(locale, "Artist"),
+            column_album: tr(locale, "Album"),
+            column_date_added: tr(locale, "Date added"),
+            column_duration: tr(locale, "Duration"),
             empty_songs: tr(locale, "No songs available."),
             show_all: tr(locale, "Show all"),
             show_more: tr(locale, "Show more"),
@@ -502,6 +514,12 @@ impl StaticLabels {
         labels.set_shuffle_button_label(self.shuffle_button.into());
         labels.set_compact_view_label(self.compact_view.into());
         labels.set_cover_view_label(self.cover_view.into());
+        labels.set_column_index_label(self.column_index.into());
+        labels.set_column_title_label(self.column_title.into());
+        labels.set_column_artist_label(self.column_artist.into());
+        labels.set_column_album_label(self.column_album.into());
+        labels.set_column_date_added_label(self.column_date_added.into());
+        labels.set_column_duration_label(self.column_duration.into());
         labels.set_empty_songs_text(self.empty_songs.into());
         labels.set_show_all_label(self.show_all.into());
         labels.set_show_more_label(self.show_more.into());
