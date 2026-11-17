@@ -169,6 +169,24 @@ pub fn request_library_covers(
         worker_tx,
         &mut seen,
     );
+    dispatch_library_cover_urls(
+        state.library_artists.iter().map(|a| a.artwork.as_deref()),
+        state,
+        worker_tx,
+        &mut seen,
+    );
+    dispatch_library_cover_urls(
+        state.library_podcasts.iter().map(|p| p.artwork.as_deref()),
+        state,
+        worker_tx,
+        &mut seen,
+    );
+    dispatch_library_cover_urls(
+        state.library_profiles.iter().map(|a| a.artwork.as_deref()),
+        state,
+        worker_tx,
+        &mut seen,
+    );
 }
 
 /// Requests background cover decoding for all uncached artwork URLs in explore shelves.
@@ -456,6 +474,22 @@ mod tests {
             "Art",
             Some("https://lh3.googleusercontent.com/a-thumb-large".into()),
         )];
+        state.library_artists = vec![Artist::new(
+            "ar1",
+            "Artist",
+            Some("https://lh3.googleusercontent.com/ar-thumb-large".into()),
+        )];
+        state.library_podcasts = vec![Playlist::new(
+            "pd1",
+            "Podcast",
+            0,
+            Some("https://lh3.googleusercontent.com/pd-thumb-large".into()),
+        )];
+        state.library_profiles = vec![Artist::new(
+            "pr1",
+            "Profile",
+            Some("https://lh3.googleusercontent.com/pr-thumb-large".into()),
+        )];
 
         let (tx, rx) = std::sync::mpsc::channel::<PlaybackWorkerCommand>();
         request_library_covers(&state, &tx);
@@ -467,9 +501,21 @@ mod tests {
             }
         }
 
-        assert_eq!(received.len(), 2);
+        assert_eq!(received.len(), 5);
         assert_eq!(received[0], ("https://lh3.googleusercontent.com/p-thumb-small".to_string(), 7));
         assert_eq!(received[1], ("https://lh3.googleusercontent.com/a-thumb-small".to_string(), 7));
+        assert_eq!(
+            received[2],
+            ("https://lh3.googleusercontent.com/ar-thumb-small".to_string(), 7)
+        );
+        assert_eq!(
+            received[3],
+            ("https://lh3.googleusercontent.com/pd-thumb-small".to_string(), 7)
+        );
+        assert_eq!(
+            received[4],
+            ("https://lh3.googleusercontent.com/pr-thumb-small".to_string(), 7)
+        );
     }
 
     #[test]
