@@ -91,6 +91,7 @@ pub struct SlintAppState {
     pub search_results: Vec<Track>,
     pub search_top_result: Option<SearchResult>,
     pub library_playlists: Vec<Playlist>,
+    pub library_songs: Vec<Track>,
     pub library_albums: Vec<Album>,
     pub library_artists: Vec<Artist>,
     pub(crate) library_filter: LibraryFilter,
@@ -255,16 +256,18 @@ impl SlintAppState {
         self.explore_loaded = true;
     }
 
-    /// Refreshes library playlists, saved albums, and followed artists from catalog.
+    /// Refreshes every library section from catalog.
     pub fn refresh_library(&mut self) {
         let fetch = match self.catalog.lock() {
             Ok(c) => LibraryFetch {
                 playlists: c.playlists(),
+                songs: c.library_songs(),
                 albums: c.saved_albums(),
                 artists: c.library_artists(),
             },
             Err(_) => LibraryFetch {
                 playlists: Err(CatalogError::Transport),
+                songs: Err(CatalogError::Transport),
                 albums: Err(CatalogError::Transport),
                 artists: Err(CatalogError::Transport),
             },
@@ -496,6 +499,9 @@ impl<T: ?Sized + Catalog> Catalog for Box<T> {
     }
     fn library_artists(&self) -> Result<Vec<Artist>, CatalogError> {
         (**self).library_artists()
+    }
+    fn library_songs(&self) -> Result<Vec<Track>, CatalogError> {
+        (**self).library_songs()
     }
     fn detail(&self, id: &str, k: DetailKind) -> Result<Option<Detail>, CatalogError> {
         (**self).detail(id, k)

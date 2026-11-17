@@ -297,6 +297,7 @@ fn apply_async_library_outcome(
         Ok(sections) => {
             let local = current_store().map(|s| s.list()).unwrap_or_default();
             let is_empty = sections.playlists.is_empty()
+                && sections.songs.is_empty()
                 && sections.albums.is_empty()
                 && sections.artists.is_empty();
             state.library_playlists = with_history_entry(
@@ -304,6 +305,7 @@ fn apply_async_library_outcome(
                 state.signed_in,
                 state.locale,
             );
+            state.library_songs = sections.songs;
             state.library_albums = sections.albums;
             state.library_artists = sections.artists;
             state.library_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
@@ -698,6 +700,7 @@ mod tests {
             9,
             LibraryFetch {
                 playlists: Err(CatalogError::Transport),
+                songs: Err(CatalogError::Transport),
                 albums: Err(CatalogError::Transport),
                 artists: Err(CatalogError::Transport),
             },
@@ -711,6 +714,7 @@ mod tests {
             10,
             LibraryFetch {
                 playlists: Err(CatalogError::Transport),
+                songs: Err(CatalogError::Transport),
                 albums: Err(CatalogError::Transport),
                 artists: Err(CatalogError::Transport),
             },
@@ -724,6 +728,7 @@ mod tests {
             10,
             LibraryFetch {
                 playlists: Ok(Vec::new()),
+                songs: Ok(Vec::new()),
                 albums: Ok(Vec::new()),
                 artists: Ok(Vec::new()),
             },

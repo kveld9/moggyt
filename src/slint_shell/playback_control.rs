@@ -81,6 +81,19 @@ impl SlintAppState {
         }
     }
 
+    /// Plays the library songs list from `index`, replacing the queue.
+    pub fn play_library_songs(&mut self, index: usize) {
+        if index >= self.library_songs.len() {
+            return;
+        }
+        let songs = self.library_songs.clone();
+        self.queue.clear();
+        for track in songs {
+            self.queue.push(track);
+        }
+        self.play_track_at_index_in_memory(index);
+    }
+
     /// Advances or retreats queue cursor to target index and requests playback.
     pub fn play_track_at_index(&mut self, index: usize) {
         self.play_track_at_index_in_memory(index);

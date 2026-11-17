@@ -1,12 +1,13 @@
 //! Library sections fetched from the catalog port in one refresh.
 
-use crate::domain::{Album, Artist, Playlist};
+use crate::domain::{Album, Artist, Playlist, Track};
 use crate::infra::CatalogError;
 
 /// Per-section catalog results for one library refresh.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibraryFetch {
     pub playlists: Result<Vec<Playlist>, CatalogError>,
+    pub songs: Result<Vec<Track>, CatalogError>,
     pub albums: Result<Vec<Album>, CatalogError>,
     pub artists: Result<Vec<Artist>, CatalogError>,
 }
@@ -15,6 +16,7 @@ pub struct LibraryFetch {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct LibrarySections {
     pub playlists: Vec<Playlist>,
+    pub songs: Vec<Track>,
     pub albums: Vec<Album>,
     pub artists: Vec<Artist>,
 }
@@ -24,6 +26,7 @@ impl LibraryFetch {
     pub(crate) fn into_sections(self) -> Result<LibrarySections, CatalogError> {
         Ok(LibrarySections {
             playlists: self.playlists?,
+            songs: self.songs?,
             albums: self.albums?,
             artists: self.artists?,
         })
@@ -36,16 +39,18 @@ mod tests {
 
     fn fetch(
         playlists: Result<Vec<Playlist>, CatalogError>,
+        songs: Result<Vec<Track>, CatalogError>,
         albums: Result<Vec<Album>, CatalogError>,
         artists: Result<Vec<Artist>, CatalogError>,
     ) -> LibraryFetch {
-        LibraryFetch { playlists, albums, artists }
+        LibraryFetch { playlists, songs, albums, artists }
     }
 
     #[test]
     fn into_sections_collects_every_section() {
         let sections = fetch(
             Ok(vec![Playlist::new("p1", "Mix", 2, None)]),
+            Ok(vec![Track::new("t1", "Song", "Artist")]),
             Ok(Vec::new()),
             Ok(vec![Artist::new("a1", "Artist", None)]),
         )
@@ -58,10 +63,14 @@ mod tests {
 
     #[test]
     fn into_sections_reports_the_first_failure() {
-        let error =
-            fetch(Ok(Vec::new()), Err(CatalogError::Unauthenticated), Err(CatalogError::Transport))
-                .into_sections()
-                .expect_err("failure");
+        let error = fetch(
+            Ok(Vec::new()),
+            Ok(Vec::new()),
+            Err(CatalogError::Unauthenticated),
+            Err(CatalogError::Transport),
+        )
+        .into_sections()
+        .expect_err("failure");
         assert_eq!(error, CatalogError::Unauthenticated);
     }
 }

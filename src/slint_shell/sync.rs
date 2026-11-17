@@ -293,6 +293,15 @@ fn artist_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
         .collect()
 }
 
+fn library_song_rows(state: &SlintAppState) -> Vec<TrackRowData> {
+    state
+        .library_songs
+        .iter()
+        .enumerate()
+        .map(|(index, track)| track_to_row_data(index, track, &state.search_covers))
+        .collect()
+}
+
 /// Synchronizes library collections and detail view models with Slint window.
 pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppState) {
     let playlist_rows = chunk_card_rows(playlist_cards(state), state.explore_columns);
@@ -303,6 +312,8 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
 
     let artist_rows = chunk_card_rows(artist_cards(state), state.explore_columns);
     window.set_library_artist_rows(ModelRc::new(VecModel::from(artist_rows)));
+
+    window.set_library_song_rows(ModelRc::new(VecModel::from(library_song_rows(state))));
 
     window.set_library_filter(state.library_filter.to_index());
 

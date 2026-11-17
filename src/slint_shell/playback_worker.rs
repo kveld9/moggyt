@@ -331,11 +331,13 @@ pub fn execute_refresh_library<C: Catalog>(
         .as_ref()
         .map(|c| LibraryFetch {
             playlists: c.playlists(),
+            songs: c.library_songs(),
             albums: c.saved_albums(),
             artists: c.library_artists(),
         })
         .unwrap_or(LibraryFetch {
             playlists: Err(CatalogError::Transport),
+            songs: Err(CatalogError::Transport),
             albums: Err(CatalogError::Transport),
             artists: Err(CatalogError::Transport),
         });

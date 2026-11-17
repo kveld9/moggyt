@@ -4,8 +4,8 @@ use super::catalog_parse_album::{album_credits, apply_credits};
 use super::catalog_parse_common::{
     best_thumbnail, browse_id, flex_text, parse_track_count, parse_two_row, two_row_title,
 };
-use super::catalog_parse_detail::detail_sections;
-use crate::domain::{Album, Artist, Playlist};
+use super::catalog_parse_detail::{collect_shelf_tracks, detail_sections};
+use crate::domain::{Album, Artist, Playlist, Track};
 use serde_json::Value;
 
 /// Renderer keys whose payload wraps a deeper library node or an item array.
@@ -130,6 +130,20 @@ fn parse_library_artist_item(item: &Value) -> Option<Artist> {
 /// Parses followed artists from catalog API browse response payload.
 pub fn parse_library_artists(value: &Value) -> Vec<Artist> {
     collect_library_items(value).into_iter().filter_map(parse_library_artist_item).collect()
+}
+
+/// Parses liked songs from catalog API browse response payload.
+pub fn parse_library_songs(value: &Value) -> Vec<Track> {
+    let mut tracks = Vec::new();
+    let Some(sections) = detail_sections(value) else {
+        return tracks;
+    };
+    for section in sections {
+        if let Some(shelf) = section.get("musicShelfRenderer") {
+            collect_shelf_tracks(shelf, &mut tracks);
+        }
+    }
+    tracks
 }
 
 /// Returns true when the catalog answered with an anonymous library page.
@@ -295,6 +309,35 @@ mod tests {
         assert_eq!(artists[0].name, "Followed Artist");
         assert_eq!(artists[0].subscribers.as_deref(), Some("1.49 K subscribers"));
         assert!(artists[0].artwork.is_some());
+    }
+
+    #[test]
+    fn parse_library_songs_reads_the_liked_shelf() {
+        let payload = serde_json::json!({ "sectionListRenderer": { "contents": [{
+            "musicShelfRenderer": { "contents": [{
+                "musicResponsiveListItemRenderer": {
+                    "playlistItemData": { "videoId": "song-1" },
+                    "flexColumns": [
+                        { "musicResponsiveListItemFlexColumnRenderer": { "text": {
+                            "runs": [{ "text": "Liked Song" }]
+                        } } },
+                        { "musicResponsiveListItemFlexColumnRenderer": { "text": {
+                            "runs": [{ "text": "Liked Artist" }]
+                        } } }
+                    ],
+                    "fixedColumns": [{ "musicResponsiveListItemFixedColumnRenderer": {
+                        "text": { "runs": [{ "text": "3:20" }] }
+                    } }]
+                }
+            }] }
+        }] } });
+
+        let songs = parse_library_songs(&payload);
+        assert_eq!(songs.len(), 1);
+        assert_eq!(songs[0].id, "song-1");
+        assert_eq!(songs[0].title, "Liked Song");
+        assert_eq!(songs[0].artist, "Liked Artist");
+        assert_eq!(songs[0].duration_secs, Some(200));
     }
 
     #[test]
