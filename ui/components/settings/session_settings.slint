@@ -4,6 +4,7 @@ import { StyledInputField } from "../controls.slint";
 
 export component SessionSettings inherits VerticalLayout {
     in property <bool> signed-in: false;
+    in property <bool> session-expired: false;
     in-out property <string> cookie-text: "";
 
     callback sign-in-submitted(string);
@@ -30,7 +31,9 @@ export component SessionSettings inherits VerticalLayout {
                 alignment: space-between;
 
                 Text {
-                    text: Labels.status-signed-in-label;
+                    text: root.session-expired
+                        ? Labels.status-session-expired-label
+                        : Labels.status-signed-in-label;
                     color: Theme.accent;
                     font-size: 14px;
                     font-weight: 600;
@@ -59,44 +62,40 @@ export component SessionSettings inherits VerticalLayout {
                 }
             }
 
-            if !root.signed-in : VerticalLayout {
-                spacing: 10px;
+            if !root.signed-in : Text {
+                text: Labels.status-anonymous-label;
+                color: Theme.secondary;
+                font-size: 14px;
+            }
 
-                Text {
-                    text: Labels.status-anonymous-label;
-                    color: Theme.secondary;
-                    font-size: 14px;
+            HorizontalLayout {
+                spacing: 8px;
+                height: 32px;
+
+                StyledInputField {
+                    text <=> root.cookie-text;
+                    placeholder-text: Labels.session-cookie-placeholder;
+                    input-type: InputType.password;
+                    accepted(t) => { root.sign-in-submitted(t); }
                 }
 
-                HorizontalLayout {
-                    spacing: 8px;
-                    height: 32px;
+                Rectangle {
+                    width: 90px;
+                    border-radius: 8px;
+                    background: sign-in-touch.pressed ? Theme.overlay : (sign-in-touch.has-hover ? Theme.hover : Theme.accent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
 
-                    StyledInputField {
-                        text <=> root.cookie-text;
-                        placeholder-text: Labels.session-cookie-placeholder;
-                        input-type: InputType.password;
-                        accepted(t) => { root.sign-in-submitted(t); }
+                    sign-in-touch := TouchArea {
+                        clicked => { root.sign-in-submitted(root.cookie-text); }
                     }
 
-                    Rectangle {
-                        width: 90px;
-                        border-radius: 8px;
-                        background: sign-in-touch.pressed ? Theme.overlay : (sign-in-touch.has-hover ? Theme.hover : Theme.accent);
-                        animate background { duration: 150ms; easing: ease-in-out; }
-
-                        sign-in-touch := TouchArea {
-                            clicked => { root.sign-in-submitted(root.cookie-text); }
-                        }
-
-                        Text {
-                            text: Labels.sign-in-label;
-                            color: sign-in-touch.has-hover ? Theme.text : Theme.window;
-                            font-size: 12px;
-                            font-weight: 700;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
+                    Text {
+                        text: Labels.sign-in-label;
+                        color: sign-in-touch.has-hover ? Theme.text : Theme.window;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                 }
             }

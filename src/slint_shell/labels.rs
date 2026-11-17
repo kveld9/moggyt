@@ -106,6 +106,7 @@ pub struct StaticLabels {
     pub section_session: &'static str,
     pub status_signed_in: &'static str,
     pub status_anonymous: &'static str,
+    pub status_session_expired: &'static str,
     pub section_about: &'static str,
     pub about_author: &'static str,
     pub about_tagline: &'static str,
@@ -322,6 +323,7 @@ impl StaticLabels {
             section_session: tr(locale, "Session"),
             status_signed_in: tr(locale, "Status: Signed in"),
             status_anonymous: tr(locale, "Status: Anonymous"),
+            status_session_expired: tr(locale, "Status: Session expired"),
             section_about: tr(locale, "About"),
             about_author: tr(locale, "Developed by kveld9"),
             about_tagline: tr(locale, "Native YouTube Music client written in Rust"),
@@ -532,6 +534,7 @@ impl StaticLabels {
         labels.set_section_session_label(self.section_session.into());
         labels.set_status_signed_in_label(self.status_signed_in.into());
         labels.set_status_anonymous_label(self.status_anonymous.into());
+        labels.set_status_session_expired_label(self.status_session_expired.into());
         labels.set_section_about_label(self.section_about.into());
         labels.set_about_author_label(self.about_author.into());
         labels.set_about_tagline_label(self.about_tagline.into());

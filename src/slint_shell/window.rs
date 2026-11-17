@@ -297,7 +297,7 @@ fn apply_async_library_outcome(
     if state.library_generation != generation {
         return false;
     }
-    let failure = library_failure_phase(&playlists, &albums);
+    let failure = library_failure_phase(&playlists, &albums, state.signed_in);
     match (playlists, albums) {
         (Ok(playlists), Ok(albums)) => {
             let local = current_store().map(|s| s.list()).unwrap_or_default();
