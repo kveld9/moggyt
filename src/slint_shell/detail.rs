@@ -5,13 +5,14 @@ use crate::domain::{Detail, DetailCard, DetailKind, PlaylistPrivacy};
 use crate::i18n::Locale;
 use crate::slint_shell::format::{format_total_duration, format_track_count};
 
-pub fn detail_kind_label(detail: &Detail) -> &'static str {
+/// Returns the category label for a detail view, preferring an album container label when present.
+pub fn detail_kind_label(detail: &Detail) -> &str {
     match (detail.kind, detail.privacy) {
         (DetailKind::Playlist, Some(PlaylistPrivacy::Public)) => "Public Playlist",
         (DetailKind::Playlist, Some(PlaylistPrivacy::Private)) => "Private Playlist",
         (DetailKind::Playlist, Some(PlaylistPrivacy::Unlisted)) => "Unlisted Playlist",
         (DetailKind::Playlist, None) => "Playlist",
-        (DetailKind::Album, _) => "Album",
+        (DetailKind::Album, _) => detail.container_label.as_deref().unwrap_or("Album"),
         (DetailKind::Artist, _) => "Artist",
     }
 }
@@ -206,6 +207,9 @@ mod tests {
         assert_eq!(detail_kind_label(&plain), "Playlist");
         let album = Detail::new(DetailKind::Album, "Title", "", Vec::new());
         assert_eq!(detail_kind_label(&album), "Album");
+        let single = Detail::new(DetailKind::Album, "Title", "", Vec::new())
+            .with_container_label("Single \u{2022} 2026");
+        assert_eq!(detail_kind_label(&single), "Single \u{2022} 2026");
     }
 
     #[test]
