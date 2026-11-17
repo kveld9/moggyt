@@ -4,7 +4,9 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::domain::{Detail, DetailCardKind, DetailKind, is_local_playlist_id};
+use crate::domain::{
+    Detail, DetailCardKind, DetailKind, SortColumn, is_local_playlist_id, next_sort,
+};
 use crate::slint_shell::callbacks::with_window_state;
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::import_callbacks::{current_store, reload_local_library};
@@ -66,6 +68,12 @@ pub(crate) fn wire_detail_callbacks(
         });
     });
 
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.global::<DetailUi>().on_sort_column_clicked(move |index| {
+        with_window_state(&w, &s, |win, st| handle_detail_sort_clicked(win, st, index));
+    });
+
     let local_ui = window.global::<LocalEditUi>();
 
     let s = Rc::clone(state_rc);
@@ -100,6 +108,18 @@ pub(crate) fn current_local_detail_id(state: &SlintAppState) -> Option<String> {
         .as_ref()
         .filter(|(id, _)| is_local_playlist_id(id))
         .map(|(id, _)| id.clone())
+}
+
+fn handle_detail_sort_clicked(win: &MoggytWindow, st: &mut SlintAppState, index: i32) {
+    let Some(column) = SortColumn::from_index(index) else {
+        return;
+    };
+    let Some((request, _)) = st.detail_request.clone() else {
+        return;
+    };
+    let current = st.detail_sort.as_ref().filter(|(id, _)| id == &request).map(|(_, sort)| *sort);
+    st.detail_sort = next_sort(current, column).map(|sort| (request, sort));
+    sync_window(win, st);
 }
 
 fn handle_local_rename(win: &MoggytWindow, st: &mut SlintAppState, title: &str) {

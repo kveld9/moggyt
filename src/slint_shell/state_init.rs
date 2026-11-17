@@ -116,6 +116,7 @@ impl SlintAppState {
             hi_res_covers: false,
             songs_only: false,
             detail_compact_tracks: false,
+            detail_sort: None,
             signed_in,
             theme: ThemeId::default(),
             custom_theme: None,

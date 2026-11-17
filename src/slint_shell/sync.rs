@@ -6,7 +6,10 @@ use std::collections::HashMap;
 
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::domain::{DetailKind, PlaybackFacts, SearchFilter, Track, is_local_playlist_id};
+use crate::domain::{
+    DetailKind, DetailSort, PlaybackFacts, SearchFilter, SortDirection, Track,
+    is_local_playlist_id, ordered_indices,
+};
 use crate::i18n::{Locale, tr};
 use crate::infra::{GithubUpdater, StoreHealth};
 use crate::slint_shell::audio_snapshot::sync_audio_snapshot;
@@ -88,8 +91,13 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_songs_only(state.songs_only);
     let playlist_table = state.detail.as_ref().is_some_and(|d| d.kind == DetailKind::Playlist)
         && state.detail_request.as_ref().is_some_and(|(id, _)| !is_local_playlist_id(id));
-    window.global::<DetailUi>().set_playlist_table(playlist_table);
-    window.global::<DetailUi>().set_compact_tracks(state.detail_compact_tracks);
+    let sort = active_detail_sort(state);
+    let detail_ui = window.global::<DetailUi>();
+    detail_ui.set_playlist_table(playlist_table);
+    detail_ui.set_compact_tracks(state.detail_compact_tracks);
+    detail_ui.set_sort_column(sort.map_or(-1, |value| value.column.to_index()));
+    let descending = sort.is_some_and(|value| value.direction == SortDirection::Descending);
+    detail_ui.set_sort_direction(if descending { 1 } else { 0 });
     window.global::<PlaybackUi>().set_autoplay_enabled(state.autoplay);
     window.set_crossfade_seconds(state.crossfade_seconds as i32);
     window.set_stream_cache_limit_mb(state.stream_cache_limit_mb as i32);
@@ -338,6 +346,11 @@ fn library_song_rows(state: &SlintAppState) -> Vec<TrackRowData> {
         .collect()
 }
 
+fn active_detail_sort(state: &SlintAppState) -> Option<DetailSort> {
+    let (request, _) = state.detail_request.as_ref()?;
+    state.detail_sort.as_ref().filter(|(id, _)| id == request).map(|(_, sort)| *sort)
+}
+
 /// Synchronizes library collections and detail view models with Slint window.
 pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppState) {
     window.set_library_session_expired(state.library_phase == ViewPhase::Expired);
@@ -367,11 +380,10 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
         window.set_detail_subtitle(detail_subtitle(detail, state.locale).into());
         window.set_detail_description(detail.description.as_deref().unwrap_or("").into());
         window.set_detail_kind_label(tr(state.locale, detail_kind_label(detail)).into());
-        let d_tracks: Vec<TrackRowData> = detail
-            .tracks
-            .iter()
-            .enumerate()
-            .map(|(i, t)| track_to_row_data(i, t, &state.search_covers))
+        let order = ordered_indices(&detail.tracks, active_detail_sort(state));
+        let d_tracks: Vec<TrackRowData> = order
+            .into_iter()
+            .map(|index| track_to_row_data(index, &detail.tracks[index], &state.search_covers))
             .collect();
         window.set_detail_tracks(ModelRc::new(VecModel::from(d_tracks)));
         let cover_img = resolve_detail_cover_url(detail)
