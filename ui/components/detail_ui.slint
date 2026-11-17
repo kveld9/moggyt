@@ -10,5 +10,8 @@ export global LocalEditUi {
 export global DetailUi {
     in-out property <bool> compact-tracks: false;
     in-out property <bool> playlist-table: false;
+    in-out property <int> sort-column: -1;
+    in-out property <int> sort-direction: 0;
+    callback sort-column-clicked(int);
     callback compact-toggled();
 }

@@ -9,7 +9,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::domain::{
-    Album, Artist, Detail, DetailKind, Palette, PlaybackPhase, PlaybackQueue, Playlist,
+    Album, Artist, Detail, DetailKind, DetailSort, Palette, PlaybackPhase, PlaybackQueue, Playlist,
     RecentSearches, SearchFilter, SearchQuery, SearchResult, Shelf, SkipRanges, SleepTimer,
     ThemeId, Track, extract_playlist_id,
 };
@@ -141,6 +141,8 @@ pub struct SlintAppState {
     pub songs_only: bool,
     /// Whether detail track lists render in compact mode without cover thumbnails.
     pub detail_compact_tracks: bool,
+    /// Active playlist-table sort together with the detail request id it belongs to.
+    pub detail_sort: Option<(String, DetailSort)>,
     pub signed_in: bool,
     pub theme: ThemeId,
     pub custom_theme: Option<CustomThemeFile>,

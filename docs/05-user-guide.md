@@ -70,8 +70,10 @@ The detail view displays full tracklistings for an album, artist, or playlist:
   when the catalog reports one, the track count, the total playback duration, and the
   description collapsed to three lines behind a `Show more` toggle.
 - **Track List**: lists all tracks in the collection. Catalog playlists render as a table with track number,
-  title, artist (compact mode only), album, date added, and duration columns. Albums and artist song lists keep
-  the title, artist, and duration rows.
+  title, artist (compact mode only), album, date added, and duration columns. Clicking a column header sorts
+  the playlist by that column, a second click reverses the order, and a third click restores the catalog order;
+  an arrow marks the active column and direction. Sorting affects the table view only, not albums, artists or
+  local playlists. Albums and artist song lists keep the title, artist, and duration rows.
 - **Compact view**: the `Compact view` button in the header hides row cover thumbnails, adds track numbers,
   and tightens row height. Playlist tables keep every column and move the artist into its own column; the
   button then reads `Cover view` and restores the default layout, where the artist sits under the title.

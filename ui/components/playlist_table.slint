@@ -1,6 +1,7 @@
 import { Labels } from "../labels.slint";
 import { Theme, TrackRowData } from "../theme.slint";
 import { ContextSurface, ContextUi } from "./context_menu.slint";
+import { DetailUi } from "./detail_ui.slint";
 
 global PlaylistTableMetrics {
     in-out property <length> row-padding: 12px;
@@ -11,6 +12,45 @@ global PlaylistTableMetrics {
     in-out property <float> artist-stretch: 2.0;
     in-out property <float> album-stretch: 2.0;
     in-out property <float> added-stretch: 1.5;
+}
+
+component SortHeaderCell inherits Rectangle {
+    in property <string> label: "";
+    in property <int> column: -1;
+    in property <bool> active: false;
+    in property <bool> descending: false;
+
+    background: transparent;
+    height: 32px;
+
+    HorizontalLayout {
+        spacing: 4px;
+        alignment: start;
+
+        Text {
+            text: root.label;
+            color: root.active ? Theme.text : Theme.secondary;
+            font-size: 12px;
+            font-weight: 600;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        if root.active : VerticalLayout {
+            alignment: center;
+
+            Path {
+                width: 8px;
+                height: 5px;
+                fill: Theme.accent;
+                commands: root.descending ? "M 0 0 L 8 0 L 4 5 Z" : "M 4 0 L 8 5 L 0 5 Z";
+            }
+        }
+    }
+
+    TouchArea {
+        clicked => { DetailUi.sort-column-clicked(root.column); }
+    }
 }
 
 export component PlaylistHeader inherits Rectangle {
@@ -41,55 +81,45 @@ export component PlaylistHeader inherits Rectangle {
             vertical-alignment: center;
         }
 
-        Text {
-            text: Labels.column-title-label;
+        SortHeaderCell {
+            label: Labels.column-title-label;
+            column: 0;
+            active: DetailUi.sort-column == 0;
+            descending: DetailUi.sort-direction == 1;
             horizontal-stretch: PlaylistTableMetrics.title-stretch;
-            color: Theme.secondary;
-            font-size: 12px;
-            font-weight: 600;
-            overflow: elide;
-            vertical-alignment: center;
         }
 
-        if root.compact : Text {
-            text: Labels.column-artist-label;
+        if root.compact : SortHeaderCell {
+            label: Labels.column-artist-label;
+            column: 1;
+            active: DetailUi.sort-column == 1;
+            descending: DetailUi.sort-direction == 1;
             horizontal-stretch: PlaylistTableMetrics.artist-stretch;
-            color: Theme.secondary;
-            font-size: 12px;
-            font-weight: 600;
-            overflow: elide;
-            vertical-alignment: center;
         }
 
-        Text {
-            text: Labels.column-album-label;
+        SortHeaderCell {
+            label: Labels.column-album-label;
+            column: 2;
+            active: DetailUi.sort-column == 2;
+            descending: DetailUi.sort-direction == 1;
             horizontal-stretch: PlaylistTableMetrics.album-stretch;
-            color: Theme.secondary;
-            font-size: 12px;
-            font-weight: 600;
-            overflow: elide;
-            vertical-alignment: center;
         }
 
-        Text {
-            text: Labels.column-date-added-label;
+        SortHeaderCell {
+            label: Labels.column-date-added-label;
+            column: 3;
+            active: DetailUi.sort-column == 3;
+            descending: DetailUi.sort-direction == 1;
             horizontal-stretch: PlaylistTableMetrics.added-stretch;
-            color: Theme.secondary;
-            font-size: 12px;
-            font-weight: 600;
-            overflow: elide;
-            vertical-alignment: center;
         }
 
-        Text {
-            text: Labels.column-duration-label;
+        SortHeaderCell {
+            label: Labels.column-duration-label;
+            column: 4;
+            active: DetailUi.sort-column == 4;
+            descending: DetailUi.sort-direction == 1;
             min-width: PlaylistTableMetrics.duration-width;
             max-width: PlaylistTableMetrics.duration-width;
-            color: Theme.secondary;
-            font-size: 12px;
-            font-weight: 600;
-            horizontal-alignment: right;
-            vertical-alignment: center;
         }
     }
 }
