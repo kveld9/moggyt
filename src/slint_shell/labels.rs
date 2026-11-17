@@ -52,6 +52,7 @@ pub struct StaticLabels {
     pub empty_playlists: &'static str,
     pub section_albums: &'static str,
     pub empty_albums: &'static str,
+    pub empty_artists: &'static str,
     pub empty_detail: &'static str,
     pub play_button: &'static str,
     pub shuffle_button: &'static str,
@@ -266,6 +267,7 @@ impl StaticLabels {
             empty_playlists: tr(locale, "No playlists found."),
             section_albums: tr(locale, "Albums"),
             empty_albums: tr(locale, "No albums found."),
+            empty_artists: tr(locale, "No artists found."),
             empty_detail: tr(locale, "No details available."),
             play_button: tr(locale, "Play"),
             shuffle_button: tr(locale, "Shuffle"),
@@ -478,6 +480,7 @@ impl StaticLabels {
         labels.set_empty_playlists_text(self.empty_playlists.into());
         labels.set_section_albums_label(self.section_albums.into());
         labels.set_empty_albums_text(self.empty_albums.into());
+        labels.set_empty_artists_text(self.empty_artists.into());
 
         labels.set_empty_detail_text(self.empty_detail.into());
         labels.set_play_button_label(self.play_button.into());

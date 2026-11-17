@@ -190,9 +190,9 @@ pub fn resolve_subject(state: &SlintAppState, target: ContextTarget) -> Option<C
             track_subject(state, target)
         }
         ContextSurface::DetailCard => detail_card_subject(state, target.index),
-        ContextSurface::LibraryPlaylist | ContextSurface::LibraryAlbum => {
-            library_subject(state, target)
-        }
+        ContextSurface::LibraryPlaylist
+        | ContextSurface::LibraryAlbum
+        | ContextSurface::LibraryArtist => library_subject(state, target),
     }
 }
 
@@ -231,6 +231,10 @@ fn library_subject(state: &SlintAppState, target: ContextTarget) -> Option<Conte
                 DetailKind::Album,
                 album.artist_id.clone().map(ArtistTarget::Id),
             ))
+        }
+        ContextSurface::LibraryArtist => {
+            let artist = state.library_artists.get(target.index)?;
+            Some(container_subject(&artist.id, DetailKind::Artist, None))
         }
         _ => None,
     }
