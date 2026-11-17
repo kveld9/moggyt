@@ -101,6 +101,9 @@ pub fn run(
     } = deps;
 
     let mut state = SlintAppState::new(catalog, audio, session, lyrics, covers);
+    crate::slint_shell::session_rotation::spawn_session_rotation(std::sync::Arc::clone(
+        &state.catalog,
+    ));
     state.device_monitor = Some(DeviceIdentityMonitor::start());
     state.custom_theme = Some(custom_theme);
     state.matugen_theme = Some(matugen_theme);

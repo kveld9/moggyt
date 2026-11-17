@@ -136,6 +136,8 @@ the Settings page, not here:
 - **Authentication**: handled in `Settings` > `Session`, where the cookie string is pasted, stored in the
   OS credential store (keyring), and cleared on sign-out. The paste field stays available while signed in, so
   rejected cookies can be replaced without signing out; a rejected session shows `Status: Session expired`.
+  While the app runs, it refreshes the rotating session tokens in the background and persists them, so a pasted
+  session keeps working without a new paste as long as the app is opened regularly.
 - **Updates Section**:
   - Displays current update status (`Never checked`, `moggyt is up to date`, `Update available: <version>`, or
     `Update check failed (offline?)`).

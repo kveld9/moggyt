@@ -83,6 +83,7 @@ mod scrobble_control;
 pub mod search;
 pub mod search_submit;
 pub mod search_top;
+mod session_rotation;
 mod settings_callbacks;
 pub mod shortcuts;
 mod sleep_fade;
