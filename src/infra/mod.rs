@@ -65,6 +65,7 @@ mod scrobble_lastfm;
 mod scrobble_stub;
 mod session;
 mod session_keyring;
+mod session_rotate;
 mod settings;
 mod skip_sponsorblock;
 mod skip_store;
@@ -175,6 +176,7 @@ pub use scrobble::{
 };
 pub use session::{MemorySessionStore, SessionStore};
 pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
+pub use session_rotate::rotate_cookies;
 pub use settings::{
     DiskSettingsStore, MAX_CROSSFADE_SECONDS, MemorySettingsStore, Settings, SettingsStore,
     clamp_crossfade_seconds, default_config_dir,
