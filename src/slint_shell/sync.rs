@@ -14,7 +14,7 @@ use crate::slint_shell::covers::resolve_row_cover_image;
 use crate::slint_shell::detail::{
     detail_has_artwork, detail_kind_label, detail_subtitle, resolve_detail_cover_url,
 };
-use crate::slint_shell::explore::explore_card_shelves;
+use crate::slint_shell::explore::{chunk_card_rows, explore_card_shelves, tile_color_for};
 use crate::slint_shell::format::{
     format_queue_label, format_sleep_timer_status, format_update_status, timer_preset_to_index,
 };
@@ -31,7 +31,7 @@ use crate::slint_shell::state::{PersistenceError, PersistenceStore, SlintAppStat
 use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{
-    DetailUi, LibraryItemData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow,
+    DetailUi, ExploreCardData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow,
     PlaybackUi, PlayerUi, ShelfData, SleepTimerUi, TrackRowData,
 };
 
@@ -245,33 +245,47 @@ pub(crate) fn persist_recent_searches(state: &SlintAppState) {
     let _ = state.settings_store.save(&settings);
 }
 
-/// Synchronizes library collections and detail view models with Slint window.
-pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppState) {
-    let playlists: Vec<LibraryItemData> = state
+fn playlist_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
+    state
         .library_playlists
         .iter()
         .enumerate()
-        .map(|(i, p)| LibraryItemData {
-            index: i as i32,
-            title: p.title.clone().into(),
-            subtitle: library_item_subtitle(p, state.locale).into(),
-            cover: resolve_row_cover_image(p.artwork.as_deref(), &state.search_covers),
+        .map(|(index, playlist)| ExploreCardData {
+            index: index as i32,
+            title: playlist.title.clone().into(),
+            subtitle: library_item_subtitle(playlist, state.locale).into(),
+            has_cover: playlist.artwork.is_some(),
+            cover: resolve_row_cover_image(playlist.artwork.as_deref(), &state.search_covers),
+            tile_color: tile_color_for(&playlist.title),
         })
-        .collect();
-    window.set_library_playlists(ModelRc::new(VecModel::from(playlists)));
+        .collect()
+}
 
-    let albums: Vec<LibraryItemData> = state
+fn album_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
+    state
         .library_albums
         .iter()
         .enumerate()
-        .map(|(i, a)| LibraryItemData {
-            index: i as i32,
-            title: a.title.clone().into(),
-            subtitle: a.artist.clone().into(),
-            cover: resolve_row_cover_image(a.artwork.as_deref(), &state.search_covers),
+        .map(|(index, album)| ExploreCardData {
+            index: index as i32,
+            title: album.title.clone().into(),
+            subtitle: album.caption().into(),
+            has_cover: album.artwork.is_some(),
+            cover: resolve_row_cover_image(album.artwork.as_deref(), &state.search_covers),
+            tile_color: tile_color_for(&album.title),
         })
-        .collect();
-    window.set_library_albums(ModelRc::new(VecModel::from(albums)));
+        .collect()
+}
+
+/// Synchronizes library collections and detail view models with Slint window.
+pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppState) {
+    let playlist_rows = chunk_card_rows(playlist_cards(state), state.explore_columns);
+    window.set_library_playlist_rows(ModelRc::new(VecModel::from(playlist_rows)));
+
+    let album_rows = chunk_card_rows(album_cards(state), state.explore_columns);
+    window.set_library_album_rows(ModelRc::new(VecModel::from(album_rows)));
+
+    window.set_library_filter(state.library_filter.to_index());
 
     if let Some(detail) = &state.detail {
         window.set_detail_has_detail(true);

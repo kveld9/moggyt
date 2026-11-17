@@ -13,6 +13,7 @@ use crate::infra::{
     MemoryPlayLogStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore, OutputDeviceWatch,
     SessionStore, SettingsStore, StubScrobbler,
 };
+use crate::slint_shell::library_filter::LibraryFilter;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
 use crate::slint_shell::state::{
@@ -75,6 +76,7 @@ impl SlintAppState {
             search_top_result: None,
             library_playlists: Vec::new(),
             library_albums: Vec::new(),
+            library_filter: LibraryFilter::default(),
             detail: None,
             detail_return: SlintPage::Search,
             playback_phase: PlaybackPhase::Empty,

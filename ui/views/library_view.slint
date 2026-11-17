@@ -1,16 +1,19 @@
 import { Labels } from "../labels.slint";
-import { Theme, LibraryItemData } from "../theme.slint";
-import { LibraryItemCard } from "../components/rows.slint";
+import { Theme, ExploreCardRow } from "../theme.slint";
+import { FilterChip } from "../components/controls.slint";
+import { MediaCard } from "../components/cards.slint";
 import { ContextSurface } from "../components/context_menu.slint";
 import { IconLibrary } from "../icons.slint";
 
 export component LibraryView inherits VerticalLayout {
     in property <bool> signed-in: false;
     in property <bool> session-expired: false;
-    in property <[LibraryItemData]> playlists: [];
-    in property <[LibraryItemData]> albums: [];
+    in property <int> active-filter: 0;
+    in property <[ExploreCardRow]> playlist-rows: [];
+    in property <[ExploreCardRow]> album-rows: [];
     callback playlist-selected(int);
     callback album-selected(int);
+    callback chip-selected(int);
     callback import-requested();
     callback open-settings();
     spacing: 16px;
@@ -96,31 +99,72 @@ export component LibraryView inherits VerticalLayout {
         }
     }
 
-    if root.signed-in && !root.session-expired : VerticalLayout {
-        spacing: 6px;
-        Text { text: Labels.section-playlists-label; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.playlists.length == 0 : Text { text: Labels.empty-playlists-text; color: Theme.secondary; font-size: 13px; }
-        for item in root.playlists : LibraryItemCard {
-            index: item.index;
-            surface: ContextSurface.library-playlist;
-            title: item.title;
-            subtitle: item.subtitle;
-            cover: item.cover;
-            clicked => { root.playlist-selected(item.index); }
+    if root.signed-in && !root.session-expired : HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+
+        FilterChip {
+            text: Labels.section-playlists-label;
+            is-active: root.active-filter == 0;
+            clicked => { root.chip-selected(0); }
+        }
+
+        FilterChip {
+            text: Labels.section-albums-label;
+            is-active: root.active-filter == 1;
+            clicked => { root.chip-selected(1); }
         }
     }
 
-    if root.signed-in && !root.session-expired : VerticalLayout {
+    if root.signed-in && !root.session-expired && root.active-filter == 0 : VerticalLayout {
         spacing: 6px;
-        Text { text: Labels.section-albums-label; color: Theme.text; font-size: 16px; font-weight: 700; }
-        if root.albums.length == 0 : Text { text: Labels.empty-albums-text; color: Theme.secondary; font-size: 13px; }
-        for item in root.albums : LibraryItemCard {
-            index: item.index;
-            surface: ContextSurface.library-album;
-            title: item.title;
-            subtitle: item.subtitle;
-            cover: item.cover;
-            clicked => { root.album-selected(item.index); }
+
+        if root.playlist-rows.length == 0 : Text {
+            text: Labels.empty-playlists-text;
+            color: Theme.secondary;
+            font-size: 13px;
+        }
+
+        for row in root.playlist-rows : HorizontalLayout {
+            spacing: 12px;
+            alignment: start;
+
+            for card in row.cards : MediaCard {
+                index: card.index;
+                surface: ContextSurface.library-playlist;
+                title: card.title;
+                subtitle: card.subtitle;
+                has-cover: card.has_cover;
+                cover: card.cover;
+                tile-color: card.tile_color;
+                clicked => { root.playlist-selected(card.index); }
+            }
+        }
+    }
+
+    if root.signed-in && !root.session-expired && root.active-filter == 1 : VerticalLayout {
+        spacing: 6px;
+
+        if root.album-rows.length == 0 : Text {
+            text: Labels.empty-albums-text;
+            color: Theme.secondary;
+            font-size: 13px;
+        }
+
+        for row in root.album-rows : HorizontalLayout {
+            spacing: 12px;
+            alignment: start;
+
+            for card in row.cards : MediaCard {
+                index: card.index;
+                surface: ContextSurface.library-album;
+                title: card.title;
+                subtitle: card.subtitle;
+                has-cover: card.has_cover;
+                cover: card.cover;
+                tile-color: card.tile_color;
+                clicked => { root.album-selected(card.index); }
+            }
         }
     }
 }

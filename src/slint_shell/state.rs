@@ -24,6 +24,7 @@ use crate::infra::{
 use crate::slint_shell::auto_skip::{SponsorFetchOutcome, SponsorRangeState};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::format::cycle_playback_speed_preset;
+use crate::slint_shell::library_filter::LibraryFilter;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_control::StartedPlay;
@@ -90,6 +91,7 @@ pub struct SlintAppState {
     pub search_top_result: Option<SearchResult>,
     pub library_playlists: Vec<Playlist>,
     pub library_albums: Vec<Album>,
+    pub(crate) library_filter: LibraryFilter,
     pub detail: Option<Detail>,
     pub detail_return: SlintPage,
     pub playback_phase: PlaybackPhase,
