@@ -1,5 +1,5 @@
 import { Labels } from "../labels.slint";
-import { PlaybackUi, Theme, TrackRowData } from "../theme.slint";
+import { PlaybackUi, PlayerBarUi, Theme, TrackRowData } from "../theme.slint";
 import { QueueList } from "./queue_list.slint";
 import { IconClose, IconTrash } from "../icons.slint";
 
@@ -23,6 +23,8 @@ export component QueuePanel inherits Rectangle {
 
     VerticalLayout {
         padding: 16px;
+        // The panel spans the window height, so reserve the strip the floating bar covers.
+        padding-bottom: 16px + PlayerBarUi.content-inset;
         spacing: 16px;
 
         HorizontalLayout {

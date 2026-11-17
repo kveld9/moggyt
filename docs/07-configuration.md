@@ -241,7 +241,8 @@ The configuration file uses JSON serialization with atomic replacement:
     compile-time environment variable (`MOGGYT_LASTFM_SECRET`).
 - **Player Bar Mode (`player_bar_mode`)**:
   - `"classic"`: Docked full-width bar flush with window bottom edge (default).
-  - `"floating"`: Rounded, centered card floating above the bottom edge capped at 960px.
+  - `"floating"`: Rounded, centered card painted over the content column, 20px above the bottom edge and capped at
+    960px; scrollable content pads its bottom edge so the covered strip cannot hide the last row.
 - **Player Bar Elements**:
   - `player_bar_show_artwork` (boolean, default `true`): Whether cover artwork thumbnail is shown.
   - `player_bar_show_like` (boolean, default `true`): Whether like/favorite heart button is shown.

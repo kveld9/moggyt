@@ -354,8 +354,9 @@ Users can customize the player bar appearance and element visibility under **Set
 
 - **Presentation Modes**:
   - `Classic`: Docked, full-width bar flush with the bottom edge of the window, separated by a thin 1px top border.
-  - `Floating`: Centered, rounded pill card floating above the bottom edge with a subtle drop shadow and a 960px width
-    cap.
+  - `Floating`: Centered, rounded pill card that paints over the content column, 24px from each side and 20px above
+    the bottom edge, with a subtle drop shadow and a 960px width cap. Scrollable pages and the queue list keep a
+    bottom inset so their last rows stay reachable above the bar.
 - **Customizable Toggles**:
   - `Show artwork`: Toggles track album art thumbnail on the left. When hidden, the title and artist move flush left.
   - `Show like button`: Toggles the favorite heart icon button next to track metadata.

@@ -1,8 +1,14 @@
 import { PlayerBar } from "../components/player_bar.slint";
+import { PlayerBarUi } from "../theme.slint";
 
 // Host that owns the classic/floating geometry of the bottom player bar.
+//
+// The host is a direct child of the Window and fills it, so the bar anchors itself to
+// the host's bottom edge: a component root cannot read `parent`, but a child placed
+// inside the host can. In classic mode the window layout reserves the bar height at the
+// bottom; in floating mode the layout reserves nothing and the bar paints over the
+// content column.
 export component PlayerBarHost inherits Rectangle {
-    in property <int> mode: 0;
     in property <bool> show-artwork: true;
     in property <bool> show-like: true;
     in property <bool> show-shuffle: true;
@@ -20,12 +26,10 @@ export component PlayerBarHost inherits Rectangle {
     in property <bool> is-queue-open: false;
     callback toggle-queue-panel();
 
-    vertical-stretch: 0;
     background: transparent;
-    height: root.mode == 1 ? 92px : 72px;
 
     PlayerBar {
-        mode: root.mode;
+        mode: PlayerBarUi.mode;
         show-artwork: root.show-artwork;
         show-like: root.show-like;
         show-shuffle: root.show-shuffle;
@@ -35,10 +39,11 @@ export component PlayerBarHost inherits Rectangle {
         show-volume: root.show-volume;
         show-timer: root.show-timer;
         show-speed: root.show-speed;
-        width: root.mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
+        width: PlayerBarUi.mode == 1 ? min(parent.width - 48px, 960px) : parent.width;
         height: 72px;
         x: (parent.width - self.width) / 2;
-        y: root.mode == 1 ? 8px : 0px;
+        // 20px gap under the floating bar; the classic bar stays flush with the edge.
+        y: parent.height - self.height - (PlayerBarUi.mode == 1 ? 20px : 0px);
         active-track-title: root.active-track-title;
         active-track-artist: root.active-track-artist;
         cover: root.cover;
