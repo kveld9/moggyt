@@ -13,6 +13,7 @@ use crate::slint_shell::explore::{
     explore_item_at, load_category_async, load_explore_async, refresh_explore_covers_if_loaded,
 };
 use crate::slint_shell::format::{audio_quality_from_index, audio_quality_to_index};
+use crate::slint_shell::library_filter::LibraryFilter;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
     cycle_repeat_mode, progress_fraction, push_time_labels, repeat_mode_to_int,
@@ -362,6 +363,15 @@ fn wire_library_callbacks(
         if let Some(a) = st.library_albums.get(idx as usize).cloned() {
             open_detail_async(&win, &mut st, &a.id, DetailKind::Album, &tx);
         }
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.on_library_chip_selected(move |idx| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        st.library_filter = LibraryFilter::from_index(idx);
+        sync_window(&win, &mut st);
     });
 }
 

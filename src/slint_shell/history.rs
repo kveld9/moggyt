@@ -3,6 +3,7 @@
 use crate::domain::{Detail, Playlist};
 use crate::i18n::{Locale, tr};
 use crate::infra::HISTORY_BROWSE_ID;
+use crate::slint_shell::format::format_track_count;
 
 /// Returns true if the given browse identifier corresponds to the account listening history.
 pub(crate) fn is_history_id(id: &str) -> bool {
@@ -34,15 +35,15 @@ pub(crate) fn label_history_detail(mut detail: Detail, locale: Locale) -> Detail
     detail
 }
 
-/// Returns the formatted subtitle for a library playlist item.
+/// Returns the formatted subtitle for a library playlist card.
 ///
 /// Returns an empty string for the account listening history entry; otherwise returns
-/// the standard track count display.
-pub(crate) fn library_item_subtitle(playlist: &Playlist, _locale: Locale) -> String {
+/// the localized track count.
+pub(crate) fn library_item_subtitle(playlist: &Playlist, locale: Locale) -> String {
     if is_history_id(&playlist.id) {
         String::new()
     } else {
-        format!("{} tracks", playlist.track_count)
+        format_track_count(locale, playlist.track_count as u32)
     }
 }
 
@@ -123,6 +124,8 @@ mod tests {
 
         let regular = Playlist::new("p1", "Regular", 12, None);
         assert_eq!(library_item_subtitle(&regular, Locale::English), "12 tracks");
-        assert_eq!(library_item_subtitle(&regular, Locale::Spanish), "12 tracks");
+        assert_eq!(library_item_subtitle(&regular, Locale::Spanish), "12 pistas");
+        let single = Playlist::new("p1", "Mine", 1, None);
+        assert_eq!(library_item_subtitle(&single, Locale::English), "1 track");
     }
 }
