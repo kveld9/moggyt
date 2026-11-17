@@ -22,7 +22,8 @@ use super::catalog_requests::{
 use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
 use crate::i18n::Locale;
 use serde_json::Value;
-use std::time::Duration;
+use sha1::{Digest, Sha1};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Blocking HTTP client for the catalog API.
 pub struct CatalogClient {
@@ -40,6 +41,25 @@ impl std::fmt::Debug for CatalogClient {
             .field("locale", &self.locale)
             .finish()
     }
+}
+
+/// Origin the catalog session signature is bound to.
+const CATALOG_ORIGIN: &str = "https://music.youtube.com";
+
+fn cookie_value<'a>(cookies: &'a str, name: &str) -> Option<&'a str> {
+    cookies
+        .split(';')
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(key, _)| *key == name)
+        .map(|(_, value)| value.trim())
+        .filter(|value| !value.is_empty())
+}
+
+/// Builds the origin-bound `SAPISIDHASH` authorization the catalog requires for signed-in requests.
+fn sapisid_authorization(cookies: &str, timestamp: u64) -> Option<String> {
+    let sapisid = cookie_value(cookies, "SAPISID")?;
+    let digest = Sha1::digest(format!("{timestamp} {sapisid} {CATALOG_ORIGIN}").as_bytes());
+    Some(format!("SAPISIDHASH {timestamp}_{digest:x}"))
 }
 
 fn has_grid_items(section: &Value) -> bool {
@@ -181,12 +201,43 @@ impl CatalogClient {
         self.cookies.is_some()
     }
 
+    /// Adds the stored session and its origin-bound signature to a catalog request.
+    ///
+    /// Anonymous requests pass through unchanged. A stored session without `SAPISID`
+    /// cannot be signed, so the request stays anonymous and the caller sees an empty
+    /// authenticated payload; warn instead of silently degrading.
+    fn signed_request(
+        &self,
+        request: reqwest::blocking::RequestBuilder,
+    ) -> reqwest::blocking::RequestBuilder {
+        let Some(cookie) = self.cookies.as_deref() else {
+            return request;
+        };
+        let request = request.header("Cookie", cookie).header("X-Origin", CATALOG_ORIGIN);
+        let timestamp = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(elapsed) => elapsed.as_secs(),
+            Err(_) => {
+                tracing::warn!("system clock precedes the unix epoch; catalog request is unsigned");
+                return request;
+            }
+        };
+        match sapisid_authorization(cookie, timestamp) {
+            Some(authorization) => request.header("Authorization", authorization),
+            None => {
+                tracing::warn!(
+                    "stored session has no SAPISID cookie; catalog request is anonymous"
+                );
+                request
+            }
+        }
+    }
+
     fn execute_search_payload(&self, body: &Value) -> anyhow::Result<Value> {
         let url = format!(
             "https://music.youtube.com/youtubei/v1/search?key={}&prettyPrint=false",
             self.api_key
         );
-        let response = self.client.post(&url).json(body).send()?;
+        let response = self.signed_request(self.client.post(&url)).json(body).send()?;
         let status = response.status();
         if !status.is_success() {
             anyhow::bail!("CatalogClient search request failed with status: {status}");
@@ -239,7 +290,7 @@ impl CatalogClient {
     pub fn next_payload(&self, video_id: &str) -> anyhow::Result<Value> {
         let url = next_url();
         let body = next_body(video_id, self.locale);
-        let response = self.client.post(&url).json(&body).send()?;
+        let response = self.signed_request(self.client.post(&url)).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
             anyhow::bail!("CatalogClient next request failed with status: {status}");
@@ -267,7 +318,7 @@ impl CatalogClient {
     ) -> anyhow::Result<Value> {
         let url = browse_url();
         let body = browse_body_with_params(browse_id, params, self.locale);
-        let response = self.client.post(&url).json(&body).send()?;
+        let response = self.signed_request(self.client.post(&url)).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
             anyhow::bail!("CatalogClient browse request failed with status: {status}");
@@ -362,7 +413,7 @@ impl CatalogClient {
     fn continuation_payload(&self, token: &str) -> anyhow::Result<Value> {
         let url = browse_url();
         let body = continuation_body(token, self.locale);
-        let response = self.client.post(&url).json(&body).send()?;
+        let response = self.signed_request(self.client.post(&url)).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
             anyhow::bail!("CatalogClient continuation request failed with status: {status}");
@@ -373,12 +424,12 @@ impl CatalogClient {
 
     /// Executes authenticated browse request for `browse_id`.
     pub fn library_browse_payload(&self, browse_id: &str) -> anyhow::Result<Value> {
-        let Some(cookie) = &self.cookies else {
+        if self.cookies.is_none() {
             anyhow::bail!("Unauthenticated CatalogClient cannot request library endpoint");
-        };
+        }
         let url = browse_url();
         let body = browse_body(browse_id, self.locale);
-        let response = self.client.post(&url).header("Cookie", cookie).json(&body).send()?;
+        let response = self.signed_request(self.client.post(&url)).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
             anyhow::bail!("CatalogClient library browse request failed with status: {status}");
@@ -426,6 +477,25 @@ impl Default for CatalogClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cookie_value_reads_named_pairs() {
+        let cookies = "SID=abc; SAPISID=xyz;  SSID=q";
+        assert_eq!(cookie_value(cookies, "SAPISID"), Some("xyz"));
+        assert_eq!(cookie_value(cookies, "SID"), Some("abc"));
+        assert_eq!(cookie_value(cookies, "MISSING"), None);
+        assert_eq!(cookie_value("SAPISID=  ", "SAPISID"), None);
+    }
+
+    #[test]
+    fn sapisid_authorization_signs_the_catalog_origin() {
+        let cookies = "SID=abc; SAPISID=Y8DaQK1-VRZxrpWu/AOBQYOHADPvQdIhvU; SSID=q";
+        assert_eq!(
+            sapisid_authorization(cookies, 1_700_000_000).as_deref(),
+            Some("SAPISIDHASH 1700000000_50bc7ad615487c9316ec93da978bcb26411ca453")
+        );
+        assert_eq!(sapisid_authorization("SID=abc", 1_700_000_000), None);
+    }
 
     #[test]
     fn catalog_client_detail_blank_id_returns_none() {
