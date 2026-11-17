@@ -46,6 +46,7 @@ pub struct StaticLabels {
     pub session_signed_in_hint: &'static str,
     pub sign_out: &'static str,
     pub library_signed_out_hint: &'static str,
+    pub library_session_expired_hint: &'static str,
     pub open_settings_label: &'static str,
     pub section_playlists: &'static str,
     pub empty_playlists: &'static str,
@@ -255,6 +256,10 @@ impl StaticLabels {
             session_signed_in_hint: tr(locale, "Signed in: library unlocked"),
             sign_out: tr(locale, "Sign out"),
             library_signed_out_hint: tr(locale, "Sign in from Settings to load your library."),
+            library_session_expired_hint: tr(
+                locale,
+                "Your session expired. Paste fresh cookies in Settings.",
+            ),
             open_settings_label: tr(locale, "Open settings"),
             section_playlists: tr(locale, "Playlists"),
             empty_playlists: tr(locale, "No playlists found."),
@@ -465,6 +470,7 @@ impl StaticLabels {
         labels.set_session_signed_in_hint(self.session_signed_in_hint.into());
         labels.set_sign_out_label(self.sign_out.into());
         labels.set_library_signed_out_hint(self.library_signed_out_hint.into());
+        labels.set_library_session_expired_hint(self.library_session_expired_hint.into());
         labels.set_open_settings_label(self.open_settings_label.into());
         labels.set_section_playlists_label(self.section_playlists.into());
         labels.set_empty_playlists_text(self.empty_playlists.into());

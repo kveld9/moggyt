@@ -43,6 +43,7 @@ use crate::slint_shell::sync::{
     observe_view_phases, sync_header_title, sync_library_and_detail, sync_playback_tick,
     sync_recent_searches, sync_shelves_and_queue, sync_update_status, sync_view_phase, sync_window,
 };
+use crate::slint_shell::sync_phase::library_failure_phase;
 use crate::slint_shell::theme::apply_custom_theme_if_changed;
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{MoggytWindow, PlayerUi};
@@ -296,6 +297,7 @@ fn apply_async_library_outcome(
     if state.library_generation != generation {
         return false;
     }
+    let failure = library_failure_phase(&playlists, &albums);
     match (playlists, albums) {
         (Ok(playlists), Ok(albums)) => {
             let local = current_store().map(|s| s.list()).unwrap_or_default();
@@ -310,7 +312,7 @@ fn apply_async_library_outcome(
             true
         }
         _ => {
-            state.library_phase = ViewPhase::Error;
+            state.library_phase = failure;
             false
         }
     }

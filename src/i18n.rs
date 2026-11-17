@@ -368,6 +368,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("View on GitHub", "Ver en GitHub"),
     ("Waiting for authorization in your browser", "Esperando la autorización en tu navegador"),
     ("White", "Blanco"),
+    (
+        "Your session expired. Paste fresh cookies in Settings.",
+        "Tu sesión venció. Pegá cookies nuevas en Ajustes.",
+    ),
     ("YouTube video ID", "ID de video de YouTube"),
     ("plays", "reproducciones"),
     ("{count} track", "{count} pista"),
