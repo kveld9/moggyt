@@ -158,6 +158,9 @@ impl Catalog for VideoTrackSearchCatalog {
     fn saved_albums(&self) -> Result<Vec<crate::domain::Album>, CatalogError> {
         Ok(Vec::new())
     }
+    fn library_artists(&self) -> Result<Vec<crate::domain::Artist>, CatalogError> {
+        Ok(Vec::new())
+    }
     fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
         Ok(None)
     }
@@ -218,6 +221,9 @@ impl Catalog for BadgeVideoSearchCatalog {
         Ok(Vec::new())
     }
     fn saved_albums(&self) -> Result<Vec<crate::domain::Album>, CatalogError> {
+        Ok(Vec::new())
+    }
+    fn library_artists(&self) -> Result<Vec<crate::domain::Artist>, CatalogError> {
         Ok(Vec::new())
     }
     fn detail(&self, _: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {

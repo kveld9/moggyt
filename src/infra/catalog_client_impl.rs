@@ -9,17 +9,19 @@ use super::catalog_parse_detail::parse_detail_all;
 use super::catalog_parse_explore::parse_explore_all;
 use super::catalog_parse_home::parse_home_all;
 use super::catalog_parse_library::{
-    parse_library_albums, parse_library_playlists, payload_is_logged_out,
+    parse_library_albums, parse_library_artists, parse_library_playlists, payload_is_logged_out,
 };
 use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::parse_search_tracks;
 use super::catalog_requests::{
     CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
-    LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body, browse_body_with_params,
-    browse_url, continuation_body, next_body, next_url, search_body, search_body_with_params,
-    search_filter_params,
+    LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_ARTISTS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, browse_body,
+    browse_body_with_params, browse_url, continuation_body, next_body, next_url, search_body,
+    search_body_with_params, search_filter_params,
 };
-use crate::domain::{Album, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track};
+use crate::domain::{
+    Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
+};
 use crate::i18n::Locale;
 use serde_json::Value;
 use sha1::{Digest, Sha1};
@@ -460,6 +462,18 @@ impl CatalogClient {
             .map_err(|_| CatalogError::Transport)?;
         let albums = parse_library_albums(&payload);
         validate_library_payload(albums, &payload)
+    }
+
+    /// Queries the browse endpoint for the user's followed artists.
+    pub fn library_artists(&self) -> Result<Vec<Artist>, CatalogError> {
+        if !self.is_authenticated() {
+            return Err(CatalogError::Unauthenticated);
+        }
+        let payload = self
+            .library_browse_payload(LIBRARY_ARTISTS_BROWSE_ID)
+            .map_err(|_| CatalogError::Transport)?;
+        let artists = parse_library_artists(&payload);
+        validate_library_payload(artists, &payload)
     }
 
     /// Converts this catalog API client into a [`LiveCatalog`] adapter.

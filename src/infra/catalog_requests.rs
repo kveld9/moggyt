@@ -16,6 +16,9 @@ pub const LIBRARY_PLAYLISTS_BROWSE_ID: &str = "FEmusic_liked_playlists";
 /// Library saved albums browse identifier for YouTube Music.
 pub const LIBRARY_ALBUMS_BROWSE_ID: &str = "FEmusic_liked_albums";
 
+/// Library artists browse identifier for YouTube Music.
+pub const LIBRARY_ARTISTS_BROWSE_ID: &str = "FEmusic_library_corpus_artists";
+
 /// Browse id of the signed-in account's listening history.
 pub const HISTORY_BROWSE_ID: &str = "FEmusic_history";
 

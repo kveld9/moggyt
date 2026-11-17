@@ -187,6 +187,10 @@ impl Catalog for CatalogStub {
         Ok(vec![Self::stub_album()])
     }
 
+    fn library_artists(&self) -> Result<Vec<Artist>, CatalogError> {
+        Ok(vec![Self::stub_artist()])
+    }
+
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         let trimmed = browse_id.trim();
         if trimmed.is_empty() {

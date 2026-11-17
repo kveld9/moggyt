@@ -68,11 +68,18 @@ pub struct Artist {
     pub id: String,
     pub name: String,
     pub artwork: Option<String>,
+    /// Subscriber count label carried by library shelves, when present.
+    pub subscribers: Option<String>,
 }
 
 impl Artist {
     pub fn new(id: &str, name: &str, artwork: Option<String>) -> Self {
-        Self { id: id.to_owned(), name: name.to_owned(), artwork }
+        Self { id: id.to_owned(), name: name.to_owned(), artwork, subscribers: None }
+    }
+
+    pub fn with_subscribers(mut self, subscribers: Option<String>) -> Self {
+        self.subscribers = subscribers;
+        self
     }
 
     pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {

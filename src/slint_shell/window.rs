@@ -30,6 +30,7 @@ use crate::slint_shell::import_callbacks::{
 };
 use crate::slint_shell::import_state::{local_detail, merge_local_library};
 use crate::slint_shell::init::apply_updater_release;
+use crate::slint_shell::library_fetch::LibraryFetch;
 use crate::slint_shell::platform::dispatch_to_ui;
 use crate::slint_shell::playback::{is_track_liked, push_time_labels};
 use crate::slint_shell::playback_control::apply_play_track_completion;
@@ -284,35 +285,32 @@ pub fn retry_detail_load(
     open_detail_async(window, state, &id, kind, worker_tx);
 }
 
-fn is_library_empty(p: &[crate::domain::Playlist], a: &[crate::domain::Album]) -> bool {
-    p.is_empty() && a.is_empty()
-}
-
 fn apply_async_library_outcome(
     state: &mut SlintAppState,
     generation: u64,
-    playlists: Result<Vec<crate::domain::Playlist>, CatalogError>,
-    albums: Result<Vec<crate::domain::Album>, CatalogError>,
+    fetch: LibraryFetch,
 ) -> bool {
     if state.library_generation != generation {
         return false;
     }
-    let failure = library_failure_phase(&playlists, &albums, state.signed_in);
-    match (playlists, albums) {
-        (Ok(playlists), Ok(albums)) => {
+    match fetch.into_sections() {
+        Ok(sections) => {
             let local = current_store().map(|s| s.list()).unwrap_or_default();
-            let is_empty = is_library_empty(&playlists, &albums);
+            let is_empty = sections.playlists.is_empty()
+                && sections.albums.is_empty()
+                && sections.artists.is_empty();
             state.library_playlists = with_history_entry(
-                merge_local_library(&playlists, &local),
+                merge_local_library(&sections.playlists, &local),
                 state.signed_in,
                 state.locale,
             );
-            state.library_albums = albums;
+            state.library_albums = sections.albums;
+            state.library_artists = sections.artists;
             state.library_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
             true
         }
-        _ => {
-            state.library_phase = failure;
+        Err(error) => {
+            state.library_phase = library_failure_phase(error, state.signed_in);
             false
         }
     }
@@ -331,11 +329,11 @@ pub(crate) fn refresh_library_async(
     let tx = worker_tx.clone();
 
     std::thread::spawn(move || {
-        let (g, playlists, albums) = execute_refresh_library(generation, &cat);
+        let (g, fetch) = execute_refresh_library(generation, &cat);
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
-                if apply_async_library_outcome(st, g, playlists, albums) {
+                if apply_async_library_outcome(st, g, fetch) {
                     request_library_covers(st, &tx);
                 }
                 sync_library_and_detail(&win, st);
@@ -698,8 +696,11 @@ mod tests {
         let applied_stale = apply_async_library_outcome(
             &mut state,
             9,
-            Err(CatalogError::Transport),
-            Err(CatalogError::Transport),
+            LibraryFetch {
+                playlists: Err(CatalogError::Transport),
+                albums: Err(CatalogError::Transport),
+                artists: Err(CatalogError::Transport),
+            },
         );
         assert!(!applied_stale);
 
@@ -708,14 +709,25 @@ mod tests {
         let applied_err = apply_async_library_outcome(
             &mut state,
             10,
-            Err(CatalogError::Transport),
-            Err(CatalogError::Transport),
+            LibraryFetch {
+                playlists: Err(CatalogError::Transport),
+                albums: Err(CatalogError::Transport),
+                artists: Err(CatalogError::Transport),
+            },
         );
         assert!(!applied_err);
         assert_eq!(state.library_phase, ViewPhase::Error);
         assert_eq!(state.library_playlists, vec![initial]);
 
-        assert!(apply_async_library_outcome(&mut state, 10, Ok(Vec::new()), Ok(Vec::new())));
+        assert!(apply_async_library_outcome(
+            &mut state,
+            10,
+            LibraryFetch {
+                playlists: Ok(Vec::new()),
+                albums: Ok(Vec::new()),
+                artists: Ok(Vec::new()),
+            },
+        ));
         assert_eq!(state.library_phase, ViewPhase::Empty);
     }
 
