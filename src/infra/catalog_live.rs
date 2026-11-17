@@ -182,6 +182,11 @@ impl Catalog for LiveCatalog {
         self.client.library_artists()
     }
 
+    /// Returns library songs.
+    fn library_songs(&self) -> Result<Vec<Track>, CatalogError> {
+        self.client.library_songs()
+    }
+
     /// Returns detail view for `browse_id` and `kind`.
     fn detail(&self, browse_id: &str, kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         self.client.detail(browse_id, kind)

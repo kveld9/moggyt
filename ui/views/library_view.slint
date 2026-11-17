@@ -1,7 +1,8 @@
 import { Labels } from "../labels.slint";
-import { Theme, ExploreCardRow } from "../theme.slint";
+import { Theme, ExploreCardRow, TrackRowData } from "../theme.slint";
 import { FilterChip } from "../components/controls.slint";
 import { MediaCard } from "../components/cards.slint";
+import { TrackRow } from "../components/rows.slint";
 import { ContextSurface } from "../components/context_menu.slint";
 import { IconLibrary } from "../icons.slint";
 
@@ -12,9 +13,11 @@ export component LibraryView inherits VerticalLayout {
     in property <[ExploreCardRow]> playlist-rows: [];
     in property <[ExploreCardRow]> album-rows: [];
     in property <[ExploreCardRow]> artist-rows: [];
+    in property <[TrackRowData]> song-rows: [];
     callback playlist-selected(int);
     callback album-selected(int);
     callback artist-selected(int);
+    callback song-selected(int);
     callback chip-selected(int);
     callback import-requested();
     callback open-settings();
@@ -112,15 +115,21 @@ export component LibraryView inherits VerticalLayout {
         }
 
         FilterChip {
-            text: Labels.section-albums-label;
+            text: Labels.filter-songs-label;
             is-active: root.active-filter == 1;
             clicked => { root.chip-selected(1); }
         }
 
         FilterChip {
-            text: Labels.filter-artists-label;
+            text: Labels.section-albums-label;
             is-active: root.active-filter == 2;
             clicked => { root.chip-selected(2); }
+        }
+
+        FilterChip {
+            text: Labels.filter-artists-label;
+            is-active: root.active-filter == 3;
+            clicked => { root.chip-selected(3); }
         }
     }
 
@@ -151,6 +160,28 @@ export component LibraryView inherits VerticalLayout {
     }
 
     if root.signed-in && !root.session-expired && root.active-filter == 1 : VerticalLayout {
+        spacing: 2px;
+
+        if root.song-rows.length == 0 : Text {
+            text: Labels.empty-liked-songs-text;
+            color: Theme.secondary;
+            font-size: 13px;
+        }
+
+        for row in root.song-rows : TrackRow {
+            index: row.index;
+            title: row.title;
+            artist: row.artist;
+            album: row.album;
+            duration: row.duration;
+            kind: row.kind;
+            cover: row.cover;
+            surface: ContextSurface.library-song;
+            clicked => { root.song-selected(row.index); }
+        }
+    }
+
+    if root.signed-in && !root.session-expired && root.active-filter == 2 : VerticalLayout {
         spacing: 6px;
 
         if root.album-rows.length == 0 : Text {
@@ -175,7 +206,7 @@ export component LibraryView inherits VerticalLayout {
             }
         }
     }
-    if root.signed-in && !root.session-expired && root.active-filter == 2 : VerticalLayout {
+    if root.signed-in && !root.session-expired && root.active-filter == 3 : VerticalLayout {
         spacing: 6px;
 
         if root.artist-rows.length == 0 : Text {

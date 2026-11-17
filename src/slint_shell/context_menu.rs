@@ -186,9 +186,10 @@ pub fn resolve_subject(state: &SlintAppState, target: ContextTarget) -> Option<C
         ContextSurface::Search | ContextSurface::Explore | ContextSurface::Category => {
             item_subject(state, target)
         }
-        ContextSurface::Detail | ContextSurface::Queue | ContextSurface::PlayerBar => {
-            track_subject(state, target)
-        }
+        ContextSurface::Detail
+        | ContextSurface::Queue
+        | ContextSurface::PlayerBar
+        | ContextSurface::LibrarySong => track_subject(state, target),
         ContextSurface::DetailCard => detail_card_subject(state, target.index),
         ContextSurface::LibraryPlaylist
         | ContextSurface::LibraryAlbum
@@ -213,6 +214,7 @@ fn track_subject(state: &SlintAppState, target: ContextTarget) -> Option<Context
         ContextSurface::Detail => state.detail.as_ref()?.tracks.get(target.index)?,
         ContextSurface::Queue => state.queue.tracks().get(target.index)?,
         ContextSurface::PlayerBar => state.queue.current()?,
+        ContextSurface::LibrarySong => state.library_songs.get(target.index)?,
         _ => return None,
     };
     Some(ContextSubject::Track(track.clone()))

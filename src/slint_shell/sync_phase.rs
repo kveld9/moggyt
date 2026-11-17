@@ -34,9 +34,11 @@ impl SlintAppState {
         match fetch.into_sections() {
             Ok(sections) => {
                 let is_empty = sections.playlists.is_empty()
+                    && sections.songs.is_empty()
                     && sections.albums.is_empty()
                     && sections.artists.is_empty();
                 self.library_playlists = sections.playlists;
+                self.library_songs = sections.songs;
                 self.library_albums = sections.albums;
                 self.library_artists = sections.artists;
                 self.library_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
@@ -145,6 +147,7 @@ mod tests {
         state.signed_in = true;
         state.apply_library_outcome(LibraryFetch {
             playlists: Err(CatalogError::Unauthenticated),
+            songs: Err(CatalogError::Unauthenticated),
             albums: Err(CatalogError::Unauthenticated),
             artists: Err(CatalogError::Unauthenticated),
         });
@@ -153,6 +156,7 @@ mod tests {
         assert_eq!(state.library_phase, ViewPhase::Expired, "derivation must preserve Expired");
         state.apply_library_outcome(LibraryFetch {
             playlists: Ok(Vec::new()),
+            songs: Ok(Vec::new()),
             albums: Ok(Vec::new()),
             artists: Ok(Vec::new()),
         });
