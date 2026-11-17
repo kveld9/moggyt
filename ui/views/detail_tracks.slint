@@ -1,0 +1,52 @@
+import { TrackRowData } from "../theme.slint";
+import { DetailUi, LocalEditUi } from "../components/detail_ui.slint";
+import { TrackRow } from "../components/rows.slint";
+import { PlaylistHeader, PlaylistRow } from "../components/playlist_table.slint";
+import { ContextSurface } from "../components/context_menu.slint";
+
+export component DetailTracks inherits VerticalLayout {
+    in property <[TrackRowData]> tracks: [];
+    callback track-selected(int);
+
+    spacing: DetailUi.playlist-table ? 0px : 16px;
+    alignment: start;
+
+    if DetailUi.playlist-table && root.tracks.length > 0 : PlaylistHeader {
+        compact: DetailUi.compact-tracks;
+    }
+
+    if DetailUi.playlist-table : VerticalLayout {
+        spacing: 0px;
+        alignment: start;
+
+        for track[i] in root.tracks : PlaylistRow {
+            track: track;
+            number: i + 1;
+            track-index: track.index;
+            compact: DetailUi.compact-tracks;
+            clicked => { root.track-selected(track.index); }
+        }
+    }
+
+    if !DetailUi.playlist-table : VerticalLayout {
+        spacing: 16px;
+        alignment: start;
+
+        for track in root.tracks : TrackRow {
+            title: track.title;
+            artist: track.artist;
+            album: track.album;
+            duration: track.duration;
+            kind: track.kind;
+            index: track.index;
+            surface: ContextSurface.detail;
+            cover: track.cover;
+            show-remove: LocalEditUi.is-local;
+            compact: DetailUi.compact-tracks;
+            clicked => { root.track-selected(track.index); }
+            remove-requested => { LocalEditUi.remove-track-requested(track.index); }
+            move-up-requested => { LocalEditUi.move-track-requested(track.index, track.index - 1); }
+            move-down-requested => { LocalEditUi.move-track-requested(track.index, track.index + 1); }
+        }
+    }
+}

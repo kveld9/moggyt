@@ -52,6 +52,7 @@ fn track_to_row(index: usize, track: &Track) -> TrackRowData {
         title: track.title.clone().into(),
         artist: track.artist.clone().into(),
         album: track.album.clone().unwrap_or_default().into(),
+        added: "".into(),
         duration: format_duration(track.duration_secs).into(),
         kind: "track".into(),
         cover: slint::Image::default(),

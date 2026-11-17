@@ -46,6 +46,12 @@ mod tests {
         assert_eq!(en_labels.show_less, "Show less");
         assert_eq!(en_labels.compact_view, "Compact view");
         assert_eq!(en_labels.cover_view, "Cover view");
+        assert_eq!(en_labels.column_index, "#");
+        assert_eq!(en_labels.column_title, "Title");
+        assert_eq!(en_labels.column_artist, "Artist");
+        assert_eq!(en_labels.column_album, "Album");
+        assert_eq!(en_labels.column_date_added, "Date added");
+        assert_eq!(en_labels.column_duration, "Duration");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish, None);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -82,6 +88,12 @@ mod tests {
         assert_eq!(es_labels.show_less, "Ver menos");
         assert_eq!(es_labels.compact_view, "Vista compacta");
         assert_eq!(es_labels.cover_view, "Vista con carátulas");
+        assert_eq!(es_labels.column_index, "#");
+        assert_eq!(es_labels.column_title, "Título");
+        assert_eq!(es_labels.column_artist, "ARTISTA");
+        assert_eq!(es_labels.column_album, "ÁLBUM");
+        assert_eq!(es_labels.column_date_added, "Fecha de incorporación");
+        assert_eq!(es_labels.column_duration, "Duración");
     }
 
     #[test]

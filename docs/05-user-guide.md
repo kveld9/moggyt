@@ -67,10 +67,13 @@ The detail view displays full tracklistings for an album, artist, or playlist:
   `Unlisted Playlist`), the creator, the save count when the catalog reports one, the track count, and the
   total playback duration (`Creator • 1 save • 66 tracks • 3 h 43 min`), plus the playlist description,
   collapsed to three lines behind a `Show more` toggle.
-- **Track List**: lists all tracks in the collection with title, artist, and duration.
+- **Track List**: lists all tracks in the collection. Catalog playlists render as a table with track number,
+  title, artist (compact mode only), album, date added, and duration columns. Albums and artist song lists keep
+  the title, artist, and duration rows.
 - **Compact view**: the `Compact view` button in the header hides row cover thumbnails, adds track numbers,
-  and tightens row height. The button then reads `Cover view` and restores the default layout. The choice is
-  persisted in `settings.json`.
+  and tightens row height. Playlist tables keep every column and move the artist into its own column; the
+  button then reads `Cover view` and restores the default layout, where the artist sits under the title.
+  The choice is persisted in `settings.json`.
 - **Artist sections**: artist pages show the popular-songs heading and its top tracks, a `Show all` action
   that opens the catalog's songs list, and the server-provided `Albums`, `Singles and EPs`, and similar-artist
   rows. Album and single cards open the album page; similar-artist cards open that artist's page.

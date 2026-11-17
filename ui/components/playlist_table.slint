@@ -1,0 +1,224 @@
+import { Labels } from "../labels.slint";
+import { Theme, TrackRowData } from "../theme.slint";
+import { ContextSurface, ContextUi } from "./context_menu.slint";
+
+global PlaylistTableMetrics {
+    in-out property <length> row-padding: 12px;
+    in-out property <length> cell-spacing: 12px;
+    in-out property <length> index-width: 24px;
+    in-out property <length> duration-width: 56px;
+    in-out property <float> title-stretch: 3.0;
+    in-out property <float> artist-stretch: 2.0;
+    in-out property <float> album-stretch: 2.0;
+    in-out property <float> added-stretch: 1.5;
+}
+
+export component PlaylistHeader inherits Rectangle {
+    in property <bool> compact: false;
+
+    height: 32px;
+    background: transparent;
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+
+    HorizontalLayout {
+        padding-left: PlaylistTableMetrics.row-padding;
+        padding-right: PlaylistTableMetrics.row-padding;
+        spacing: PlaylistTableMetrics.cell-spacing;
+
+        Text {
+            text: Labels.column-index-label;
+            min-width: PlaylistTableMetrics.index-width;
+            max-width: PlaylistTableMetrics.index-width;
+            color: Theme.secondary;
+            font-size: 12px;
+            font-weight: 600;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: Labels.column-title-label;
+            horizontal-stretch: PlaylistTableMetrics.title-stretch;
+            color: Theme.secondary;
+            font-size: 12px;
+            font-weight: 600;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        if root.compact : Text {
+            text: Labels.column-artist-label;
+            horizontal-stretch: PlaylistTableMetrics.artist-stretch;
+            color: Theme.secondary;
+            font-size: 12px;
+            font-weight: 600;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: Labels.column-album-label;
+            horizontal-stretch: PlaylistTableMetrics.album-stretch;
+            color: Theme.secondary;
+            font-size: 12px;
+            font-weight: 600;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: Labels.column-date-added-label;
+            horizontal-stretch: PlaylistTableMetrics.added-stretch;
+            color: Theme.secondary;
+            font-size: 12px;
+            font-weight: 600;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: Labels.column-duration-label;
+            min-width: PlaylistTableMetrics.duration-width;
+            max-width: PlaylistTableMetrics.duration-width;
+            color: Theme.secondary;
+            font-size: 12px;
+            font-weight: 600;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component PlaylistRow inherits Rectangle {
+    in property <int> number: 1;
+    in property <int> track-index: -1;
+    in property <TrackRowData> track;
+    in property <bool> compact: false;
+    callback clicked();
+
+    height: root.compact ? 40px : 56px;
+    border-radius: 8px;
+    background: touch.pressed ? Theme.overlay : (touch.has-hover ? Theme.hover : transparent);
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                ContextUi.opened(
+                    ContextSurface.detail,
+                    root.track-index,
+                    self.absolute-position.x + self.mouse-x,
+                    self.absolute-position.y + self.mouse-y,
+                );
+            }
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: PlaylistTableMetrics.row-padding;
+        padding-right: PlaylistTableMetrics.row-padding;
+        spacing: PlaylistTableMetrics.cell-spacing;
+
+        Text {
+            text: "\{root.number}";
+            min-width: PlaylistTableMetrics.index-width;
+            max-width: PlaylistTableMetrics.index-width;
+            color: Theme.secondary;
+            font-size: 12px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+
+        HorizontalLayout {
+            horizontal-stretch: PlaylistTableMetrics.title-stretch;
+            spacing: PlaylistTableMetrics.cell-spacing;
+            alignment: start;
+
+            if !root.compact : VerticalLayout {
+                alignment: center;
+
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 6px;
+                    background: Theme.surface;
+                    clip: true;
+
+                    Image {
+                        width: parent.width;
+                        height: parent.height;
+                        source: root.track.cover;
+                        image-fit: ImageFit.cover;
+                    }
+                }
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: 2px;
+
+                Text {
+                    text: root.track.title;
+                    color: Theme.text;
+                    font-size: root.compact ? 13px : 14px;
+                    font-weight: 600;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+
+                if !root.compact && root.track.artist != "" : Text {
+                    text: root.track.artist;
+                    color: Theme.secondary;
+                    font-size: 12px;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        if root.compact : Text {
+            text: root.track.artist;
+            horizontal-stretch: PlaylistTableMetrics.artist-stretch;
+            color: Theme.secondary;
+            font-size: 12px;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.track.album;
+            horizontal-stretch: PlaylistTableMetrics.album-stretch;
+            color: Theme.secondary;
+            font-size: 12px;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.track.added;
+            horizontal-stretch: PlaylistTableMetrics.added-stretch;
+            color: Theme.secondary;
+            font-size: 12px;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.track.duration;
+            min-width: PlaylistTableMetrics.duration-width;
+            max-width: PlaylistTableMetrics.duration-width;
+            color: Theme.secondary;
+            font-size: 12px;
+            font-weight: 500;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+    }
+}
