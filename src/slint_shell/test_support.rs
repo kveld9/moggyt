@@ -96,6 +96,10 @@ impl Catalog for LocaleTrackingCatalog {
         Ok(Vec::new())
     }
 
+    fn library_podcasts(&self) -> Result<Vec<Playlist>, CatalogError> {
+        Ok(Vec::new())
+    }
+
     fn detail(&self, _browse_id: &str, _kind: DetailKind) -> Result<Option<Detail>, CatalogError> {
         Ok(None)
     }
@@ -113,6 +117,7 @@ pub struct MockLibraryCatalog {
     pub albums_res: Result<Vec<Album>, CatalogError>,
     pub artists_res: Result<Vec<Artist>, CatalogError>,
     pub songs_res: Result<Vec<Track>, CatalogError>,
+    pub podcasts_res: Result<Vec<Playlist>, CatalogError>,
     pub search_res: Result<Vec<Track>, CatalogError>,
     pub search_filtered_res: Result<Vec<SearchResult>, CatalogError>,
     pub detail_res: Result<Option<Detail>, CatalogError>,
@@ -134,6 +139,7 @@ impl Default for MockLibraryCatalog {
             albums_res: Ok(Vec::new()),
             artists_res: Ok(Vec::new()),
             songs_res: Ok(Vec::new()),
+            podcasts_res: Ok(Vec::new()),
             search_res: Ok(Vec::new()),
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
@@ -157,6 +163,7 @@ impl MockLibraryCatalog {
             albums_res: albums,
             artists_res: Ok(Vec::new()),
             songs_res: Ok(Vec::new()),
+            podcasts_res: Ok(Vec::new()),
             search_res: Ok(Vec::new()),
             search_filtered_res: Ok(Vec::new()),
             detail_res: Ok(None),
@@ -245,6 +252,9 @@ impl Catalog for MockLibraryCatalog {
     }
     fn library_songs(&self) -> Result<Vec<Track>, CatalogError> {
         self.songs_res.clone()
+    }
+    fn library_podcasts(&self) -> Result<Vec<Playlist>, CatalogError> {
+        self.podcasts_res.clone()
     }
     fn detail(&self, id: &str, _: DetailKind) -> Result<Option<Detail>, CatalogError> {
         if let Some(detail) = self.detail_by_id.get(id) {

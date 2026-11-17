@@ -8,6 +8,7 @@ pub(crate) enum LibraryFilter {
     Songs,
     Albums,
     Artists,
+    Podcasts,
 }
 
 impl LibraryFilter {
@@ -17,6 +18,7 @@ impl LibraryFilter {
             1 => Self::Songs,
             2 => Self::Albums,
             3 => Self::Artists,
+            4 => Self::Podcasts,
             _ => Self::Playlists,
         }
     }
@@ -28,6 +30,7 @@ impl LibraryFilter {
             Self::Songs => 1,
             Self::Albums => 2,
             Self::Artists => 3,
+            Self::Podcasts => 4,
         }
     }
 }
@@ -43,6 +46,7 @@ mod tests {
             LibraryFilter::Songs,
             LibraryFilter::Albums,
             LibraryFilter::Artists,
+            LibraryFilter::Podcasts,
         ] {
             assert_eq!(LibraryFilter::from_index(filter.to_index()), filter);
         }

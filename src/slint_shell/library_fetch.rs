@@ -10,6 +10,7 @@ pub struct LibraryFetch {
     pub songs: Result<Vec<Track>, CatalogError>,
     pub albums: Result<Vec<Album>, CatalogError>,
     pub artists: Result<Vec<Artist>, CatalogError>,
+    pub podcasts: Result<Vec<Playlist>, CatalogError>,
 }
 
 /// Successful library contents with every section resolved.
@@ -19,6 +20,7 @@ pub(crate) struct LibrarySections {
     pub songs: Vec<Track>,
     pub albums: Vec<Album>,
     pub artists: Vec<Artist>,
+    pub podcasts: Vec<Playlist>,
 }
 
 impl LibraryFetch {
@@ -29,6 +31,7 @@ impl LibraryFetch {
             songs: self.songs?,
             albums: self.albums?,
             artists: self.artists?,
+            podcasts: self.podcasts?,
         })
     }
 }
@@ -42,8 +45,9 @@ mod tests {
         songs: Result<Vec<Track>, CatalogError>,
         albums: Result<Vec<Album>, CatalogError>,
         artists: Result<Vec<Artist>, CatalogError>,
+        podcasts: Result<Vec<Playlist>, CatalogError>,
     ) -> LibraryFetch {
-        LibraryFetch { playlists, songs, albums, artists }
+        LibraryFetch { playlists, songs, albums, artists, podcasts }
     }
 
     #[test]
@@ -53,6 +57,7 @@ mod tests {
             Ok(vec![Track::new("t1", "Song", "Artist")]),
             Ok(Vec::new()),
             Ok(vec![Artist::new("a1", "Artist", None)]),
+            Ok(Vec::new()),
         )
         .into_sections()
         .expect("sections");
@@ -68,6 +73,7 @@ mod tests {
             Ok(Vec::new()),
             Err(CatalogError::Unauthenticated),
             Err(CatalogError::Transport),
+            Ok(Vec::new()),
         )
         .into_sections()
         .expect_err("failure");

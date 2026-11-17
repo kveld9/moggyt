@@ -141,8 +141,8 @@ the Settings page, not here:
   - `Check for updates`: triggers an asynchronous query to GitHub Releases.
   - When an update is available, displays a direct link to the GitHub download page and a `Dismiss` button to clear the
     notice for the session.
-- **Section chips**: `Playlists`, `Songs`, `Albums`, and `Artists` chips sit above the grid; selecting one
-  switches the visible section.
+- **Section chips**: `Playlists`, `Songs`, `Albums`, `Artists`, and `Podcasts` chips sit above the grid;
+  selecting one switches the visible section.
 - **Playlists**: a card grid of saved playlists with cover art and the localized track count. Shows
   `No playlists found.` when empty. When signed in, a read-only "History" card appears first, loading the account's
   recent plays as recorded by YouTube Music into the detail view with grouped day sections flattened in order.
@@ -152,6 +152,8 @@ the Settings page, not here:
   when empty.
 - **Artists**: a grid of artist cards with the subscriber label that opens the artist page. Shows
   `No artists found.` when empty.
+- **Podcasts**: a card grid of saved podcasts that opens the podcast detail page. Shows `No podcasts found.`
+  when empty.
 
 ### Stats Page
 

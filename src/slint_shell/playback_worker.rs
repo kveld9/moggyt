@@ -334,12 +334,14 @@ pub fn execute_refresh_library<C: Catalog>(
             songs: c.library_songs(),
             albums: c.saved_albums(),
             artists: c.library_artists(),
+            podcasts: c.library_podcasts(),
         })
         .unwrap_or(LibraryFetch {
             playlists: Err(CatalogError::Transport),
             songs: Err(CatalogError::Transport),
             albums: Err(CatalogError::Transport),
             artists: Err(CatalogError::Transport),
+            podcasts: Err(CatalogError::Transport),
         });
     (generation, fetch)
 }

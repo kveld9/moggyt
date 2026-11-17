@@ -98,6 +98,7 @@ mod tests {
         assert_eq!(es.filter_songs, "Canciones");
         assert_eq!(es.filter_albums, "Álbumes");
         assert_eq!(es.filter_artists, "Artistas");
+        assert_eq!(es.filter_podcasts, "Podcasts");
         assert_eq!(es.filter_playlists, "Listas de reproducción");
         assert_eq!(es.search_empty, "No se encontraron resultados.");
         assert_eq!(es.recent_searches_title, "Búsquedas recientes");
@@ -134,6 +135,7 @@ mod tests {
         assert_eq!(es.empty_albums, "No hay álbumes.");
         assert_eq!(es.empty_artists, "No se encontraron artistas.");
         assert_eq!(es.empty_liked_songs, "No hay canciones que te gusten.");
+        assert_eq!(es.empty_podcasts, "No se encontraron podcasts.");
         assert_eq!(es.empty_detail, "No hay detalles disponibles.");
         assert_eq!(es.play_button, "Reproducir");
         assert_eq!(es.shuffle_button, "Aleatorio");
@@ -298,6 +300,7 @@ mod tests {
         assert_eq!(en.filter_songs, "Songs");
         assert_eq!(en.filter_albums, "Albums");
         assert_eq!(en.filter_artists, "Artists");
+        assert_eq!(en.filter_podcasts, "Podcasts");
         assert_eq!(en.filter_playlists, "Playlists");
         assert_eq!(en.search_empty, "No results found.");
         assert_eq!(en.recent_searches_title, "Recent searches");
@@ -328,6 +331,7 @@ mod tests {
         assert_eq!(en.empty_albums, "No albums found.");
         assert_eq!(en.empty_artists, "No artists found.");
         assert_eq!(en.empty_liked_songs, "No liked songs.");
+        assert_eq!(en.empty_podcasts, "No podcasts found.");
         assert_eq!(en.empty_detail, "No details available.");
         assert_eq!(en.play_button, "Play");
         assert_eq!(en.shuffle_button, "Shuffle");

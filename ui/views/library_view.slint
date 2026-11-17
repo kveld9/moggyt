@@ -14,10 +14,12 @@ export component LibraryView inherits VerticalLayout {
     in property <[ExploreCardRow]> album-rows: [];
     in property <[ExploreCardRow]> artist-rows: [];
     in property <[TrackRowData]> song-rows: [];
+    in property <[ExploreCardRow]> podcast-rows: [];
     callback playlist-selected(int);
     callback album-selected(int);
     callback artist-selected(int);
     callback song-selected(int);
+    callback podcast-selected(int);
     callback chip-selected(int);
     callback import-requested();
     callback open-settings();
@@ -131,6 +133,12 @@ export component LibraryView inherits VerticalLayout {
             is-active: root.active-filter == 3;
             clicked => { root.chip-selected(3); }
         }
+
+        FilterChip {
+            text: Labels.filter-podcasts-label;
+            is-active: root.active-filter == 4;
+            clicked => { root.chip-selected(4); }
+        }
     }
 
     if root.signed-in && !root.session-expired && root.active-filter == 0 : VerticalLayout {
@@ -228,6 +236,32 @@ export component LibraryView inherits VerticalLayout {
                 cover: card.cover;
                 tile-color: card.tile_color;
                 clicked => { root.artist-selected(card.index); }
+            }
+        }
+    }
+
+    if root.signed-in && !root.session-expired && root.active-filter == 4 : VerticalLayout {
+        spacing: 6px;
+
+        if root.podcast-rows.length == 0 : Text {
+            text: Labels.empty-podcasts-text;
+            color: Theme.secondary;
+            font-size: 13px;
+        }
+
+        for row in root.podcast-rows : HorizontalLayout {
+            spacing: 12px;
+            alignment: start;
+
+            for card in row.cards : MediaCard {
+                index: card.index;
+                surface: ContextSurface.library-podcast;
+                title: card.title;
+                subtitle: card.subtitle;
+                has-cover: card.has_cover;
+                cover: card.cover;
+                tile-color: card.tile_color;
+                clicked => { root.podcast-selected(card.index); }
             }
         }
     }

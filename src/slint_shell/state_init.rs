@@ -78,6 +78,7 @@ impl SlintAppState {
             library_songs: Vec::new(),
             library_albums: Vec::new(),
             library_artists: Vec::new(),
+            library_podcasts: Vec::new(),
             library_filter: LibraryFilter::default(),
             detail: None,
             detail_return: SlintPage::Search,

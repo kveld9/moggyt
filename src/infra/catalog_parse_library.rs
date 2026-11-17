@@ -132,6 +132,18 @@ pub fn parse_library_artists(value: &Value) -> Vec<Artist> {
     collect_library_items(value).into_iter().filter_map(parse_library_artist_item).collect()
 }
 
+/// Parses library podcasts from catalog API browse response payload.
+///
+/// The podcasts grid opens with the catalog's "Add podcast" card, which carries no
+/// playable playlist and is dropped.
+pub fn parse_library_podcasts(value: &Value) -> Vec<Playlist> {
+    collect_library_items(value)
+        .into_iter()
+        .skip(1)
+        .filter_map(parse_library_playlist_item)
+        .collect()
+}
+
 /// Parses liked songs from catalog API browse response payload.
 pub fn parse_library_songs(value: &Value) -> Vec<Track> {
     let mut tracks = Vec::new();
@@ -309,6 +321,25 @@ mod tests {
         assert_eq!(artists[0].name, "Followed Artist");
         assert_eq!(artists[0].subscribers.as_deref(), Some("1.49 K subscribers"));
         assert!(artists[0].artwork.is_some());
+    }
+
+    #[test]
+    fn parse_library_podcasts_skips_the_add_card() {
+        let payload = serde_json::json!({ "sectionListRenderer": { "contents": [{
+            "gridRenderer": { "items": [
+                { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Add podcast" }] } } },
+                { "musicTwoRowItemRenderer": {
+                    "title": { "runs": [{ "text": "Saved Podcast", "navigationEndpoint": {
+                        "browseEndpoint": { "browseId": "MPSPPLD_saved" }
+                    } }] },
+                    "subtitle": { "runs": [{ "text": "Podcast" }] }
+                } }
+            ] }
+        }] } });
+        let podcasts = parse_library_podcasts(&payload);
+        assert_eq!(podcasts.len(), 1);
+        assert_eq!(podcasts[0].id, "MPSPPLD_saved");
+        assert_eq!(podcasts[0].title, "Saved Podcast");
     }
 
     #[test]

@@ -36,11 +36,13 @@ impl SlintAppState {
                 let is_empty = sections.playlists.is_empty()
                     && sections.songs.is_empty()
                     && sections.albums.is_empty()
-                    && sections.artists.is_empty();
+                    && sections.artists.is_empty()
+                    && sections.podcasts.is_empty();
                 self.library_playlists = sections.playlists;
                 self.library_songs = sections.songs;
                 self.library_albums = sections.albums;
                 self.library_artists = sections.artists;
+                self.library_podcasts = sections.podcasts;
                 self.library_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
             }
             Err(error) => {
@@ -150,6 +152,7 @@ mod tests {
             songs: Err(CatalogError::Unauthenticated),
             albums: Err(CatalogError::Unauthenticated),
             artists: Err(CatalogError::Unauthenticated),
+            podcasts: Err(CatalogError::Unauthenticated),
         });
         assert_eq!(state.library_phase, ViewPhase::Expired);
         observe_view_phases(&mut state);
@@ -159,6 +162,7 @@ mod tests {
             songs: Ok(Vec::new()),
             albums: Ok(Vec::new()),
             artists: Ok(Vec::new()),
+            podcasts: Ok(Vec::new()),
         });
         assert_eq!(state.library_phase, ViewPhase::Empty);
     }
