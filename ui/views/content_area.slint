@@ -1,6 +1,7 @@
 import {
     Theme,
     PlayerUi,
+    PlayerBarUi,
     ShelfData,
     TopResultData,
     TrackRowData,
@@ -155,6 +156,9 @@ export component ContentArea inherits Rectangle {
         mouse-drag-pan-enabled: root.active-page != 4;
         VerticalLayout {
             padding: 24px;
+            // Keep the last row scrollable above the floating player bar: the content
+            // column now extends under the bar, so the inset restores the reachable area.
+            padding-bottom: 24px + PlayerBarUi.content-inset;
             spacing: 16px;
             alignment: start;
 

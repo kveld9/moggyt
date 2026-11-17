@@ -246,6 +246,13 @@ guessing; every rule here was verified against a build or the official documenta
   In a fixed-height container (such as a 72px bar holding a 56px controls block), specifying explicit
   symmetric vertical padding (`padding-top: root.mode == 1 ? 6px : 8px; padding-bottom: root.mode == 1 ? 6px : 8px;`)
   ensures the inner controls block is vertically centered instead of flush against the top border.
+- Window-level overlay elements: an element that must paint over other content (such as the floating
+  player bar) is declared as a direct child of the `Window` that fills it, because a component root cannot
+  read `parent` (the compiler reports `Cannot access id 'parent'`); its children can, so the visible surface
+  anchors itself to the host's bottom edge. Children of a layout cannot set their own geometry, and a later
+  sibling paints above an earlier one. The sibling layout then reserves space only for the docked variant,
+  while scrollable columns pad their bottom edge with the covered strip so their last rows stay reachable.
+  Source: <https://docs.slint.dev/docs/slint/guide/language/coding/positioning-and-layouts/>.
 - `Flickable` content-sizing and layout interaction: a `Flickable` does not provide an intrinsic
   content height to enclosing layouts or intermediate containers; its `content-height` (formerly `viewport-height` in
   Slint < 1.18) is computed from its children, while its own outer `height` defaults to 100% of the parent element or
