@@ -361,7 +361,7 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
         window.set_detail_title(detail.title.clone().into());
         window.set_detail_subtitle(detail_subtitle(detail, state.locale).into());
         window.set_detail_description(detail.description.as_deref().unwrap_or("").into());
-        window.set_detail_kind_label(tr(state.locale, detail_kind_label(detail.kind)).into());
+        window.set_detail_kind_label(tr(state.locale, detail_kind_label(detail)).into());
         let d_tracks: Vec<TrackRowData> = detail
             .tracks
             .iter()

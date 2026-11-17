@@ -177,6 +177,14 @@ impl Shelf {
     }
 }
 
+/// Visibility of a playlist as reported by the catalog header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlaylistPrivacy {
+    Public,
+    Private,
+    Unlisted,
+}
+
 /// Category of detail container view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DetailKind {
@@ -250,6 +258,10 @@ pub struct Detail {
     pub track_count: Option<u32>,
     /// Total playback duration in seconds the server reports (playlists only).
     pub total_duration_secs: Option<u32>,
+    /// Playlist visibility reported by the catalog header (playlists only).
+    pub privacy: Option<PlaylistPrivacy>,
+    /// Localized "saved N times" label carried by the playlist header, when present.
+    pub saves: Option<String>,
     pub tracks: Vec<Track>,
     /// Complete playback list when the container exposes one beyond [`Detail::tracks`]
     /// (artist pages expose the full songs list behind their "Show all" action).
@@ -268,6 +280,8 @@ impl Detail {
             artwork: None,
             track_count: None,
             total_duration_secs: None,
+            privacy: None,
+            saves: None,
             tracks,
             queue_tracks: None,
             artist: None,
@@ -277,6 +291,17 @@ impl Detail {
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         let desc = description.into();
         self.description = if desc.trim().is_empty() { None } else { Some(desc) };
+        self
+    }
+
+    pub fn with_privacy(mut self, privacy: PlaylistPrivacy) -> Self {
+        self.privacy = Some(privacy);
+        self
+    }
+
+    pub fn with_saves(mut self, saves: impl Into<String>) -> Self {
+        let saves = saves.into();
+        self.saves = if saves.trim().is_empty() { None } else { Some(saves) };
         self
     }
 

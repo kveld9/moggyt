@@ -1,15 +1,18 @@
 //! Slint detail page state and view-model bridge.
 //! Hexagonal invariant: pure in-memory with zero I/O, network, audio, or async.
 
-use crate::domain::{Detail, DetailCard, DetailKind};
+use crate::domain::{Detail, DetailCard, DetailKind, PlaylistPrivacy};
 use crate::i18n::Locale;
 use crate::slint_shell::format::{format_total_duration, format_track_count};
 
-pub fn detail_kind_label(kind: DetailKind) -> &'static str {
-    match kind {
-        DetailKind::Album => "Album",
-        DetailKind::Artist => "Artist",
-        DetailKind::Playlist => "Playlist",
+pub fn detail_kind_label(detail: &Detail) -> &'static str {
+    match (detail.kind, detail.privacy) {
+        (DetailKind::Playlist, Some(PlaylistPrivacy::Public)) => "Public Playlist",
+        (DetailKind::Playlist, Some(PlaylistPrivacy::Private)) => "Private Playlist",
+        (DetailKind::Playlist, Some(PlaylistPrivacy::Unlisted)) => "Unlisted Playlist",
+        (DetailKind::Playlist, None) => "Playlist",
+        (DetailKind::Album, _) => "Album",
+        (DetailKind::Artist, _) => "Artist",
     }
 }
 
@@ -21,7 +24,7 @@ pub fn detail_subtitle(detail: &Detail, locale: Locale) -> String {
         .total_duration_secs
         .map(|secs| format_total_duration(locale, secs))
         .filter(|text| !text.is_empty());
-    [Some(base), count, duration]
+    [Some(base), detail.saves.clone(), count, duration]
         .into_iter()
         .flatten()
         .filter(|part| !part.is_empty())
@@ -187,6 +190,25 @@ mod tests {
     }
 
     #[test]
+    fn detail_kind_label_reports_playlist_visibility() {
+        use crate::domain::PlaylistPrivacy;
+
+        let public = Detail::new(DetailKind::Playlist, "Title", "", Vec::new())
+            .with_privacy(PlaylistPrivacy::Public);
+        assert_eq!(detail_kind_label(&public), "Public Playlist");
+        let private = Detail::new(DetailKind::Playlist, "Title", "", Vec::new())
+            .with_privacy(PlaylistPrivacy::Private);
+        assert_eq!(detail_kind_label(&private), "Private Playlist");
+        let unlisted = Detail::new(DetailKind::Playlist, "Title", "", Vec::new())
+            .with_privacy(PlaylistPrivacy::Unlisted);
+        assert_eq!(detail_kind_label(&unlisted), "Unlisted Playlist");
+        let plain = Detail::new(DetailKind::Playlist, "Title", "", Vec::new());
+        assert_eq!(detail_kind_label(&plain), "Playlist");
+        let album = Detail::new(DetailKind::Album, "Title", "", Vec::new());
+        assert_eq!(detail_kind_label(&album), "Album");
+    }
+
+    #[test]
     fn detail_subtitle_composes_playlist_meta() {
         let playlist = Detail::new(DetailKind::Playlist, "Title", "Creator", Vec::new())
             .with_track_count(64)
@@ -198,6 +220,12 @@ mod tests {
         assert_eq!(
             detail_subtitle(&playlist, Locale::Spanish),
             "Creator \u{2022} 64 pistas \u{2022} 3 h 47 min"
+        );
+
+        let with_saves = playlist.clone().with_saves("1 save");
+        assert_eq!(
+            detail_subtitle(&with_saves, Locale::English),
+            "Creator \u{2022} 1 save \u{2022} 64 tracks \u{2022} 3 h 47 min"
         );
 
         let album = Detail::new(DetailKind::Album, "Album", "Artist", Vec::new());

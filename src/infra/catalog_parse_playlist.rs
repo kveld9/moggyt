@@ -18,6 +18,8 @@ pub struct PlaylistMeta {
     pub track_count: Option<u32>,
     /// Total playback duration in seconds, as reported by the server.
     pub total_duration_secs: Option<u32>,
+    /// Localized "saved N times" label from the `secondSubtitle` run list, when present.
+    pub saves: Option<String>,
 }
 
 /// Count-unit words the catalog puts in the `secondSubtitle` run list.
@@ -25,6 +27,9 @@ const COUNT_WORDS: &[&str] = &["pista", "canci", "titu", "song", "track"];
 
 /// Duration-unit words the catalog puts in the `secondSubtitle` run list.
 const TIME_WORDS: &[&str] = &["hora", "hour", "min", "seg", "sec"];
+
+/// Save-count words the catalog puts in the `secondSubtitle` run list.
+const SAVE_WORDS: &[&str] = &["guardad", "save"];
 
 /// Parses playlist header metadata from an optional header node.
 pub fn playlist_meta(header: Option<&Value>) -> PlaylistMeta {
@@ -35,6 +40,7 @@ pub fn playlist_meta(header: Option<&Value>) -> PlaylistMeta {
         author: playlist_author(header),
         track_count: playlist_track_count(header),
         total_duration_secs: playlist_total_duration_secs(header),
+        saves: playlist_saves(header),
     }
 }
 
@@ -74,6 +80,11 @@ fn playlist_total_duration_secs(header: &Value) -> Option<u32> {
         .into_iter()
         .find(|text| contains_any(text, TIME_WORDS))
         .and_then(|text| duration_secs_from_text(&text))
+}
+
+/// Resolves the localized save-count label from the `secondSubtitle` run list.
+fn playlist_saves(header: &Value) -> Option<String> {
+    second_subtitle_runs(header).into_iter().find(|text| contains_any(text, SAVE_WORDS))
 }
 
 /// Collects the trimmed text of every `secondSubtitle` run.

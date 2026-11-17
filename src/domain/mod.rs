@@ -30,7 +30,7 @@ pub use gapless::{
 };
 pub use library::{
     Album, Artist, ArtistPage, Detail, DetailCard, DetailCardKind, DetailKind, DetailSection,
-    Playlist, SearchResult, Shelf,
+    Playlist, PlaylistPrivacy, SearchResult, Shelf,
 };
 pub use listening_stats::{
     ListeningStats, RankedEntry, SECS_PER_DAY, STATS_TOP_LIMIT, StatsPeriod,

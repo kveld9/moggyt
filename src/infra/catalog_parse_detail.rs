@@ -5,11 +5,13 @@ use super::catalog_parse_common::{
     best_thumbnail, flex_text, music_video_type, panel_artist, parse_duration_secs, watch_video_id,
 };
 use super::catalog_parse_playlist::{PlaylistMeta, playlist_meta};
-use crate::domain::{Detail, DetailKind, Track};
+use crate::domain::{Detail, DetailKind, PlaylistPrivacy, Track};
 use serde_json::Value;
 
 fn detail_header_node(value: &Value) -> Option<&Value> {
     const PATHS: &[&str] = &[
+        "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicEditablePlaylistDetailHeaderRenderer/header/musicResponsiveHeaderRenderer",
+        "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicEditablePlaylistDetailHeaderRenderer/header/musicDetailHeaderRenderer",
         "/header/musicDetailHeaderRenderer",
         "/header/musicVisualHeaderRenderer",
         "/header/musicEditablePlaylistDetailHeaderRenderer/header/musicDetailHeaderRenderer",
@@ -21,6 +23,32 @@ fn detail_header_node(value: &Value) -> Option<&Value> {
         "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicResponsiveHeaderRenderer",
     ];
     PATHS.iter().find_map(|path| value.pointer(path))
+}
+
+/// Resolves playlist visibility from the editable header, when the payload carries it.
+fn playlist_privacy(value: &Value) -> Option<PlaylistPrivacy> {
+    const PATHS: &[&str] = &[
+        "/contents/twoColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicEditablePlaylistDetailHeaderRenderer/editHeader/musicPlaylistEditHeaderRenderer/privacy",
+        "/header/musicEditablePlaylistDetailHeaderRenderer/editHeader/musicPlaylistEditHeaderRenderer/privacy",
+    ];
+    let raw = PATHS.iter().find_map(|path| value.pointer(path).and_then(Value::as_str))?;
+    match raw.trim().to_ascii_uppercase().as_str() {
+        "PUBLIC" => Some(PlaylistPrivacy::Public),
+        "PRIVATE" => Some(PlaylistPrivacy::Private),
+        "UNLISTED" => Some(PlaylistPrivacy::Unlisted),
+        _ => None,
+    }
+}
+
+/// Attaches the playlist visibility label carried by the editable header.
+fn apply_playlist_privacy(detail: Detail, value: &Value, kind: DetailKind) -> Detail {
+    if kind != DetailKind::Playlist {
+        return detail;
+    }
+    match playlist_privacy(value) {
+        Some(privacy) => detail.with_privacy(privacy),
+        None => detail,
+    }
 }
 
 /// Resolves playlist header metadata; other container kinds carry none.
@@ -343,6 +371,10 @@ pub fn parse_detail_all(value: &Value, kind: DetailKind) -> Option<Detail> {
     if let Some(secs) = meta.total_duration_secs {
         detail = detail.with_total_duration_secs(secs);
     }
+    if let Some(saves) = meta.saves.clone() {
+        detail = detail.with_saves(saves);
+    }
+    let detail = apply_playlist_privacy(detail, value, kind);
     let detail = fill_missing_track_artwork(with_optional_detail_fields(detail, value));
     if kind == DetailKind::Artist {
         return Some(detail.with_artist_page(parse_artist_page(value)));
@@ -753,3 +785,7 @@ mod tests {
         assert_eq!(track.video_type, Some(crate::domain::MusicVideoType::Omv));
     }
 }
+
+#[cfg(test)]
+#[path = "catalog_parse_detail_header_tests.rs"]
+mod header_tests;
