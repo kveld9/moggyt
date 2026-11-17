@@ -277,6 +277,22 @@ fn album_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
         .collect()
 }
 
+fn artist_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
+    state
+        .library_artists
+        .iter()
+        .enumerate()
+        .map(|(index, artist)| ExploreCardData {
+            index: index as i32,
+            title: artist.name.clone().into(),
+            subtitle: artist.subscribers.clone().unwrap_or_default().into(),
+            has_cover: artist.artwork.is_some(),
+            cover: resolve_row_cover_image(artist.artwork.as_deref(), &state.search_covers),
+            tile_color: tile_color_for(&artist.name),
+        })
+        .collect()
+}
+
 /// Synchronizes library collections and detail view models with Slint window.
 pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppState) {
     let playlist_rows = chunk_card_rows(playlist_cards(state), state.explore_columns);
@@ -284,6 +300,9 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
 
     let album_rows = chunk_card_rows(album_cards(state), state.explore_columns);
     window.set_library_album_rows(ModelRc::new(VecModel::from(album_rows)));
+
+    let artist_rows = chunk_card_rows(artist_cards(state), state.explore_columns);
+    window.set_library_artist_rows(ModelRc::new(VecModel::from(artist_rows)));
 
     window.set_library_filter(state.library_filter.to_index());
 

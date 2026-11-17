@@ -6,12 +6,17 @@ pub(crate) enum LibraryFilter {
     #[default]
     Playlists,
     Albums,
+    Artists,
 }
 
 impl LibraryFilter {
     /// Maps a chip index from the UI to a filter.
     pub(crate) fn from_index(index: i32) -> Self {
-        if index == 1 { Self::Albums } else { Self::Playlists }
+        match index {
+            1 => Self::Albums,
+            2 => Self::Artists,
+            _ => Self::Playlists,
+        }
     }
 
     /// Stable index exposed to the chips row.
@@ -19,6 +24,7 @@ impl LibraryFilter {
         match self {
             Self::Playlists => 0,
             Self::Albums => 1,
+            Self::Artists => 2,
         }
     }
 }
@@ -29,7 +35,7 @@ mod tests {
 
     #[test]
     fn filter_indices_round_trip() {
-        for filter in [LibraryFilter::Playlists, LibraryFilter::Albums] {
+        for filter in [LibraryFilter::Playlists, LibraryFilter::Albums, LibraryFilter::Artists] {
             assert_eq!(LibraryFilter::from_index(filter.to_index()), filter);
         }
     }

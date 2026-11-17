@@ -132,6 +132,7 @@ mod tests {
         assert_eq!(es.empty_playlists, "No hay listas de reproducción.");
         assert_eq!(es.section_albums, "Álbumes");
         assert_eq!(es.empty_albums, "No hay álbumes.");
+        assert_eq!(es.empty_artists, "No se encontraron artistas.");
         assert_eq!(es.empty_detail, "No hay detalles disponibles.");
         assert_eq!(es.play_button, "Reproducir");
         assert_eq!(es.shuffle_button, "Aleatorio");
@@ -324,6 +325,7 @@ mod tests {
         assert_eq!(en.empty_playlists, "No playlists found.");
         assert_eq!(en.section_albums, "Albums");
         assert_eq!(en.empty_albums, "No albums found.");
+        assert_eq!(en.empty_artists, "No artists found.");
         assert_eq!(en.empty_detail, "No details available.");
         assert_eq!(en.play_button, "Play");
         assert_eq!(en.shuffle_button, "Shuffle");
