@@ -101,6 +101,8 @@ impl LocalTrack {
             duration_secs: self.duration_secs,
             artwork,
             video_type: None,
+            added_label: None,
+            added_at_secs: None,
         }
     }
 }

@@ -163,6 +163,12 @@ pub struct Track {
     /// Optional InnerTube music video classification.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub video_type: Option<MusicVideoType>,
+    /// Localized "date added" label carried by playlist rows, when the catalog provides one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added_label: Option<String>,
+    /// Epoch seconds of the "date added" label, resolved at parse time for stable sorting.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added_at_secs: Option<i64>,
 }
 
 impl Track {
@@ -176,6 +182,8 @@ impl Track {
             duration_secs: None,
             artwork: None,
             video_type: None,
+            added_label: None,
+            added_at_secs: None,
         }
     }
 
@@ -195,6 +203,8 @@ impl Track {
             duration_secs,
             artwork: None,
             video_type: None,
+            added_label: None,
+            added_at_secs: None,
         }
     }
 
@@ -213,6 +223,13 @@ impl Track {
     /// Sets the optional artwork URL, consuming self.
     pub fn with_artwork(mut self, artwork: impl Into<String>) -> Self {
         self.artwork = Some(artwork.into());
+        self
+    }
+
+    /// Sets the localized date-added label and its resolved epoch timestamp.
+    pub fn with_added(mut self, label: impl Into<String>, at_secs: i64) -> Self {
+        self.added_label = Some(label.into());
+        self.added_at_secs = Some(at_secs);
         self
     }
 
@@ -577,5 +594,27 @@ mod tests {
         let container: Container = serde_json::from_str("{}").expect("deserialize missing field");
         assert!(container.history.is_empty());
         assert_eq!(container.history.len(), 0);
+    }
+
+    #[test]
+    fn track_added_builder_and_serde_behavior() {
+        let track = Track::new("id-1", "Title", "Artist");
+        let serialized_without =
+            serde_json::to_string(&track).expect("serialization without added fields");
+        assert!(!serialized_without.contains("added_label"));
+        assert!(!serialized_without.contains("added_at_secs"));
+
+        let with_added = track.with_added("1 week ago", 1_800_000_000);
+        assert_eq!(with_added.added_label.as_deref(), Some("1 week ago"));
+        assert_eq!(with_added.added_at_secs, Some(1_800_000_000));
+
+        let serialized_with =
+            serde_json::to_string(&with_added).expect("serialization with added fields");
+        assert!(serialized_with.contains(r#""added_label":"1 week ago""#));
+        assert!(serialized_with.contains(r#""added_at_secs":1800000000"#));
+
+        let deserialized: Track =
+            serde_json::from_str(&serialized_with).expect("deserialize with added fields");
+        assert_eq!(deserialized, with_added);
     }
 }
