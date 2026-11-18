@@ -505,4 +505,28 @@ mod tests {
             assert_ne!(en, es);
         }
     }
+
+    #[test]
+    fn test_playlist_creation_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Create", "Crear"),
+            ("Could not create the playlist", "No se pudo crear la playlist"),
+            ("New playlist", "Nueva playlist"),
+            ("Playlist created", "Playlist creada"),
+            ("Playlist name", "Nombre de la playlist"),
+            ("Playlist name cannot be empty", "El nombre de la playlist no puede estar vacío"),
+            (
+                "Playlist name contains unsupported characters",
+                "El nombre de la playlist contiene caracteres no admitidos",
+            ),
+            ("Playlist name is too long", "El nombre de la playlist es demasiado largo"),
+        ];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key for '{key}'");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
 }

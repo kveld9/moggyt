@@ -5,9 +5,7 @@ import { ContentArea } from "./content_area.slint";
 import { PlayerBarHost } from "./player_bar_host.slint";
 import { QueuePanelHost } from "./queue_panel_host.slint";
 import { ImportOverlay } from "import_overlay.slint";
-import { ContextMenuLayer } from "../components/context_menu.slint";
-import { PresetMenuLayer } from "../components/preset_menu.slint";
-import { ToastsLayer } from "../components/toasts.slint";
+import { AppOverlays } from "app_overlays.slint";
 
 export component MoggytWindow inherits Window {
     title: "Moggyt";
@@ -183,8 +181,6 @@ export component MoggytWindow inherits Window {
     callback import-alternative-chosen(int);
     callback import-picker-dismissed();
     callback import-custom-id-submitted(string);
-    callback library-import-requested();
-    library-import-requested => { root.show-import-modal = true; }
     shortcuts := ShortcutScope {
         shortcut-pressed(text, modified) => { return root.shortcut-pressed(text, modified); }
         VerticalLayout {
@@ -275,7 +271,6 @@ export component MoggytWindow inherits Window {
                     player-bar-show-timer: root.player-bar-show-timer;
                     player-bar-show-speed: root.player-bar-show-speed;
                     open-settings => { root.page-selected(4); }
-                    library-import-requested => { root.library-import-requested(); }
                     query-submitted(q) => { root.query-submitted(q); }
                     query-cleared => { root.query-cleared(); }
                     track-selected(idx) => { root.track-selected(idx); }
@@ -388,13 +383,5 @@ export component MoggytWindow inherits Window {
         picker-dismissed => { root.import-picker-dismissed(); }
         custom-id-submitted(text) => { root.import-custom-id-submitted(text); }
     }
-    ContextMenuLayer {
-        x: 0;
-        y: 0;
-    }
-    PresetMenuLayer {}
-    ToastsLayer {
-        x: 0;
-        y: 0;
-    }
+    AppOverlays {}
 }

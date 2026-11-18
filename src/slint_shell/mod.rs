@@ -59,6 +59,7 @@ pub mod import_worker;
 pub mod init;
 pub mod labels;
 pub mod lastfm_connect;
+mod library_create;
 mod library_fetch;
 mod library_filter;
 pub mod likes;

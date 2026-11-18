@@ -4,7 +4,8 @@ import { FilterChip } from "../components/controls.slint";
 import { MediaCard } from "../components/cards.slint";
 import { TrackRow } from "../components/rows.slint";
 import { ContextSurface } from "../components/context_menu.slint";
-import { IconLibrary } from "../icons.slint";
+import { IconLibrary, IconPlus } from "../icons.slint";
+import { LibraryAddUi } from "../components/library_add.slint";
 
 export component LibraryView inherits VerticalLayout {
     in property <bool> signed-in: false;
@@ -23,7 +24,6 @@ export component LibraryView inherits VerticalLayout {
     callback podcast-selected(int);
     callback profile-selected(int);
     callback chip-selected(int);
-    callback import-requested();
     callback open-settings();
     spacing: 16px;
     alignment: start;
@@ -84,33 +84,34 @@ export component LibraryView inherits VerticalLayout {
     }
 
     if root.signed-in && !root.session-expired : HorizontalLayout {
-        alignment: end;
-
-        Rectangle {
-            width: 90px;
-            height: 32px;
-            border-radius: 8px;
-            background: import-btn.pressed ? Theme.overlay : (import-btn.has-hover ? Theme.hover : Theme.accent);
-            animate background { duration: 150ms; easing: ease-in-out; }
-
-            import-btn := TouchArea {
-                clicked => { root.import-requested(); }
-            }
-
-            Text {
-                text: Labels.import-button-label;
-                color: import-btn.has-hover ? Theme.text : Theme.window;
-                font-size: 12px;
-                font-weight: 700;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-        }
-    }
-
-    if root.signed-in && !root.session-expired : HorizontalLayout {
         spacing: 8px;
         alignment: start;
+
+        add-pill := Rectangle {
+            width: 28px;
+            height: 28px;
+            border-radius: 14px;
+            background: add-touch.pressed ? Theme.overlay : (add-touch.has-hover ? Theme.hover : Theme.surface);
+            animate background { duration: 150ms; easing: ease-in-out; }
+
+            add-touch := TouchArea {
+                accessible-role: button;
+                accessible-label: Labels.new-playlist-label;
+                mouse-cursor: pointer;
+                clicked => {
+                    LibraryAddUi.menu-x = add-pill.absolute-position.x;
+                    LibraryAddUi.menu-y = add-pill.absolute-position.y;
+                    LibraryAddUi.menu-open = true;
+                }
+            }
+
+            IconPlus {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                size: 14px;
+                tint: add-touch.has-hover ? Theme.accent : Theme.secondary;
+            }
+        }
 
         FilterChip {
             text: Labels.section-playlists-label;
