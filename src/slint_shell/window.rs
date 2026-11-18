@@ -46,6 +46,7 @@ use crate::slint_shell::sync::{
 use crate::slint_shell::sync_phase::library_failure_phase;
 use crate::slint_shell::theme::apply_custom_theme_if_changed;
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
+use crate::slint_shell::window_width::sync_window_width;
 use crate::slint_shell::{MoggytWindow, PlayerUi};
 
 thread_local! {
@@ -388,6 +389,7 @@ pub(crate) fn spawn_playback_worker(
 /// Builds and configures MoggytWindow wired to SlintAppState with callbacks and background timer.
 pub fn build_window(state: SlintAppState) -> anyhow::Result<(MoggytWindow, slint::Timer)> {
     let window = MoggytWindow::new().context("failed to instantiate MoggytWindow")?;
+    sync_window_width(&window);
     let state_rc = Rc::new(RefCell::new(state));
     set_ui_state(&state_rc);
 
@@ -420,6 +422,7 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
     let timer = slint::Timer::default();
     timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
         let Some(win) = weak.upgrade() else { return };
+        sync_window_width(&win);
         // The import poll re-enters the app state through `with_ui_state`, so it
         // must run before this borrow is taken.
         poll_import(&win);

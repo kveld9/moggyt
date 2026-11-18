@@ -109,6 +109,7 @@ pub mod version_fix;
 pub mod video_policy;
 pub mod view_phase;
 pub mod window;
+mod window_width;
 pub mod worker_catalog;
 
 pub use app::{

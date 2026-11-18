@@ -111,6 +111,11 @@ export global PlayerBarUi {
     out property <length> reserved-height: mode == 0 ? 72px : 0px;
     // Bottom strip the floating bar covers; content scrolls underneath it.
     out property <length> content-inset: mode == 1 ? 92px : 0px;
+    // Horizontal margin the floating bar keeps from the window edges (24px per side).
+    out property <length> floating-margin: 48px;
+    // Logical window width published by the Rust shell. The window size is only observable
+    // from the OS side; deriving it in Slint would feed the layout pass back into itself.
+    in-out property <length> window-width: 1024px;
 }
 
 export struct ImportRowData {
