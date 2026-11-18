@@ -39,7 +39,7 @@ export component PlayerBarHost inherits Rectangle {
         show-volume: root.show-volume;
         show-timer: root.show-timer;
         show-speed: root.show-speed;
-        width: PlayerBarUi.mode == 1 ? min(parent.width - 48px, PlayerBarUi.floating-width * 1px) : parent.width;
+        width: PlayerBarUi.mode == 1 ? min(parent.width - PlayerBarUi.floating-margin, PlayerBarUi.floating-width * 1px) : parent.width;
         height: 72px;
         x: (parent.width - self.width) / 2;
         // 20px gap under the floating bar; the classic bar stays flush with the edge.

@@ -11,6 +11,16 @@ export component QueuePanel inherits Rectangle {
     callback track-selected(int);
     callback close-panel();
 
+    // The floating bar is centered and capped by `floating-width`, so it covers this panel's
+    // bottom strip only when its right edge reaches the panel. `window-width` is published by
+    // the Rust shell; the panel's own width and the bar cap are the only Slint-side inputs.
+    property <length> bar-width: min(
+        PlayerBarUi.window-width - PlayerBarUi.floating-margin,
+        PlayerBarUi.floating-width * 1px,
+    );
+    property <bool> bar-covers-panel: PlayerBarUi.mode == 1
+        && (PlayerBarUi.window-width + bar-width) / 2 > PlayerBarUi.window-width - root.width;
+
     background: Theme.panel;
 
     Rectangle {
@@ -23,8 +33,8 @@ export component QueuePanel inherits Rectangle {
 
     VerticalLayout {
         padding: 16px;
-        // The panel spans the window height, so reserve the strip the floating bar covers.
-        padding-bottom: 16px + PlayerBarUi.content-inset;
+        // Reserve the strip the floating bar covers only when the bar actually reaches this panel.
+        padding-bottom: 16px + (root.bar-covers-panel ? PlayerBarUi.content-inset : 0px);
         spacing: 16px;
 
         HorizontalLayout {

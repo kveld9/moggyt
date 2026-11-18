@@ -251,8 +251,15 @@ guessing; every rule here was verified against a build or the official documenta
   read `parent` (the compiler reports `Cannot access id 'parent'`); its children can, so the visible surface
   anchors itself to the host's bottom edge. Children of a layout cannot set their own geometry, and a later
   sibling paints above an earlier one. The sibling layout then reserves space only for the docked variant,
-  while scrollable columns pad their bottom edge with the covered strip so their last rows stay reachable.
+  while scrollable columns pad their bottom edge with the covered strip so their last rows stay reachable,
+  and a side panel reserves it only when the centered overlay actually reaches that panel's column.
   Source: <https://docs.slint.dev/docs/slint/guide/language/coding/positioning-and-layouts/>.
+- A layout decision cannot read the window size from Slint: binding a panel's padding to `root.width` or to
+  an element's `absolute-position` makes the window's preferred size depend on the padding that depends on
+  it. Slint 1.18.1 aborts with `Recursion detected` for the `absolute-position` form and reports a
+  deprecated binding loop through `layoutinfo-h` for `root.width`. Publish the logical width from Rust
+  instead (`Window::size()` divided by `Window::scale_factor()`) into a plain property, so the dependency
+  stays one-way. Source: <https://docs.slint.dev/docs/slint/reference/common/#absolute-position>.
 - `Flickable` content-sizing and layout interaction: a `Flickable` does not provide an intrinsic
   content height to enclosing layouts or intermediate containers; its `content-height` (formerly `viewport-height` in
   Slint < 1.18) is computed from its children, while its own outer `height` defaults to 100% of the parent element or
