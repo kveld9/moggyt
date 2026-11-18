@@ -24,7 +24,9 @@ pub(crate) fn library_failure_phase(error: CatalogError, signed_in: bool) -> Vie
     match error {
         CatalogError::Unauthenticated if !signed_in => ViewPhase::Empty,
         CatalogError::Unauthenticated => ViewPhase::Expired,
-        CatalogError::Transport | CatalogError::Malformed => ViewPhase::Error,
+        CatalogError::Transport | CatalogError::Malformed | CatalogError::Unsupported => {
+            ViewPhase::Error
+        }
     }
 }
 
@@ -174,6 +176,7 @@ mod tests {
     #[test]
     fn library_phase_error_for_transport_failure() {
         assert_eq!(library_failure_phase(CatalogError::Transport, true), ViewPhase::Error);
+        assert_eq!(library_failure_phase(CatalogError::Unsupported, true), ViewPhase::Error);
     }
 
     #[test]

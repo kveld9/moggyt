@@ -12,6 +12,7 @@ mod local_playlist;
 mod matching;
 mod play_log;
 mod playback_phase;
+mod playlist_create;
 mod playlist_import;
 mod queue;
 mod search;
@@ -54,6 +55,7 @@ pub use matching::{
 };
 pub use play_log::{MIN_RECORDED_PLAY_SECS, PlayRecord, listened_secs, record_for_play};
 pub use playback_phase::{END_TOLERANCE_SECS, PlaybackEvent, PlaybackFacts, PlaybackPhase};
+pub use playlist_create::{MAX_PLAYLIST_TITLE_CHARS, PlaylistTitleError, new_playlist_title};
 pub use playlist_import::{SpotifyRef, extract_playlist_id, parse_spotify_ref};
 pub use queue::{PlaybackQueue, RepeatMode};
 pub use search::{

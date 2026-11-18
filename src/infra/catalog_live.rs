@@ -219,6 +219,10 @@ impl Catalog for LiveCatalog {
     fn set_locale(&mut self, locale: crate::i18n::Locale) {
         self.set_locale(locale);
     }
+
+    fn create_playlist(&self, title: &str) -> Result<String, CatalogError> {
+        self.client.create_playlist(title)
+    }
 }
 
 #[cfg(test)]
@@ -327,6 +331,7 @@ mod tests {
 
         assert_eq!(catalog.playlists(), Err(CatalogError::Unauthenticated));
         assert_eq!(catalog.saved_albums(), Err(CatalogError::Unauthenticated));
+        assert_eq!(catalog.create_playlist("Mix"), Err(CatalogError::Unauthenticated));
     }
 
     #[test]

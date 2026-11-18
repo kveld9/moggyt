@@ -1,0 +1,251 @@
+import { Theme } from "../theme.slint";
+import { Labels } from "../labels.slint";
+import { StyledInputField } from "./controls.slint";
+import { IconPlus, IconOpen } from "../icons.slint";
+
+export global LibraryAddUi {
+    in-out property <bool> menu-open: false;
+    in-out property <length> menu-x: 0px;
+    in-out property <length> menu-y: 0px;
+    in-out property <bool> create-open: false;
+    in-out property <bool> create-busy: false;
+    in-out property <bool> create-failed: false;
+    in-out property <string> create-status-text: "";
+    in-out property <string> playlist-name-text: "";
+    callback new-playlist-requested();
+    callback import-requested();
+    callback submit-requested(string);
+    callback create-dismissed();
+    callback menu-dismissed();
+}
+
+export component LibraryAddMenuLayer inherits Rectangle {
+    width: 100%;
+    height: 100%;
+
+    if LibraryAddUi.menu-open : Rectangle {
+        width: 100%;
+        height: 100%;
+
+        backdrop := TouchArea {
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down {
+                    LibraryAddUi.menu-dismissed();
+                }
+            }
+        }
+
+        panel := Rectangle {
+            width: 210px;
+            height: 72px;
+            x: min(max(LibraryAddUi.menu-x, 8px), parent.width - self.width - 8px);
+            y: min(max(LibraryAddUi.menu-y + 36px, 8px), parent.height - self.height - 8px);
+            background: Theme.panel;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: Theme.border;
+            drop-shadow-blur: 14px;
+            drop-shadow-color: #00000066;
+            drop-shadow-offset-y: 3px;
+
+            VerticalLayout {
+                padding: 4px;
+                spacing: 0px;
+
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: touch-new.pressed ? Theme.overlay : (touch-new.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    touch-new := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            LibraryAddUi.menu-open = false;
+                            LibraryAddUi.new-playlist-requested();
+                        }
+                    }
+
+                    IconPlus {
+                        x: 10px;
+                        y: (parent.height - self.height) / 2;
+                        size: 14px;
+                        tint: Theme.secondary;
+                    }
+
+                    Text {
+                        x: 34px;
+                        y: 0px;
+                        width: parent.width - 44px;
+                        height: parent.height;
+                        text: Labels.new-playlist-label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: touch-import.pressed ? Theme.overlay : (touch-import.has-hover ? Theme.hover : transparent);
+                    animate background { duration: 150ms; easing: ease-in-out; }
+
+                    touch-import := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            LibraryAddUi.menu-open = false;
+                            LibraryAddUi.import-requested();
+                        }
+                    }
+
+                    IconOpen {
+                        x: 10px;
+                        y: (parent.height - self.height) / 2;
+                        size: 14px;
+                        tint: Theme.secondary;
+                    }
+
+                    Text {
+                        x: 34px;
+                        y: 0px;
+                        width: parent.width - 44px;
+                        height: parent.height;
+                        text: Labels.import-title-label;
+                        color: Theme.text;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component CreatePlaylistModal inherits Rectangle {
+    width: 100%;
+    height: 100%;
+
+    if LibraryAddUi.create-open : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.scrim;
+
+        TouchArea {
+            // Absorbs backdrop clicks
+        }
+
+        panel := Rectangle {
+            width: min(parent.width - 48px, 420px);
+            height: body.preferred-height;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 6px;
+            drop-shadow-color: #00000066;
+            background: Theme.panel;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.border;
+
+            body := VerticalLayout {
+                padding: 24px;
+                spacing: 16px;
+
+                Text {
+                    text: Labels.new-playlist-label;
+                    color: Theme.text;
+                    font-size: 18px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                StyledInputField {
+                    height: 36px;
+                    text <=> LibraryAddUi.playlist-name-text;
+                    placeholder-text: Labels.new-playlist-placeholder;
+                    accepted(t) => {
+                        if !LibraryAddUi.create-busy {
+                            LibraryAddUi.submit-requested(t);
+                        }
+                    }
+                }
+
+                if LibraryAddUi.create-status-text != "" : Text {
+                    text: LibraryAddUi.create-status-text;
+                    color: LibraryAddUi.create-failed ? Theme.accent : Theme.secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 12px;
+                    height: 36px;
+
+                    Rectangle {
+                        width: 100px;
+                        border-radius: 8px;
+                        background: cancel-btn.pressed ? Theme.overlay : (cancel-btn.has-hover ? Theme.hover : Theme.surface);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        cancel-btn := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { LibraryAddUi.create-dismissed(); }
+                        }
+
+                        Text {
+                            text: Labels.cancel-label;
+                            color: Theme.text;
+                            font-size: 13px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 130px;
+                        border-radius: 8px;
+                        opacity: LibraryAddUi.create-busy ? 0.5 : 1.0;
+                        background: create-btn.pressed ? Theme.overlay : (create-btn.has-hover ? Theme.hover : Theme.accent);
+                        animate background { duration: 150ms; easing: ease-in-out; }
+
+                        create-btn := TouchArea {
+                            enabled: !LibraryAddUi.create-busy;
+                            mouse-cursor: LibraryAddUi.create-busy ? default : pointer;
+                            clicked => { LibraryAddUi.submit-requested(LibraryAddUi.playlist-name-text); }
+                        }
+
+                        Text {
+                            text: Labels.create-label;
+                            color: create-btn.has-hover ? Theme.text : Theme.window;
+                            font-size: 13px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component LibraryAddOverlay inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    LibraryAddMenuLayer {
+        x: 0px;
+        y: 0px;
+    }
+
+    CreatePlaylistModal {
+        x: 0px;
+        y: 0px;
+    }
+}

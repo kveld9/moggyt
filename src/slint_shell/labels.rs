@@ -216,6 +216,9 @@ pub struct StaticLabels {
     pub clear_queue_confirm_hint: &'static str,
     pub clear_confirm_label: &'static str,
     pub cancel_label: &'static str,
+    pub new_playlist_label: &'static str,
+    pub new_playlist_placeholder: &'static str,
+    pub create_label: &'static str,
 }
 
 impl StaticLabels {
@@ -459,6 +462,9 @@ impl StaticLabels {
             clear_queue_confirm_hint: tr(locale, "This removes all other tracks from the queue."),
             clear_confirm_label: tr(locale, "Clear"),
             cancel_label: tr(locale, "Cancel"),
+            new_playlist_label: tr(locale, "New playlist"),
+            new_playlist_placeholder: tr(locale, "Playlist name"),
+            create_label: tr(locale, "Create"),
         }
     }
 
@@ -675,6 +681,9 @@ impl StaticLabels {
         labels.set_clear_queue_confirm_hint(self.clear_queue_confirm_hint.into());
         labels.set_clear_confirm_label(self.clear_confirm_label.into());
         labels.set_cancel_label(self.cancel_label.into());
+        labels.set_new_playlist_label(self.new_playlist_label.into());
+        labels.set_new_playlist_placeholder(self.new_playlist_placeholder.into());
+        labels.set_create_label(self.create_label.into());
     }
 }
 

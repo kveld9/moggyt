@@ -16,14 +16,16 @@ use super::catalog_parse_library::{
     parse_library_albums, parse_library_artists, parse_library_playlists, parse_library_podcasts,
     parse_library_profiles, parse_library_songs, payload_is_logged_out,
 };
+use super::catalog_parse_playlist_create::parse_created_playlist_id;
 use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::parse_search_tracks;
 use super::catalog_requests::{
     CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
     LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_ARTISTS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID,
     LIBRARY_PODCASTS_BROWSE_ID, LIBRARY_PROFILES_BROWSE_ID, LIBRARY_SONGS_BROWSE_ID, browse_body,
-    browse_body_with_params, browse_url, continuation_body, next_body, next_url, search_body,
-    search_body_with_params, search_filter_params,
+    browse_body_with_params, browse_url, continuation_body, next_body, next_url,
+    playlist_create_body, playlist_create_url, search_body, search_body_with_params,
+    search_filter_params,
 };
 use crate::domain::{
     Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
@@ -542,6 +544,25 @@ impl CatalogClient {
         validate_library_payload(profiles, &payload)
     }
 
+    /// Creates a new private playlist in the user's account and returns its playlist id.
+    pub fn create_playlist(&self, title: &str) -> Result<String, CatalogError> {
+        if !self.is_authenticated() {
+            return Err(CatalogError::Unauthenticated);
+        }
+        let url = playlist_create_url();
+        let body = playlist_create_body(title, self.locale);
+        let response = self
+            .signed_request(self.client.post(&url))
+            .json(&body)
+            .send()
+            .map_err(|_| CatalogError::Transport)?;
+        if !response.status().is_success() {
+            return Err(CatalogError::Transport);
+        }
+        let payload: Value = response.json().map_err(|_| CatalogError::Malformed)?;
+        parse_created_playlist_id(&payload).ok_or(CatalogError::Malformed)
+    }
+
     /// Converts this catalog API client into a [`LiveCatalog`] adapter.
     pub fn into_catalog(self) -> super::catalog_live::LiveCatalog {
         super::catalog_live::LiveCatalog::with_client(self)
@@ -746,5 +767,10 @@ mod tests {
         );
         assert!(parse_explore_all(&serde_json::json!({})).is_empty());
         assert!(parse_explore_all(&serde_json::json!({"error": {"code": 404}})).is_empty());
+    }
+
+    #[test]
+    fn catalog_client_create_playlist_unauthenticated_returns_unauthenticated() {
+        assert_eq!(CatalogClient::new().create_playlist("Mix"), Err(CatalogError::Unauthenticated));
     }
 }

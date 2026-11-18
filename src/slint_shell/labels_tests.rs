@@ -33,6 +33,9 @@ mod tests {
         assert_eq!(en_labels.import_to_queue_label, "Load directly to queue");
         assert_eq!(en_labels.import_valid_link_label, "Valid Spotify link");
         assert_eq!(en_labels.import_invalid_link_label, "Invalid Spotify link");
+        assert_eq!(en_labels.new_playlist_label, "New playlist");
+        assert_eq!(en_labels.new_playlist_placeholder, "Playlist name");
+        assert_eq!(en_labels.create_label, "Create");
         assert_eq!(en_labels.local_rename_placeholder, "New playlist name");
         assert_eq!(en_labels.local_rename_label, "Rename");
         assert_eq!(en_labels.local_delete_label, "Delete playlist");
@@ -75,6 +78,9 @@ mod tests {
         assert_eq!(es_labels.import_to_queue_label, "Cargar directamente en la cola");
         assert_eq!(es_labels.import_valid_link_label, "Enlace de Spotify valido");
         assert_eq!(es_labels.import_invalid_link_label, "Enlace de Spotify no valido");
+        assert_eq!(es_labels.new_playlist_label, "Nueva playlist");
+        assert_eq!(es_labels.new_playlist_placeholder, "Nombre de la playlist");
+        assert_eq!(es_labels.create_label, "Crear");
         assert_eq!(es_labels.local_rename_placeholder, "Nuevo nombre de playlist");
         assert_eq!(es_labels.local_rename_label, "Renombrar");
         assert_eq!(es_labels.local_delete_label, "Borrar playlist");
@@ -307,6 +313,9 @@ mod tests {
         assert_eq!(es.clear_queue_confirm_hint, "Esto quita las demás canciones de la cola.");
         assert_eq!(es.clear_confirm_label, "Vaciar");
         assert_eq!(es.cancel_label, "Cancelar");
+        assert_eq!(es.new_playlist_label, "Nueva playlist");
+        assert_eq!(es.new_playlist_placeholder, "Nombre de la playlist");
+        assert_eq!(es.create_label, "Crear");
 
         let en = StaticLabels::resolve(Locale::English, Some(test_config_dir));
         assert_eq!(en.nav_search, "Search");
@@ -510,6 +519,9 @@ mod tests {
         assert_eq!(en.clear_queue_confirm_hint, "This removes all other tracks from the queue.");
         assert_eq!(en.clear_confirm_label, "Clear");
         assert_eq!(en.cancel_label, "Cancel");
+        assert_eq!(en.new_playlist_label, "New playlist");
+        assert_eq!(en.new_playlist_placeholder, "Playlist name");
+        assert_eq!(en.create_label, "Create");
     }
 
     #[test]

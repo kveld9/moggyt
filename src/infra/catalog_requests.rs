@@ -154,6 +154,30 @@ pub fn continuation_body(token: &str, locale: Locale) -> Value {
     })
 }
 
+/// Privacy setting for newly created playlists.
+///
+/// Playlists created from the app are private so they are never published without an explicit action.
+pub const NEW_PLAYLIST_PRIVACY: &str = "PRIVATE";
+
+/// Returns the catalog API playlist creation endpoint URL.
+pub fn playlist_create_url() -> String {
+    format!(
+        "https://music.youtube.com/youtubei/v1/playlist/create?key={CATALOG_API_KEY}&prettyPrint=false"
+    )
+}
+
+/// Builds the minimal WEB_REMIX payload to create a new playlist with `title` and `locale`.
+pub fn playlist_create_body(title: &str, locale: Locale) -> Value {
+    serde_json::json!({
+        "context": {
+            "client": client_context(locale),
+        },
+        "title": title,
+        "description": "",
+        "privacyStatus": NEW_PLAYLIST_PRIVACY,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,5 +299,30 @@ mod tests {
     #[test]
     fn history_browse_id_constant() {
         assert_eq!(HISTORY_BROWSE_ID, "FEmusic_history");
+    }
+
+    #[test]
+    fn playlist_create_url_format_and_key() {
+        let url = playlist_create_url();
+        assert_eq!(
+            url,
+            format!(
+                "https://music.youtube.com/youtubei/v1/playlist/create?key={CATALOG_API_KEY}&prettyPrint=false"
+            )
+        );
+    }
+
+    #[test]
+    fn playlist_create_body_structure() {
+        for (locale, expected_hl) in [(Locale::English, "en"), (Locale::Spanish, "es")] {
+            let body = playlist_create_body("My New Mix", locale);
+            assert_eq!(body["title"], "My New Mix");
+            assert_eq!(body["description"], "");
+            assert_eq!(body["privacyStatus"], NEW_PLAYLIST_PRIVACY);
+            assert_eq!(body["context"]["client"]["clientName"], "WEB_REMIX");
+            assert_eq!(body["context"]["client"]["clientVersion"], CATALOG_CLIENT_VERSION);
+            assert_eq!(body["context"]["client"]["hl"], expected_hl);
+            assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
+        }
     }
 }

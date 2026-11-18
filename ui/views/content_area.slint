@@ -131,7 +131,6 @@ export component ContentArea inherits Rectangle {
     callback player-bar-mode-selected(int);
     callback player-bar-option-toggled(int);
     callback open-project-page();
-    callback library-import-requested();
     in property <string> persistence-error-text: "";
     in property <string> persistence-dismiss-text: "Dismiss";
     callback persistence-error-dismissed();
@@ -296,7 +295,6 @@ export component ContentArea inherits Rectangle {
                 podcast-selected(idx) => { root.podcast-selected(idx); }
                 profile-selected(idx) => { root.profile-selected(idx); }
                 chip-selected(idx) => { root.library-chip-selected(idx); }
-                import-requested() => { root.library-import-requested(); }
                 open-settings() => { root.open-settings(); }
             }
 
