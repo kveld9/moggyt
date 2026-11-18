@@ -246,7 +246,7 @@ The configuration file uses JSON serialization with atomic replacement:
     margins, and a width cap configurable through `player_bar_floating_width`; scrollable content pads its bottom edge
     so the covered strip cannot hide the last row.
 - **Player Bar Floating Width (`player_bar_floating_width`)**:
-  - Integer pixels, default `960`, clamped to `640..=1600`. Width cap of the floating bar; the
+  - Integer pixels, default `960`, clamped to `800..=1600`. Width cap of the floating bar; the
     bar still shrinks to fit windows narrower than the cap plus its 48px side margins.
 - **Player Bar Elements**:
   - `player_bar_show_artwork` (boolean, default `true`): Whether cover artwork thumbnail is shown.

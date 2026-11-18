@@ -476,8 +476,8 @@ mod tests {
     #[test]
     fn test_clamp_player_bar_floating_width_boundary_cases() {
         assert_eq!(clamp_player_bar_floating_width(0), MIN_PLAYER_BAR_FLOATING_WIDTH);
-        assert_eq!(clamp_player_bar_floating_width(639), MIN_PLAYER_BAR_FLOATING_WIDTH);
-        assert_eq!(clamp_player_bar_floating_width(640), 640);
+        assert_eq!(clamp_player_bar_floating_width(799), MIN_PLAYER_BAR_FLOATING_WIDTH);
+        assert_eq!(clamp_player_bar_floating_width(800), 800);
         assert_eq!(clamp_player_bar_floating_width(960), 960);
         assert_eq!(clamp_player_bar_floating_width(1600), 1600);
         assert_eq!(clamp_player_bar_floating_width(1601), MAX_PLAYER_BAR_FLOATING_WIDTH);

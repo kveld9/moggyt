@@ -134,7 +134,7 @@ mod tests {
         state.set_player_bar_floating_width(5000);
         assert_eq!(state.settings_store.load().player_bar_floating_width, 1600);
         state.set_player_bar_floating_width(100);
-        assert_eq!(state.settings_store.load().player_bar_floating_width, 640);
+        assert_eq!(state.settings_store.load().player_bar_floating_width, 800);
     }
 
     #[test]

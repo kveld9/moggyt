@@ -402,7 +402,7 @@ mod tests {
 
         // Negative pointer values clamp to the lower bound through the state setter.
         handle_player_bar_width_change(&mut state, -40);
-        assert_eq!(state.player_bar.floating_width, 640);
+        assert_eq!(state.player_bar.floating_width, 800);
 
         // Values above the supported range clamp to the upper bound.
         handle_player_bar_width_change(&mut state, 4000);
