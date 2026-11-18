@@ -18,13 +18,15 @@ pub(crate) fn artwork_url(item: &SearchResult) -> Option<&str> {
     }
 }
 
-fn kind_label(state: &SlintAppState, item: &SearchResult) -> &'static str {
-    match item {
+/// Returns the uppercase kind tag shown in search result subtitles.
+fn kind_label(state: &SlintAppState, item: &SearchResult) -> String {
+    let label = match item {
         SearchResult::Track(_) => tr(state.locale, "Song"),
         SearchResult::Album(_) => tr(state.locale, "Album"),
         SearchResult::Artist(_) => tr(state.locale, "Artist"),
         SearchResult::Playlist(_) => tr(state.locale, "Playlist"),
-    }
+    };
+    label.to_uppercase()
 }
 
 fn join_detail(label: &str, detail: &str) -> String {
@@ -34,9 +36,9 @@ fn join_detail(label: &str, detail: &str) -> String {
 fn subtitle_for(state: &SlintAppState, item: &SearchResult) -> String {
     let label = kind_label(state, item);
     match item {
-        SearchResult::Track(track) => join_detail(label, &track.artist),
-        SearchResult::Album(album) => join_detail(label, &album.artist),
-        SearchResult::Artist(_) | SearchResult::Playlist(_) => label.to_owned(),
+        SearchResult::Track(track) => join_detail(&label, &track.artist),
+        SearchResult::Album(album) => join_detail(&label, &album.artist),
+        SearchResult::Artist(_) | SearchResult::Playlist(_) => label,
     }
 }
 
@@ -95,19 +97,19 @@ mod tests {
         assert!(track_data.has_result);
         assert_eq!(track_data.heading.as_str(), "Top result");
         assert_eq!(track_data.title.as_str(), "Celoso");
-        assert_eq!(track_data.subtitle.as_str(), "Song - Santa Fe Klan");
+        assert_eq!(track_data.subtitle.as_str(), "SONG - Santa Fe Klan");
         assert!(!track_data.circular);
 
         state.search_top_result =
             Some(SearchResult::Album(Album::new("a1", "Album", "Artist", None)));
         let album_data = top_result_data(&state);
-        assert_eq!(album_data.subtitle.as_str(), "Album - Artist");
+        assert_eq!(album_data.subtitle.as_str(), "ALBUM - Artist");
         assert!(!album_data.circular);
 
         state.search_top_result =
             Some(SearchResult::Artist(Artist::new("ar1", "Los Angeles", None)));
         let artist_data = top_result_data(&state);
-        assert_eq!(artist_data.subtitle.as_str(), "Artist");
+        assert_eq!(artist_data.subtitle.as_str(), "ARTIST");
         assert!(artist_data.circular);
     }
 
@@ -126,7 +128,7 @@ mod tests {
         let mut state = test_wired();
         state.search_top_result = Some(SearchResult::Track(Track::new("t1", "Celoso", "  ")));
         let data = top_result_data(&state);
-        assert_eq!(data.subtitle.as_str(), "Song");
+        assert_eq!(data.subtitle.as_str(), "SONG");
     }
 
     #[test]

@@ -83,10 +83,10 @@ mod tests {
             "Custom theme not loaded: file not found"
         );
 
-        // Kind labels
-        assert_eq!(tr(Locale::Spanish, "Album"), "ÁLBUM");
-        assert_eq!(tr(Locale::Spanish, "Artist"), "ARTISTA");
-        assert_eq!(tr(Locale::Spanish, "Playlist"), "LISTA");
+        // Kind and table column labels
+        assert_eq!(tr(Locale::Spanish, "Album"), "Álbum");
+        assert_eq!(tr(Locale::Spanish, "Artist"), "Artista");
+        assert_eq!(tr(Locale::Spanish, "Playlist"), "Lista");
 
         // Dynamic labels & transient status
         assert_eq!(tr(Locale::Spanish, "Queue ({count})").replace("{count}", "3"), "Cola (3)");

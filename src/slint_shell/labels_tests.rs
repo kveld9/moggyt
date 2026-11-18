@@ -96,8 +96,8 @@ mod tests {
         assert_eq!(es_labels.cover_view, "Vista con carátulas");
         assert_eq!(es_labels.column_index, "#");
         assert_eq!(es_labels.column_title, "Título");
-        assert_eq!(es_labels.column_artist, "ARTISTA");
-        assert_eq!(es_labels.column_album, "ÁLBUM");
+        assert_eq!(es_labels.column_artist, "Artista");
+        assert_eq!(es_labels.column_album, "Álbum");
         assert_eq!(es_labels.column_date_added, "Fecha de incorporación");
         assert_eq!(es_labels.column_duration, "Duración");
     }
