@@ -147,6 +147,9 @@ export global Theme {
     in-out property <color> border;
     in-out property <color> hover;
     in-out property <color> overlay;
+    // Modal backdrop scrim: translucent so the app stays readable behind dialogs.
+    // Intrinsic to the design system (one owner for every overlay), never themed.
+    in-out property <color> scrim: #00000099;
     in-out property <bool> dark;
 }
 
