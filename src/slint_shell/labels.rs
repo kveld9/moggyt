@@ -129,6 +129,8 @@ pub struct StaticLabels {
     pub section_player_bar: &'static str,
     pub player_bar_classic: &'static str,
     pub player_bar_floating: &'static str,
+    pub player_bar_width: &'static str,
+    pub player_bar_width_hint: &'static str,
     pub player_bar_artwork: &'static str,
     pub player_bar_like: &'static str,
     pub player_bar_shuffle: &'static str,
@@ -358,6 +360,11 @@ impl StaticLabels {
             section_player_bar: tr(locale, "Player bar"),
             player_bar_classic: tr(locale, "Classic"),
             player_bar_floating: tr(locale, "Floating"),
+            player_bar_width: tr(locale, "Floating bar width"),
+            player_bar_width_hint: tr(
+                locale,
+                "Width cap of the floating bar; it shrinks to fit narrower windows",
+            ),
             player_bar_artwork: tr(locale, "Show artwork"),
             player_bar_like: tr(locale, "Show like button"),
             player_bar_shuffle: tr(locale, "Show shuffle button"),
@@ -581,6 +588,8 @@ impl StaticLabels {
         labels.set_section_player_bar_label(self.section_player_bar.into());
         labels.set_player_bar_classic_label(self.player_bar_classic.into());
         labels.set_player_bar_floating_label(self.player_bar_floating.into());
+        labels.set_player_bar_width_label(self.player_bar_width.into());
+        labels.set_player_bar_width_hint_label(self.player_bar_width_hint.into());
         labels.set_player_bar_artwork_label(self.player_bar_artwork.into());
         labels.set_player_bar_like_label(self.player_bar_like.into());
         labels.set_player_bar_shuffle_label(self.player_bar_shuffle.into());

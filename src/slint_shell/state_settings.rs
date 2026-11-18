@@ -67,6 +67,14 @@ impl SlintAppState {
         let _ = self.settings_store.save(&settings);
     }
 
+    /// Updates the floating player bar width cap and persists it to the settings store.
+    pub fn set_player_bar_floating_width(&mut self, width: u32) {
+        self.player_bar.floating_width = crate::infra::clamp_player_bar_floating_width(width);
+        let mut settings = self.settings_store.load();
+        self.player_bar.apply_to_settings(&mut settings);
+        let _ = self.settings_store.save(&settings);
+    }
+
     /// Toggles an individual player bar element option by index and persists to settings store.
     pub fn toggle_player_bar_option(&mut self, index: i32) {
         self.player_bar = self.player_bar.toggled(index);
@@ -120,6 +128,13 @@ mod tests {
         assert_eq!(state.settings_store.load().cover_cache_limit_mb, 128);
         state.set_cover_cache_limit_mb(20000);
         assert_eq!(state.cover_cache_limit_mb, 10240);
+        state.set_player_bar_floating_width(1200);
+        assert_eq!(state.player_bar.floating_width, 1200);
+        assert_eq!(state.settings_store.load().player_bar_floating_width, 1200);
+        state.set_player_bar_floating_width(5000);
+        assert_eq!(state.settings_store.load().player_bar_floating_width, 1600);
+        state.set_player_bar_floating_width(100);
+        assert_eq!(state.settings_store.load().player_bar_floating_width, 640);
     }
 
     #[test]

@@ -30,6 +30,15 @@ const fn default_playback_speed() -> f32 {
 /// Maximum allowed crossfade duration in seconds.
 pub const MAX_CROSSFADE_SECONDS: u32 = 15;
 
+/// Lower bound of the configurable floating player bar width in pixels.
+pub const MIN_PLAYER_BAR_FLOATING_WIDTH: u32 = 640;
+
+/// Upper bound of the configurable floating player bar width in pixels.
+pub const MAX_PLAYER_BAR_FLOATING_WIDTH: u32 = 1600;
+
+/// Default width cap of the floating player bar in pixels.
+pub const DEFAULT_PLAYER_BAR_FLOATING_WIDTH: u32 = 960;
+
 /// Schema version of persisted settings.
 pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
 
@@ -42,8 +51,22 @@ pub const fn clamp_crossfade_seconds(seconds: u32) -> u32 {
     if seconds > MAX_CROSSFADE_SECONDS { MAX_CROSSFADE_SECONDS } else { seconds }
 }
 
+/// Clamps the floating player bar width to the supported pixel range.
+pub const fn clamp_player_bar_floating_width(width: u32) -> u32 {
+    if width < MIN_PLAYER_BAR_FLOATING_WIDTH {
+        MIN_PLAYER_BAR_FLOATING_WIDTH
+    } else if width > MAX_PLAYER_BAR_FLOATING_WIDTH {
+        MAX_PLAYER_BAR_FLOATING_WIDTH
+    } else {
+        width
+    }
+}
+
 const fn default_crossfade_seconds() -> u32 {
     0
+}
+const fn default_player_bar_floating_width() -> u32 {
+    DEFAULT_PLAYER_BAR_FLOATING_WIDTH
 }
 const fn default_stream_cache_limit_mb() -> u32 {
     512
@@ -129,6 +152,9 @@ pub struct Settings {
     /// Presentation mode of the playback bar.
     #[serde(default)]
     pub player_bar_mode: PlayerBarMode,
+    /// Width cap in pixels of the floating player bar.
+    #[serde(default = "default_player_bar_floating_width")]
+    pub player_bar_floating_width: u32,
     /// Whether cover artwork thumbnail is shown in the player bar.
     #[serde(default = "default_true")]
     pub player_bar_show_artwork: bool,
@@ -193,6 +219,7 @@ impl Default for Settings {
             loudness_normalization: false,
             sponsorblock_enabled: true,
             player_bar_mode: PlayerBarMode::Classic,
+            player_bar_floating_width: DEFAULT_PLAYER_BAR_FLOATING_WIDTH,
             player_bar_show_artwork: true,
             player_bar_show_like: true,
             player_bar_show_shuffle: true,
@@ -224,6 +251,8 @@ impl Settings {
         self.volume = self.volume.min(100);
         self.playback_speed = clamp_speed(self.playback_speed);
         self.crossfade_seconds = clamp_crossfade_seconds(self.crossfade_seconds);
+        self.player_bar_floating_width =
+            clamp_player_bar_floating_width(self.player_bar_floating_width);
         self.stream_cache_limit_mb = self.stream_cache_limit_mb.min(10240);
         self.cover_cache_limit_mb = self.cover_cache_limit_mb.min(10240);
     }

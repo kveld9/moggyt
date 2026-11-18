@@ -35,7 +35,7 @@ use crate::slint_shell::theme::{apply_palette, theme_to_index};
 use crate::slint_shell::view_phase::{ViewId, ViewPhase};
 use crate::slint_shell::{
     DetailUi, ExploreCardData, LocalEditUi, LyricLineData, LyricsHighlight, MoggytWindow,
-    PlaybackUi, PlayerUi, ShelfData, SleepTimerUi, TrackRowData,
+    PlaybackUi, PlayerBarUi, PlayerUi, ShelfData, SleepTimerUi, TrackRowData,
 };
 
 pub(crate) use super::sync_phase::{observe_view_phases, sync_view_phase};
@@ -112,6 +112,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     window.set_queue_count(state.queue.len() as i32);
     window.set_queue_button_text(format_queue_label(state.locale, state.queue.len()).into());
     window.set_player_bar_mode(mode_to_index(state.player_bar.mode));
+    window.global::<PlayerBarUi>().set_floating_width(state.player_bar.floating_width as i32);
     window.set_player_bar_show_artwork(state.player_bar.show_artwork);
     window.set_player_bar_show_like(state.player_bar.show_like);
     window.set_player_bar_show_shuffle(state.player_bar.show_shuffle);

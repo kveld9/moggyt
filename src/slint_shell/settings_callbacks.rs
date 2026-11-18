@@ -19,7 +19,7 @@ use crate::slint_shell::sync::{
 use crate::slint_shell::theme::{apply_palette, theme_from_index};
 use crate::slint_shell::toast::notify;
 use crate::slint_shell::window::refresh_library_async;
-use crate::slint_shell::{ContextIcon, MoggytWindow, PresetMenuUi};
+use crate::slint_shell::{ContextIcon, MoggytWindow, PlayerBarUi, PresetMenuUi};
 
 /// Wires settings, account authentication, player bar preferences, and resize callbacks.
 pub(crate) fn wire_settings_callbacks(
@@ -132,6 +132,15 @@ pub(crate) fn wire_settings_callbacks(
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         st.toggle_player_bar_option(idx);
+        sync_window(&win, &mut st);
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
+    window.global::<PlayerBarUi>().on_floating_width_changed(move |width| {
+        let Some(win) = w.upgrade() else { return };
+        let mut st = s.borrow_mut();
+        handle_player_bar_width_change(&mut st, width);
         sync_window(&win, &mut st);
     });
 
@@ -253,12 +262,17 @@ pub(crate) fn handle_cover_cache_limit_selection(state: &mut SlintAppState, mb: 
     state.set_cover_cache_limit_mb(mb.clamp(0, 10240) as u32);
 }
 
+/// Handles floating player bar width changes from the settings slider, rejecting negative pixels.
+pub(crate) fn handle_player_bar_width_change(state: &mut SlintAppState, width: i32) {
+    state.set_player_bar_floating_width(width.max(0) as u32);
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         handle_cover_cache_limit_selection, handle_crossfade_change,
-        handle_playback_speed_selection, handle_sleep_timer_selection,
-        handle_stream_cache_limit_selection,
+        handle_playback_speed_selection, handle_player_bar_width_change,
+        handle_sleep_timer_selection, handle_stream_cache_limit_selection,
     };
     use crate::domain::{TimerPreset, Track};
     use crate::slint_shell::test_support::test_wired;
@@ -375,5 +389,23 @@ mod tests {
 
         handle_playback_speed_selection(&mut state, 99);
         assert_eq!(state.audio.lock().unwrap().speed(), 1.0);
+    }
+
+    #[test]
+    fn test_player_bar_width_change_callback_path() {
+        let mut state = test_wired();
+        assert_eq!(state.player_bar.floating_width, 960);
+
+        handle_player_bar_width_change(&mut state, 1200);
+        assert_eq!(state.player_bar.floating_width, 1200);
+        assert_eq!(state.settings_store.load().player_bar_floating_width, 1200);
+
+        // Negative pointer values clamp to the lower bound through the state setter.
+        handle_player_bar_width_change(&mut state, -40);
+        assert_eq!(state.player_bar.floating_width, 640);
+
+        // Values above the supported range clamp to the upper bound.
+        handle_player_bar_width_change(&mut state, 4000);
+        assert_eq!(state.player_bar.floating_width, 1600);
     }
 }

@@ -363,8 +363,8 @@ Users can customize the player bar appearance and element visibility under **Set
 - **Presentation Modes**:
   - `Classic`: Docked, full-width bar flush with the bottom edge of the window, separated by a thin 1px top border.
   - `Floating`: Centered, rounded pill card that paints over the content column, 24px from each side and 20px above
-    the bottom edge, with a subtle drop shadow and a 960px width cap. Scrollable pages and the queue list keep a
-    bottom inset so their last rows stay reachable above the bar.
+    the bottom edge, with a subtle drop shadow and a configurable width cap (640px to 1600px, 960px by default).
+    Scrollable pages and the queue list keep a bottom inset so their last rows stay reachable above the bar.
 - **Customizable Toggles**:
   - `Show artwork`: Toggles track album art thumbnail on the left. When hidden, the title and artist move flush left.
   - `Show like button`: Toggles the favorite heart icon button next to track metadata.
@@ -375,6 +375,8 @@ Users can customize the player bar appearance and element visibility under **Set
   - `Show queue button`: Toggles the queue button on the right displaying active queue count.
   - `Show volume slider`: Toggles the speaker icon and volume slider on the right. The speaker icon switches to a muted
     icon at volume 0 and serves as a mute toggle.
+  - `Floating bar width`: Slider that sets the width cap of the floating bar between 640px and 1600px. The bar
+    still shrinks to fit narrower windows.
 
 ### Transport and Playback Controls
 

@@ -179,8 +179,9 @@ pub use session::{MemorySessionStore, SessionStore};
 pub use session_keyring::{KeyringSessionStore, sanitize_cookie_input};
 pub use session_rotate::rotate_cookies;
 pub use settings::{
-    DiskSettingsStore, MAX_CROSSFADE_SECONDS, MemorySettingsStore, Settings, SettingsStore,
-    clamp_crossfade_seconds, default_config_dir,
+    DEFAULT_PLAYER_BAR_FLOATING_WIDTH, DiskSettingsStore, MAX_CROSSFADE_SECONDS,
+    MAX_PLAYER_BAR_FLOATING_WIDTH, MIN_PLAYER_BAR_FLOATING_WIDTH, MemorySettingsStore, Settings,
+    SettingsStore, clamp_crossfade_seconds, clamp_player_bar_floating_width, default_config_dir,
 };
 pub use skip_sponsorblock::{
     SPONSORBLOCK_API_BASE, SPONSORBLOCK_DURATION_TOLERANCE_SECS, SkipProvider, SponsorBlockClient,

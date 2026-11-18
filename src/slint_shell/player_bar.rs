@@ -4,7 +4,7 @@
 //! with zero I/O, zero network, zero window dependencies, and zero async runtimes.
 
 use crate::domain::PlayerBarMode;
-use crate::infra::Settings;
+use crate::infra::{DEFAULT_PLAYER_BAR_FLOATING_WIDTH, Settings};
 
 /// Number of customizable player bar element toggles.
 pub const PLAYER_BAR_OPTION_COUNT: usize = 9;
@@ -14,6 +14,8 @@ pub const PLAYER_BAR_OPTION_COUNT: usize = 9;
 pub struct PlayerBarPrefs {
     /// Active layout mode: docked full-width classic or rounded centered floating.
     pub mode: PlayerBarMode,
+    /// Width cap in pixels of the floating player bar.
+    pub floating_width: u32,
     /// Whether track cover artwork is displayed.
     pub show_artwork: bool,
     /// Whether the favorite/like heart toggle is displayed.
@@ -38,6 +40,7 @@ impl Default for PlayerBarPrefs {
     fn default() -> Self {
         Self {
             mode: PlayerBarMode::Classic,
+            floating_width: DEFAULT_PLAYER_BAR_FLOATING_WIDTH,
             show_artwork: true,
             show_like: true,
             show_shuffle: true,
@@ -56,6 +59,7 @@ impl PlayerBarPrefs {
     pub fn from_settings(settings: &Settings) -> Self {
         Self {
             mode: settings.player_bar_mode,
+            floating_width: settings.player_bar_floating_width,
             show_artwork: settings.player_bar_show_artwork,
             show_like: settings.player_bar_show_like,
             show_shuffle: settings.player_bar_show_shuffle,
@@ -71,6 +75,7 @@ impl PlayerBarPrefs {
     /// Writes player bar preferences back into application settings.
     pub fn apply_to_settings(&self, settings: &mut Settings) {
         settings.player_bar_mode = self.mode;
+        settings.player_bar_floating_width = self.floating_width;
         settings.player_bar_show_artwork = self.show_artwork;
         settings.player_bar_show_like = self.show_like;
         settings.player_bar_show_shuffle = self.show_shuffle;
@@ -158,6 +163,7 @@ mod tests {
     fn test_is_enabled_matches_fields() {
         let prefs = PlayerBarPrefs {
             mode: PlayerBarMode::Floating,
+            floating_width: 1200,
             show_artwork: true,
             show_like: false,
             show_shuffle: true,
@@ -221,6 +227,7 @@ mod tests {
     fn test_from_and_apply_to_settings_round_trip() {
         let settings = Settings {
             player_bar_mode: PlayerBarMode::Floating,
+            player_bar_floating_width: 1200,
             player_bar_show_artwork: false,
             player_bar_show_like: false,
             player_bar_show_shuffle: false,
@@ -235,6 +242,7 @@ mod tests {
 
         let prefs = PlayerBarPrefs::from_settings(&settings);
         assert_eq!(prefs.mode, PlayerBarMode::Floating);
+        assert_eq!(prefs.floating_width, 1200);
         assert!(!prefs.show_artwork);
         assert!(!prefs.show_like);
         assert!(!prefs.show_shuffle);
@@ -249,6 +257,7 @@ mod tests {
         prefs.apply_to_settings(&mut round_trip_settings);
 
         assert_eq!(round_trip_settings.player_bar_mode, settings.player_bar_mode);
+        assert_eq!(round_trip_settings.player_bar_floating_width, 1200);
         assert_eq!(round_trip_settings.player_bar_show_artwork, settings.player_bar_show_artwork);
         assert_eq!(round_trip_settings.player_bar_show_like, settings.player_bar_show_like);
         assert_eq!(round_trip_settings.player_bar_show_shuffle, settings.player_bar_show_shuffle);
@@ -261,5 +270,14 @@ mod tests {
         assert_eq!(round_trip_settings.player_bar_show_volume, settings.player_bar_show_volume);
         assert_eq!(round_trip_settings.player_bar_show_timer, settings.player_bar_show_timer);
         assert_eq!(round_trip_settings.player_bar_show_speed, settings.player_bar_show_speed);
+    }
+
+    #[test]
+    fn test_default_floating_width_is_960() {
+        assert_eq!(PlayerBarPrefs::default().floating_width, 960);
+        assert_eq!(
+            PlayerBarPrefs::from_settings(&Settings::default()).floating_width,
+            DEFAULT_PLAYER_BAR_FLOATING_WIDTH
+        );
     }
 }
