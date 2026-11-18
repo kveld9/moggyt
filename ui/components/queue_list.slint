@@ -9,11 +9,15 @@ export component QueueList inherits ListView {
     in property <[TrackRowData]> tracks: [];
     in property <int> selected-index: -1;
     in property <bool> open: true;
+    // Trailing scroll space that lets the last row clear the floating player bar. It
+    // belongs to the scrollable content, never to the viewport: panel padding would
+    // shorten the list even while its first rows are on screen.
+    in property <length> bottom-inset: 0px;
     callback track-selected(int);
 
     property <length> row-height: 64px;
 
-    content-height: root.tracks.length * root.row-height;
+    content-height: root.tracks.length * root.row-height + root.bottom-inset;
     vertical-scrollbar-policy: ScrollBarPolicy.always-off;
     horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
     mouse-drag-pan-enabled: true;

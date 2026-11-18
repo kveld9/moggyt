@@ -251,8 +251,10 @@ guessing; every rule here was verified against a build or the official documenta
   read `parent` (the compiler reports `Cannot access id 'parent'`); its children can, so the visible surface
   anchors itself to the host's bottom edge. Children of a layout cannot set their own geometry, and a later
   sibling paints above an earlier one. The sibling layout then reserves space only for the docked variant,
-  while scrollable columns pad their bottom edge with the covered strip so their last rows stay reachable,
-  and a side panel reserves it only when the centered overlay actually reaches that panel's column.
+  while scrollable columns reserve the covered strip in their scrollable content so their last rows stay
+  reachable, and a side panel does the same, only when the centered overlay actually reaches that panel's
+  column. Padding the layout instead of the content shortens the viewport and leaves a dead strip above the
+  panel bottom even while the first rows are on screen.
   Source: <https://docs.slint.dev/docs/slint/guide/language/coding/positioning-and-layouts/>.
 - A layout decision cannot read the window size from Slint: binding a panel's padding to `root.width` or to
   an element's `absolute-position` makes the window's preferred size depend on the padding that depends on

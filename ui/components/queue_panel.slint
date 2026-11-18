@@ -33,8 +33,6 @@ export component QueuePanel inherits Rectangle {
 
     VerticalLayout {
         padding: 16px;
-        // Reserve the strip the floating bar covers only when the bar actually reaches this panel.
-        padding-bottom: 16px + (root.bar-covers-panel ? PlayerBarUi.content-inset : 0px);
         spacing: 16px;
 
         HorizontalLayout {
@@ -117,6 +115,7 @@ export component QueuePanel inherits Rectangle {
 
         if root.tracks.length > 0 : QueueList {
             vertical-stretch: 1;
+            bottom-inset: root.bar-covers-panel ? PlayerBarUi.content-inset : 0px;
             tracks: root.tracks;
             selected-index: root.selected-index;
             open: root.open;
