@@ -235,6 +235,18 @@ mod tests {
         let album = Detail::new(DetailKind::Album, "Album", "Artist", Vec::new());
         assert_eq!(detail_subtitle(&album, Locale::English), "Artist");
 
+        let album_with_meta = Detail::new(DetailKind::Album, "Album", "Bad Bunny", Vec::new())
+            .with_track_count(15)
+            .with_total_duration_secs(3240);
+        assert_eq!(
+            detail_subtitle(&album_with_meta, Locale::English),
+            "Bad Bunny \u{2022} 15 tracks \u{2022} 54 min"
+        );
+        assert_eq!(
+            detail_subtitle(&album_with_meta, Locale::Spanish),
+            "Bad Bunny \u{2022} 15 pistas \u{2022} 54 min"
+        );
+
         let counted =
             Detail::new(DetailKind::Playlist, "Title", "", Vec::new()).with_track_count(12);
         assert_eq!(detail_subtitle(&counted, Locale::English), "12 tracks");

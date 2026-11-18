@@ -63,12 +63,14 @@ The search view accepts queries for tracks, artists, and albums, and maintains a
 The detail view displays full tracklistings for an album, artist, or playlist:
 
 - **Header**: displays the container title and subtitle. Album headers show the credited
-  artist as the subtitle and the catalog release label with its year as the small accent
-  label above the title (`Single • 2026`), and their tracks inherit that credited artist
-  when the catalog omits it per row. Playlist headers show their visibility label
-  (`Public Playlist`, `Private Playlist`, `Unlisted Playlist`), the creator, the save count
-  when the catalog reports one, the track count, the total playback duration, and the
-  description collapsed to three lines behind a `Show more` toggle.
+  artist as the subtitle and append the catalog-reported track count and total playback
+  duration after the credited artist, e.g. `Bad Bunny • 15 tracks • 54 min`, keeping the
+  release label with its year as the small accent label above the title (`Single • 2026`),
+  and their tracks inherit that credited artist when the catalog omits it per row. Playlist
+  headers show their visibility label (`Public Playlist`, `Private Playlist`, `Unlisted
+  Playlist`), the creator, the save count when the catalog reports one, the track count,
+  the total playback duration, and the description collapsed to three lines behind a `Show
+  more` toggle.
 - **Track List**: lists all tracks in the collection. Catalog playlists render as a table with track number,
   title, artist (compact mode only), album, date added, and duration columns. Clicking a column header sorts
   the playlist by that column, a second click reverses the order, and a third click restores the catalog order;

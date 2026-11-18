@@ -49,6 +49,8 @@ fn album_header_reads_artists_and_container_label_from_responsive_header() {
     let header = album_header(&payload);
     assert_eq!(header.artists.as_deref(), Some("La Piedra Urbana y La 24 7 del sur"));
     assert_eq!(header.container_label.as_deref(), Some("Single \u{2022} 2026"));
+    assert_eq!(header.track_count, Some(1));
+    assert_eq!(header.total_duration_secs, Some(668));
 }
 
 #[test]
@@ -130,4 +132,35 @@ fn album_header_drops_container_label_when_matching_artists_or_blank() {
     let header_blank = album_header(&blank_sub);
     assert_eq!(header_blank.artists.as_deref(), Some("Solo Artist"));
     assert_eq!(header_blank.container_label, None);
+}
+
+#[test]
+fn album_header_preserves_aggregates_when_strapline_is_missing() {
+    let payload = json!({
+        "header": {
+            "musicResponsiveHeaderRenderer": {
+                "title": { "runs": [{ "text": "Session cali cali" }] },
+                "subtitle": {
+                    "runs": [
+                        { "text": "Single" },
+                        { "text": " \u{2022} " },
+                        { "text": "2026" }
+                    ]
+                },
+                "secondSubtitle": {
+                    "runs": [
+                        { "text": "1 canci\u{00f3}n" },
+                        { "text": " \u{2022} " },
+                        { "text": "11 minutos y 8 segundos" }
+                    ]
+                }
+            }
+        }
+    });
+
+    let header = album_header(&payload);
+    assert_eq!(header.artists, None);
+    assert_eq!(header.container_label, None);
+    assert_eq!(header.track_count, Some(1));
+    assert_eq!(header.total_duration_secs, Some(668));
 }

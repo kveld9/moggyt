@@ -10,6 +10,8 @@
 use serde_json::Value;
 
 /// Aggregate playlist metadata carried by a detail header node.
+///
+/// The `secondSubtitle` aggregate run list is shared by playlist and album detail headers.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PlaylistMeta {
     /// Playlist creator or channel name.
@@ -32,6 +34,8 @@ const TIME_WORDS: &[&str] = &["hora", "hour", "min", "seg", "sec"];
 const SAVE_WORDS: &[&str] = &["guardad", "save"];
 
 /// Parses playlist header metadata from an optional header node.
+///
+/// The `secondSubtitle` aggregate run list is shared by playlist and album detail headers.
 pub fn playlist_meta(header: Option<&Value>) -> PlaylistMeta {
     let Some(header) = header else {
         return PlaylistMeta::default();

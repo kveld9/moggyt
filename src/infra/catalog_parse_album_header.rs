@@ -1,6 +1,7 @@
 //! Album responsive header parser extracting credited artists and release label.
 
 use super::catalog_parse_detail::{detail_header_node, join_runs};
+use super::catalog_parse_playlist::playlist_meta;
 use serde_json::Value;
 
 const STRAPLINE_PATHS: &[&str] = &[
@@ -22,6 +23,10 @@ pub struct AlbumHeader {
     pub artists: Option<String>,
     /// Release type label and year carried by header `subtitle`.
     pub container_label: Option<String>,
+    /// Total number of tracks the album carries, as reported by the server.
+    pub track_count: Option<u32>,
+    /// Total playback duration in seconds, as reported by the server.
+    pub total_duration_secs: Option<u32>,
 }
 
 fn runs_from(header: &Value, paths: &[&str]) -> Option<String> {
@@ -37,16 +42,27 @@ fn runs_from(header: &Value, paths: &[&str]) -> Option<String> {
 
 /// Parses the credited artists and container release label from an album header.
 ///
-/// Returns an empty [`AlbumHeader`] when `straplineTextOne` is absent or blank.
+/// Carries aggregate track count and duration even when `straplineTextOne` is absent or blank.
 pub fn album_header(value: &Value) -> AlbumHeader {
     let Some(header) = detail_header_node(value) else {
         return AlbumHeader::default();
     };
+    let meta = playlist_meta(Some(header));
     let Some(artists) = runs_from(header, STRAPLINE_PATHS) else {
-        return AlbumHeader::default();
+        return AlbumHeader {
+            artists: None,
+            container_label: None,
+            track_count: meta.track_count,
+            total_duration_secs: meta.total_duration_secs,
+        };
     };
     let container_label = runs_from(header, SUBTITLE_PATHS).filter(|label| label != &artists);
-    AlbumHeader { artists: Some(artists), container_label }
+    AlbumHeader {
+        artists: Some(artists),
+        container_label,
+        track_count: meta.track_count,
+        total_duration_secs: meta.total_duration_secs,
+    }
 }
 
 #[cfg(test)]

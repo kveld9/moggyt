@@ -91,6 +91,8 @@ fn parse_detail_all_reads_two_column_album_header_and_backfills_track_artists() 
     assert_eq!(detail.kind, DetailKind::Album);
     assert_eq!(detail.subtitle, "La Piedra Urbana y La 24 7 del sur");
     assert_eq!(detail.container_label.as_deref(), Some("Single \u{2022} 2026"));
+    assert_eq!(detail.track_count, Some(1));
+    assert_eq!(detail.total_duration_secs, Some(668));
     assert_eq!(detail.tracks.len(), 1);
     assert_eq!(detail.tracks[0].artist, "La Piedra Urbana y La 24 7 del sur");
     assert_eq!(detail.tracks[0].duration_secs, Some(668));
