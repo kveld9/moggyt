@@ -136,8 +136,8 @@ The Now Playing view presents a full two-column playback dashboard:
 
 ### Library Page
 
-The library view lists the saved collection and hosts the import entry point. Session controls live in
-the Settings page, not here:
+The library view lists the saved collection. The section chip row starts with a circular `+` add button
+that opens the add menu. Session controls live in the Settings page, not here:
 
 - **Not signed in**: shows `Sign in from Settings to load your library.` next to an `Open settings`
   button that switches to the Settings page, and hides the playlist and album sections.
@@ -181,6 +181,19 @@ The stats page presents Wrapped-style listening statistics computed from your lo
 - **Top Rankings**: inspect top 5 artists and top 5 tracks ranked by play count and listening duration.
 - **Local Data Privacy**: all metrics are computed locally from `play-log.jsonl` without contacting external servers.
 
+### Creating a playlist
+
+Clicking the `+` button at the start of the section chip row opens a menu with `New playlist` and `Import from Spotify`:
+
+- Selecting `New playlist` opens a dialog with a `Playlist name` input field, `Cancel`, and `Create`.
+- Titles are trimmed before processing. Empty names, names longer than 150 characters, and names containing `<` or `>`
+  are rejected before contacting the catalog.
+- On creation, the playlist is created as private in the signed-in YouTube Music account, appears under `Playlists`,
+  and opens its detail view immediately.
+- If the catalog request fails, the dialog stays open and displays `Could not create the playlist`.
+- Adding tracks to an account playlist is still done from YouTube Music itself, because moggyt does
+  not add tracks to account playlists yet.
+
 ### Spotify Import
 
 `moggyt` allows importing playlists and albums from Spotify directly into your local library, resolving tracks against
@@ -188,7 +201,7 @@ YouTube Music audio streams without requiring Spotify accounts or developer API 
 
 #### Launching Import
 
-Click the `Import` button located in the `Library` view to open the Spotify import modal.
+Click the `+` button at the start of the section chip row and choose `Import from Spotify` to open the Spotify import modal.
 
 #### Import Sources
 
