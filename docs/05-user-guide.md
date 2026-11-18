@@ -73,7 +73,8 @@ The detail view displays full tracklistings for an album, artist, or playlist:
   title, artist (compact mode only), album, date added, and duration columns. Clicking a column header sorts
   the playlist by that column, a second click reverses the order, and a third click restores the catalog order;
   an arrow marks the active column and direction. Sorting affects the table view only, not albums, artists or
-  local playlists. Albums and artist song lists keep the title, artist, and duration rows.
+  local playlists. Albums keep the title, artist, and duration rows; artist song lists keep the title, album,
+  and duration rows, because the page header already names the artist.
   Album rows come from the release's audio playlist, so their durations match the album master even when the
   album also offers official videos for the same songs.
 - **Compact view**: the `Compact view` button in the header hides row cover thumbnails, adds track numbers,
