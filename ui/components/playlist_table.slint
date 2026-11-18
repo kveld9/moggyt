@@ -8,6 +8,7 @@ global PlaylistTableMetrics {
     in-out property <length> cell-spacing: 12px;
     in-out property <length> index-width: 24px;
     in-out property <length> duration-width: 56px;
+    in-out property <length> cover-size: 40px;
     in-out property <float> title-stretch: 3.0;
     in-out property <float> artist-stretch: 2.0;
     in-out property <float> album-stretch: 2.0;
@@ -19,11 +20,13 @@ component SortHeaderCell inherits Rectangle {
     in property <int> column: -1;
     in property <bool> active: false;
     in property <bool> descending: false;
+    in property <length> indent: 0px;
 
     background: transparent;
     height: 32px;
 
     HorizontalLayout {
+        padding-left: root.indent;
         spacing: 4px;
         alignment: start;
 
@@ -83,6 +86,9 @@ export component PlaylistHeader inherits Rectangle {
 
         SortHeaderCell {
             label: Labels.column-title-label;
+            preferred-width: 0px;
+            min-width: 0px;
+            indent: root.compact ? 0px : PlaylistTableMetrics.cover-size + PlaylistTableMetrics.cell-spacing;
             column: 0;
             active: DetailUi.sort-column == 0;
             descending: DetailUi.sort-direction == 1;
@@ -91,6 +97,8 @@ export component PlaylistHeader inherits Rectangle {
 
         if root.compact : SortHeaderCell {
             label: Labels.column-artist-label;
+            preferred-width: 0px;
+            min-width: 0px;
             column: 1;
             active: DetailUi.sort-column == 1;
             descending: DetailUi.sort-direction == 1;
@@ -99,6 +107,8 @@ export component PlaylistHeader inherits Rectangle {
 
         SortHeaderCell {
             label: Labels.column-album-label;
+            preferred-width: 0px;
+            min-width: 0px;
             column: 2;
             active: DetailUi.sort-column == 2;
             descending: DetailUi.sort-direction == 1;
@@ -107,6 +117,8 @@ export component PlaylistHeader inherits Rectangle {
 
         SortHeaderCell {
             label: Labels.column-date-added-label;
+            preferred-width: 0px;
+            min-width: 0px;
             column: 3;
             active: DetailUi.sort-column == 3;
             descending: DetailUi.sort-direction == 1;
@@ -167,6 +179,8 @@ export component PlaylistRow inherits Rectangle {
 
         HorizontalLayout {
             horizontal-stretch: PlaylistTableMetrics.title-stretch;
+            preferred-width: 0px;
+            min-width: 0px;
             spacing: PlaylistTableMetrics.cell-spacing;
             alignment: start;
 
@@ -174,8 +188,8 @@ export component PlaylistRow inherits Rectangle {
                 alignment: center;
 
                 Rectangle {
-                    width: 40px;
-                    height: 40px;
+                    width: PlaylistTableMetrics.cover-size;
+                    height: PlaylistTableMetrics.cover-size;
                     border-radius: 6px;
                     background: Theme.surface;
                     clip: true;
@@ -216,6 +230,8 @@ export component PlaylistRow inherits Rectangle {
         if root.compact : Text {
             text: root.track.artist;
             horizontal-stretch: PlaylistTableMetrics.artist-stretch;
+            preferred-width: 0px;
+            min-width: 0px;
             color: Theme.secondary;
             font-size: 12px;
             overflow: elide;
@@ -225,6 +241,8 @@ export component PlaylistRow inherits Rectangle {
         Text {
             text: root.track.album;
             horizontal-stretch: PlaylistTableMetrics.album-stretch;
+            preferred-width: 0px;
+            min-width: 0px;
             color: Theme.secondary;
             font-size: 12px;
             overflow: elide;
@@ -234,6 +252,8 @@ export component PlaylistRow inherits Rectangle {
         Text {
             text: root.track.added;
             horizontal-stretch: PlaylistTableMetrics.added-stretch;
+            preferred-width: 0px;
+            min-width: 0px;
             color: Theme.secondary;
             font-size: 12px;
             overflow: elide;
