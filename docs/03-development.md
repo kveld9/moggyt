@@ -277,6 +277,14 @@ guessing; every rule here was verified against a build or the official documenta
   `HorizontalLayout { alignment: center; ... }`: the wrapper takes the full width and the
   icon centers inside it.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/layouts/verticallayout/>.
+- Proportional table columns need `preferred-width: 0px` and `min-width: 0px` on every flexible
+  cell together with `horizontal-stretch`: a layout gives each child its preferred (content) size
+  first and shares only the remaining space by stretch factor, so a header label and the row cells
+  of the same column land at different x positions as soon as their contents differ. Zeroing the
+  preferred and minimum widths makes the split depend on the stretch factors alone, so header and
+  rows line up at any width; both properties are needed, because the content-derived minimum still
+  consumes space without `min-width: 0px`.
+  Source: <https://docs.slint.dev/docs/slint/guide/language/coding/positioning-and-layouts/#stretch-algorithm>.
 
 - Solid icon glyphs must be drawn as a single filled `Path`, never as a fill plus a stroke of
   the same closed outline: the two antialiased passes composite at the path start and leave a
