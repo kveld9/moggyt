@@ -492,8 +492,8 @@ mod tests {
             ("Remove recent search", "Quitar búsqueda reciente"),
             ("Repeat", "Repetir"),
             (
-                "This removes all tracks from the queue.",
-                "Esto quita todas las canciones de la cola.",
+                "This removes all other tracks from the queue.",
+                "Esto quita las demás canciones de la cola.",
             ),
             ("Unmute", "Activar sonido"),
         ];

@@ -141,6 +141,17 @@ impl PlaybackQueue {
         self.cursor = 0;
     }
 
+    /// Keeps only the track under the cursor as the sole entry and resets the cursor to 0.
+    ///
+    /// Preserves the active repeat mode. Has no effect if the queue is empty or has no current track.
+    pub fn retain_current(&mut self) {
+        let Some(track) = self.current().cloned() else {
+            return;
+        };
+        self.tracks = vec![track];
+        self.cursor = 0;
+    }
+
     /// Reorders tracks according to the provided index permutation.
     ///
     /// Callers inject randomness by generating `order` outside the domain.
@@ -248,6 +259,23 @@ mod tests {
         assert!(q.is_empty());
         assert_eq!(current_id(&q), None);
         assert_eq!(q.repeat(), RepeatMode::All);
+    }
+
+    #[test]
+    fn retain_current_keeps_only_cursor_track_and_preserves_repeat() {
+        let mut q = queue_from(&["a", "b", "c"], 1, RepeatMode::All);
+        q.retain_current();
+        assert_eq!(track_ids(&q), ["b"]);
+        assert_eq!(q.cursor(), 0);
+        assert_eq!(current_id(&q), Some("b"));
+        assert_eq!(q.repeat(), RepeatMode::All);
+
+        let mut empty = PlaybackQueue::new();
+        empty.set_repeat(RepeatMode::One);
+        empty.retain_current();
+        assert!(empty.is_empty());
+        assert_eq!(empty.cursor(), 0);
+        assert_eq!(empty.repeat(), RepeatMode::One);
     }
 
     #[test]

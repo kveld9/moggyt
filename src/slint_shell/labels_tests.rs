@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(es.exclude_track_tooltip, "Excluir de la importación");
         assert_eq!(es.include_track_tooltip, "Incluir en la importación");
         assert_eq!(es.clear_queue_confirm_title, "¿Vaciar cola?");
-        assert_eq!(es.clear_queue_confirm_hint, "Esto quita todas las canciones de la cola.");
+        assert_eq!(es.clear_queue_confirm_hint, "Esto quita las demás canciones de la cola.");
         assert_eq!(es.clear_confirm_label, "Vaciar");
         assert_eq!(es.cancel_label, "Cancelar");
 
@@ -507,7 +507,7 @@ mod tests {
         assert_eq!(en.exclude_track_tooltip, "Exclude from import");
         assert_eq!(en.include_track_tooltip, "Include in import");
         assert_eq!(en.clear_queue_confirm_title, "Clear queue?");
-        assert_eq!(en.clear_queue_confirm_hint, "This removes all tracks from the queue.");
+        assert_eq!(en.clear_queue_confirm_hint, "This removes all other tracks from the queue.");
         assert_eq!(en.clear_confirm_label, "Clear");
         assert_eq!(en.cancel_label, "Cancel");
     }

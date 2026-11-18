@@ -198,8 +198,36 @@ impl SlintAppState {
         let _ = self.settings_store.save(&settings);
     }
 
-    /// Empties the queue, stops playback, and persists the empty queue.
+    /// Clears the queue, retaining the active track when loaded or being resolved, or clearing fully when idle.
     pub fn clear_queue(&mut self) {
+        if self.is_current_track_loaded() {
+            self.clear_queue_keeping_current();
+        } else {
+            self.clear_queue_fully();
+        }
+    }
+
+    /// Returns whether the cursor track is loaded in the audio backend or being resolved.
+    fn is_current_track_loaded(&self) -> bool {
+        let Some(current) = self.queue.current() else {
+            return false;
+        };
+        if self.playback_phase == PlaybackPhase::Resolving {
+            return true;
+        }
+        let Ok(audio) = self.audio.lock() else {
+            return false;
+        };
+        audio.last_requested() == Some(current.id.as_str())
+    }
+
+    fn clear_queue_keeping_current(&mut self) {
+        self.queue.retain_current();
+        self.gapless.reset();
+        let _ = self.queue_store.save(&self.queue);
+    }
+
+    fn clear_queue_fully(&mut self) {
         if let Ok(mut audio) = self.audio.lock() {
             audio.pause();
         }
@@ -405,18 +433,90 @@ mod tests {
     }
 
     #[test]
-    fn test_clear_queue_empties_stops_and_persists() {
+    fn test_clear_queue_retains_playing_current_track_and_persists() {
         let mut state = test_wired();
         state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
         state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
         state.request_current_play();
         assert!(state.audio.lock().unwrap().is_playing());
+        state.gapless.mark_armed("t2");
+        let phase_before = state.playback_phase;
 
         state.clear_queue();
+
+        assert_eq!(state.queue.len(), 1);
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+        let audio = state.audio.lock().unwrap();
+        assert!(audio.is_playing());
+        assert_eq!(audio.last_requested(), Some("t1"));
+        drop(audio);
+
+        let stored = state.queue_store.load();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored.current().map(|t| t.id.as_str()), Some("t1"));
+        assert_eq!(state.playback_phase, phase_before);
+        assert!(state.gapless.is_free());
+    }
+
+    #[test]
+    fn test_clear_queue_keeps_paused_current_track_paused() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        state.request_current_play();
+        state.toggle_play();
+        assert!(!state.audio.lock().unwrap().is_playing());
+        assert_eq!(state.playback_phase, PlaybackPhase::Paused);
+
+        state.clear_queue();
+
+        assert_eq!(state.queue.len(), 1);
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+        let audio = state.audio.lock().unwrap();
+        assert!(!audio.is_playing());
+        assert_eq!(audio.last_requested(), Some("t1"));
+        drop(audio);
+
+        let stored = state.queue_store.load();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored.current().map(|t| t.id.as_str()), Some("t1"));
+        assert_eq!(state.playback_phase, PlaybackPhase::Paused);
+    }
+
+    #[test]
+    fn test_clear_queue_idle_tracks_without_request_clears_fully() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        assert_eq!(state.audio.lock().unwrap().last_requested(), None);
+
+        state.clear_queue();
+
         assert!(state.queue.is_empty());
+        assert_eq!(state.queue.cursor(), 0);
         assert!(!state.audio.lock().unwrap().is_playing());
         assert!(state.queue_store.load().is_empty());
         assert_eq!(state.playback_phase, PlaybackPhase::Empty);
+    }
+
+    #[test]
+    fn clear_queue_during_resolving_keeps_the_pending_track() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        state.play_track_at_index(0);
+        state.queue.advance();
+        state.set_playback_phase(PlaybackPhase::Resolving);
+
+        state.clear_queue();
+
+        assert_eq!(state.queue.len(), 1);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+        assert_eq!(state.queue.cursor(), 0);
+        assert!(state.audio.lock().unwrap().is_playing());
+        assert_eq!(state.playback_phase, PlaybackPhase::Resolving);
     }
 
     #[test]
