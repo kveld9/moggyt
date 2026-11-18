@@ -239,9 +239,9 @@ official Spotify Web API to fetch full playlists without the 100-track cap and m
 first. If credentials are absent or cleared via **Clear credentials**, link imports seamlessly fall back to the public
 embed page scraper.
 
-#### Progress Overlay
+#### Progress Dialog
 
-Clicking `Start import` initiates the matching process and displays the progress overlay:
+Clicking `Start import` initiates the matching process and displays the progress dialog:
 
 - **Progress Bar**: Shows real-time progress (`done / total` tracks).
 - **Status Tallies**:

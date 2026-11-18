@@ -12,7 +12,7 @@ export component ImportProgress inherits Rectangle {
 
     callback cancel-requested();
 
-    background: Theme.overlay;
+    background: Theme.scrim;
 
     TouchArea {
         // Absorbs backdrop clicks
@@ -20,6 +20,10 @@ export component ImportProgress inherits Rectangle {
 
     Rectangle {
         width: min(root.width - 48px, 480px);
+        height: body.preferred-height;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 6px;
+        drop-shadow-color: #00000066;
         background: Theme.panel;
         border-radius: 12px;
         border-width: 1px;
@@ -27,7 +31,7 @@ export component ImportProgress inherits Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
 
-        VerticalLayout {
+        body := VerticalLayout {
             padding: 24px;
             spacing: 16px;
 

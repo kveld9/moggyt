@@ -2,6 +2,7 @@ import { Labels } from "../labels.slint";
 import { Theme } from "../theme.slint";
 import { StyledInputField } from "../components/controls.slint";
 import { SettingsToggleRow } from "../components/settings_rows.slint";
+import { IconClose } from "../icons.slint";
 
 export component ImportModal inherits Rectangle {
     in-out property <int> active-tab: 0;
@@ -21,7 +22,7 @@ export component ImportModal inherits Rectangle {
     callback close-requested();
     callback link-changed(string);
 
-    background: Theme.overlay;
+    background: Theme.scrim;
 
     TouchArea {
         // Absorbs backdrop clicks
@@ -29,6 +30,12 @@ export component ImportModal inherits Rectangle {
 
     Rectangle {
         width: min(root.width - 48px, 560px);
+        // A dialog sizes to its content: an unset height would stretch the panel
+        // (and its fields) across the whole window.
+        height: body.preferred-height;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 6px;
+        drop-shadow-color: #00000066;
         background: Theme.panel;
         border-radius: 12px;
         border-width: 1px;
@@ -36,7 +43,7 @@ export component ImportModal inherits Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
 
-        VerticalLayout {
+        body := VerticalLayout {
             padding: 24px;
             spacing: 20px;
 
@@ -51,21 +58,21 @@ export component ImportModal inherits Rectangle {
                 }
 
                 Rectangle {
-                    width: 64px;
+                    width: 28px;
                     height: 28px;
-                    border-radius: 6px;
+                    border-radius: 14px;
                     background: close-btn.pressed ? Theme.overlay : (close-btn.has-hover ? Theme.hover : transparent);
                     animate background { duration: 150ms; easing: ease-in-out; }
                     close-btn := TouchArea {
+                        accessible-role: button;
+                        accessible-label: Labels.import-close-label;
                         clicked => { root.close-requested(); }
                     }
-                    Text {
-                        text: Labels.import-close-label;
-                        color: close-btn.has-hover ? Theme.text : Theme.secondary;
-                        font-size: 13px;
-                        font-weight: 600;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+                    IconClose {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        size: 16px;
+                        tint: close-btn.has-hover ? Theme.text : Theme.secondary;
                     }
                 }
             }
@@ -180,6 +187,7 @@ export component ImportModal inherits Rectangle {
             }
 
             if !root.to-queue : StyledInputField {
+                height: 36px;
                 text <=> root.name-text;
                 placeholder-text: Labels.import-name-placeholder;
             }
