@@ -19,9 +19,9 @@ use crate::slint_shell::detail::{
 };
 use crate::slint_shell::explore::{chunk_card_rows, explore_card_shelves, tile_color_for};
 use crate::slint_shell::format::{
-    format_queue_label, format_sleep_timer_status, format_update_status, timer_preset_to_index,
+    format_queue_label, format_sleep_timer_status, format_track_count, format_update_status,
+    timer_preset_to_index,
 };
-use crate::slint_shell::history::library_item_subtitle;
 use crate::slint_shell::labels::sync_static_labels;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::playback::{
@@ -265,7 +265,7 @@ fn playlist_cards(state: &SlintAppState) -> Vec<ExploreCardData> {
         .map(|(index, playlist)| ExploreCardData {
             index: index as i32,
             title: playlist.title.clone().into(),
-            subtitle: library_item_subtitle(playlist, state.locale).into(),
+            subtitle: format_track_count(state.locale, playlist.track_count as u32).into(),
             has_cover: playlist.artwork.is_some(),
             cover: resolve_row_cover_image(playlist.artwork.as_deref(), &state.search_covers),
             tile_color: tile_color_for(&playlist.title),

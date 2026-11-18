@@ -179,7 +179,6 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Hide music videos", "Ocultar videoclips"),
     ("High (Opus 130 kbps)", "Alta (Opus 130 kbps)"),
     ("High confidence", "Confianza alta"),
-    ("History", "Historial"),
     ("Import", "Importar"),
     ("Import cancelled", "Importacion cancelada"),
     ("Import from Spotify", "Importar desde Spotify"),
