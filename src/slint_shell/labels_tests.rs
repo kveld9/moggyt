@@ -213,6 +213,11 @@ mod tests {
         assert_eq!(es.section_player_bar, "Barra de reproducción");
         assert_eq!(es.player_bar_classic, "Clásica");
         assert_eq!(es.player_bar_floating, "Flotante");
+        assert_eq!(es.player_bar_width, "Ancho de la barra flotante");
+        assert_eq!(
+            es.player_bar_width_hint,
+            "Ancho máximo de la barra flotante; se reduce para caber en ventanas más angostas"
+        );
         assert_eq!(es.player_bar_artwork, "Mostrar portada");
         assert_eq!(es.player_bar_like, "Mostrar botón Me gusta");
         assert_eq!(es.player_bar_shuffle, "Mostrar botón Aleatorio");
@@ -411,6 +416,11 @@ mod tests {
         assert_eq!(en.section_player_bar, "Player bar");
         assert_eq!(en.player_bar_classic, "Classic");
         assert_eq!(en.player_bar_floating, "Floating");
+        assert_eq!(en.player_bar_width, "Floating bar width");
+        assert_eq!(
+            en.player_bar_width_hint,
+            "Width cap of the floating bar; it shrinks to fit narrower windows"
+        );
         assert_eq!(en.player_bar_artwork, "Show artwork");
         assert_eq!(en.player_bar_like, "Show like button");
         assert_eq!(en.player_bar_shuffle, "Show shuffle button");

@@ -102,6 +102,11 @@ export global PlayerUi {
 // every consumer in sync without repeating the pixel values.
 export global PlayerBarUi {
     in-out property <int> mode: 0;
+    // Width cap in pixels of the floating bar; mirrors the persisted player-bar width
+    // setting and the Rust clamp range (640..=1600), so slider, geometry and store agree.
+    in-out property <int> floating-width: 960;
+    // Emitted on every slider step with the requested width cap in pixels.
+    callback floating-width-changed(int);
     // Bottom strip the window layout reserves for the docked classic bar.
     out property <length> reserved-height: mode == 0 ? 72px : 0px;
     // Bottom strip the floating bar covers; content scrolls underneath it.

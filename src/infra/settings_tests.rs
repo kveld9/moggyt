@@ -255,6 +255,7 @@ mod tests {
     fn test_player_bar_settings_serde_defaults_and_explicit_deserialization() {
         let empty: Settings = serde_json::from_str("{}").expect("deserialize empty");
         assert_eq!(empty.player_bar_mode, PlayerBarMode::Classic);
+        assert_eq!(empty.player_bar_floating_width, DEFAULT_PLAYER_BAR_FLOATING_WIDTH);
         assert!(empty.player_bar_show_artwork && empty.player_bar_show_like);
         assert!(empty.player_bar_show_shuffle && empty.player_bar_show_repeat);
         assert!(!empty.player_bar_show_skip_seconds && empty.player_bar_show_queue);
@@ -267,10 +268,12 @@ mod tests {
             "player_bar_show_like": false, "player_bar_show_shuffle": false,
             "player_bar_show_repeat": false, "player_bar_show_skip_seconds": true,
             "player_bar_show_queue": false, "player_bar_show_volume": false,
-            "player_bar_show_timer": false, "player_bar_show_speed": false
+            "player_bar_show_timer": false, "player_bar_show_speed": false,
+            "player_bar_floating_width": 1200
         }"#;
         let explicit: Settings = serde_json::from_str(explicit_json).expect("deserialize explicit");
         assert_eq!(explicit.player_bar_mode, PlayerBarMode::Floating);
+        assert_eq!(explicit.player_bar_floating_width, 1200);
         assert!(!explicit.player_bar_show_artwork && !explicit.player_bar_show_like);
         assert!(!explicit.player_bar_show_shuffle && !explicit.player_bar_show_repeat);
         assert!(explicit.player_bar_show_skip_seconds && !explicit.player_bar_show_queue);
@@ -455,6 +458,29 @@ mod tests {
         assert_eq!(clamp_crossfade_seconds(15), 15);
         assert_eq!(clamp_crossfade_seconds(16), 15);
         assert_eq!(clamp_crossfade_seconds(100), 15);
+    }
+
+    #[test]
+    fn test_player_bar_floating_width_clamped_on_load_from_disk() {
+        let temp = TempDir::new("test-player-bar-width-clamp");
+        let store = DiskSettingsStore::new(temp.path());
+
+        std::fs::write(store.file_path(), r#"{"player_bar_floating_width": 5000}"#).unwrap();
+        assert_eq!(store.load().player_bar_floating_width, MAX_PLAYER_BAR_FLOATING_WIDTH);
+        std::fs::write(store.file_path(), r#"{"player_bar_floating_width": 99}"#).unwrap();
+        assert_eq!(store.load().player_bar_floating_width, MIN_PLAYER_BAR_FLOATING_WIDTH);
+        std::fs::write(store.file_path(), r#"{"player_bar_floating_width": 1200}"#).unwrap();
+        assert_eq!(store.load().player_bar_floating_width, 1200);
+    }
+
+    #[test]
+    fn test_clamp_player_bar_floating_width_boundary_cases() {
+        assert_eq!(clamp_player_bar_floating_width(0), MIN_PLAYER_BAR_FLOATING_WIDTH);
+        assert_eq!(clamp_player_bar_floating_width(639), MIN_PLAYER_BAR_FLOATING_WIDTH);
+        assert_eq!(clamp_player_bar_floating_width(640), 640);
+        assert_eq!(clamp_player_bar_floating_width(960), 960);
+        assert_eq!(clamp_player_bar_floating_width(1600), 1600);
+        assert_eq!(clamp_player_bar_floating_width(1601), MAX_PLAYER_BAR_FLOATING_WIDTH);
     }
 
     #[test]

@@ -111,6 +111,14 @@ mod tests {
         assert_eq!(tr(Locale::Spanish, "Player bar"), "Barra de reproducción");
         assert_eq!(tr(Locale::Spanish, "Classic"), "Clásica");
         assert_eq!(tr(Locale::Spanish, "Floating"), "Flotante");
+        assert_eq!(tr(Locale::Spanish, "Floating bar width"), "Ancho de la barra flotante");
+        assert_eq!(
+            tr(
+                Locale::Spanish,
+                "Width cap of the floating bar; it shrinks to fit narrower windows"
+            ),
+            "Ancho máximo de la barra flotante; se reduce para caber en ventanas más angostas"
+        );
         assert_eq!(tr(Locale::Spanish, "Show artwork"), "Mostrar portada");
         assert_eq!(tr(Locale::Spanish, "Show like button"), "Mostrar botón Me gusta");
         assert_eq!(tr(Locale::Spanish, "Show shuffle button"), "Mostrar botón Aleatorio");

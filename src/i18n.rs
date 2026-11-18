@@ -172,6 +172,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Fix audio version", "Corregir versión de audio"),
     ("Fix version", "Corregir versión"),
     ("Floating", "Flotante"),
+    ("Floating bar width", "Ancho de la barra flotante"),
     ("From file", "Desde archivo"),
     ("From link", "Desde enlace"),
     ("Go to album", "Ir al álbum"),
@@ -381,6 +382,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("View on GitHub", "Ver en GitHub"),
     ("Waiting for authorization in your browser", "Esperando la autorización en tu navegador"),
     ("White", "Blanco"),
+    (
+        "Width cap of the floating bar; it shrinks to fit narrower windows",
+        "Ancho máximo de la barra flotante; se reduce para caber en ventanas más angostas",
+    ),
     (
         "Your session expired. Paste fresh cookies in Settings.",
         "Tu sesión venció. Pegá cookies nuevas en Ajustes.",
