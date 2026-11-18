@@ -2,6 +2,9 @@
 
 use std::sync::{Arc, Mutex};
 
+use slint::Model;
+
+use crate::domain::Track;
 use crate::slint_shell::platform::{dispatch_to_ui, rgba_to_image};
 use crate::slint_shell::playback_worker::{
     COVER_FETCH_CONCURRENCY_LIMIT, fetch_and_decode_cover, thumbnail_variant_for_row,
@@ -9,6 +12,7 @@ use crate::slint_shell::playback_worker::{
 use crate::slint_shell::state::{SharedCovers, SlintAppState};
 use crate::slint_shell::sync::{
     sync_category_shelves, sync_explore_shelves, sync_library_and_detail, sync_shelves_and_queue,
+    track_to_row_data,
 };
 use crate::slint_shell::window::with_ui_state;
 use crate::slint_shell::{CoverArtData, MoggytWindow};
@@ -179,7 +183,7 @@ fn sync_target_views(win: &MoggytWindow, st: &mut SlintAppState, targets: CoverT
     }
 }
 
-/// Applies decoded cover art to UI state, triggering shelf card and search row resync.
+/// Applies decoded cover art to UI state, caching it and repainting the rows that own it.
 pub(crate) fn apply_fetched_cover_to_state(
     win: &MoggytWindow,
     st: &mut SlintAppState,
@@ -189,12 +193,62 @@ pub(crate) fn apply_fetched_cover_to_state(
     let Some(img) = rgba_to_image(&cover.rgba, cover.width, cover.height) else {
         return;
     };
+    // The cache is keyed by URL and shared by every view, so a fetch keeps its value even when
+    // the generation that requested it is no longer the active view: only repainting is gated.
+    st.search_covers.insert(cover.url.clone(), img.clone());
     let targets = cover_targets(st, generation);
     if targets.any() {
-        st.search_covers.insert(cover.url.clone(), img.clone());
         sync_target_views(win, st, targets);
     }
+    if !targets.shelves_and_queue {
+        repaint_queue_rows_with_cover(win, st, &cover.url, &img);
+    }
     sync_now_playing_after_cover_fetch(win, st, &cover.url, &img);
+}
+
+/// Indices of queued tracks whose artwork resolves to the fetched cover URL.
+///
+/// A fetch carries either the row thumbnail variant or the full-resolution source, so both
+/// forms count as a match.
+pub(crate) fn queue_rows_matching_artwork(tracks: &[Track], url: &str) -> Vec<usize> {
+    tracks
+        .iter()
+        .enumerate()
+        .filter(|(_, track)| track_artwork_matches(track, url))
+        .map(|(index, _)| index)
+        .collect()
+}
+
+fn track_artwork_matches(track: &Track, url: &str) -> bool {
+    let Some(artwork) = track.artwork.as_deref() else {
+        return false;
+    };
+    artwork == url || thumbnail_variant_for_row(artwork) == url
+}
+
+/// Repaints only the queue rows whose artwork matches a newly cached cover.
+///
+/// Queue rows are otherwise rebuilt only by a full window sync, so a cover that returns after
+/// the last sync would never reach its row. Updating the existing model in place keeps the list
+/// scroll offset and avoids rebuilding every row.
+pub(crate) fn repaint_queue_rows_with_cover(
+    win: &MoggytWindow,
+    st: &SlintAppState,
+    url: &str,
+    img: &slint::Image,
+) {
+    let model = win.get_queue_tracks();
+    for index in queue_rows_matching_artwork(st.queue.tracks(), url) {
+        if index >= model.row_count() {
+            continue;
+        }
+        let Some(track) = st.queue.tracks().get(index) else {
+            continue;
+        };
+        let mut row = track_to_row_data(index, track, &st.search_covers);
+        row.cover = img.clone();
+        model.set_row_data(index, row);
+    }
 }
 
 /// Updates now-playing cover when fetched artwork matches active track without downgrading hi-res.
@@ -261,6 +315,7 @@ pub(crate) fn run_cover_fetch_worker_loop(
 mod tests {
     use super::*;
     use crate::slint_shell::test_support::test_wired;
+    use slint::{ModelRc, VecModel};
 
     #[test]
     fn test_cover_fetch_pool_concurrency_bound_constant_integration() {
@@ -472,5 +527,79 @@ mod tests {
         assert!(!stale_search.library_and_detail);
         assert!(!stale_search.explore);
         assert!(!stale_search.category);
+    }
+
+    #[test]
+    fn queue_rows_matching_artwork_accepts_thumbnail_and_full_url() {
+        let tracks = vec![
+            Track::new("t1", "Thumb", "Artist")
+                .with_artwork("https://lh3.googleusercontent.com/row-thumb-large"),
+            Track::new("t2", "Full", "Artist")
+                .with_artwork("https://i.ytimg.com/vi/abc/hqdefault.jpg"),
+            Track::new("t3", "Other", "Artist")
+                .with_artwork("https://lh3.googleusercontent.com/other-thumb-large"),
+            Track::new("t4", "Bare", "Artist"),
+        ];
+
+        assert_eq!(
+            queue_rows_matching_artwork(
+                &tracks,
+                "https://lh3.googleusercontent.com/row-thumb-small"
+            ),
+            vec![0]
+        );
+        assert_eq!(
+            queue_rows_matching_artwork(&tracks, "https://i.ytimg.com/vi/abc/mqdefault.jpg"),
+            vec![1]
+        );
+        assert_eq!(
+            queue_rows_matching_artwork(&tracks, "https://i.ytimg.com/vi/abc/hqdefault.jpg"),
+            vec![1]
+        );
+        assert!(queue_rows_matching_artwork(&tracks, "https://img.local/missing.jpg").is_empty());
+    }
+
+    #[test]
+    fn stale_generation_cover_is_cached_and_repaints_queue_row() {
+        let Ok(win) = MoggytWindow::new() else {
+            return;
+        };
+        let mut st = test_wired();
+        let track = Track::new("q1", "Queued", "Artist")
+            .with_artwork("https://lh3.googleusercontent.com/queued-thumb-large");
+        st.queue.push(track.clone());
+        st.play_generation = CoverDomain::Play.base() + 2;
+        let rows = vec![track_to_row_data(0, &track, &st.search_covers)];
+        win.set_queue_tracks(ModelRc::new(VecModel::from(rows)));
+
+        let url = thumbnail_variant_for_row(track.artwork.as_deref().unwrap());
+        let cover = CoverArtData::new(url.clone(), vec![255, 0, 0, 255], 1, 1);
+        apply_fetched_cover_to_state(&win, &mut st, cover, CoverDomain::Play.base() + 1);
+
+        assert!(st.search_covers.contains_key(&url), "stale fetch must still fill the cache");
+        let row = win.get_queue_tracks().row_data(0).expect("queue row present");
+        assert!(row.cover.size().width > 0, "queue row cover must be repainted");
+    }
+
+    #[test]
+    fn detail_generation_cover_repaints_queue_row() {
+        let Ok(win) = MoggytWindow::new() else {
+            return;
+        };
+        let mut st = test_wired();
+        let track = Track::new("q2", "Queued", "Artist")
+            .with_artwork("https://lh3.googleusercontent.com/detail-thumb-large");
+        st.queue.push(track.clone());
+        st.detail_generation = CoverDomain::Detail.base() + 1;
+        let rows = vec![track_to_row_data(0, &track, &st.search_covers)];
+        win.set_queue_tracks(ModelRc::new(VecModel::from(rows)));
+
+        let url = thumbnail_variant_for_row(track.artwork.as_deref().unwrap());
+        let cover = CoverArtData::new(url.clone(), vec![0, 0, 255, 255], 1, 1);
+        apply_fetched_cover_to_state(&win, &mut st, cover, CoverDomain::Detail.base() + 1);
+
+        assert!(st.search_covers.contains_key(&url));
+        let row = win.get_queue_tracks().row_data(0).expect("queue row present");
+        assert!(row.cover.size().width > 0, "queue row cover must be repainted");
     }
 }
