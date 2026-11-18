@@ -31,7 +31,6 @@ mod tests {
         assert_eq!(tr(Locale::Spanish, "Queue"), "Cola");
         assert_eq!(tr(Locale::Spanish, "Now Playing"), "Sonando");
         assert_eq!(tr(Locale::Spanish, "Library"), "Biblioteca");
-        assert_eq!(tr(Locale::Spanish, "History"), "Historial");
         assert_eq!(tr(Locale::Spanish, "Detail"), "Detalle");
         assert_eq!(tr(Locale::Spanish, "Settings"), "Ajustes");
         assert_eq!(tr(Locale::Spanish, "Explore"), "Explorar");

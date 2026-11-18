@@ -154,8 +154,7 @@ the Settings page, not here:
 - **Section chips**: `Playlists`, `Songs`, `Albums`, `Artists`, `Profiles`, and `Podcasts` chips sit above the
   grid; selecting one switches the visible section.
 - **Playlists**: a card grid of saved playlists with cover art and the localized track count. Shows
-  `No playlists found.` when empty. When signed in, a read-only "History" card appears first, loading the account's
-  recent plays as recorded by YouTube Music into the detail view with grouped day sections flattened in order.
+  `No playlists found.` when empty.
 - **Liked Songs**: the `Songs` chip lists liked tracks with title, artist, album, and duration. Clicking a row
   replaces the queue with the liked songs and plays from that track. Shows `No liked songs.` when empty.
 - **Saved Albums**: a card grid of saved albums with cover art, release type, and artist. Shows `No saved albums`

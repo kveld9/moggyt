@@ -24,7 +24,6 @@ use crate::slint_shell::covers::{
 };
 use crate::slint_shell::detail::detail_is_empty;
 use crate::slint_shell::format::format_queue_label;
-use crate::slint_shell::history::{is_history_id, label_history_detail, with_history_entry};
 use crate::slint_shell::import_callbacks::{
     current_store, install_import_callbacks, install_playlist_store, poll_import,
 };
@@ -143,14 +142,6 @@ pub fn resolve_local_detail(browse_id: &str, store: &dyn PlaylistStore) -> Optio
     store.get(trimmed).map(|p| local_detail(&p))
 }
 
-fn apply_detail_result(
-    detail: Option<Detail>,
-    id: &str,
-    locale: crate::i18n::Locale,
-) -> Option<Detail> {
-    if is_history_id(id) { detail.map(|d| label_history_detail(d, locale)) } else { detail }
-}
-
 fn begin_detail_load(state: &mut SlintAppState, browse_id: &str, kind: DetailKind) -> Option<u64> {
     let trimmed = browse_id.trim();
     if trimmed.is_empty() {
@@ -205,7 +196,6 @@ fn apply_detail_outcome(
     state: &mut SlintAppState,
     generation: u64,
     detail: Result<Option<Detail>, CatalogError>,
-    id: &str,
 ) -> bool {
     if state.detail_generation != generation {
         return false;
@@ -214,7 +204,7 @@ fn apply_detail_outcome(
         Ok(Some(detail)) => {
             let detail = crate::domain::apply_detail_policy(detail, state.songs_only);
             let is_empty = detail_is_empty(&detail);
-            state.detail = apply_detail_result(Some(detail), id, state.locale);
+            state.detail = Some(detail);
             state.detail_error = None;
             state.detail_phase = if is_empty { ViewPhase::Empty } else { ViewPhase::Ready };
         }
@@ -246,7 +236,7 @@ pub(crate) fn open_detail_async(
     let trimmed = browse_id.trim();
     if is_local_playlist_id(trimmed) {
         let detail = current_store().and_then(|st| resolve_local_detail(trimmed, st.as_ref()));
-        apply_detail_outcome(state, generation, Ok(detail), trimmed);
+        apply_detail_outcome(state, generation, Ok(detail));
         sync_window(window, state);
         return;
     }
@@ -263,7 +253,7 @@ pub(crate) fn open_detail_async(
         let _ = dispatch_to_ui(move || {
             let Some(win) = weak.upgrade() else { return };
             with_ui_state(|st| {
-                if apply_detail_outcome(st, g, detail, &id) {
+                if apply_detail_outcome(st, g, detail) {
                     request_detail_covers(st, &tx);
                     sync_library_and_detail(&win, st);
                     sync_header_title(&win, st);
@@ -302,11 +292,7 @@ fn apply_async_library_outcome(
                 && sections.artists.is_empty()
                 && sections.podcasts.is_empty()
                 && sections.profiles.is_empty();
-            state.library_playlists = with_history_entry(
-                merge_local_library(&sections.playlists, &local),
-                state.signed_in,
-                state.locale,
-            );
+            state.library_playlists = merge_local_library(&sections.playlists, &local);
             state.library_songs = sections.songs;
             state.library_albums = sections.albums;
             state.library_artists = sections.artists;
@@ -605,13 +591,13 @@ mod tests {
 
         let local =
             Detail::new(DetailKind::Playlist, "Local", "", vec![Track::new("t1", "T", "A")]);
-        assert!(apply_detail_outcome(&mut state, l_gen, Ok(Some(local)), "local:race"));
+        assert!(apply_detail_outcome(&mut state, l_gen, Ok(Some(local))));
         assert_eq!(state.detail_phase, ViewPhase::Ready);
         assert_eq!(state.detail.as_ref().map(|d| d.title.as_str()), Some("Local"));
 
         let remote =
             Detail::new(DetailKind::Album, "Remote", "", vec![Track::new("t2", "T2", "A2")]);
-        assert!(!apply_detail_outcome(&mut state, r_gen, Ok(Some(remote)), "album-1"));
+        assert!(!apply_detail_outcome(&mut state, r_gen, Ok(Some(remote))));
         assert_eq!(state.detail_phase, ViewPhase::Ready);
         assert_eq!(state.detail.as_ref().map(|d| d.title.as_str()), Some("Local"));
     }
@@ -621,12 +607,7 @@ mod tests {
         let mut state = test_wired();
         let generation =
             begin_detail_load(&mut state, "album-fail", DetailKind::Album).expect("load begins");
-        let applied = apply_detail_outcome(
-            &mut state,
-            generation,
-            Err(CatalogError::Transport),
-            "album-fail",
-        );
+        let applied = apply_detail_outcome(&mut state, generation, Err(CatalogError::Transport));
         assert!(applied);
         assert_eq!(state.detail_phase, ViewPhase::Error);
         assert!(state.detail_error.is_some());
@@ -639,7 +620,7 @@ mod tests {
         let mut state = test_wired();
         let generation =
             begin_detail_load(&mut state, "album-404", DetailKind::Album).expect("load begins");
-        assert!(apply_detail_outcome(&mut state, generation, Ok(None), "album-404"));
+        assert!(apply_detail_outcome(&mut state, generation, Ok(None)));
         assert_eq!(state.detail_phase, ViewPhase::Empty);
         assert_eq!(state.detail_error, None);
         assert!(state.detail.is_none());
@@ -664,8 +645,7 @@ mod tests {
         let generation =
             begin_detail_load(&mut state, "album-empty", DetailKind::Album).expect("load begins");
         let empty_detail = Detail::new(DetailKind::Album, "Empty Album", "", Vec::new());
-        let applied =
-            apply_detail_outcome(&mut state, generation, Ok(Some(empty_detail)), "album-empty");
+        let applied = apply_detail_outcome(&mut state, generation, Ok(Some(empty_detail)));
         assert!(applied);
         assert_eq!(state.detail_phase, ViewPhase::Empty);
         assert_eq!(state.detail_error, None);
