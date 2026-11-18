@@ -89,7 +89,10 @@ export component PlayerBarSettings inherits VerticalLayout {
                     maximum: 1600.0;
                     value: PlayerBarUi.floating-width;
                     hit-slack: 14px;
-                    changed(val) => { PlayerBarUi.floating-width-changed(round(val)); }
+                    // Live preview while dragging: the bar geometry and the px label follow the
+                    // pointer. The persisted commit happens once, when the pointer is released.
+                    changed(val) => { PlayerBarUi.floating-width = round(val); }
+                    committed(val) => { PlayerBarUi.floating-width-changed(round(val)); }
                 }
             }
 
