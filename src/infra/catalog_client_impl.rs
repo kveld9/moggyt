@@ -4,8 +4,12 @@ use super::catalog::CatalogError;
 use super::catalog_client::parse_search_all;
 use super::catalog_live::{LiveCatalog, raw_to_track};
 use super::catalog_model::{RawTrack, SearchHits};
+use super::catalog_parse_album::{
+    album_audio_playlist_id, has_music_video_rows, replace_album_tracks_with_audio,
+};
 use super::catalog_parse_continuation::parse_paginated_detail;
 use super::catalog_parse_detail::parse_detail_all;
+use super::catalog_parse_detail_track::now_epoch_secs;
 use super::catalog_parse_explore::parse_explore_all;
 use super::catalog_parse_home::parse_home_all;
 use super::catalog_parse_library::{
@@ -389,7 +393,31 @@ impl CatalogClient {
             return Err(CatalogError::Unauthenticated);
         }
         let payload = self.detail_payload(trimmed).map_err(|_| CatalogError::Transport)?;
-        parse_detail_all(&payload, kind).map(Some).ok_or(CatalogError::Malformed)
+        let detail = parse_detail_all(&payload, kind).ok_or(CatalogError::Malformed)?;
+        Ok(Some(self.with_album_audio_tracks(detail, kind, &payload)))
+    }
+
+    /// Replaces a music-video album tracklist with its canonical audio playlist tracks.
+    ///
+    /// Album rows whose provider supplies official videos point at the video ids, so streaming them
+    /// would play the video edit. The album payload also carries the release audio playlist
+    /// (`OLAK5uy_...`); browsing it yields the art tracks with the album durations. A failed or empty
+    /// audio playlist keeps the catalog rows and is reported as a degraded response.
+    fn with_album_audio_tracks(&self, detail: Detail, kind: DetailKind, payload: &Value) -> Detail {
+        if kind != DetailKind::Album || !has_music_video_rows(&detail) {
+            return detail;
+        }
+        let Some(playlist_id) = album_audio_playlist_id(payload) else {
+            return detail;
+        };
+        let Ok(audio) = self.browse_payload(&format!("VL{playlist_id}")) else {
+            tracing::warn!(
+                playlist_id = %playlist_id,
+                "album audio playlist request failed; keeping catalog rows"
+            );
+            return detail;
+        };
+        replace_album_tracks_with_audio(detail, &audio, now_epoch_secs())
     }
 
     /// Queries the browse endpoint for `browse_id` and merges its track-list continuation

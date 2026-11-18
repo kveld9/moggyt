@@ -297,7 +297,7 @@ fn with_optional_detail_fields(mut detail: Detail, value: &Value) -> Detail {
 ///
 /// Album tracklist items carry no thumbnail in the catalog API, so every track would
 /// otherwise render an empty cover square.
-fn fill_missing_track_artwork(mut detail: Detail) -> Detail {
+pub(super) fn fill_missing_track_artwork(mut detail: Detail) -> Detail {
     let Some(artwork) = detail.artwork.clone() else {
         return detail;
     };
@@ -313,7 +313,10 @@ fn fill_missing_track_artwork(mut detail: Detail) -> Detail {
 }
 
 /// Fills album tracks without an artist with the header credit line.
-fn fill_missing_album_track_artists(mut detail: Detail, artists: Option<&str>) -> Detail {
+pub(super) fn fill_missing_album_track_artists(
+    mut detail: Detail,
+    artists: Option<&str>,
+) -> Detail {
     let Some(artist) = artists else {
         return detail;
     };

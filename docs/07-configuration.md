@@ -212,9 +212,10 @@ The configuration file uses JSON serialization with atomic replacement:
     its 48 kHz output rather than additional bitrate.
 - **Hide Music Videos (`songs_only`)**:
   - `false`: Catalog browse surfaces retain music videos, ranked after audio tracks (default).
-  - `true`: Search results, Explore and category shelves, remote album/playlist/artist track lists, and autoplay radio
+  - `true`: Search results, Explore and category shelves, remote playlist/artist track lists, and autoplay radio
     drop music videos (InnerTube `OMV` and `UGC` types), keeping audio tracks (`ATV`) and unknown types. A list
-    composed only of music videos becomes empty instead of falling back to videos. The playback queue, locally saved
+    composed only of music videos becomes empty instead of falling back to videos. Album pages are unaffected: they
+    list the release's audio playlist, so every album row is an audio track. The playback queue, locally saved
     playlists, import matching, and the audio version picker are not filtered.
 - **Autoplay Continuation (`autoplay_enabled`)**:
   - `false`: Playback ends when the current queue reaches the end (default).
