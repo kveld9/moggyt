@@ -357,7 +357,7 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ),
     ("The queue is empty.", "La cola está vacía."),
     ("Theme", "Tema"),
-    ("This removes all tracks from the queue.", "Esto quita todas las canciones de la cola."),
+    ("This removes all other tracks from the queue.", "Esto quita las demás canciones de la cola."),
     ("Timer:", "Temporizador:"),
     ("Timer: End of track", "Temporizador: Fin de la canción"),
     ("Timer: Off", "Temporizador: Desactivado"),

@@ -456,7 +456,7 @@ impl StaticLabels {
             exclude_track_tooltip: tr(locale, "Exclude from import"),
             include_track_tooltip: tr(locale, "Include in import"),
             clear_queue_confirm_title: tr(locale, "Clear queue?"),
-            clear_queue_confirm_hint: tr(locale, "This removes all tracks from the queue."),
+            clear_queue_confirm_hint: tr(locale, "This removes all other tracks from the queue."),
             clear_confirm_label: tr(locale, "Clear"),
             cancel_label: tr(locale, "Cancel"),
         }
