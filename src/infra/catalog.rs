@@ -14,6 +14,8 @@ pub enum CatalogError {
     Transport,
     /// The response could not be parsed into the expected model.
     Malformed,
+    /// The catalog implementation does not support account-write operations.
+    Unsupported,
 }
 
 impl std::fmt::Display for CatalogError {
@@ -22,6 +24,7 @@ impl std::fmt::Display for CatalogError {
             Self::Unauthenticated => write!(f, "unauthenticated"),
             Self::Transport => write!(f, "transport error"),
             Self::Malformed => write!(f, "malformed response"),
+            Self::Unsupported => write!(f, "unsupported request"),
         }
     }
 }
@@ -106,6 +109,11 @@ pub trait Catalog {
     ///
     /// Default implementation is a no-op for stubs or static catalogs.
     fn set_locale(&mut self, _locale: crate::i18n::Locale) {}
+
+    /// Creates a playlist in the signed-in account and returns its id.
+    fn create_playlist(&self, _title: &str) -> Result<String, CatalogError> {
+        Err(CatalogError::Unsupported)
+    }
 }
 
 #[cfg(test)]
@@ -183,11 +191,19 @@ mod tests {
     }
 
     #[test]
+    fn default_create_playlist_returns_unsupported() {
+        let pass_through = PassThroughCatalog::default();
+        assert_eq!(pass_through.create_playlist("Mix"), Err(CatalogError::Unsupported));
+    }
+
+    #[test]
     fn catalog_error_display_and_equality() {
         assert_eq!(CatalogError::Unauthenticated.to_string(), "unauthenticated");
         assert_eq!(CatalogError::Transport.to_string(), "transport error");
         assert_eq!(CatalogError::Malformed.to_string(), "malformed response");
+        assert_eq!(CatalogError::Unsupported.to_string(), "unsupported request");
         assert_eq!(CatalogError::Unauthenticated, CatalogError::Unauthenticated);
         assert_ne!(CatalogError::Unauthenticated, CatalogError::Transport);
+        assert_ne!(CatalogError::Unsupported, CatalogError::Transport);
     }
 }

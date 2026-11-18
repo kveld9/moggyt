@@ -31,6 +31,7 @@ pub mod catalog_parse_explore;
 pub mod catalog_parse_home;
 pub mod catalog_parse_library;
 pub mod catalog_parse_playlist;
+pub mod catalog_parse_playlist_create;
 pub mod catalog_parse_playlist_row;
 pub mod catalog_parse_radio;
 pub mod catalog_parse_search;
@@ -113,9 +114,10 @@ pub use browser::{open_url, opener_command};
 pub use catalog::{Catalog, CatalogError};
 pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
 pub use catalog_live::LiveCatalog;
+pub use catalog_parse_playlist_create::parse_created_playlist_id;
 pub use catalog_requests::{
     EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID,
-    LIBRARY_PLAYLISTS_BROWSE_ID,
+    LIBRARY_PLAYLISTS_BROWSE_ID, NEW_PLAYLIST_PRIVACY, playlist_create_body, playlist_create_url,
 };
 pub use catalog_stub::CatalogStub;
 pub use clipboard::{Clipboard, MemoryClipboard, SystemClipboard, copy_text};
