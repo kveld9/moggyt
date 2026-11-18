@@ -256,9 +256,9 @@ pub struct Detail {
     pub container_label: Option<String>,
     pub description: Option<String>,
     pub artwork: Option<String>,
-    /// Track count the server reports for the whole container (playlists only).
+    /// Track count the server reports for the whole container (playlists and albums).
     pub track_count: Option<u32>,
-    /// Total playback duration in seconds the server reports (playlists only).
+    /// Total playback duration in seconds the server reports (playlists and albums).
     pub total_duration_secs: Option<u32>,
     /// Playlist visibility reported by the catalog header (playlists only).
     pub privacy: Option<PlaylistPrivacy>,

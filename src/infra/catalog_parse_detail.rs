@@ -335,7 +335,14 @@ fn apply_album_header(mut detail: Detail, album: &AlbumHeader) -> Detail {
     if let Some(label) = &album.container_label {
         detail = detail.with_container_label(label);
     }
-    fill_missing_album_track_artists(detail, album.artists.as_deref())
+    let mut detail = fill_missing_album_track_artists(detail, album.artists.as_deref());
+    if let Some(count) = album.track_count {
+        detail = detail.with_track_count(count);
+    }
+    if let Some(secs) = album.total_duration_secs {
+        detail = detail.with_total_duration_secs(secs);
+    }
+    detail
 }
 
 /// Parses a detail view from catalog API browse response payload at a specified epoch timestamp.
