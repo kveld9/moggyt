@@ -103,7 +103,7 @@ export global PlayerUi {
 export global PlayerBarUi {
     in-out property <int> mode: 0;
     // Width cap in pixels of the floating bar; mirrors the persisted player-bar width
-    // setting and the Rust clamp range (640..=1600), so slider, geometry and store agree.
+    // setting and the Rust clamp range (800..=1600), so slider, geometry and store agree.
     in-out property <int> floating-width: 960;
     // Emitted on every slider step with the requested width cap in pixels.
     callback floating-width-changed(int);

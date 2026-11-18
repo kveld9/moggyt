@@ -31,7 +31,7 @@ const fn default_playback_speed() -> f32 {
 pub const MAX_CROSSFADE_SECONDS: u32 = 15;
 
 /// Lower bound of the configurable floating player bar width in pixels.
-pub const MIN_PLAYER_BAR_FLOATING_WIDTH: u32 = 640;
+pub const MIN_PLAYER_BAR_FLOATING_WIDTH: u32 = 800;
 
 /// Upper bound of the configurable floating player bar width in pixels.
 pub const MAX_PLAYER_BAR_FLOATING_WIDTH: u32 = 1600;
