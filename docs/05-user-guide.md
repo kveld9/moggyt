@@ -74,6 +74,8 @@ The detail view displays full tracklistings for an album, artist, or playlist:
   the playlist by that column, a second click reverses the order, and a third click restores the catalog order;
   an arrow marks the active column and direction. Sorting affects the table view only, not albums, artists or
   local playlists. Albums and artist song lists keep the title, artist, and duration rows.
+  Album rows come from the release's audio playlist, so their durations match the album master even when the
+  album also offers official videos for the same songs.
 - **Compact view**: the `Compact view` button in the header hides row cover thumbnails, adds track numbers,
   and tightens row height. Playlist tables keep every column and move the artist into its own column; the
   button then reads `Cover view` and restores the default layout, where the artist sits under the title.
@@ -343,10 +345,11 @@ In headless mode:
 Playback options can be configured under **Settings -> Playback**:
 
 - **Hide music videos**: When enabled, removes music videos from search results, Explore and category shelves,
-  remote album/playlist/artist track lists, and autoplay recommendations. Audio tracks and unknown track types are
-  kept; a list containing only music videos becomes empty. The queue, locally saved playlists, import matching, and
-  the audio version picker are unaffected. Search result lists always rank songs ahead of music videos, even with
-  this option disabled.
+  remote playlist/artist track lists, and autoplay recommendations. Album track lists are never filtered: an album
+  page lists the release's audio playlist, so every row is an audio track with the album duration. Audio tracks and
+  unknown track types are kept; a list containing only music videos becomes empty. The queue, locally saved
+  playlists, import matching, and the audio version picker are unaffected. Search result lists always rank songs
+  ahead of music videos, even with this option disabled.
 - **Autoplay similar tracks**: Appends similar tracks when the queue ends. It is off by default; when enabled,
   playback continues with catalog radio recommendations after the last track.
 - **Cover cache limit**: selects the disk budget for cached cover art (Off, 64 MB, 128 MB, 256 MB, 512 MB,
