@@ -341,6 +341,16 @@ guessing; every rule here was verified against a build or the official documenta
   `focus()` on the input; otherwise only the thin text line accepts the click.
   Source: <https://docs.slint.dev/latest/docs/slint/reference/keyboard-input/textinput/>.
 
+- A dialog panel that inherits `Rectangle` and sets only `width` fills its window: an unset `height`
+  stretches the panel to the parent, and inside its layout every child with a default stretch factor
+  of 1 (another `Rectangle`, a `StyledInputField`) absorbs the surplus, so the modal opens as a
+  full-window column with an oversized input. Size the panel to its content with
+  `height: body.preferred-height`, naming the panel's `VerticalLayout` as `body`: the layout's
+  preferred height is computed from its children and re-evaluated when a conditional block appears.
+  Dim the app behind the dialog with a translucent scrim, never an opaque theme color, so the
+  surrounding UI stays readable instead of disappearing behind a solid pane.
+  Source: <https://docs.slint.dev/docs/slint/guide/language/coding/positioning-and-layouts/#preferred-size>.
+
 ## Packaging (Arch Linux)
 
 Arch packaging lives under `packaging/arch/`: `moggyt-bin` repackages the release tarball and `moggyt` builds the
