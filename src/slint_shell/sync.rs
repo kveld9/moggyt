@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::domain::{
-    DetailKind, DetailSort, PlaybackFacts, SearchFilter, SortDirection, Track,
+    Detail, DetailKind, DetailSort, PlaybackFacts, SearchFilter, SortDirection, Track,
     is_local_playlist_id, ordered_indices,
 };
 use crate::i18n::{Locale, tr};
@@ -384,7 +384,9 @@ pub(crate) fn sync_library_and_detail(window: &MoggytWindow, state: &SlintAppSta
         let order = ordered_indices(&detail.tracks, active_detail_sort(state));
         let d_tracks: Vec<TrackRowData> = order
             .into_iter()
-            .map(|index| track_to_row_data(index, &detail.tracks[index], &state.search_covers))
+            .map(|index| {
+                detail_track_row(index, detail, &detail.tracks[index], &state.search_covers)
+            })
             .collect();
         window.set_detail_tracks(ModelRc::new(VecModel::from(d_tracks)));
         let cover_img = resolve_detail_cover_url(detail)
@@ -535,6 +537,23 @@ pub(crate) fn track_to_row_data(
         kind: "track".into(),
         cover,
     }
+}
+
+/// Projects one detail track row, dropping the artist on artist pages.
+///
+/// The detail header already names the artist, so the second line carries the album
+/// name only.
+fn detail_track_row(
+    index: usize,
+    detail: &Detail,
+    track: &Track,
+    covers: &HashMap<String, slint::Image>,
+) -> TrackRowData {
+    let mut row = track_to_row_data(index, track, covers);
+    if detail.kind == DetailKind::Artist {
+        row.artist = "".into();
+    }
+    row
 }
 
 #[cfg(test)]
@@ -692,5 +711,23 @@ mod tests {
         let track = Track::new("t1", "Title", "Artist").with_added("1 week ago", 1_700_000_000);
         let row = track_to_row_data(0, &track, &HashMap::new());
         assert_eq!(row.added.as_str(), "1 week ago");
+    }
+
+    #[test]
+    fn test_detail_track_row_drops_artist_on_artist_pages() {
+        let tracks = vec![Track::new("t1", "Title", "Artist").with_album("Album")];
+        let detail = Detail::new(DetailKind::Artist, "Artist", "", tracks);
+        let row = detail_track_row(0, &detail, &detail.tracks[0], &HashMap::new());
+        assert_eq!(row.artist.as_str(), "");
+        assert_eq!(row.album.as_str(), "Album");
+    }
+
+    #[test]
+    fn test_detail_track_row_keeps_artist_off_artist_pages() {
+        let tracks = vec![Track::new("t1", "Title", "Artist").with_album("Album")];
+        let detail = Detail::new(DetailKind::Album, "Album", "", tracks);
+        let row = detail_track_row(0, &detail, &detail.tracks[0], &HashMap::new());
+        assert_eq!(row.artist.as_str(), "Artist");
+        assert_eq!(row.album.as_str(), "Album");
     }
 }
