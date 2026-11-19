@@ -113,8 +113,9 @@ pub(crate) fn trigger_playback(window: &MoggytWindow, state: &mut SlintAppState)
     push_time_labels(&player, 0, track.duration_secs);
     player.set_progress(0.0);
     player.set_is_liked(is_track_liked(&state.liked_ids, &track.id));
-    window.set_queue_count(state.queue.len() as i32);
-    window.set_queue_button_text(format_queue_label(state.locale, state.queue.len()).into());
+    window.set_queue_count(state.queue.visible_len() as i32);
+    window
+        .set_queue_button_text(format_queue_label(state.locale, state.queue.visible_len()).into());
     window.set_has_cover(false);
     window.set_lyrics_lines(ModelRc::new(VecModel::default()));
     window.set_active_lyric_index(-1);
@@ -424,7 +425,7 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
         poll_import(&win);
         let mut state = state_rc.borrow_mut();
         if state.drain_tray_actions() {
-            let _ = state.queue_store.save(&state.queue);
+            let _ = state.queue_store.save(&state.queue.persistable());
             slint::quit_event_loop().ok();
             return;
         }

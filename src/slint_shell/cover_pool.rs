@@ -239,7 +239,11 @@ pub(crate) fn repaint_queue_rows_with_cover(
 ) {
     let model = win.get_queue_tracks();
     for index in queue_rows_matching_artwork(st.queue.tracks(), url) {
-        if index >= model.row_count() {
+        if st.queue.is_autoplay_at(index) {
+            continue;
+        }
+        let row_idx = (0..index).filter(|&i| !st.queue.is_autoplay_at(i)).count();
+        if row_idx >= model.row_count() {
             continue;
         }
         let Some(track) = st.queue.tracks().get(index) else {
@@ -247,7 +251,7 @@ pub(crate) fn repaint_queue_rows_with_cover(
         };
         let mut row = track_to_row_data(index, track, &st.search_covers);
         row.cover = img.clone();
-        model.set_row_data(index, row);
+        model.set_row_data(row_idx, row);
     }
 }
 
@@ -601,5 +605,29 @@ mod tests {
         assert!(st.search_covers.contains_key(&url));
         let row = win.get_queue_tracks().row_data(0).expect("queue row present");
         assert!(row.cover.size().width > 0, "queue row cover must be repainted");
+    }
+
+    #[test]
+    fn repaint_queue_rows_maps_to_visible_row_position() {
+        let Ok(win) = MoggytWindow::new() else {
+            return;
+        };
+        let mut st = test_wired();
+        let auto_track = Track::new("auto", "Auto", "Artist")
+            .with_artwork("https://lh3.googleusercontent.com/auto-thumb-large");
+        let ctx_track = Track::new("ctx", "Ctx", "Artist")
+            .with_artwork("https://lh3.googleusercontent.com/ctx-thumb-large");
+        st.queue.push_autoplay(auto_track);
+        st.queue.push(ctx_track.clone());
+
+        let rows = vec![track_to_row_data(1, &ctx_track, &st.search_covers)];
+        win.set_queue_tracks(ModelRc::new(VecModel::from(rows)));
+
+        let url = thumbnail_variant_for_row(ctx_track.artwork.as_deref().unwrap());
+        let cover = CoverArtData::new(url.clone(), vec![128, 128, 128, 255], 1, 1);
+        apply_fetched_cover_to_state(&win, &mut st, cover, CoverDomain::Play.base() + 1);
+
+        let row = win.get_queue_tracks().row_data(0).expect("row exists");
+        assert!(row.cover.size().width > 0);
     }
 }

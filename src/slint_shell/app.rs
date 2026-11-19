@@ -174,7 +174,7 @@ pub fn run(
 /// Persists the active playback queue to storage on application exit.
 pub fn persist_state_on_exit(state: &mut SlintAppState) -> anyhow::Result<()> {
     state.maybe_scrobble_current();
-    state.queue_store.save(&state.queue)
+    state.queue_store.save(&state.queue.persistable())
 }
 
 /// Applies persisted settings that shape in-memory UI state.
@@ -243,6 +243,21 @@ mod tests {
         let loaded = state.queue_store.load();
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded.tracks(), &[track1, track2]);
+    }
+
+    #[test]
+    fn test_persist_state_on_exit_filters_autoplay_tracks() {
+        let mut state = test_wired();
+        let track1 = Track::new("t1", "Track 1", "Artist 1");
+        let track2 = Track::new("t2", "Track 2", "Artist 2");
+        state.queue.push(track1.clone());
+        state.queue.push_autoplay(track2);
+
+        persist_state_on_exit(&mut state).expect("failed to persist queue on exit");
+
+        let loaded = state.queue_store.load();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded.tracks(), &[track1]);
     }
 
     #[test]
