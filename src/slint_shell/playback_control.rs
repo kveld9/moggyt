@@ -73,12 +73,7 @@ impl SlintAppState {
         if index >= self.queue.len() {
             return;
         }
-        while self.queue.cursor() < index {
-            self.queue.advance();
-        }
-        while self.queue.cursor() > index {
-            self.queue.retreat();
-        }
+        self.queue.set_cursor(index);
     }
 
     /// Plays the library songs list from `index`, replacing the queue.
@@ -771,5 +766,21 @@ mod tests {
         assert_eq!(audio.last_requested(), Some("a"));
         assert!(audio.is_playing());
         assert!(!audio.is_empty());
+    }
+
+    #[test]
+    fn play_track_at_index_in_memory_repeat_one_and_out_of_range() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist 2"));
+        state.queue.set_repeat(crate::domain::RepeatMode::One);
+
+        state.play_track_at_index_in_memory(1);
+        assert_eq!(state.queue.cursor(), 1);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+
+        state.play_track_at_index_in_memory(99);
+        assert_eq!(state.queue.cursor(), 1);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
     }
 }

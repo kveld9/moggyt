@@ -216,9 +216,7 @@ impl SlintAppState {
         }
         if let Some(id) = current_id {
             if let Some(idx) = self.queue.tracks().iter().position(|t| t.id == id) {
-                for _ in 0..idx {
-                    self.queue.advance();
-                }
+                self.queue.set_cursor(idx);
             }
         }
     }
@@ -448,6 +446,13 @@ mod tests {
         let original_ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
         assert_eq!(original_ids, vec!["t1", "t2", "t3", "t4"]);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some(second_track_id.as_str()));
+
+        // Under RepeatMode::One the restored cursor addresses the same track id
+        state.queue.set_repeat(crate::domain::RepeatMode::One);
+        state.queue.set_cursor(2);
+        state.unshuffled_tracks = Some(vec![t1, t2, t3, t4]);
+        state.restore_unshuffled_queue();
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t3"));
     }
 
     #[test]
