@@ -7,6 +7,7 @@ mod artist_match;
 mod buffering;
 pub mod detail_sort;
 mod gapless;
+mod level_history;
 mod library;
 mod listening_stats;
 mod local_playlist;
@@ -34,6 +35,7 @@ pub use detail_sort::{DetailSort, SortColumn, SortDirection, next_sort, ordered_
 pub use gapless::{
     GAPLESS_ARM_SECS, GaplessFact, GaplessSlot, GaplessState, StartedGapless, should_arm,
 };
+pub use level_history::{LEVEL_HISTORY_SAMPLES, LevelHistory};
 pub use library::{
     Album, Artist, ArtistPage, Detail, DetailCard, DetailCardKind, DetailKind, DetailSection,
     Playlist, PlaylistPrivacy, SearchResult, Shelf,

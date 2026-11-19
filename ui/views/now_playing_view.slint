@@ -1,5 +1,5 @@
 import { Labels } from "../labels.slint";
-import { LyricLineData, LyricsHighlight, PlayerUi, Theme, TrackRowData } from "../theme.slint";
+import { LyricLineData, LyricsHighlight, MeterUi, PlayerUi, Theme, TrackRowData } from "../theme.slint";
 import { ThemedSlider } from "../components/controls.slint";
 import { SettingsModeButton } from "../components/settings_rows.slint";
 import { VinylDeck } from "../components/vinyl_deck.slint";
@@ -61,6 +61,24 @@ export component NowPlayingView inherits HorizontalLayout {
                 cover: root.cover-image;
                 has-cover: root.has-cover;
                 is-playing: PlayerUi.is-playing;
+            }
+
+            // Live level history over the artwork bottom: one bar per 500 ms sample of the
+            // samples actually playing. Overlaying keeps the Now Playing column inside the
+            // window's 500px minimum height.
+            Rectangle {
+                y: parent.height - self.height;
+                width: parent.width;
+                height: 34px;
+                background: #00000073;
+
+                for index in MeterUi.levels.length : Rectangle {
+                    x: (parent.width - MeterUi.levels.length * 3px) / 2 + index * 3px;
+                    y: parent.height - self.height - 5px;
+                    width: 2px;
+                    height: Math.max(2px, MeterUi.levels[index] * 24px);
+                    background: Theme.accent;
+                }
             }
         }
 

@@ -10,6 +10,7 @@ mod audio;
 mod audio_device;
 mod audio_dsp;
 mod audio_fade;
+mod audio_level;
 mod audio_live;
 pub mod audio_resample;
 mod audio_rodio;
@@ -107,6 +108,7 @@ pub use audio_dsp::{
     append_normalized, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
     is_silent_sample, linear_to_db, normalization_stage, replaygain_linear, rms_to_db,
 };
+pub use audio_level::{LEVEL_TAP_WINDOW_SAMPLES, LevelTap};
 pub use audio_live::LiveAudio;
 pub use audio_resample::ResamplingSource;
 pub use audio_rodio::{RodioBackend, volume_to_amplitude};

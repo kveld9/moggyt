@@ -9,9 +9,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::domain::{
-    Album, Artist, BufferingWatch, Detail, DetailKind, DetailSort, Palette, PlaybackPhase,
-    PlaybackQueue, Playlist, RecentSearches, SearchFilter, SearchQuery, SearchResult, Shelf,
-    SkipRanges, SleepTimer, ThemeId, Track, extract_playlist_id,
+    Album, Artist, BufferingWatch, Detail, DetailKind, DetailSort, LevelHistory, Palette,
+    PlaybackPhase, PlaybackQueue, Playlist, RecentSearches, SearchFilter, SearchQuery,
+    SearchResult, Shelf, SkipRanges, SleepTimer, ThemeId, Track, extract_playlist_id,
 };
 use crate::i18n::{Locale, tr};
 use crate::infra::{
@@ -106,6 +106,8 @@ pub struct SlintAppState {
     pub playback_phase: PlaybackPhase,
     /// Watchdog over the audible position used to report buffering.
     pub buffering_watch: BufferingWatch,
+    /// Rolling history of audible levels for the Now Playing meter.
+    pub level_history: LevelHistory,
     /// Last failed play attempt surfaced in the player bar, if any.
     pub playback_error: Option<PlaybackErrorState>,
     /// Automatic retry plan for the last failed play attempt.

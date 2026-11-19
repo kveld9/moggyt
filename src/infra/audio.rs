@@ -102,6 +102,10 @@ pub trait AudioBackend {
     fn duration_secs(&self) -> u64 {
         0
     }
+    /// Returns the latest audible RMS level in `0.0..=1.0`, when the backend measures it.
+    fn output_level(&self) -> Option<f32> {
+        None
+    }
     fn last_requested(&self) -> Option<&str>;
     fn set_quality(&mut self, _q: AudioQuality) {}
     /// Returns current audio streaming quality preference (defaults to [`AudioQuality::Standard`]).
@@ -151,6 +155,7 @@ pub struct AudioStub {
     gapless: GaplessSlot,
     /// Simulated sink depth: two sources while an armed track waits behind the active one.
     gapless_sounds: usize,
+    output_level: Option<f32>,
 }
 
 impl Default for AudioStub {
@@ -168,6 +173,7 @@ impl Default for AudioStub {
             session_cookies: None,
             gapless: GaplessSlot::default(),
             gapless_sounds: 0,
+            output_level: None,
         }
     }
 }
@@ -203,6 +209,11 @@ impl AudioStub {
     /// Returns the currently stored session cookies, if any.
     pub fn session_cookies(&self) -> Option<&str> {
         self.session_cookies.as_deref()
+    }
+
+    /// Sets the simulated audible RMS level returned by [`AudioBackend::output_level`].
+    pub fn set_output_level(&mut self, level: Option<f32>) {
+        self.output_level = level;
     }
 }
 
@@ -313,6 +324,10 @@ impl AudioBackend for AudioStub {
     fn set_session_cookies(&mut self, cookies: Option<&str>) {
         self.session_cookies =
             cookies.map(str::trim).filter(|s| !s.is_empty()).map(ToString::to_string);
+    }
+
+    fn output_level(&self) -> Option<f32> {
+        self.output_level
     }
 }
 
@@ -508,5 +523,15 @@ mod tests {
         assert_eq!(audio.play("explicit"), Ok(()));
         assert_eq!(audio.gapless.state(), crate::domain::GaplessState::Idle);
         assert_eq!(audio.take_started_gapless(), None);
+    }
+
+    #[test]
+    fn audio_stub_output_level_default_and_settable() {
+        let mut audio = AudioStub::new();
+        assert_eq!(audio.output_level(), None);
+        audio.set_output_level(Some(0.42));
+        assert_eq!(audio.output_level(), Some(0.42));
+        audio.set_output_level(None);
+        assert_eq!(audio.output_level(), None);
     }
 }

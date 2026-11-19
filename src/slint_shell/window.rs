@@ -447,6 +447,7 @@ pub(crate) fn setup_app_timer(window: &MoggytWindow, state_rc: SharedState) -> s
         super::toast::tick_toasts(&win, &mut state);
         state.poll_playback_recovery(std::time::Instant::now());
         sync_playback_tick(&win, &mut state);
+        super::level_meter::push_level(&win, &mut state);
         super::tray_sync::sync_tray(&win, &state);
     });
     timer

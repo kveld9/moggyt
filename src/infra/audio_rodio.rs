@@ -2,14 +2,14 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
 use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink, Source};
 
 use super::audio::{AudioBackend, AudioError, clamp_speed};
-use super::audio_dsp::{SkipSilence, append_normalized, normalization_stage};
+use super::audio_dsp::{SkipSilence, append_normalized_with_level, normalization_stage};
 use super::audio_fade::{spawn_fade_in, spawn_fade_out};
 use super::audio_resample::ResamplingSource;
 use super::audio_stream_cache_worker::cache_download_worker;
@@ -68,6 +68,7 @@ pub struct RodioBackend {
     fade_generation: Arc<AtomicU64>,
     /// Next-track slot appended behind the active track.
     gapless: GaplessSlot,
+    level: Arc<AtomicU32>,
 }
 
 impl RodioBackend {
@@ -103,6 +104,7 @@ impl RodioBackend {
             loudness_normalization: false,
             fade_generation: Arc::new(AtomicU64::new(0)),
             gapless: GaplessSlot::default(),
+            level: Arc::new(AtomicU32::new(0)),
         })
     }
 
@@ -137,10 +139,11 @@ impl RodioBackend {
         loudness_db: Option<f32>,
     ) {
         let stage = normalization_stage(self.loudness_normalization, loudness_db);
+        let level = Arc::clone(&self.level);
         if self.skip_silence {
-            append_normalized(sink, SkipSilence::new(source), stage);
+            append_normalized_with_level(sink, SkipSilence::new(source), stage, level);
         } else {
-            append_normalized(sink, source, stage);
+            append_normalized_with_level(sink, source, stage, level);
         }
     }
 
@@ -534,6 +537,11 @@ impl AudioBackend for RodioBackend {
 
     fn duration_secs(&self) -> u64 {
         self.track_duration.map_or(0, |d| d.as_secs())
+    }
+
+    fn output_level(&self) -> Option<f32> {
+        let raw = f32::from_bits(self.level.load(Ordering::Relaxed));
+        Some(if raw.is_finite() { raw.clamp(0.0, 1.0) } else { 0.0 })
     }
 
     fn is_playing(&self) -> bool {

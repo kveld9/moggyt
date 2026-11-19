@@ -57,6 +57,9 @@ impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
     fn duration_secs(&self) -> u64 {
         (**self).duration_secs()
     }
+    fn output_level(&self) -> Option<f32> {
+        (**self).output_level()
+    }
     fn last_requested(&self) -> Option<&str> {
         (**self).last_requested()
     }
@@ -104,6 +107,7 @@ mod tests {
         prefetcher: StreamChain,
         cached_track: &'static str,
         cookies: Arc<Mutex<Option<String>>>,
+        output_level: Option<f32>,
     }
 
     impl RecordingAudio {
@@ -116,6 +120,7 @@ mod tests {
                 )),
                 cached_track: "cached-track",
                 cookies: Arc::new(Mutex::new(None)),
+                output_level: None,
             }
         }
     }
@@ -182,6 +187,19 @@ mod tests {
         fn set_session_cookies(&mut self, cookies: Option<&str>) {
             *self.cookies.lock().unwrap() = cookies.map(str::to_owned);
         }
+
+        fn output_level(&self) -> Option<f32> {
+            self.output_level
+        }
+    }
+
+    #[test]
+    fn boxed_backend_forwards_output_level() {
+        let mut recorder = RecordingAudio::new();
+        recorder.output_level = Some(0.75);
+        let boxed: Box<dyn AudioBackend> = Box::new(recorder);
+
+        assert_eq!(boxed.output_level(), Some(0.75));
     }
 
     #[test]
