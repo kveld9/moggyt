@@ -8,7 +8,7 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 
 use crate::domain::{DetailKind, PlaybackPhase, SearchFilter, SearchResult};
-use crate::slint_shell::covers::request_queue_track_cover;
+use crate::slint_shell::covers::{request_detail_covers, request_queue_track_cover};
 use crate::slint_shell::explore::{
     explore_item_at, load_category_async, load_explore_async, refresh_explore_covers_if_loaded,
 };
@@ -171,10 +171,14 @@ fn wire_navigation_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    let tx = worker_tx.clone();
     window.on_back_pressed(move || {
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         st.go_back();
+        if st.page == SlintPage::Detail {
+            request_detail_covers(&st, &tx);
+        }
         sync_window(&win, &mut st);
     });
 

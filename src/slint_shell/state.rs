@@ -23,6 +23,7 @@ use crate::infra::{
 };
 use crate::slint_shell::auto_skip::{SponsorFetchOutcome, SponsorRangeState};
 use crate::slint_shell::covers::request_queue_track_cover;
+use crate::slint_shell::detail_history::DetailHistory;
 use crate::slint_shell::format::cycle_playback_speed_preset;
 use crate::slint_shell::library_fetch::LibraryFetch;
 use crate::slint_shell::library_filter::LibraryFilter;
@@ -99,6 +100,8 @@ pub struct SlintAppState {
     pub(crate) library_filter: LibraryFilter,
     pub detail: Option<Detail>,
     pub detail_return: SlintPage,
+    /// Previously visited detail containers, most recent last.
+    pub detail_history: DetailHistory,
     pub playback_phase: PlaybackPhase,
     pub library_phase: ViewPhase,
     pub search_phase: ViewPhase,
@@ -344,10 +347,7 @@ impl SlintAppState {
         if trimmed.is_empty() {
             return;
         }
-        if self.page != SlintPage::Detail {
-            self.detail_return = self.page;
-        }
-        self.page = SlintPage::Detail;
+        self.record_detail_navigation((trimmed.to_owned(), kind));
         self.apply_sync_detail(trimmed, kind);
     }
 

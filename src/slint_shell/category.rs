@@ -39,7 +39,7 @@ impl SlintAppState {
     pub fn go_back(&mut self) {
         if self.page == SlintPage::Detail {
             self.detail_error = None;
-            self.page = self.detail_return;
+            self.pop_detail_history();
         } else if self.page == SlintPage::Category {
             self.page = self.category_return;
         }

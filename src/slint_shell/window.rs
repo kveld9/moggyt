@@ -148,14 +148,10 @@ fn begin_detail_load(state: &mut SlintAppState, browse_id: &str, kind: DetailKin
     if trimmed.is_empty() {
         return None;
     }
-    if state.page != crate::slint_shell::page::SlintPage::Detail {
-        state.detail_return = state.page;
-    }
-    state.page = crate::slint_shell::page::SlintPage::Detail;
+    state.record_detail_navigation((trimmed.to_owned(), kind));
     state.detail_generation = state.detail_generation.wrapping_add(1);
     state.detail_phase = ViewPhase::Loading;
     state.detail_error = None;
-    state.detail_request = Some((trimmed.to_string(), kind));
     Some(state.detail_generation)
 }
 
@@ -640,6 +636,17 @@ mod tests {
         assert_eq!(gen2, gen1.wrapping_add(1));
         assert_eq!(state.detail_generation, gen2);
         assert_eq!(state.detail_phase, ViewPhase::Loading);
+    }
+
+    #[test]
+    fn begin_detail_load_records_the_open_container_in_history() {
+        let mut state = test_wired();
+        begin_detail_load(&mut state, "artist-1", DetailKind::Artist).expect("load begins");
+        assert!(state.detail_history.is_empty());
+
+        begin_detail_load(&mut state, "album-1", DetailKind::Album).expect("load begins");
+
+        assert_eq!(state.detail_history.len(), 1);
     }
 
     #[test]
