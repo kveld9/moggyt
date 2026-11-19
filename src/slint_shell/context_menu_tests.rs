@@ -433,9 +433,10 @@ mod tests {
     }
 
     #[test]
-    fn apply_action_play_now_on_detail_pushes_and_opens_now_playing() {
+    fn apply_action_play_now_on_detail_replaces_queue_and_opens_now_playing() {
         let mut state = test_wired();
-        assert_eq!(state.queue.len(), 0);
+        state.queue.push(Track::new("old", "Old", "Artist"));
+        assert_eq!(state.queue.len(), 1);
 
         let track = Track::new("t1", "Title 1", "Artist 1");
         let target = ContextTarget { surface: ContextSurface::Detail, index: 0 };
@@ -444,6 +445,29 @@ mod tests {
         assert_eq!(follow_up, FollowUp::StartPlayback);
         assert_eq!(state.queue.len(), 1);
         assert_eq!(state.queue.cursor(), 0);
+        let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, ["t1"]);
+        assert_eq!(state.page, SlintPage::NowPlaying);
+    }
+
+    #[test]
+    fn apply_action_play_now_on_search_replaces_queue_with_single_track() {
+        let mut state = test_wired();
+        state.is_shuffle = true;
+        state.unshuffled_tracks = Some(vec![Track::new("old1", "Old 1", "Artist")]);
+        state.queue.push(Track::new("old1", "Old 1", "Artist"));
+        state.queue.push(Track::new("old2", "Old 2", "Artist"));
+
+        let track = Track::new("t1", "Title 1", "Artist 1");
+        let target = ContextTarget { surface: ContextSurface::Search, index: 0 };
+        let follow_up = apply_action(&mut state, target, ContextAction::PlayNow, track);
+
+        assert_eq!(follow_up, FollowUp::StartPlayback);
+        assert_eq!(state.queue.len(), 1);
+        assert_eq!(state.queue.cursor(), 0);
+        let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, ["t1"]);
+        assert!(state.unshuffled_tracks.is_none());
         assert_eq!(state.page, SlintPage::NowPlaying);
     }
 

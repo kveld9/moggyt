@@ -364,9 +364,7 @@ fn play_now(state: &mut SlintAppState, target: ContextTarget, track: Track) -> F
         ContextSurface::PlayerBar => state.play_track_at_index_in_memory(state.queue.cursor()),
         ContextSurface::Queue => state.play_track_at_index_in_memory(target.index),
         _ => {
-            state.queue.push(track);
-            let index = state.queue.len().saturating_sub(1);
-            state.play_track_at_index_in_memory(index);
+            state.replace_context(vec![track], 0);
             state.page = SlintPage::NowPlaying;
         }
     }

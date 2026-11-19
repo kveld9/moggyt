@@ -147,7 +147,8 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-2: render search result shelves for active queries with a single promoted top-result card for the best
   name match; prefetch detail content on hover or focus intent.
 - FR-3: show track, album, artist, and playlist detail views from cached plus fresh data.
-- FR-4: queue operations (add, remove, reorder, clear, shuffle, repeat off / all / one).
+- FR-4: queue operations (add, remove, reorder, clear, shuffle, repeat off / all / one); starting playback of a
+  container replaces the playback context, while "add to queue" and "play next" append explicitly.
 - FR-5: transport controls with seek and volume, including keyboard shortcuts.
 - FR-6: start radio from any track and keep an autoplay continuation queue.
 - FR-7: read the signed-in library (playlists, likes, saved albums); like or dislike tracks.
