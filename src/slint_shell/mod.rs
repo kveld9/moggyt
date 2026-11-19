@@ -83,6 +83,7 @@ mod playback_phase_trace_tests;
 pub mod playback_request;
 pub mod playback_worker;
 pub mod player_bar;
+pub mod preview_control;
 mod scrobble_control;
 pub mod search;
 pub mod search_submit;

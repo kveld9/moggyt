@@ -26,8 +26,12 @@ use crate::slint_shell::{
 
 /// Actions offered for a track row, honoring the metadata the track carries.
 pub fn track_actions(track: &Track) -> Vec<ContextAction> {
-    let mut actions =
-        vec![ContextAction::PlayNow, ContextAction::PlayNext, ContextAction::AddToQueue];
+    let mut actions = vec![
+        ContextAction::PlayNow,
+        ContextAction::PlayNext,
+        ContextAction::AddToQueue,
+        ContextAction::Preview,
+    ];
     if !track.artist.trim().is_empty() {
         actions.push(ContextAction::GoToArtist);
         actions.push(ContextAction::GoToAlbum);
@@ -89,6 +93,8 @@ pub enum ContextAction {
     PlayNext,
     /// Append the track to the end of the queue.
     AddToQueue,
+    /// Audition the track for a few seconds without changing playback.
+    Preview,
     /// Open the artist page for the track's artist.
     GoToArtist,
     /// Open the album page for the track's album.
@@ -108,6 +114,7 @@ impl ContextAction {
             Self::PlayNow => tr(locale, "Play"),
             Self::PlayNext => tr(locale, "Play next"),
             Self::AddToQueue => tr(locale, "Add to queue"),
+            Self::Preview => tr(locale, "Preview 20s"),
             Self::GoToArtist => tr(locale, "Go to artist"),
             Self::GoToAlbum => tr(locale, "Go to album"),
             Self::ToggleLike if liked => tr(locale, "Unlike"),
@@ -123,6 +130,7 @@ impl ContextAction {
             Self::PlayNow => ContextIcon::Play,
             Self::PlayNext => ContextIcon::Next,
             Self::AddToQueue => ContextIcon::Queue,
+            Self::Preview => ContextIcon::Play,
             Self::GoToArtist => ContextIcon::Artist,
             Self::GoToAlbum => ContextIcon::Album,
             Self::ToggleLike if liked => ContextIcon::HeartFilled,
@@ -333,6 +341,10 @@ pub fn apply_action(
         ContextAction::PlayNext => {
             state.queue.insert_next(track);
             state.persist_queue();
+            FollowUp::None
+        }
+        ContextAction::Preview => {
+            state.toggle_preview(&track);
             FollowUp::None
         }
         ContextAction::PlayNow => play_now(state, target, track),

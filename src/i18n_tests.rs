@@ -148,6 +148,23 @@ mod tests {
     }
 
     #[test]
+    fn test_track_preview_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Preview 20s", "Escuchar 20 s"),
+            ("Preview unavailable", "Vista previa no disponible"),
+            ("Previewing", "Escuchando"),
+        ];
+
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key for '{key}'");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
+
+    #[test]
     fn test_7_given_stored_tag_when_from_tag_parses_then_round_trips_via_tag_and_unknown_returns_none()
      {
         // 1. Valid tags parse correctly

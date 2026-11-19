@@ -20,6 +20,8 @@ impl SlintAppState {
     /// Marks the phase as `Resolving` so a track that already reached `Ended` cannot advance
     /// the queue again before the new stream starts.
     pub fn begin_play_request(&mut self) -> Option<PlayTrackRequest> {
+        // Starting playback takes over the audio.
+        self.cancel_preview();
         self.gapless.reset();
         let track = self.queue.current().cloned()?;
         if let PlaybackRecovery::Scheduled { track_id, .. } = &self.playback_recovery {

@@ -473,6 +473,9 @@ the pointer:
 - **Play next**: inserts the track immediately after the current queue position, leaving the
   current playback untouched.
 - **Add to queue**: appends the track to the end of the queue.
+- **Preview 20s**: auditions the track for 20 seconds over a ducked active track. It never
+  changes the queue or the play history, and it stops on its own, on a second activation,
+  when another preview starts, or when playback starts.
 - **Go to artist** and **Go to album**: open the matching detail page for the row. The container is
   resolved by name against the catalog off the UI thread; when nothing matches, a toast reports the
   failure. These entries appear when the row carries an artist.

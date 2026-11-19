@@ -57,6 +57,27 @@ impl AudioBackend for LiveAudio {
         }
     }
 
+    fn preview(&mut self, track_id: &str) -> Result<(), AudioError> {
+        match self {
+            Self::Live(backend) => backend.preview(track_id),
+            Self::Muted(_) => Err(AudioError::Unavailable),
+        }
+    }
+
+    fn stop_preview(&mut self) {
+        match self {
+            Self::Live(backend) => backend.stop_preview(),
+            Self::Muted(_) => {}
+        }
+    }
+
+    fn is_previewing(&self) -> bool {
+        match self {
+            Self::Live(backend) => backend.is_previewing(),
+            Self::Muted(_) => false,
+        }
+    }
+
     fn take_started_gapless(&mut self) -> Option<crate::domain::StartedGapless> {
         delegate_audio!(self, take_started_gapless)
     }
@@ -209,6 +230,27 @@ mod tests {
         assert_eq!(res, Err(AudioError::Unavailable));
         assert!(!audio.is_playing());
         assert_eq!(audio.last_requested(), None);
+    }
+
+    #[test]
+    fn live_audio_muted_preview_returns_unavailable() {
+        let mut audio = LiveAudio::muted();
+        assert!(!audio.is_previewing());
+        assert_eq!(audio.preview("prev-muted"), Err(AudioError::Unavailable));
+        assert!(!audio.is_previewing());
+        audio.stop_preview();
+        assert!(!audio.is_previewing());
+    }
+
+    #[test]
+    fn live_audio_live_forwards_preview_lifecycle() {
+        let stub = AudioStub::new();
+        let mut live = LiveAudio::Live(Box::new(stub));
+        assert!(!live.is_previewing());
+        assert_eq!(live.preview("prev-live"), Ok(()));
+        assert!(live.is_previewing());
+        live.stop_preview();
+        assert!(!live.is_previewing());
     }
 
     struct ReportedAudio {

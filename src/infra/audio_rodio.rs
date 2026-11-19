@@ -33,6 +33,11 @@ pub fn volume_to_amplitude(volume: u8) -> f32 {
     normalized * normalized * normalized
 }
 
+/// Main-track volume factor while a preview plays over it.
+const PREVIEW_DUCK_FACTOR: f32 = 0.25;
+/// Preview playback volume amplitude.
+const PREVIEW_VOLUME: f32 = 0.9;
+
 /// Clamps a playback position to the known track duration.
 fn clamp_playback_position(pos: Duration, duration: Option<Duration>) -> Duration {
     duration.map_or(pos, |duration| pos.min(duration))
@@ -53,6 +58,12 @@ fn log_decode_stream_error(track_id: &str, err: anyhow::Error) -> anyhow::Error 
     anyhow_err
 }
 
+/// Preview slot: at most one preview sink per backend.
+enum PreviewSlot {
+    Idle,
+    Playing { sink: Arc<Sink> },
+}
+
 /// Real rodio playback backend maintaining an active sink and position tracking.
 pub struct RodioBackend {
     _stream: OutputStream,
@@ -69,6 +80,7 @@ pub struct RodioBackend {
     /// Next-track slot appended behind the active track.
     gapless: GaplessSlot,
     level: Arc<AtomicU32>,
+    preview: PreviewSlot,
 }
 
 impl RodioBackend {
@@ -105,6 +117,7 @@ impl RodioBackend {
             fade_generation: Arc::new(AtomicU64::new(0)),
             gapless: GaplessSlot::default(),
             level: Arc::new(AtomicU32::new(0)),
+            preview: PreviewSlot::Idle,
         })
     }
 
@@ -409,6 +422,40 @@ impl RodioBackend {
             AudioError::Playback(err.to_string())
         })
     }
+
+    /// Starts a 20-second preview on a dedicated sink of the active mixer.
+    fn start_preview_sink(&mut self, track_id: &str) -> Result<(), AudioError> {
+        self.stop_preview_sink();
+        let Some(stream) = self.resolver.resolve_stream(track_id) else {
+            return Err(AudioError::Resolve(track_id.to_string()));
+        };
+        let source = self
+            .decode_source(
+                &stream.url,
+                track_id,
+                None,
+                stream.mime_type.as_deref(),
+                self.output_sample_rate(),
+            )
+            .map_err(|err| AudioError::Playback(err.to_string()))?;
+        let sink = Sink::connect_new(self._stream.mixer());
+        sink.set_volume(PREVIEW_VOLUME);
+        sink.append(source.take_duration(Duration::from_secs(crate::domain::PREVIEW_SECS)));
+        sink.play();
+        self.sink.set_volume(volume_to_amplitude(self.volume) * PREVIEW_DUCK_FACTOR);
+        self.preview = PreviewSlot::Playing { sink: Arc::new(sink) };
+        Ok(())
+    }
+
+    /// Stops the preview sink and restores the active track's volume.
+    fn stop_preview_sink(&mut self) {
+        if let PreviewSlot::Playing { sink } =
+            std::mem::replace(&mut self.preview, PreviewSlot::Idle)
+        {
+            sink.stop();
+            self.sink.set_volume(volume_to_amplitude(self.volume));
+        }
+    }
 }
 
 impl AudioBackend for RodioBackend {
@@ -475,6 +522,18 @@ impl AudioBackend for RodioBackend {
         })
     }
 
+    fn preview(&mut self, track_id: &str) -> Result<(), AudioError> {
+        self.start_preview_sink(track_id)
+    }
+
+    fn stop_preview(&mut self) {
+        self.stop_preview_sink();
+    }
+
+    fn is_previewing(&self) -> bool {
+        matches!(&self.preview, PreviewSlot::Playing { sink } if !sink.empty())
+    }
+
     fn take_started_gapless(&mut self) -> Option<StartedGapless> {
         if self.sink.empty() {
             self.gapless.reset();
@@ -513,7 +572,12 @@ impl AudioBackend for RodioBackend {
     fn set_volume(&mut self, volume: u8) {
         self.fade_generation.fetch_add(1, Ordering::SeqCst);
         self.volume = volume.min(100);
-        self.sink.set_volume(volume_to_amplitude(self.volume));
+        let factor = if matches!(self.preview, PreviewSlot::Playing { .. }) {
+            PREVIEW_DUCK_FACTOR
+        } else {
+            1.0
+        };
+        self.sink.set_volume(volume_to_amplitude(self.volume) * factor);
     }
 
     fn volume(&self) -> u8 {

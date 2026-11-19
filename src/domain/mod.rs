@@ -17,6 +17,7 @@ mod playback_failure;
 mod playback_phase;
 mod playlist_create;
 mod playlist_import;
+mod preview;
 mod queue;
 mod search;
 mod segments;
@@ -63,6 +64,7 @@ pub use playback_failure::{MAX_PLAYBACK_RETRIES, PlaybackFailure};
 pub use playback_phase::{END_TOLERANCE_SECS, PlaybackEvent, PlaybackFacts, PlaybackPhase};
 pub use playlist_create::{MAX_PLAYLIST_TITLE_CHARS, PlaylistTitleError, new_playlist_title};
 pub use playlist_import::{SpotifyRef, extract_playlist_id, parse_spotify_ref};
+pub use preview::{PREVIEW_SECS, PreviewState};
 pub use queue::{PlaybackQueue, RepeatMode};
 pub use search::{
     LyricsSnippet, LyricsSnippetError, MAX_LYRICS_SNIPPET_LEN, RECENT_SEARCH_LIMIT, RecentSearches,

@@ -7,7 +7,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use crate::domain::{
-    BufferingWatch, LevelHistory, PlaybackPhase, PlaybackQueue, SearchFilter, SleepTimer, ThemeId,
+    BufferingWatch, LevelHistory, PlaybackPhase, PlaybackQueue, PreviewState, SearchFilter,
+    SleepTimer, ThemeId,
 };
 use crate::i18n::Locale;
 use crate::infra::{
@@ -89,6 +90,8 @@ impl SlintAppState {
             detail_return: SlintPage::Search,
             detail_history: DetailHistory::default(),
             playback_phase: PlaybackPhase::Empty,
+            preview: PreviewState::Idle,
+            preview_rx: None,
             buffering_watch: BufferingWatch::Flowing,
             level_history: LevelHistory::default(),
             playback_error: None,
