@@ -74,6 +74,7 @@ pub mod playback;
 pub mod playback_advance;
 pub mod playback_control;
 pub mod playback_failure;
+pub mod playback_persist;
 #[cfg(test)]
 #[path = "playback_phase_trace_tests.rs"]
 mod playback_phase_trace_tests;

@@ -344,6 +344,7 @@ fn wire_library_callbacks(
         let Some(win) = w.upgrade() else { return };
         let mut st = s.borrow_mut();
         st.play_track_at_index_in_memory(idx as usize);
+        st.persist_queue();
         trigger_playback(&win, &mut st);
         sync_window(&win, &mut st);
     });
@@ -551,12 +552,14 @@ fn wire_playback_callbacks(
 
 fn handle_prev_track(win: &MoggytWindow, st: &mut SlintAppState) {
     st.queue.retreat();
+    st.persist_queue();
     trigger_playback(win, st);
     sync_window(win, st);
 }
 
 fn handle_next_track(win: &MoggytWindow, st: &mut SlintAppState) {
     st.queue.advance();
+    st.persist_queue();
     trigger_playback(win, st);
     sync_window(win, st);
 }
@@ -594,6 +597,7 @@ fn handle_toggle_like(win: &MoggytWindow, st: &mut SlintAppState) {
 fn handle_cycle_repeat(win: &MoggytWindow, st: &mut SlintAppState) {
     let next = cycle_repeat_mode(st.queue.repeat());
     st.queue.set_repeat(next);
+    st.persist_queue();
     win.global::<PlayerUi>().set_repeat_mode(repeat_mode_to_int(next));
 }
 
@@ -682,5 +686,45 @@ mod tests {
         assert_eq!(filter_from_index(4), SearchFilter::Playlists);
         assert_eq!(filter_from_index(5), SearchFilter::Tracks);
         assert_eq!(filter_from_index(99), SearchFilter::All);
+    }
+
+    #[test]
+    fn test_handle_cycle_repeat_persists_repeat_mode() {
+        let mut state = test_wired();
+        assert_eq!(state.queue_store.load().repeat(), crate::domain::RepeatMode::Off);
+
+        if let Ok(win) = MoggytWindow::new() {
+            handle_cycle_repeat(&win, &mut state);
+            assert_eq!(state.queue_store.load().repeat(), crate::domain::RepeatMode::All);
+        } else {
+            let next = cycle_repeat_mode(state.queue.repeat());
+            state.queue.set_repeat(next);
+            state.persist_queue();
+            assert_eq!(state.queue_store.load().repeat(), crate::domain::RepeatMode::All);
+        }
+    }
+
+    #[test]
+    fn test_handle_next_and_prev_track_persist_cursor() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist"));
+        state.play_track_at_index_in_memory(0);
+        state.persist_queue();
+        assert_eq!(state.queue_store.load().cursor(), 0);
+
+        if let Ok(win) = MoggytWindow::new() {
+            handle_next_track(&win, &mut state);
+            assert_eq!(state.queue_store.load().cursor(), 1);
+            handle_prev_track(&win, &mut state);
+            assert_eq!(state.queue_store.load().cursor(), 0);
+        } else {
+            state.queue.advance();
+            state.persist_queue();
+            assert_eq!(state.queue_store.load().cursor(), 1);
+            state.queue.retreat();
+            state.persist_queue();
+            assert_eq!(state.queue_store.load().cursor(), 0);
+        }
     }
 }

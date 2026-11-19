@@ -398,6 +398,7 @@ impl SlintAppState {
             }
             self.queue.push(track);
         }
+        self.persist_queue();
         Ok(count)
     }
 
@@ -664,5 +665,26 @@ mod tests {
         let cached =
             SlintAppState::cover_bytes_or_fetch(&state.covers, "https://example.com/art.jpg");
         assert_eq!(cached, Some(vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn test_import_playlist_url_persists_queue() {
+        let mut state = test_wired();
+        let track1 = Track::new("p1", "Playlist Track 1", "Artist");
+        let track2 = Track::new("p2", "Playlist Track 2", "Artist");
+        let d = Detail::new(
+            DetailKind::Playlist,
+            "Playlist",
+            "Author",
+            vec![track1.clone(), track2.clone()],
+        );
+        let ok_cat = MockLibraryCatalog::default().with_detail(Ok(Some(d)));
+        state.catalog = wrap_mock_catalog(ok_cat);
+
+        let res = state.import_playlist_url("https://music.youtube.com/playlist?list=VLPL123");
+        assert_eq!(res.unwrap(), 2);
+        let stored = state.queue_store.load();
+        assert_eq!(stored.len(), 2);
+        assert_eq!(stored.tracks(), &[track1, track2]);
     }
 }

@@ -160,8 +160,9 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-11: single instance; tray icon with play/pause/next and show/hide actions.
 - FR-12: check GitHub Releases for updates and offer the download page (no silent install).
   Note: unauthenticated checks return 404 on private repo and soft-fail to CheckFailed (see ADR-001).
-- FR-13: persistent playback queue across application restarts (serializes track list and
-  position, holding the context plus explicitly queued tracks while omitting transient autoplay
+- FR-13: persistent playback queue saved on every queue mutation (not only on exit), restoring
+  the last persisted queue across application restarts (serializes track list and position,
+  holding the context plus explicitly queued tracks while omitting transient autoplay
   recommendations).
 - FR-14: sleep timer with standard interval presets and stop-after-current-track option.
 - FR-15: DSP settings for skip-silence and -14 LUFS loudness normalization in playback.

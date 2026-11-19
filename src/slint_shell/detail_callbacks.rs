@@ -261,6 +261,7 @@ fn handle_detail_track_selected(
     idx: i32,
 ) {
     if idx >= 0 && replace_detail_at_row(st, tx, idx as usize).is_some() {
+        st.persist_queue();
         trigger_playback(win, st);
     }
     sync_window(win, st);
@@ -274,6 +275,7 @@ fn handle_detail_play(
     if st.detail.as_ref().is_some_and(|d| !d.tracks.is_empty())
         && replace_detail_queue(st, tx, 0).is_some()
     {
+        st.persist_queue();
         trigger_playback(win, st);
     }
     sync_window(win, st);
@@ -286,6 +288,7 @@ fn handle_detail_shuffle(
 ) {
     if st.detail.as_ref().is_some_and(|d| !d.tracks.is_empty()) {
         shuffle_detail_into_queue(st, tx);
+        st.persist_queue();
         trigger_playback(win, st);
     }
     sync_window(win, st);
@@ -648,5 +651,25 @@ mod tests {
             .map(|t| t.id.as_str())
             .collect();
         assert_eq!(baseline_ids, ["album-1", "album-2"]);
+    }
+
+    #[test]
+    fn test_detail_play_and_shuffle_persist_queue() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        let track1 = Track::new("album-1", "Track 1", "Artist");
+        let track2 = Track::new("album-2", "Track 2", "Artist");
+        state.detail =
+            Some(Detail::new(DetailKind::Album, "Album", "Artist", vec![track1, track2]));
+
+        if let Ok(win) = MoggytWindow::new() {
+            handle_detail_play(&win, &mut state, &tx);
+            assert_eq!(state.queue_store.load().len(), 2);
+            assert_eq!(state.queue_store.load().cursor(), 0);
+
+            handle_detail_shuffle(&win, &mut state, &tx);
+            assert_eq!(state.queue_store.load().len(), 2);
+            assert_eq!(state.queue_store.load().cursor(), 0);
+        }
     }
 }
