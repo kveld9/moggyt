@@ -1,6 +1,7 @@
 //! Single playback transition request builder and dispatch authority.
 
 use crate::domain::PlaybackPhase;
+use crate::slint_shell::playback_failure::PlaybackRecovery;
 
 #[cfg(test)]
 use crate::slint_shell::playback_worker::PlaybackWorkerAdapters;
@@ -21,6 +22,11 @@ impl SlintAppState {
     pub fn begin_play_request(&mut self) -> Option<PlayTrackRequest> {
         self.gapless.reset();
         let track = self.queue.current().cloned()?;
+        if let PlaybackRecovery::Scheduled { track_id, .. } = &self.playback_recovery {
+            if track_id != &track.id {
+                self.playback_recovery = PlaybackRecovery::Idle;
+            }
+        }
         if self.on_track_changing_sleep_timer(&track.id) {
             return None;
         }

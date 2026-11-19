@@ -272,6 +272,7 @@ mod tests {
             title: "Next".to_string(),
             artist: "Artist".to_string(),
             success,
+            failure: None,
             lyrics_lines: Vec::new(),
             cover_data: None,
             presence: PresenceSnapshot::new("Next", "Artist", success),

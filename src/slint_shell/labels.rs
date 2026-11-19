@@ -138,6 +138,8 @@ pub struct StaticLabels {
     pub player_bar_skip: &'static str,
     pub player_bar_queue: &'static str,
     pub player_bar_volume: &'static str,
+    /// Inline retry action label in the player bar.
+    pub playback_retry_label: &'static str,
     pub import_title_label: &'static str,
     pub import_button_label: &'static str,
     pub import_tab_link_label: &'static str,
@@ -375,6 +377,7 @@ impl StaticLabels {
             player_bar_skip: tr(locale, "Show skip 10s buttons"),
             player_bar_queue: tr(locale, "Show queue button"),
             player_bar_volume: tr(locale, "Show volume slider"),
+            playback_retry_label: tr(locale, "Retry"),
             import_title_label: tr(locale, "Import from Spotify"),
             import_button_label: tr(locale, "Import"),
             import_tab_link_label: tr(locale, "From link"),
@@ -603,6 +606,7 @@ impl StaticLabels {
         labels.set_player_bar_skip_label(self.player_bar_skip.into());
         labels.set_player_bar_queue_label(self.player_bar_queue.into());
         labels.set_player_bar_volume_label(self.player_bar_volume.into());
+        labels.set_playback_retry_label(self.playback_retry_label.into());
         labels.set_import_title_label(self.import_title_label.into());
         labels.set_import_button_label(self.import_button_label.into());
         labels.set_import_tab_link_label(self.import_tab_link_label.into());

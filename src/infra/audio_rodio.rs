@@ -399,7 +399,7 @@ impl RodioBackend {
         self.resolver.invalidate(track_id);
         let Some(stream) = self.resolver.resolve_stream(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to re-resolve audio stream URL on retry");
-            return Err(AudioError::Unavailable);
+            return Err(AudioError::Resolve(track_id.to_string()));
         };
         self.play_resolved(track_id, &stream).map_err(|err| {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream on retry");
@@ -421,7 +421,7 @@ impl AudioBackend for RodioBackend {
         }
         let Some(stream) = self.resolver.resolve_stream(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL");
-            return Err(AudioError::Unavailable);
+            return Err(AudioError::Resolve(track_id.to_string()));
         };
         if let Err(err) = self.play_resolved(track_id, &stream) {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to play audio stream");
@@ -441,7 +441,7 @@ impl AudioBackend for RodioBackend {
         }
         let Some(stream) = self.resolver.resolve_stream(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL for crossfade");
-            return Err(AudioError::Unavailable);
+            return Err(AudioError::Resolve(track_id.to_string()));
         };
         if let Err(err) = self.play_resolved_crossfade(track_id, &stream, duration) {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to crossfade audio stream; retrying immediate play");
@@ -464,7 +464,7 @@ impl AudioBackend for RodioBackend {
         }
         let Some(stream) = self.resolver.resolve_stream(track_id) else {
             tracing::warn!(track_id = %track_id, "failed to resolve audio stream URL for gapless preload");
-            return Err(AudioError::Unavailable);
+            return Err(AudioError::Resolve(track_id.to_string()));
         };
         self.play_gapless_resolved(track_id, &stream).map_err(|err| {
             tracing::warn!(track_id = %track_id, error = ?err, "failed to append gapless audio stream");

@@ -278,10 +278,11 @@ pub fn apply_play_track_completion(
     res: PlayTrackResult,
 ) {
     if !res.success {
-        super::playback_failure::notify_playback_failure(window, state, &res.title);
+        super::playback_failure::report_playback_failure(window, state, &res);
         window.global::<PlayerUi>().set_is_playing(false);
         return;
     }
+    super::playback_failure::clear_playback_failure(window, state);
     state.lyrics_lines = res.lyrics_lines;
     state.lyrics_key = Some((res.artist.clone(), res.title.clone()));
 

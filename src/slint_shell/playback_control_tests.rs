@@ -2,9 +2,11 @@ use std::sync::{Arc, Mutex};
 
 use super::*;
 
-use crate::domain::{PlaybackPhase, Track};
+use crate::domain::{PlaybackFailure, PlaybackPhase, Track};
 use crate::infra::CatalogError;
-use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
+use crate::slint_shell::platform::PresenceSnapshot;
+use crate::slint_shell::playback_failure::PlaybackRecovery;
+use crate::slint_shell::playback_worker::{PlayTrackResult, PlaybackWorkerCommand};
 use crate::slint_shell::test_support::{EndedAudio, MockLibraryCatalog, test_wired};
 
 #[test]
@@ -520,4 +522,36 @@ fn test_play_library_songs_persists_replaced_queue() {
     assert_eq!(ids, ["s1", "s2"]);
     assert_eq!(stored.cursor(), 1);
     assert_eq!(stored.current().map(|t| t.id.as_str()), Some("s2"));
+}
+
+#[test]
+fn failed_play_completion_schedules_recovery_and_surfaces_error() {
+    let Ok(window) = MoggytWindow::new() else {
+        return;
+    };
+    let mut state = test_wired();
+    state.queue.push(Track::new("t1", "Track 1", "Artist 1"));
+
+    apply_play_track_completion(
+        &window,
+        &mut state,
+        PlayTrackResult {
+            generation: 1,
+            track_id: "t1".into(),
+            title: "Track 1".into(),
+            artist: "Artist 1".into(),
+            success: false,
+            failure: Some(PlaybackFailure::Network),
+            lyrics_lines: Vec::new(),
+            cover_data: None,
+            presence: PresenceSnapshot::new("Track 1", "Artist 1", false),
+            gapless: false,
+        },
+    );
+
+    assert!(!window.global::<PlayerUi>().get_is_playing());
+    let error_text = window.global::<PlayerUi>().get_playback_error();
+    assert!(!error_text.is_empty());
+    assert!(error_text.contains("Network error"));
+    assert!(matches!(state.playback_recovery, PlaybackRecovery::Scheduled { .. }));
 }

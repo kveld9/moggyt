@@ -11,6 +11,7 @@ mod listening_stats;
 mod local_playlist;
 mod matching;
 mod play_log;
+mod playback_failure;
 mod playback_phase;
 mod playlist_create;
 mod playlist_import;
@@ -54,6 +55,7 @@ pub use matching::{
     score_candidate, similarity, split_featured, title_similarity, token_set,
 };
 pub use play_log::{MIN_RECORDED_PLAY_SECS, PlayRecord, listened_secs, record_for_play};
+pub use playback_failure::{MAX_PLAYBACK_RETRIES, PlaybackFailure};
 pub use playback_phase::{END_TOLERANCE_SECS, PlaybackEvent, PlaybackFacts, PlaybackPhase};
 pub use playlist_create::{MAX_PLAYLIST_TITLE_CHARS, PlaylistTitleError, new_playlist_title};
 pub use playlist_import::{SpotifyRef, extract_playlist_id, parse_spotify_ref};

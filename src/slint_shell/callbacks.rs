@@ -449,6 +449,12 @@ fn wire_playback_callbacks(
 
     let s = Rc::clone(state_rc);
     let w = window.as_weak();
+    window.global::<PlayerUi>().on_retry_playback(move || {
+        with_window_state(&w, &s, |_, st| st.retry_playback_failure());
+    });
+
+    let s = Rc::clone(state_rc);
+    let w = window.as_weak();
     window.global::<PlayerUi>().on_prev_track(move || {
         with_window_state(&w, &s, handle_prev_track);
     });

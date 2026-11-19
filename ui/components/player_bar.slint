@@ -141,7 +141,7 @@ export component PlayerBar inherits Rectangle {
 
                     // The artist line opens the artist page on left click and carries the same
                     // right-click target as the artwork and the title.
-                    if root.active-track-artist != "" : Rectangle {
+                    if root.active-track-artist != "" && PlayerUi.playback-error == "" : Rectangle {
                         height: artist-text.preferred-height;
                         horizontal-stretch: 1;
 
@@ -167,6 +167,40 @@ export component PlayerBar inherits Rectangle {
                                         self.absolute-position.y + self.mouse-y,
                                     );
                                 }
+                            }
+                        }
+                    }
+
+                    // Playback error row: localized reason plus an inline retry action. It
+                    // replaces the artist line while the last attempt failed.
+                    if PlayerUi.playback-error != "" : HorizontalLayout {
+                        spacing: 6px;
+
+                        Text {
+                            horizontal-stretch: 1;
+                            text: PlayerUi.playback-error;
+                            color: Theme.accent;
+                            font-size: 11px;
+                            overflow: elide;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle {
+                            width: retry-label.preferred-width;
+                            height: retry-label.preferred-height;
+                            background: transparent;
+
+                            retry-label := Text {
+                                text: Labels.playback-retry-label;
+                                color: retry-touch.has-hover ? Theme.accent : Theme.secondary;
+                                font-size: 11px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+
+                            retry-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { PlayerUi.retry-playback(); }
                             }
                         }
                     }
