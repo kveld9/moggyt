@@ -44,6 +44,7 @@ pub mod cover_pool;
 pub mod covers;
 pub mod detail;
 mod detail_callbacks;
+pub mod detail_history;
 mod detail_sections;
 pub mod discord;
 pub mod explore;

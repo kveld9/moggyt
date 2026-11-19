@@ -13,6 +13,7 @@ use crate::infra::{
     MemoryPlayLogStore, MemoryQueueStore, MemorySettingsStore, MemorySkipStore, OutputDeviceWatch,
     SessionStore, SettingsStore, StubScrobbler,
 };
+use crate::slint_shell::detail_history::DetailHistory;
 use crate::slint_shell::library_filter::LibraryFilter;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
@@ -83,6 +84,7 @@ impl SlintAppState {
             library_filter: LibraryFilter::default(),
             detail: None,
             detail_return: SlintPage::Search,
+            detail_history: DetailHistory::default(),
             playback_phase: PlaybackPhase::Empty,
             library_phase: ViewPhase::Idle,
             search_phase: ViewPhase::Idle,
