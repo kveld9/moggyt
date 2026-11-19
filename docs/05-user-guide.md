@@ -83,6 +83,11 @@ The detail view displays full tracklistings for an album, artist, or playlist:
   and tightens row height. Playlist tables keep every column and move the artist into its own column; the
   button then reads `Cover view` and restores the default layout, where the artist sits under the title.
   The choice is persisted in `settings.json`.
+- **Now playing marker**: the row of the track loaded in the player always shows an animated
+  equalizer badge in the accent color. The badge keeps animating while audio plays and freezes
+  while playback is paused. It replaces the track number in compact and playlist-table rows and
+  sits on the lower-right corner of the cover in cover rows; it appears in detail track listings,
+  search shelves, liked songs, and the queue panel.
 - **Artist sections**: artist pages show the popular-songs heading and its top tracks, a `Show all` action
   that opens the catalog's songs list, and the server-provided `Albums`, `Singles and EPs`, and similar-artist
   rows. Album and single cards open the album page; similar-artist cards open that artist's page.

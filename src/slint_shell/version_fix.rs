@@ -49,6 +49,7 @@ pub fn apply_choice(state: &mut SlintAppState, index: usize) -> bool {
 fn track_to_row(index: usize, track: &Track) -> TrackRowData {
     TrackRowData {
         index: index as i32,
+        id: track.id.clone().into(),
         title: track.title.clone().into(),
         artist: track.artist.clone().into(),
         album: track.album.clone().unwrap_or_default().into(),

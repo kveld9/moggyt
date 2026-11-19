@@ -47,6 +47,7 @@ export component QueueList inherits ListView {
             duration: track.duration;
             kind: track.kind;
             index: track.index;
+            track-id: track.id;
             surface: ContextSurface.queue;
             cover: track.cover;
             is-active: track.index == root.selected-index;

@@ -1,0 +1,40 @@
+// Animated equalizer bars that mark the track the player currently holds.
+// The bars cycle through fixed heights while audio plays and rest in a low
+// profile while paused, so the marker stays visible without motion.
+// Timer reference: https://releases.slint.dev/1.18.1/docs/slint/reference/timer/
+// Math.mod reference: https://releases.slint.dev/1.18.1/docs/slint/reference/global-functions/math/
+import { Theme } from "../theme.slint";
+
+export component PlayingBars inherits Rectangle {
+    in property <bool> playing: false;
+    in property <color> tint: Theme.accent;
+
+    property <int> frame: 0;
+    property <[length]> levels: [11px, 7px, 13px, 8px];
+    property <[length]> rest-levels: [6px, 10px, 8px];
+
+    width: 14px;
+    height: 14px;
+    background: transparent;
+
+    Timer {
+        interval: 220ms;
+        running: root.playing;
+        triggered => {
+            root.frame = Math.mod(root.frame + 1, 4);
+        }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 1px;
+
+        for i in 3 : Rectangle {
+            width: 3px;
+            border-radius: 1.5px;
+            background: root.tint;
+            height: root.playing ? root.levels[Math.mod(root.frame + i, 4)] : root.rest-levels[i];
+            animate height { duration: 200ms; easing: ease-in-out; }
+        }
+    }
+}
