@@ -84,6 +84,18 @@ impl PlaybackQueue {
         self.cursor
     }
 
+    /// Sets the cursor to target index, clamping to valid queue bounds.
+    ///
+    /// Resets cursor to 0 if the queue is empty; otherwise clamps `index` to `tracks.len() - 1`.
+    /// Ignores and preserves the active repeat policy.
+    pub fn set_cursor(&mut self, index: usize) {
+        if self.tracks.is_empty() {
+            self.cursor = 0;
+            return;
+        }
+        self.cursor = index.min(self.tracks.len() - 1);
+    }
+
     /// Clamps the cursor to valid bounds within the track list.
     ///
     /// Resets cursor to 0 if the queue is empty; otherwise clamps to `tracks.len() - 1`.
@@ -391,5 +403,49 @@ mod tests {
         q.insert_next(Track::new("x", "title", "artist"));
         assert_eq!(track_ids(&q), ["a", "b", "x"]);
         assert_eq!(current_id(&q), Some("b"));
+    }
+
+    #[test]
+    fn set_cursor_moves_under_every_repeat_mode() {
+        for mode in [RepeatMode::Off, RepeatMode::All, RepeatMode::One] {
+            let mut q = queue_from(&["a", "b", "c"], 0, mode);
+            assert_eq!(q.cursor(), 0);
+            assert_eq!(q.repeat(), mode);
+
+            q.set_cursor(1);
+            assert_eq!(q.cursor(), 1);
+            assert_eq!(current_id(&q), Some("b"));
+            assert_eq!(q.repeat(), mode);
+
+            q.set_cursor(2);
+            assert_eq!(q.cursor(), 2);
+            assert_eq!(current_id(&q), Some("c"));
+            assert_eq!(q.repeat(), mode);
+
+            q.set_cursor(0);
+            assert_eq!(q.cursor(), 0);
+            assert_eq!(current_id(&q), Some("a"));
+            assert_eq!(q.repeat(), mode);
+        }
+    }
+
+    #[test]
+    fn set_cursor_clamps_and_handles_empty_queue() {
+        let mut empty = PlaybackQueue::new();
+        empty.set_repeat(RepeatMode::One);
+        empty.set_cursor(5);
+        assert_eq!(empty.cursor(), 0);
+        assert_eq!(empty.repeat(), RepeatMode::One);
+
+        let mut q = queue_from(&["a", "b", "c"], 0, RepeatMode::All);
+        q.set_cursor(10);
+        assert_eq!(q.cursor(), 2);
+        assert_eq!(current_id(&q), Some("c"));
+        assert_eq!(q.repeat(), RepeatMode::All);
+
+        q.set_cursor(1);
+        assert_eq!(q.cursor(), 1);
+        assert_eq!(current_id(&q), Some("b"));
+        assert_eq!(q.repeat(), RepeatMode::All);
     }
 }
