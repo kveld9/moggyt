@@ -185,6 +185,7 @@ impl SlintAppState {
         } else {
             self.restore_unshuffled_queue();
         }
+        self.persist_queue();
     }
 
     /// Shuffles the current queue, preserving the currently playing track at cursor 0.
@@ -219,6 +220,7 @@ impl SlintAppState {
                 self.queue.set_cursor(idx);
             }
         }
+        self.persist_queue();
     }
 
     /// Replaces the playback context and re-applies the active shuffle policy.
@@ -584,5 +586,25 @@ mod tests {
             .map(|t| t.id.as_str())
             .collect();
         assert_eq!(baseline_ids, ["t1", "t2", "t3"]);
+    }
+
+    #[test]
+    fn test_toggle_shuffle_persists_queue() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist"));
+        state.queue.push(Track::new("t2", "Track 2", "Artist"));
+
+        state.toggle_shuffle();
+        assert!(state.is_shuffle);
+        let stored = state.queue_store.load();
+        assert_eq!(stored.len(), 2);
+        assert_eq!(stored.tracks(), state.queue.tracks());
+
+        state.toggle_shuffle();
+        assert!(!state.is_shuffle);
+        let restored = state.queue_store.load();
+        assert_eq!(restored.tracks(), state.queue.tracks());
     }
 }

@@ -327,10 +327,12 @@ pub fn apply_action(
     match action {
         ContextAction::AddToQueue => {
             state.queue.push(track);
+            state.persist_queue();
             FollowUp::None
         }
         ContextAction::PlayNext => {
             state.queue.insert_next(track);
+            state.persist_queue();
             FollowUp::None
         }
         ContextAction::PlayNow => play_now(state, target, track),

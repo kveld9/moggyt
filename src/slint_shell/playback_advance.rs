@@ -150,6 +150,7 @@ impl SlintAppState {
         let current_id = current.id.clone();
         self.append_autoplay_radio(&current_id);
         self.queue.advance();
+        self.persist_queue();
         self.request_current_play();
     }
 
@@ -239,6 +240,7 @@ impl SlintAppState {
         self.on_track_changing_sleep_timer(&started.track_id);
         self.maybe_scrobble_current();
         self.queue.advance();
+        self.persist_queue();
         self.play_generation = self.play_generation.wrapping_add(1);
         Some(result)
     }
@@ -347,6 +349,7 @@ mod tests {
         let result = result.expect("preloaded track became audible");
         assert_eq!(result.track_id, "t2");
         assert_eq!(state.queue.cursor(), 1);
+        assert_eq!(state.queue_store.load().cursor(), 1);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
         assert!(state.gapless.is_free());
 
@@ -413,5 +416,21 @@ mod tests {
         assert!(!state.queue.is_autoplay_at(0));
         assert!(state.queue.is_autoplay_at(1));
         assert!(state.queue.is_autoplay_at(2));
+    }
+
+    #[test]
+    fn test_ended_advance_persists_new_cursor() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("t1", "Track 1", "Artist").with_duration(100));
+        state.queue.push(Track::new("t2", "Track 2", "Artist").with_duration(120));
+        state.play_track_at_index(0);
+        assert_eq!(state.queue_store.load().cursor(), 0);
+
+        state.set_playback_phase(PlaybackPhase::Ended);
+        state.continue_autoplay_if_ended();
+
+        assert_eq!(state.queue.cursor(), 1);
+        assert_eq!(state.queue_store.load().cursor(), 1);
+        assert_eq!(state.queue_store.load().current().map(|t| t.id.as_str()), Some("t2"));
     }
 }
