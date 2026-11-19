@@ -12,7 +12,7 @@ use crate::domain::{ThemeId, parse_hex_rgb};
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, CustomThemeFile, DeviceIdentityMonitor, DiscordPresence,
     LyricOverrideDir, LyricsSource, PlayLogStore, QueueStore, Scrobbler, SessionStore, Settings,
-    SettingsStore, SingleInstanceGuard, SkipStore, SponsorBlockClient, TrayHandle,
+    SettingsStore, SingleInstanceGuard, SkipStore, SponsorBlockClient, TrayPublisher,
     VersionOverrideStore,
 };
 
@@ -56,7 +56,7 @@ pub struct AppDependencies<C, A, S, L, K> {
     pub secondary_scrobbler: Option<Box<dyn Scrobbler>>,
     pub lyric_overrides: Option<LyricOverrideDir>,
     pub version_store: Box<dyn VersionOverrideStore>,
-    pub tray: Option<TrayHandle>,
+    pub tray: Option<Box<dyn TrayPublisher>>,
     /// Loaded custom theme file watcher for runtime reloading.
     pub custom_theme: CustomThemeFile,
     /// Watcher for the matugen-generated palette file.

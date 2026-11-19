@@ -224,7 +224,7 @@ pub use stream_window::{
     STREAM_WINDOW_AHEAD_BLOCKS, STREAM_WINDOW_BEHIND_BLOCKS, block_index, block_is_in_window,
     next_block_to_fetch,
 };
-pub use tray::{TrayAction, TrayHandle};
+pub use tray::{TRAY_LABEL_MAX_CHARS, TrayAction, TrayHandle, TrayPublisher, now_playing_label};
 pub use updater::{ReleaseInfo, StaticUpdater, Updater};
 pub use updater_github::{
     GithubUpdater, UPDATE_OWNER_REPO, is_newer, latest_url, parse_release_payload,

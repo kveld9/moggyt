@@ -519,6 +519,8 @@ text input does not have focus. Any shortcut pressed with Ctrl, Alt, or Meta hel
 When supported by the desktop environment, `moggyt` creates a system tray icon:
 
 - Supports background transport actions: toggle playback, skip next, skip previous.
+- The tray menu is localized, and its Play/Pause item follows the transport state.
+- The active track appears in the tray label on Linux (`set_title`) and as the icon tooltip on Windows and macOS.
 - Context menu option to quit the application cleanly.
 - If the desktop environment lacks system tray support, the application logs a warning and runs normally without an
   icon.

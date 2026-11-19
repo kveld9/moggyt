@@ -18,7 +18,7 @@ use crate::infra::{
     AudioBackend, Catalog, CatalogError, CoverCache, CustomThemeFile, DesktopPresence,
     DeviceIdentityMonitor, DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource,
     MediaKeyAction, OutputDeviceWatch, PlayLogStore, PresenceTrack, QueueStore, ReleaseInfo,
-    Scrobbler, SessionStore, SettingsStore, SkipProvider, SkipStore, TrayAction, TrayHandle,
+    Scrobbler, SessionStore, SettingsStore, SkipProvider, SkipStore, TrayAction, TrayPublisher,
     decode_cover, fetch_artwork,
 };
 use crate::slint_shell::auto_skip::{SponsorFetchOutcome, SponsorRangeState};
@@ -62,7 +62,7 @@ pub struct SlintAppState {
     pub lyrics: SharedLyrics,
     pub covers: SharedCovers,
     pub lyric_overrides: Option<LyricOverrideDir>,
-    pub tray: Option<TrayHandle>,
+    pub tray: Option<Box<dyn TrayPublisher>>,
     pub presence: DesktopPresence,
     pub discord: DiscordPresence,
     pub scrobbler: Arc<Mutex<Box<dyn Scrobbler>>>,

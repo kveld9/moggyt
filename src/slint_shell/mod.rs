@@ -109,6 +109,7 @@ mod sync_phase;
 pub mod test_support;
 pub mod theme;
 pub mod toast;
+pub mod tray_sync;
 pub mod version_fix;
 pub mod video_policy;
 pub mod view_phase;
