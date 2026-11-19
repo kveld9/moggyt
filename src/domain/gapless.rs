@@ -87,8 +87,10 @@ impl GaplessSlot {
 
 /// Returns whether the next track should be armed behind the active one.
 ///
-/// Gapless arming runs only for a playing track with a known remaining time, with a
-/// next queue track available, and with crossfade disabled.
+/// Gapless arming runs only for a playing track with a known remaining time, with a next queue
+/// track available, and with crossfade disabled: a configured crossfade is an explicit request
+/// for a blend and owns the transition. When the preload fails, the normal end-of-track advance
+/// takes over; the failure is latched so it is not retried on every tick.
 pub fn should_arm(
     phase: PlaybackPhase,
     remaining_secs: Option<u64>,
@@ -145,9 +147,9 @@ mod tests {
         assert!(should_arm(PlaybackPhase::Playing, Some(3), 0, true));
         assert!(should_arm(PlaybackPhase::Playing, Some(0), 0, true));
         assert!(!should_arm(PlaybackPhase::Playing, Some(4), 0, true));
-        assert!(!should_arm(PlaybackPhase::Playing, None, 0, true));
         assert!(!should_arm(PlaybackPhase::Playing, Some(2), 5, true));
         assert!(!should_arm(PlaybackPhase::Playing, Some(2), 0, false));
+        assert!(!should_arm(PlaybackPhase::Playing, None, 0, true));
         assert!(!should_arm(PlaybackPhase::Paused, Some(2), 0, true));
         assert!(!should_arm(PlaybackPhase::Ended, Some(2), 0, true));
         assert!(!should_arm(PlaybackPhase::Resolving, Some(2), 0, true));
