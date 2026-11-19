@@ -48,6 +48,7 @@ mod tests {
         assert_eq!(en_labels.show_more, "Show more");
         assert_eq!(en_labels.show_less, "Show less");
         assert_eq!(en_labels.compact_view, "Compact view");
+        assert_eq!(en_labels.playback_retry_label, "Retry");
         assert_eq!(en_labels.cover_view, "Cover view");
         assert_eq!(en_labels.column_index, "#");
         assert_eq!(en_labels.column_title, "Title");
@@ -55,6 +56,7 @@ mod tests {
         assert_eq!(en_labels.column_album, "Album");
         assert_eq!(en_labels.column_date_added, "Date added");
         assert_eq!(en_labels.column_duration, "Duration");
+        assert_eq!(en_labels.playback_retry_label, "Retry");
 
         let es_labels = StaticLabels::resolve(crate::i18n::Locale::Spanish, None);
         assert_eq!(es_labels.nav_explore, "Explorar");
@@ -100,6 +102,7 @@ mod tests {
         assert_eq!(es_labels.column_album, "Álbum");
         assert_eq!(es_labels.column_date_added, "Fecha de incorporación");
         assert_eq!(es_labels.column_duration, "Duración");
+        assert_eq!(es_labels.playback_retry_label, "Reintentar");
     }
 
     #[test]
@@ -231,6 +234,7 @@ mod tests {
         assert_eq!(es.player_bar_skip, "Mostrar botones +/-10s");
         assert_eq!(es.player_bar_queue, "Mostrar botón de cola");
         assert_eq!(es.player_bar_volume, "Mostrar control de volumen");
+        assert_eq!(es.playback_retry_label, "Reintentar");
         assert_eq!(es.import_title_label, "Importar desde Spotify");
         assert_eq!(es.import_button_label, "Importar");
         assert_eq!(es.import_tab_link_label, "Desde enlace");
@@ -437,6 +441,7 @@ mod tests {
         assert_eq!(en.player_bar_skip, "Show skip 10s buttons");
         assert_eq!(en.player_bar_queue, "Show queue button");
         assert_eq!(en.player_bar_volume, "Show volume slider");
+        assert_eq!(en.playback_retry_label, "Retry");
         assert_eq!(en.import_title_label, "Import from Spotify");
         assert_eq!(en.import_button_label, "Import");
         assert_eq!(en.import_tab_link_label, "From link");

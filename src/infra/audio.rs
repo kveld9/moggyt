@@ -2,7 +2,7 @@
 
 use super::stream::AudioQuality;
 use super::stream_chain::StreamChain;
-use crate::domain::{GaplessSlot, StartedGapless};
+use crate::domain::{GaplessSlot, PlaybackFailure, StartedGapless};
 
 /// Clamps a playback speed factor to the valid `0.5..=2.0` range.
 ///
@@ -20,6 +20,8 @@ pub fn clamp_speed(speed: f32) -> f32 {
 pub enum AudioError {
     /// The backend cannot produce audio (muted, unavailable device, unconfigured).
     Unavailable,
+    /// The stream could not be resolved or fetched (network, yt-dlp, region).
+    Resolve(String),
     /// The stream could not be resolved or decoded.
     Playback(String),
 }
@@ -28,12 +30,24 @@ impl std::fmt::Display for AudioError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Unavailable => write!(f, "audio backend unavailable"),
+            Self::Resolve(msg) => write!(f, "stream resolution failed: {msg}"),
             Self::Playback(msg) => write!(f, "playback failed: {msg}"),
         }
     }
 }
 
 impl std::error::Error for AudioError {}
+
+impl AudioError {
+    /// Maps the audio error to a classified playback failure.
+    pub fn failure(&self) -> PlaybackFailure {
+        match self {
+            Self::Unavailable => PlaybackFailure::OutputUnavailable,
+            Self::Resolve(_) => PlaybackFailure::Network,
+            Self::Playback(_) => PlaybackFailure::Playback,
+        }
+    }
+}
 
 /// Playback port: stream control and observable playback state.
 pub trait AudioBackend {
@@ -305,6 +319,23 @@ impl AudioBackend for AudioStub {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn audio_error_failure_classification() {
+        assert_eq!(AudioError::Unavailable.failure(), PlaybackFailure::OutputUnavailable);
+        assert_eq!(AudioError::Resolve("net".into()).failure(), PlaybackFailure::Network);
+        assert_eq!(AudioError::Playback("err".into()).failure(), PlaybackFailure::Playback);
+    }
+
+    #[test]
+    fn audio_error_display_formatting() {
+        assert_eq!(AudioError::Unavailable.to_string(), "audio backend unavailable");
+        assert_eq!(
+            AudioError::Resolve("timeout".into()).to_string(),
+            "stream resolution failed: timeout"
+        );
+        assert_eq!(AudioError::Playback("decode".into()).to_string(), "playback failed: decode");
+    }
 
     #[test]
     fn clamp_speed_validation_table() {

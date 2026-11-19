@@ -41,6 +41,7 @@ fn test_execute_play_track_in_worker_thread() {
     assert_eq!(res.generation, 1);
     assert_eq!(res.track_id, "t1");
     assert!(res.success);
+    assert_eq!(res.failure, None);
     assert_eq!(res.lyrics_lines.len(), 2);
     assert!(res.presence.is_playing);
 
@@ -59,6 +60,7 @@ fn gapless_request_appends_behind_the_active_track_and_reports_success() {
     let res = execute_play_track(req, &adapters);
 
     assert!(res.success);
+    assert_eq!(res.failure, None);
     assert!(res.gapless);
     let guard = audio.lock().unwrap();
     assert_eq!(guard.last_requested(), Some("next"));
@@ -98,6 +100,53 @@ fn success_requires_requested_id_match() {
     let adapters = test_worker_adapters(audio);
     let res = execute_play_track(dummy_play_req("track-C"), &adapters);
     assert!(!res.success);
+}
+
+struct ResolveFailingAudio;
+
+impl AudioBackend for ResolveFailingAudio {
+    fn play(&mut self, track_id: &str) -> Result<(), AudioError> {
+        Err(AudioError::Resolve(track_id.to_string()))
+    }
+
+    fn pause(&mut self) {}
+
+    fn resume_play(&mut self) {}
+
+    fn seek(&mut self, _position_secs: u64) {}
+
+    fn set_volume(&mut self, _volume: u8) {}
+
+    fn volume(&self) -> u8 {
+        100
+    }
+
+    fn position_secs(&self) -> u64 {
+        0
+    }
+
+    fn is_playing(&self) -> bool {
+        false
+    }
+
+    fn last_requested(&self) -> Option<&str> {
+        None
+    }
+}
+
+#[test]
+fn test_execute_play_track_reports_network_failure_on_resolve_error() {
+    let audio = Arc::new(Mutex::new(ResolveFailingAudio));
+    let adapters = test_worker_adapters(audio);
+    let res = execute_play_track(dummy_play_req("track-fail-net"), &adapters);
+    assert!(!res.success);
+    assert_eq!(res.failure, Some(crate::domain::PlaybackFailure::Network));
+
+    let ok_audio = Arc::new(Mutex::new(AudioStub::new()));
+    let ok_adapters = test_worker_adapters(ok_audio);
+    let ok_res = execute_play_track(dummy_play_req("track-ok"), &ok_adapters);
+    assert!(ok_res.success);
+    assert_eq!(ok_res.failure, None);
 }
 
 #[test]

@@ -16,6 +16,7 @@ use crate::infra::{
 use crate::slint_shell::detail_history::DetailHistory;
 use crate::slint_shell::library_filter::LibraryFilter;
 use crate::slint_shell::page::SlintPage;
+use crate::slint_shell::playback_failure::PlaybackRecovery;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
 use crate::slint_shell::state::{
     SharedAudio, SharedCatalog, SharedCovers, SharedLyrics, SlintAppState,
@@ -86,6 +87,8 @@ impl SlintAppState {
             detail_return: SlintPage::Search,
             detail_history: DetailHistory::default(),
             playback_phase: PlaybackPhase::Empty,
+            playback_error: None,
+            playback_recovery: PlaybackRecovery::Idle,
             library_phase: ViewPhase::Idle,
             search_phase: ViewPhase::Idle,
             detail_phase: ViewPhase::Idle,

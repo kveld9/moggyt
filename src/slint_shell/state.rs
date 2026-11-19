@@ -30,6 +30,7 @@ use crate::slint_shell::library_filter::LibraryFilter;
 use crate::slint_shell::page::SlintPage;
 use crate::slint_shell::platform::rgba_to_image;
 use crate::slint_shell::playback_control::StartedPlay;
+use crate::slint_shell::playback_failure::{PlaybackErrorState, PlaybackRecovery};
 use crate::slint_shell::playback_worker::PlaybackWorkerCommand;
 use crate::slint_shell::player_bar::PlayerBarPrefs;
 use crate::slint_shell::view_phase::ViewPhase;
@@ -103,6 +104,10 @@ pub struct SlintAppState {
     /// Previously visited detail containers, most recent last.
     pub detail_history: DetailHistory,
     pub playback_phase: PlaybackPhase,
+    /// Last failed play attempt surfaced in the player bar, if any.
+    pub playback_error: Option<PlaybackErrorState>,
+    /// Automatic retry plan for the last failed play attempt.
+    pub playback_recovery: PlaybackRecovery,
     pub library_phase: ViewPhase,
     pub search_phase: ViewPhase,
     pub detail_phase: ViewPhase,
@@ -209,9 +214,13 @@ impl SlintAppState {
 
     /// Stores the current playback phase; this is the only assignment site.
     ///
-    /// Emits one INFO event per real change so playback problems can be diagnosed from the
-    /// application log, and ignores repeated writes of the current phase.
+    /// Pausing cancels a pending automatic retry. Emits one INFO event per real change so
+    /// playback problems can be diagnosed from the application log, and ignores repeated
+    /// writes of the current phase.
     pub(crate) fn set_playback_phase(&mut self, phase: PlaybackPhase) {
+        if phase == PlaybackPhase::Paused {
+            self.playback_recovery = PlaybackRecovery::Idle;
+        }
         if self.playback_phase == phase {
             return;
         }

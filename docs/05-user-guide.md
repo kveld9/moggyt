@@ -433,6 +433,10 @@ Users can customize the player bar appearance and element visibility under **Set
   catalog metadata or the decoded audio stream.
   The elapsed label tracks audible playback, so it stays frozen while playback is
   paused and never shows a position longer than the displayed duration.
+- **Playback Failure Recovery**: when a play attempt fails, the toast reports the specific failure
+  reason and the track title, while the player bar shows `Retrying (1/2)` for a pending automatic
+  retry or the short reason once retries are exhausted. Transient failures retry automatically
+  twice (after 2s and 5s), and the inline `Retry` action replays the track immediately.
 
 ## Context Menu
 

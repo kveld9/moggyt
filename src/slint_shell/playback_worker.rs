@@ -35,7 +35,7 @@ use std::sync::{Arc, Mutex};
 
 use tracing::{debug, warn};
 
-use crate::domain::{Detail, DetailKind};
+use crate::domain::{Detail, DetailKind, PlaybackFailure};
 #[cfg(test)]
 use crate::domain::{LyricsSnippet, SearchQuery, SearchResult, Shelf};
 #[cfg(test)]
@@ -83,6 +83,8 @@ pub struct PlayTrackResult {
     pub title: String,
     pub artist: String,
     pub success: bool,
+    /// Classified failure when `success` is false.
+    pub failure: Option<PlaybackFailure>,
     pub lyrics_lines: Vec<LyricLine>,
     pub cover_data: Option<CoverArtData>,
     pub presence: PresenceSnapshot,
@@ -256,6 +258,23 @@ fn dispatch_backend_play<A: AudioBackend>(
     audio.play(&req.track_id)
 }
 
+/// Runs the backend call and reports audibility plus the classified failure.
+fn evaluate_play_outcome<A: AudioBackend>(
+    audio: &mut A,
+    req: &PlayTrackRequest,
+) -> (bool, Option<PlaybackFailure>) {
+    let started = dispatch_backend_play(audio, req);
+    let requested = audio.last_requested() == Some(req.track_id.as_str());
+    let audible = req.gapless || audio.is_playing();
+    if let Err(error) = started {
+        return (false, Some(error.failure()));
+    }
+    if requested && audible {
+        return (true, None);
+    }
+    (false, Some(PlaybackFailure::Unknown))
+}
+
 /// Executes blocking audio resolve/play, scrobbler, lyrics, and cover fetching on worker thread.
 pub fn execute_play_track<A, L, K>(
     req: PlayTrackRequest,
@@ -266,14 +285,9 @@ where
     L: LyricsSource,
     K: CoverCache,
 {
-    let success = match adapters.audio.lock() {
-        Ok(mut a) => {
-            let started = dispatch_backend_play(&mut *a, &req).is_ok();
-            let requested = a.last_requested() == Some(req.track_id.as_str());
-            let audible = req.gapless || a.is_playing();
-            started && requested && audible
-        }
-        Err(_) => false,
+    let (success, failure) = match adapters.audio.lock() {
+        Ok(mut a) => evaluate_play_outcome(&mut *a, &req),
+        Err(_) => (false, Some(PlaybackFailure::Unknown)),
     };
 
     if let Ok(mut scrob) = adapters.scrobbler.lock() {
@@ -295,6 +309,7 @@ where
         title: req.title,
         artist: req.artist,
         success,
+        failure,
         lyrics_lines,
         cover_data,
         presence,

@@ -88,6 +88,8 @@ export global PlayerUi {
     in-out property <string> remaining-text: "";
     in-out property <bool> show-remaining-time: false;
     in-out property <float> progress: 0.0;
+    // Localized reason of the last failed play attempt; empty when there is no error.
+    in-out property <string> playback-error: "";
     in-out property <int> volume: 100;
 
     callback toggle-play();
@@ -97,6 +99,7 @@ export global PlayerUi {
     callback seek-to(int);
     callback set-volume(int);
     callback toggle-like();
+    callback retry-playback();
     callback open-artist();
     callback toggle-shuffle();
     callback cycle-repeat();

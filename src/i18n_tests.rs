@@ -529,4 +529,21 @@ mod tests {
             assert_ne!(en, es, "Spanish must differ from English for '{key}'");
         }
     }
+
+    #[test]
+    fn test_playback_failure_recovery_i18n_strings_exist_and_differ() {
+        let keys_and_expected = [
+            ("Audio output unavailable", "Salida de audio no disponible"),
+            ("Network error", "Error de red"),
+            ("Playback failed", "Error de reproducción"),
+            ("Retrying", "Reintentando"),
+        ];
+        for (key, expected_es) in keys_and_expected {
+            let en = tr(Locale::English, key);
+            let es = tr(Locale::Spanish, key);
+            assert_eq!(en, key, "English must return source key for '{key}'");
+            assert_eq!(es, expected_es, "Spanish must match expected translation for '{key}'");
+            assert_ne!(en, es, "Spanish must differ from English for '{key}'");
+        }
+    }
 }
