@@ -168,7 +168,7 @@ pub use playlist_store::{MemoryPlaylistStore, PlaylistStore};
 pub use playlist_store_disk::{
     DiskPlaylistStore, PLAYLISTS_FILE, PLAYLISTS_SCHEMA_VERSION, PlaylistFile,
 };
-pub use presence::{NoopPresence, Presence};
+pub use presence::{NoopPresence, Presence, PresenceTrack};
 pub use presence_desktop::{DesktopPresence, MediaKeyAction, action_for, metadata_for, status_for};
 pub use presence_discord::{DISCORD_APP_ID, DiscordPresence, activity_parts};
 pub use queue_store::{DiskQueueStore, MemoryQueueStore, QueueStore};
