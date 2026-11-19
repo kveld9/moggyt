@@ -1,8 +1,9 @@
 //! Desktop media presence integration (MPRIS on Linux, SMTC on Windows).
 
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
+use std::time::Duration;
 
-use souvlaki::{MediaControlEvent, MediaMetadata, MediaPlayback};
+use souvlaki::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition};
 
 use super::presence::{Presence, PresenceTrack};
 
@@ -67,17 +68,14 @@ pub fn metadata_for(track: &PresenceTrack) -> MediaMetadata<'_> {
         artist: Some(clean_text(&track.artist, "Unknown artist")),
         album: None,
         cover_url: track.artwork.as_deref(),
-        duration: None,
+        duration: track.duration_secs.map(Duration::from_secs),
     }
 }
 
-/// Maps boolean playback state to OS media playback status.
-pub fn status_for(playing: bool) -> MediaPlayback {
-    if playing {
-        MediaPlayback::Playing { progress: None }
-    } else {
-        MediaPlayback::Paused { progress: None }
-    }
+/// Maps boolean playback state and elapsed position to OS media playback status.
+pub fn status_for(playing: bool, position: Duration) -> MediaPlayback {
+    let progress = Some(MediaPosition(position));
+    if playing { MediaPlayback::Playing { progress } } else { MediaPlayback::Paused { progress } }
 }
 
 /// Native desktop media presence (MPRIS on Linux, SMTC on Windows).
@@ -85,6 +83,7 @@ pub struct DesktopPresence {
     controls: Option<souvlaki::MediaControls>,
     last_published: Option<PresenceTrack>,
     last_status: Option<bool>,
+    last_position: Duration,
     action_sender: SyncSender<MediaKeyAction>,
     action_receiver: Receiver<MediaKeyAction>,
 }
@@ -98,6 +97,7 @@ impl DesktopPresence {
             controls,
             last_published: None,
             last_status: None,
+            last_position: Duration::ZERO,
             action_sender: sender,
             action_receiver: receiver,
         }
@@ -112,6 +112,7 @@ impl DesktopPresence {
             controls: None,
             last_published: None,
             last_status: None,
+            last_position: Duration::ZERO,
             action_sender: sender,
             action_receiver: receiver,
         }
@@ -125,10 +126,24 @@ impl DesktopPresence {
     /// Sets playback status when live; always records the status seam.
     pub fn set_playing(&mut self, playing: bool) {
         self.last_status = Some(playing);
-        let Some(controls) = &mut self.controls else {
+        self.publish_playback();
+    }
+
+    /// Sets the playback position in seconds, throttling duplicate whole-second emissions.
+    pub fn set_playback_position(&mut self, position_secs: u64) {
+        let position = Duration::from_secs(position_secs);
+        if position == self.last_position {
+            return;
+        }
+        self.last_position = position;
+        self.publish_playback();
+    }
+
+    fn publish_playback(&mut self) {
+        let (Some(controls), Some(playing)) = (&mut self.controls, self.last_status) else {
             return;
         };
-        let _ = controls.set_playback(status_for(playing));
+        let _ = controls.set_playback(status_for(playing, self.last_position));
     }
 
     /// Test seam accessor for the last published track metadata.
@@ -139,6 +154,11 @@ impl DesktopPresence {
     /// Test seam accessor for the last published playback status.
     pub fn last_status(&self) -> Option<bool> {
         self.last_status
+    }
+
+    /// Test seam accessor for the last published playback position.
+    pub fn last_position(&self) -> Duration {
+        self.last_position
     }
 
     /// Returns a clone of the action sender seam.
@@ -166,10 +186,15 @@ impl Default for DesktopPresence {
 impl Presence for DesktopPresence {
     fn set_track(&mut self, track: &PresenceTrack) {
         self.last_published = Some(track.clone());
-        let Some(controls) = &mut self.controls else {
-            return;
-        };
-        let _ = controls.set_metadata(metadata_for(track));
+        self.last_position = Duration::ZERO;
+        if let Some(controls) = &mut self.controls {
+            let _ = controls.set_metadata(metadata_for(track));
+        }
+        self.publish_playback();
+    }
+
+    fn set_position(&mut self, position_secs: u64) {
+        self.set_playback_position(position_secs);
     }
 
     fn clear(&mut self) {
@@ -206,29 +231,40 @@ mod tests {
     #[test]
     fn metadata_for_populates_trimmed_fields_and_fallbacks() {
         let track =
-            PresenceTrack::new(" Radiohead ", " Creep ", Some(" https://example.com/art.jpg "));
+            PresenceTrack::new(" Radiohead ", " Creep ", Some(" https://example.com/art.jpg "))
+                .with_duration(Some(238));
         let meta = metadata_for(&track);
         assert_eq!(meta.title, Some("Creep"));
         assert_eq!(meta.artist, Some("Radiohead"));
         assert_eq!(meta.cover_url, Some("https://example.com/art.jpg"));
+        assert_eq!(meta.duration, Some(Duration::from_secs(238)));
 
         let fallback_title = PresenceTrack::new("Radiohead", "   ", None);
         let meta_fallback = metadata_for(&fallback_title);
         assert_eq!(meta_fallback.title, Some("Unknown title"));
         assert_eq!(meta_fallback.artist, Some("Radiohead"));
         assert_eq!(meta_fallback.cover_url, None);
+        assert_eq!(meta_fallback.duration, None);
 
         let fallback_artist = PresenceTrack::new("", "Creep", None);
         let meta_artist = metadata_for(&fallback_artist);
         assert_eq!(meta_artist.title, Some("Creep"));
         assert_eq!(meta_artist.artist, Some("Unknown artist"));
         assert_eq!(meta_artist.cover_url, None);
+        assert_eq!(meta_artist.duration, None);
     }
 
     #[test]
-    fn status_for_maps_playing_boolean() {
-        assert_eq!(status_for(true), MediaPlayback::Playing { progress: None });
-        assert_eq!(status_for(false), MediaPlayback::Paused { progress: None });
+    fn status_for_embeds_position_for_playing_and_paused() {
+        let pos = Duration::from_secs(42);
+        assert_eq!(
+            status_for(true, pos),
+            MediaPlayback::Playing { progress: Some(MediaPosition(pos)) }
+        );
+        assert_eq!(
+            status_for(false, pos),
+            MediaPlayback::Paused { progress: Some(MediaPosition(pos)) }
+        );
     }
 
     #[test]
@@ -295,14 +331,27 @@ mod tests {
         let mut presence = DesktopPresence::new();
         assert_eq!(presence.last_published(), None);
         assert_eq!(presence.last_status(), None);
+        assert_eq!(presence.last_position(), Duration::ZERO);
 
         let track =
-            PresenceTrack::new("Daft Punk", "Get Lucky", Some("https://example.com/art.jpg"));
+            PresenceTrack::new("Daft Punk", "Get Lucky", Some("https://example.com/art.jpg"))
+                .with_duration(Some(248));
         presence.set_track(&track);
         assert_eq!(presence.last_published(), Some(track));
 
         presence.set_playing(true);
         assert_eq!(presence.last_status(), Some(true));
+
+        presence.set_position(12);
+        assert_eq!(presence.last_position(), Duration::from_secs(12));
+
+        // Duplicate second is throttled and preserves stored position
+        presence.set_position(12);
+        assert_eq!(presence.last_position(), Duration::from_secs(12));
+
+        // A new track restarts the position
+        presence.set_track(&PresenceTrack::new("Other", "Track", None));
+        assert_eq!(presence.last_position(), Duration::ZERO);
 
         presence.clear();
         assert_eq!(presence.last_published(), None);

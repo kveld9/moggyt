@@ -495,8 +495,8 @@ When supported by the desktop environment, `moggyt` creates a system tray icon:
 
 ### MPRIS and SMTC
 
-- **Linux (MPRIS)**: exports active playback metadata (track title, artist, cover art, play/pause state)
-  over D-Bus to system media widgets and desktop shells.
+- **Linux (MPRIS)**: exports active playback metadata (track title, artist, cover art, playback position, duration,
+  and play/pause state) over D-Bus to system media widgets and desktop shells.
 - **Windows (SMTC)**: synchronizes media metadata with Windows System Media Transport Controls.
 - **Operational Note**: in v1, desktop media presence operates as outbound metadata synchronization only; inbound media
   key routing from system shell buttons is deferred.

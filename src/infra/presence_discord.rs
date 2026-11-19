@@ -119,6 +119,10 @@ impl Presence for DiscordPresence {
         }
     }
 
+    /// Discord Rich Presence calculates playback progress using start/end activity timestamps;
+    /// this port method is intentionally unused.
+    fn set_position(&mut self, _position_secs: u64) {}
+
     /// Clears the active Discord Rich Presence activity.
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
@@ -200,6 +204,16 @@ mod tests {
         presence.shutdown();
         assert_eq!(presence.last_published(), None);
         assert!(!presence.is_live());
+    }
+
+    #[test]
+    fn discord_presence_set_position_leaves_activity_untouched() {
+        let mut presence = DiscordPresence::dormant();
+        let track = PresenceTrack::new("Daft Punk", "Get Lucky", None);
+        presence.set_track(&track);
+        let before = presence.last_published();
+        presence.set_position(42);
+        assert_eq!(presence.last_published(), before);
     }
 
     #[test]
