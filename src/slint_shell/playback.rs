@@ -220,6 +220,25 @@ impl SlintAppState {
             }
         }
     }
+
+    /// Replaces the playback context and re-applies the active shuffle policy.
+    ///
+    /// Clears the previous unshuffled baseline, resets the gapless latch and the crossfade
+    /// checkpoint. When shuffle is enabled the new tracks are shuffled after taking the
+    /// baseline snapshot, keeping the selected track as the current one.
+    pub fn replace_context(&mut self, tracks: Vec<Track>, cursor: usize) {
+        self.queue.replace(tracks, cursor);
+        self.gapless.reset();
+        self.last_crossfaded_track = None;
+        self.unshuffled_tracks = None;
+        if self.is_shuffle && self.queue.len() > 1 {
+            let keep = self.queue.cursor();
+            let baseline = self.queue.tracks().to_vec();
+            let order = shuffle_permutation(self.queue.len(), Some(keep));
+            self.unshuffled_tracks = Some(baseline);
+            self.queue.shuffle_with(&order);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -506,5 +525,64 @@ mod tests {
         assert_eq!(clamp_elapsed_secs(300, Some(243)), 243);
         assert_eq!(clamp_elapsed_secs(300, None), 300);
         assert_eq!(clamp_elapsed_secs(0, Some(0)), 0);
+    }
+
+    #[test]
+    fn replace_context_clears_stale_shuffle_baseline_and_restores_new_tracks_on_unshuffle() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        let old1 = Track::new("old1", "Old 1", "Artist");
+        let old2 = Track::new("old2", "Old 2", "Artist");
+        state.queue.push(old1.clone());
+        state.queue.push(old2.clone());
+        state.unshuffled_tracks = Some(vec![old1, old2]);
+        state.is_shuffle = true;
+
+        let new1 = Track::new("new1", "New 1", "Artist");
+        let new2 = Track::new("new2", "New 2", "Artist");
+        let new3 = Track::new("new3", "New 3", "Artist");
+        state.replace_context(vec![new1, new2, new3], 1);
+
+        let baseline_ids: Vec<&str> = state
+            .unshuffled_tracks
+            .as_ref()
+            .expect("baseline present")
+            .iter()
+            .map(|t| t.id.as_str())
+            .collect();
+        assert_eq!(baseline_ids, ["new1", "new2", "new3"]);
+
+        state.toggle_shuffle();
+        assert!(!state.is_shuffle);
+        let restored_ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(restored_ids, ["new1", "new2", "new3"]);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("new2"));
+    }
+
+    #[test]
+    fn replace_context_with_shuffle_active_preserves_selected_track_under_cursor() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.is_shuffle = true;
+
+        let t1 = Track::new("t1", "T1", "A");
+        let t2 = Track::new("t2", "T2", "A");
+        let t3 = Track::new("t3", "T3", "A");
+        state.replace_context(vec![t1, t2, t3], 2);
+
+        assert_eq!(state.queue.len(), 3);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t3"));
+        assert_eq!(state.queue.cursor(), 0);
+
+        let baseline_ids: Vec<&str> = state
+            .unshuffled_tracks
+            .as_ref()
+            .expect("baseline present")
+            .iter()
+            .map(|t| t.id.as_str())
+            .collect();
+        assert_eq!(baseline_ids, ["t1", "t2", "t3"]);
     }
 }

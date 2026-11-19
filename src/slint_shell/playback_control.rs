@@ -81,12 +81,7 @@ impl SlintAppState {
         if index >= self.library_songs.len() {
             return;
         }
-        let songs = self.library_songs.clone();
-        self.queue.clear();
-        for track in songs {
-            self.queue.push(track);
-        }
-        self.play_track_at_index_in_memory(index);
+        self.replace_context(self.library_songs.clone(), index);
     }
 
     /// Advances or retreats queue cursor to target index and requests playback.
@@ -782,5 +777,18 @@ mod tests {
         state.play_track_at_index_in_memory(99);
         assert_eq!(state.queue.cursor(), 1);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
+    }
+
+    #[test]
+    fn play_library_songs_replaces_queue() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("old", "Old", "Artist"));
+        state.library_songs = vec![Track::new("s1", "S1", "A"), Track::new("s2", "S2", "A")];
+        state.play_library_songs(1);
+        let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, ["s1", "s2"]);
+        assert_eq!(state.queue.cursor(), 1);
+        state.play_library_songs(99);
+        assert_eq!(state.queue.cursor(), 1);
     }
 }

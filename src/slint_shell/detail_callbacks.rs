@@ -5,7 +5,7 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 
 use crate::domain::{
-    Detail, DetailCardKind, DetailKind, SortColumn, is_local_playlist_id, next_sort,
+    Detail, DetailCardKind, DetailKind, SortColumn, Track, is_local_playlist_id, next_sort,
 };
 use crate::slint_shell::callbacks::with_window_state;
 use crate::slint_shell::covers::request_queue_track_cover;
@@ -201,16 +201,20 @@ fn handle_local_move_track(win: &MoggytWindow, st: &mut SlintAppState, from: i32
     }
 }
 
-fn enqueue_detail_tracks(
+/// Replaces the playback queue with the open detail container's tracks and sets the cursor.
+///
+/// Requests cover art for every track and resets any active crossfade checkpoint.
+/// Returns the replaced tracks, or `None` when no detail is open or its playback list is empty.
+fn replace_detail_queue(
     st: &mut SlintAppState,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
-) -> usize {
-    let Some(detail) = st.detail.clone() else {
-        return st.queue.len();
-    };
-    let start_idx = st.queue.len();
-    let tracks = detail.playback_tracks();
-    for track in tracks {
+    cursor: usize,
+) -> Option<Vec<Track>> {
+    let tracks = st.detail.as_ref()?.playback_tracks().to_vec();
+    if tracks.is_empty() {
+        return None;
+    }
+    for track in &tracks {
         request_queue_track_cover(
             track.artwork.as_deref(),
             st.play_generation,
@@ -218,10 +222,8 @@ fn enqueue_detail_tracks(
             tx,
         );
     }
-    for track in tracks {
-        st.queue.push(track.clone());
-    }
-    start_idx
+    st.replace_context(tracks.clone(), cursor);
+    Some(tracks)
 }
 
 /// Resolves the playback-list index for a displayed track row.
@@ -237,20 +239,18 @@ fn playback_index_for_row(detail: &Detail, row: usize) -> Option<usize> {
     (row < playback.len()).then_some(row)
 }
 
-/// Enqueues the open detail container's playback list and moves the cursor to `idx` inside the
-/// appended block.
+/// Replaces the playback queue with the open detail container's tracks and places the cursor on
+/// the track matching row `idx`.
 ///
-/// Returns the absolute queue index of the selected track, or `None` when no detail is open
+/// Returns the mapped track index within the replaced queue, or `None` when no detail is open
 /// or the index does not address a track.
-fn enqueue_detail_at_row(
+fn replace_detail_at_row(
     st: &mut SlintAppState,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
     idx: usize,
 ) -> Option<usize> {
-    let offset = playback_index_for_row(st.detail.as_ref()?, idx)?;
-    let start = enqueue_detail_tracks(st, tx);
-    let target = start + offset;
-    st.play_track_at_index_in_memory(target);
+    let target = playback_index_for_row(st.detail.as_ref()?, idx)?;
+    replace_detail_queue(st, tx, target)?;
     Some(target)
 }
 
@@ -260,7 +260,7 @@ fn handle_detail_track_selected(
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
     idx: i32,
 ) {
-    if idx >= 0 && enqueue_detail_at_row(st, tx, idx as usize).is_some() {
+    if idx >= 0 && replace_detail_at_row(st, tx, idx as usize).is_some() {
         trigger_playback(win, st);
     }
     sync_window(win, st);
@@ -271,9 +271,9 @@ fn handle_detail_play(
     st: &mut SlintAppState,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
-    if st.detail.as_ref().is_some_and(|d| !d.tracks.is_empty()) {
-        let start = enqueue_detail_tracks(st, tx);
-        st.play_track_at_index_in_memory(start);
+    if st.detail.as_ref().is_some_and(|d| !d.tracks.is_empty())
+        && replace_detail_queue(st, tx, 0).is_some()
+    {
         trigger_playback(win, st);
     }
     sync_window(win, st);
@@ -328,19 +328,18 @@ fn handle_detail_show_all_songs(
     open_detail_async(win, st, &id, DetailKind::Playlist, tx);
 }
 
-/// Enqueues the open detail and shuffles it, rebuilding the linear queue first so the
-/// unshuffled baseline always holds every queued track in its real order.
+/// Replaces the playback queue with the open detail container's tracks and shuffles them with a
+/// fully random permutation, recording the unshuffled baseline and setting cursor to 0.
 fn shuffle_detail_into_queue(
     st: &mut SlintAppState,
     tx: &std::sync::mpsc::Sender<PlaybackWorkerCommand>,
 ) {
-    if st.is_shuffle {
-        st.restore_unshuffled_queue();
-    }
+    let Some(tracks) = replace_detail_queue(st, tx, 0) else {
+        return;
+    };
+    st.unshuffled_tracks = Some(tracks);
     st.is_shuffle = true;
-    let start = enqueue_detail_tracks(st, tx);
-    st.unshuffled_tracks = Some(st.queue.tracks().to_vec());
-    let order = crate::slint_shell::playback::shuffle_permutation(st.queue.len(), Some(start));
+    let order = crate::slint_shell::playback::shuffle_permutation(st.queue.len(), None);
     st.queue.shuffle_with(&order);
     st.play_track_at_index_in_memory(0);
 }
@@ -384,7 +383,7 @@ mod tests {
             ],
         ));
 
-        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 1), Some(1));
+        assert_eq!(replace_detail_at_row(&mut state, &tx, 1), Some(1));
         let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
         assert_eq!(ids, vec!["t1", "t2", "t3"]);
         assert_eq!(state.queue.cursor(), 1);
@@ -392,7 +391,7 @@ mod tests {
     }
 
     #[test]
-    fn test_detail_track_row_appends_after_existing_queue() {
+    fn test_detail_track_row_replaces_existing_queue() {
         let (tx, _rx) = std::sync::mpsc::channel();
         let mut state = test_wired();
         state.queue.push(Track::new("old", "Old", "Other"));
@@ -403,9 +402,9 @@ mod tests {
             vec![Track::new("a1", "A1", "Artist"), Track::new("a2", "A2", "Artist")],
         ));
 
-        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 1), Some(2));
+        assert_eq!(replace_detail_at_row(&mut state, &tx, 1), Some(1));
         let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
-        assert_eq!(ids, vec!["old", "a1", "a2"]);
+        assert_eq!(ids, vec!["a1", "a2"]);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("a2"));
     }
 
@@ -426,8 +425,7 @@ mod tests {
         let mut state = test_wired();
         state.detail = Some(artist_detail_with_full_songs_list());
 
-        let start = enqueue_detail_tracks(&mut state, &tx);
-        state.play_track_at_index_in_memory(start);
+        replace_detail_queue(&mut state, &tx, 0);
 
         let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
         assert_eq!(ids, vec!["t0", "t1", "t2", "t3"]);
@@ -440,7 +438,7 @@ mod tests {
         let mut state = test_wired();
         state.detail = Some(artist_detail_with_full_songs_list());
 
-        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 1), Some(2));
+        assert_eq!(replace_detail_at_row(&mut state, &tx, 1), Some(2));
         assert_eq!(state.queue.len(), 4);
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t2"));
     }
@@ -454,7 +452,7 @@ mod tests {
         state.detail =
             Some(Detail::new(DetailKind::Artist, "Artist", "", shelf).with_queue_tracks(complete));
 
-        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 0), Some(0));
+        assert_eq!(replace_detail_at_row(&mut state, &tx, 0), Some(0));
         assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
     }
 
@@ -482,7 +480,7 @@ mod tests {
             vec![Track::new("a1", "A1", "Artist")],
         ));
 
-        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 1), None);
+        assert_eq!(replace_detail_at_row(&mut state, &tx, 1), None);
         assert!(state.queue.is_empty());
     }
 
@@ -491,7 +489,7 @@ mod tests {
         let (tx, _rx) = std::sync::mpsc::channel();
         let mut state = test_wired();
 
-        assert_eq!(enqueue_detail_at_row(&mut state, &tx, 0), None);
+        assert_eq!(replace_detail_at_row(&mut state, &tx, 0), None);
         assert!(state.queue.is_empty());
     }
 
@@ -517,14 +515,14 @@ mod tests {
             assert!(state.unshuffled_tracks.is_some());
             assert_eq!(state.unshuffled_tracks.as_ref().unwrap().len(), 3);
             assert_eq!(state.queue.cursor(), 0);
-            assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+            assert!(state.queue.current().is_some());
         } else {
             shuffle_detail_into_queue(&mut state, &tx);
             assert_eq!(state.queue.len(), 3);
             assert!(state.unshuffled_tracks.is_some());
             assert_eq!(state.unshuffled_tracks.as_ref().unwrap().len(), 3);
             assert_eq!(state.queue.cursor(), 0);
-            assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("t1"));
+            assert!(state.queue.current().is_some());
         }
     }
 
@@ -555,7 +553,7 @@ mod tests {
     }
 
     #[test]
-    fn test_detail_shuffle_keeps_original_order_when_already_shuffled() {
+    fn test_detail_shuffle_replaces_queue_and_sets_unshuffled_snapshot() {
         let (tx, _rx) = std::sync::mpsc::channel();
         let mut state = test_wired();
         let track1 = Track::new("t1", "Track 1", "Artist 1").with_duration(180);
@@ -569,7 +567,10 @@ mod tests {
             DetailKind::Album,
             "Album Title",
             "Album Subtitle",
-            vec![Track::new("d1", "Detail 1", "Artist D").with_duration(210)],
+            vec![
+                Track::new("d1", "Detail 1", "Artist D").with_duration(210),
+                Track::new("d2", "Detail 2", "Artist D").with_duration(220),
+            ],
         ));
         shuffle_detail_into_queue(&mut state, &tx);
 
@@ -580,11 +581,72 @@ mod tests {
             .iter()
             .map(|t| t.id.as_str())
             .collect();
-        assert_eq!(snapshot, vec!["t2", "t1", "d1"]);
+        assert_eq!(snapshot, vec!["d1", "d2"]);
 
         state.toggle_shuffle();
         assert!(!state.is_shuffle);
         let restored: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
-        assert_eq!(restored, vec!["t2", "t1", "d1"]);
+        assert_eq!(restored, vec!["d1", "d2"]);
+    }
+
+    #[test]
+    fn test_detail_play_replaces_restored_queue_with_album_tracks() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.queue.push(Track::new("restored-1", "Restored 1", "Artist"));
+        state.queue.push(Track::new("restored-2", "Restored 2", "Artist"));
+        state.queue.push(Track::new("autoplay-1", "Autoplay 1", "Artist"));
+        state.last_crossfaded_track = Some("restored-1".to_string());
+
+        let track1 = Track::new("album-1", "Album Track 1", "Artist").with_duration(180);
+        let track2 = Track::new("album-2", "Album Track 2", "Artist").with_duration(200);
+        state.detail =
+            Some(Detail::new(DetailKind::Album, "Album Title", "Artist", vec![track1, track2]));
+
+        if let Ok(win) = MoggytWindow::new() {
+            handle_detail_play(&win, &mut state, &tx);
+        } else {
+            replace_detail_queue(&mut state, &tx, 0);
+        }
+
+        let ids: Vec<&str> = state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["album-1", "album-2"]);
+        assert_eq!(state.queue.cursor(), 0);
+        assert_eq!(state.queue.current().map(|t| t.id.as_str()), Some("album-1"));
+        assert_eq!(state.last_crossfaded_track, None);
+    }
+
+    #[test]
+    fn test_detail_play_with_shuffle_enabled_sets_baseline_and_keeps_tracks() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let mut state = test_wired();
+        state.is_shuffle = true;
+        state.unshuffled_tracks = Some(vec![Track::new("old", "Old", "Artist")]);
+
+        let track1 = Track::new("album-1", "Track 1", "Artist");
+        let track2 = Track::new("album-2", "Track 2", "Artist");
+        state.detail =
+            Some(Detail::new(DetailKind::Album, "Album", "Artist", vec![track1, track2]));
+
+        if let Ok(win) = MoggytWindow::new() {
+            handle_detail_play(&win, &mut state, &tx);
+        } else {
+            replace_detail_queue(&mut state, &tx, 0);
+        }
+
+        assert_eq!(state.queue.len(), 2);
+        let mut current_ids: Vec<&str> =
+            state.queue.tracks().iter().map(|t| t.id.as_str()).collect();
+        current_ids.sort();
+        assert_eq!(current_ids, ["album-1", "album-2"]);
+
+        let baseline_ids: Vec<&str> = state
+            .unshuffled_tracks
+            .as_ref()
+            .expect("unshuffled baseline present")
+            .iter()
+            .map(|t| t.id.as_str())
+            .collect();
+        assert_eq!(baseline_ids, ["album-1", "album-2"]);
     }
 }

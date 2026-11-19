@@ -153,6 +153,14 @@ impl PlaybackQueue {
         self.cursor = 0;
     }
 
+    /// Replaces every entry in the queue with the provided tracks and sets the cursor.
+    ///
+    /// Preserves the active repeat mode. An empty list resets the cursor to 0.
+    pub fn replace(&mut self, tracks: Vec<Track>, cursor: usize) {
+        self.tracks = tracks;
+        self.set_cursor(cursor);
+    }
+
     /// Keeps only the track under the cursor as the sole entry and resets the cursor to 0.
     ///
     /// Preserves the active repeat mode. Has no effect if the queue is empty or has no current track.
@@ -447,5 +455,51 @@ mod tests {
         assert_eq!(q.cursor(), 1);
         assert_eq!(current_id(&q), Some("b"));
         assert_eq!(q.repeat(), RepeatMode::All);
+    }
+
+    #[test]
+    fn replace_replaces_non_empty_queue_with_new_list() {
+        let mut q = queue_from(&["old1", "old2"], 1, RepeatMode::Off);
+        let new_tracks = vec![
+            Track::new("new1", "Title 1", "Artist 1"),
+            Track::new("new2", "Title 2", "Artist 2"),
+        ];
+        q.replace(new_tracks, 1);
+        assert_eq!(track_ids(&q), ["new1", "new2"]);
+        assert_eq!(q.cursor(), 1);
+        assert_eq!(current_id(&q), Some("new2"));
+    }
+
+    #[test]
+    fn replace_clamps_out_of_range_cursor() {
+        let mut q = queue_from(&["old"], 0, RepeatMode::Off);
+        let new_tracks =
+            vec![Track::new("a", "Title A", "Artist A"), Track::new("b", "Title B", "Artist B")];
+        q.replace(new_tracks, 99);
+        assert_eq!(track_ids(&q), ["a", "b"]);
+        assert_eq!(q.cursor(), 1);
+        assert_eq!(current_id(&q), Some("b"));
+    }
+
+    #[test]
+    fn replace_empty_input_empties_queue() {
+        let mut q = queue_from(&["old1", "old2"], 1, RepeatMode::Off);
+        q.replace(Vec::new(), 3);
+        assert!(q.is_empty());
+        assert_eq!(q.cursor(), 0);
+        assert_eq!(current_id(&q), None);
+    }
+
+    #[test]
+    fn replace_preserves_repeat_policy() {
+        for mode in [RepeatMode::Off, RepeatMode::All, RepeatMode::One] {
+            let mut q = queue_from(&["old"], 0, mode);
+            q.replace(vec![Track::new("n", "N", "A")], 0);
+            assert_eq!(q.repeat(), mode);
+
+            let mut empty_q = queue_from(&["old"], 0, mode);
+            empty_q.replace(Vec::new(), 0);
+            assert_eq!(empty_q.repeat(), mode);
+        }
     }
 }
