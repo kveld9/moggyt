@@ -493,6 +493,8 @@ pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppStat
     window.set_active_lyric_index(state.active_lyric_index_at(pos_secs));
     let (sung, rest) = state.active_lyric_text_split_at(u64::from(pos_secs) * 1000);
     set_lyrics_highlight(window, sung, rest);
+    super::buffering::observe_buffering(state, pos_secs as u64);
+    super::buffering::sync_buffering(window, state);
     player.set_is_playing(is_playing);
     sync_sleep_timer(window, state);
     sync_audio_snapshot(window, state);

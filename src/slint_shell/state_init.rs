@@ -6,7 +6,9 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use crate::domain::{PlaybackPhase, PlaybackQueue, SearchFilter, SleepTimer, ThemeId};
+use crate::domain::{
+    BufferingWatch, PlaybackPhase, PlaybackQueue, SearchFilter, SleepTimer, ThemeId,
+};
 use crate::i18n::Locale;
 use crate::infra::{
     AudioBackend, Catalog, CoverCache, DesktopPresence, DiscordPresence, LyricsSource,
@@ -87,6 +89,7 @@ impl SlintAppState {
             detail_return: SlintPage::Search,
             detail_history: DetailHistory::default(),
             playback_phase: PlaybackPhase::Empty,
+            buffering_watch: BufferingWatch::Flowing,
             playback_error: None,
             playback_recovery: PlaybackRecovery::Idle,
             library_phase: ViewPhase::Idle,
