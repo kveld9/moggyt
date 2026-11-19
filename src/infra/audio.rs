@@ -74,6 +74,18 @@ pub trait AudioBackend {
     fn play_gapless(&mut self, _track_id: &str) -> Result<(), AudioError> {
         Err(AudioError::Playback("gapless playback is not supported".to_string()))
     }
+    /// Plays a short preview of `track_id` without touching the active track.
+    ///
+    /// Backends without preview support report an error so the caller can tell the user.
+    fn preview(&mut self, _track_id: &str) -> Result<(), AudioError> {
+        Err(AudioError::Playback("preview is not supported".to_string()))
+    }
+    /// Stops any running preview and restores the active track's volume.
+    fn stop_preview(&mut self) {}
+    /// Returns whether a preview is currently audible.
+    fn is_previewing(&self) -> bool {
+        false
+    }
     /// Returns the appended track once it crossed the sample boundary and became audible.
     ///
     /// The caller adopts it as the active track; while it is still queued this returns `None`.
@@ -156,6 +168,7 @@ pub struct AudioStub {
     /// Simulated sink depth: two sources while an armed track waits behind the active one.
     gapless_sounds: usize,
     output_level: Option<f32>,
+    previewing: bool,
 }
 
 impl Default for AudioStub {
@@ -174,6 +187,7 @@ impl Default for AudioStub {
             gapless: GaplessSlot::default(),
             gapless_sounds: 0,
             output_level: None,
+            previewing: false,
         }
     }
 }
@@ -215,6 +229,11 @@ impl AudioStub {
     pub fn set_output_level(&mut self, level: Option<f32>) {
         self.output_level = level;
     }
+
+    /// Sets whether the stub reports an active preview sink.
+    pub fn set_previewing(&mut self, previewing: bool) {
+        self.previewing = previewing;
+    }
 }
 
 impl AudioBackend for AudioStub {
@@ -248,6 +267,22 @@ impl AudioBackend for AudioStub {
         self.gapless_sounds = 2;
         self.last_requested = Some(track_id.to_owned());
         Ok(())
+    }
+
+    fn preview(&mut self, _track_id: &str) -> Result<(), AudioError> {
+        if self.fail_plays {
+            return Err(AudioError::Unavailable);
+        }
+        self.previewing = true;
+        Ok(())
+    }
+
+    fn stop_preview(&mut self) {
+        self.previewing = false;
+    }
+
+    fn is_previewing(&self) -> bool {
+        self.previewing
     }
 
     fn take_started_gapless(&mut self) -> Option<StartedGapless> {
@@ -533,5 +568,26 @@ mod tests {
         assert_eq!(audio.output_level(), Some(0.42));
         audio.set_output_level(None);
         assert_eq!(audio.output_level(), None);
+    }
+
+    #[test]
+    fn audio_stub_preview_recording_and_clearing() {
+        let mut audio = AudioStub::new();
+        assert!(!audio.is_previewing());
+
+        assert_eq!(audio.preview("prev-1"), Ok(()));
+        assert!(audio.is_previewing());
+
+        audio.stop_preview();
+        assert!(!audio.is_previewing());
+
+        audio.set_previewing(true);
+        assert!(audio.is_previewing());
+        audio.set_previewing(false);
+        assert!(!audio.is_previewing());
+
+        let mut failing = AudioStub::failing();
+        assert_eq!(failing.preview("prev-2"), Err(AudioError::Unavailable));
+        assert!(!failing.is_previewing());
     }
 }

@@ -20,6 +20,15 @@ impl<T: ?Sized + AudioBackend> AudioBackend for Box<T> {
     fn play_gapless(&mut self, id: &str) -> Result<(), AudioError> {
         (**self).play_gapless(id)
     }
+    fn preview(&mut self, id: &str) -> Result<(), AudioError> {
+        (**self).preview(id)
+    }
+    fn stop_preview(&mut self) {
+        (**self).stop_preview();
+    }
+    fn is_previewing(&self) -> bool {
+        (**self).is_previewing()
+    }
     fn take_started_gapless(&mut self) -> Option<crate::domain::StartedGapless> {
         (**self).take_started_gapless()
     }
@@ -108,6 +117,7 @@ mod tests {
         cached_track: &'static str,
         cookies: Arc<Mutex<Option<String>>>,
         output_level: Option<f32>,
+        preview_id: Arc<Mutex<Option<String>>>,
     }
 
     impl RecordingAudio {
@@ -121,6 +131,7 @@ mod tests {
                 cached_track: "cached-track",
                 cookies: Arc::new(Mutex::new(None)),
                 output_level: None,
+                preview_id: Arc::new(Mutex::new(None)),
             }
         }
     }
@@ -142,6 +153,19 @@ mod tests {
         fn play_gapless(&mut self, track_id: &str) -> Result<(), AudioError> {
             *self.gapless_id.lock().unwrap() = Some(track_id.to_owned());
             Ok(())
+        }
+
+        fn preview(&mut self, track_id: &str) -> Result<(), AudioError> {
+            *self.preview_id.lock().unwrap() = Some(track_id.to_owned());
+            Ok(())
+        }
+
+        fn stop_preview(&mut self) {
+            *self.preview_id.lock().unwrap() = None;
+        }
+
+        fn is_previewing(&self) -> bool {
+            self.preview_id.lock().unwrap().is_some()
         }
 
         fn take_started_gapless(&mut self) -> Option<StartedGapless> {
@@ -191,6 +215,22 @@ mod tests {
         fn output_level(&self) -> Option<f32> {
             self.output_level
         }
+    }
+
+    #[test]
+    fn boxed_backend_forwards_preview() {
+        let recorder = RecordingAudio::new();
+        let preview = Arc::clone(&recorder.preview_id);
+        let mut boxed: Box<dyn AudioBackend + Send> = Box::new(recorder);
+
+        assert!(!boxed.is_previewing());
+        assert_eq!(boxed.preview("prev-boxed"), Ok(()));
+        assert!(boxed.is_previewing());
+        assert_eq!(*preview.lock().unwrap(), Some("prev-boxed".to_string()));
+
+        boxed.stop_preview();
+        assert!(!boxed.is_previewing());
+        assert_eq!(*preview.lock().unwrap(), None);
     }
 
     #[test]
