@@ -114,8 +114,9 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
 
     player.set_is_shuffle(state.is_shuffle);
     player.set_repeat_mode(repeat_mode_to_int(state.queue.repeat()));
-    window.set_queue_count(state.queue.len() as i32);
-    window.set_queue_button_text(format_queue_label(state.locale, state.queue.len()).into());
+    window.set_queue_count(state.queue.visible_len() as i32);
+    window
+        .set_queue_button_text(format_queue_label(state.locale, state.queue.visible_len()).into());
     window.set_player_bar_mode(mode_to_index(state.player_bar.mode));
     window.global::<PlayerBarUi>().set_floating_width(state.player_bar.floating_width as i32);
     window.set_player_bar_show_artwork(state.player_bar.show_artwork);
@@ -239,6 +240,7 @@ pub(crate) fn sync_shelves_and_queue(window: &MoggytWindow, state: &SlintAppStat
         .tracks()
         .iter()
         .enumerate()
+        .filter(|(i, _)| !state.queue.is_autoplay_at(*i))
         .map(|(i, t)| track_to_row_data(i, t, &state.search_covers))
         .collect();
     window.set_queue_tracks(ModelRc::new(VecModel::from(q_tracks)));
@@ -751,5 +753,30 @@ mod tests {
         let row = detail_track_row(0, &detail, &detail.tracks[0], &HashMap::new());
         assert_eq!(row.artist.as_str(), "Artist");
         assert_eq!(row.album.as_str(), "Album");
+    }
+
+    #[test]
+    fn sync_shelves_and_queue_omits_autoplay_tracks_preserving_indices() {
+        use slint::Model;
+
+        let Ok(win) = MoggytWindow::new() else {
+            return;
+        };
+        let mut state = crate::slint_shell::test_support::test_wired();
+        state.queue.push(Track::new("c1", "Context 1", "Artist"));
+        state.queue.push_autoplay(Track::new("a1", "Autoplay 1", "Artist"));
+        state.queue.push(Track::new("c2", "Context 2", "Artist"));
+
+        sync_shelves_and_queue(&win, &state);
+
+        let model = win.get_queue_tracks();
+        assert_eq!(model.row_count(), 2);
+        let row0 = model.row_data(0).expect("row 0 exists");
+        assert_eq!(row0.id.as_str(), "c1");
+        assert_eq!(row0.index, 0);
+
+        let row1 = model.row_data(1).expect("row 1 exists");
+        assert_eq!(row1.id.as_str(), "c2");
+        assert_eq!(row1.index, 2);
     }
 }

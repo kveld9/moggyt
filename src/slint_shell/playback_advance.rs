@@ -65,7 +65,7 @@ impl SlintAppState {
                         tx,
                     );
                 }
-                self.queue.push(track);
+                self.queue.push_autoplay(track);
             }
         }
     }
@@ -395,5 +395,23 @@ mod tests {
         state.continue_autoplay_if_ended();
 
         assert!(state.gapless.is_free());
+    }
+
+    #[test]
+    fn radio_recommendations_land_as_autoplay_and_do_not_change_visible_len() {
+        let mut state = test_wired();
+        state.queue.push(Track::new("c1", "Context", "Artist"));
+        assert_eq!(state.queue.len(), 1);
+        assert_eq!(state.queue.visible_len(), 1);
+
+        let recs =
+            vec![Track::new("r1", "Radio 1", "Artist"), Track::new("r2", "Radio 2", "Artist")];
+        state.enqueue_radio_recommendations(recs);
+
+        assert_eq!(state.queue.len(), 3);
+        assert_eq!(state.queue.visible_len(), 1);
+        assert!(!state.queue.is_autoplay_at(0));
+        assert!(state.queue.is_autoplay_at(1));
+        assert!(state.queue.is_autoplay_at(2));
     }
 }

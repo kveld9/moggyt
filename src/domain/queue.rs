@@ -16,24 +16,58 @@ pub enum RepeatMode {
     One,
 }
 
+/// Origin of a queued track, distinguishing user actions from transient autoplay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum QueueOrigin {
+    /// Context playback (e.g. albums, playlists, searches).
+    #[default]
+    Context,
+    /// Explicitly inserted next by the user.
+    User,
+    /// Transient radio continuation recommendation.
+    Autoplay,
+}
+
 /// Ordered playback queue with a cursor over the current track.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PlaybackQueue {
     tracks: Vec<Track>,
     cursor: usize,
     repeat: RepeatMode,
+    #[serde(default, skip)]
+    origins: Vec<QueueOrigin>,
 }
+
+impl PartialEq for PlaybackQueue {
+    fn eq(&self, other: &Self) -> bool {
+        self.tracks == other.tracks
+            && self.cursor == other.cursor
+            && self.repeat == other.repeat
+            && (0..self.tracks.len()).all(|i| self.origin_at(i) == other.origin_at(i))
+    }
+}
+
+impl Eq for PlaybackQueue {}
 
 impl PlaybackQueue {
     /// Creates an empty queue with default repeat policy.
     pub fn new() -> Self {
-        Self { tracks: Vec::new(), cursor: 0, repeat: RepeatMode::default() }
+        Self { tracks: Vec::new(), cursor: 0, repeat: RepeatMode::default(), origins: Vec::new() }
     }
 
-    /// Appends a track to the tail.
+    /// Appends a track to the tail with Context origin.
     pub fn push(&mut self, track: Track) {
+        self.ensure_origins_aligned();
         self.tracks.push(track);
+        self.origins.push(QueueOrigin::Context);
+    }
+
+    /// Appends a track to the tail with Autoplay origin.
+    pub fn push_autoplay(&mut self, track: Track) {
+        self.ensure_origins_aligned();
+        self.tracks.push(track);
+        self.origins.push(QueueOrigin::Autoplay);
     }
 
     /// Inserts a track immediately after the current cursor, keeping the cursor on the same track.
@@ -42,11 +76,57 @@ impl PlaybackQueue {
     pub fn insert_next(&mut self, track: Track) {
         if self.tracks.is_empty() {
             self.tracks.push(track);
+            self.origins = vec![QueueOrigin::User];
             self.cursor = 0;
             return;
         }
+        self.ensure_origins_aligned();
         let at = (self.cursor + 1).min(self.tracks.len());
         self.tracks.insert(at, track);
+        self.origins.insert(at, QueueOrigin::User);
+    }
+
+    /// Origin of the track at the specified index, defaulting to Context if missing.
+    pub fn origin_at(&self, index: usize) -> QueueOrigin {
+        self.origins.get(index).copied().unwrap_or_default()
+    }
+
+    /// Whether the track at the specified index originated from autoplay.
+    pub fn is_autoplay_at(&self, index: usize) -> bool {
+        self.origin_at(index) == QueueOrigin::Autoplay
+    }
+
+    /// Number of entries whose origin is not Autoplay.
+    pub fn visible_len(&self) -> usize {
+        (0..self.tracks.len()).filter(|&i| !self.is_autoplay_at(i)).count()
+    }
+
+    /// Returns a clone of the queue with Autoplay entries removed and cursor clamped.
+    pub fn persistable(&self) -> PlaybackQueue {
+        let mut persistable_tracks = Vec::new();
+        let mut persistable_origins = Vec::new();
+        for (idx, track) in self.tracks.iter().enumerate() {
+            if !self.is_autoplay_at(idx) {
+                persistable_tracks.push(track.clone());
+                persistable_origins.push(self.origin_at(idx));
+            }
+        }
+        let mut queue = PlaybackQueue {
+            tracks: persistable_tracks,
+            cursor: self.cursor,
+            repeat: self.repeat,
+            origins: persistable_origins,
+        };
+        queue.clamp_cursor();
+        queue
+    }
+
+    fn ensure_origins_aligned(&mut self) {
+        if self.origins.len() < self.tracks.len() {
+            self.origins.resize(self.tracks.len(), QueueOrigin::Context);
+        } else if self.origins.len() > self.tracks.len() {
+            self.origins.truncate(self.tracks.len());
+        }
     }
 
     /// Number of queued tracks.
@@ -150,6 +230,7 @@ impl PlaybackQueue {
     /// Clears all tracks and resets the cursor to 0, retaining repeat mode.
     pub fn clear(&mut self) {
         self.tracks.clear();
+        self.origins.clear();
         self.cursor = 0;
     }
 
@@ -157,7 +238,9 @@ impl PlaybackQueue {
     ///
     /// Preserves the active repeat mode. An empty list resets the cursor to 0.
     pub fn replace(&mut self, tracks: Vec<Track>, cursor: usize) {
+        let len = tracks.len();
         self.tracks = tracks;
+        self.origins = vec![QueueOrigin::Context; len];
         self.set_cursor(cursor);
     }
 
@@ -168,7 +251,9 @@ impl PlaybackQueue {
         let Some(track) = self.current().cloned() else {
             return;
         };
+        let origin = self.origin_at(self.cursor);
         self.tracks = vec![track];
+        self.origins = vec![origin];
         self.cursor = 0;
     }
 
@@ -187,10 +272,21 @@ impl PlaybackQueue {
     }
 
     fn apply_permutation(&mut self, order: &[usize]) {
-        let old = std::mem::take(&mut self.tracks);
-        let mut lookup: Vec<Option<Track>> = old.into_iter().map(Some).collect();
-        self.tracks =
-            order.iter().filter_map(|&idx| lookup.get_mut(idx).and_then(Option::take)).collect();
+        self.ensure_origins_aligned();
+        let old_tracks = std::mem::take(&mut self.tracks);
+        let mut track_lookup: Vec<Option<Track>> = old_tracks.into_iter().map(Some).collect();
+        self.tracks = order
+            .iter()
+            .filter_map(|&idx| track_lookup.get_mut(idx).and_then(Option::take))
+            .collect();
+
+        let old_origins = std::mem::take(&mut self.origins);
+        let mut origin_lookup: Vec<Option<QueueOrigin>> =
+            old_origins.into_iter().map(Some).collect();
+        self.origins = order
+            .iter()
+            .filter_map(|&idx| origin_lookup.get_mut(idx).and_then(Option::take))
+            .collect();
     }
 }
 
@@ -501,5 +597,128 @@ mod tests {
             empty_q.replace(Vec::new(), 0);
             assert_eq!(empty_q.repeat(), mode);
         }
+    }
+
+    #[test]
+    fn autoplay_entries_marked_and_counted_out_of_visible_len() {
+        let mut q = PlaybackQueue::new();
+        q.push(Track::new("c1", "Context 1", "Artist"));
+        q.push_autoplay(Track::new("a1", "Autoplay 1", "Artist"));
+        q.push(Track::new("c2", "Context 2", "Artist"));
+        q.push_autoplay(Track::new("a2", "Autoplay 2", "Artist"));
+
+        assert_eq!(q.len(), 4);
+        assert_eq!(q.visible_len(), 2);
+        assert_eq!(q.origin_at(0), QueueOrigin::Context);
+        assert_eq!(q.origin_at(1), QueueOrigin::Autoplay);
+        assert_eq!(q.origin_at(2), QueueOrigin::Context);
+        assert_eq!(q.origin_at(3), QueueOrigin::Autoplay);
+        assert_eq!(q.origin_at(99), QueueOrigin::Context);
+
+        assert!(!q.is_autoplay_at(0));
+        assert!(q.is_autoplay_at(1));
+        assert!(!q.is_autoplay_at(2));
+        assert!(q.is_autoplay_at(3));
+        assert!(!q.is_autoplay_at(99));
+    }
+
+    #[test]
+    fn persistable_drops_autoplay_and_clamps_cursor_when_context_exhausted() {
+        let mut q = PlaybackQueue::new();
+        q.push(Track::new("c1", "Context 1", "Artist"));
+        q.push(Track::new("c2", "Context 2", "Artist"));
+        q.push_autoplay(Track::new("a1", "Autoplay 1", "Artist"));
+        q.push_autoplay(Track::new("a2", "Autoplay 2", "Artist"));
+        q.set_cursor(3);
+        q.set_repeat(RepeatMode::All);
+
+        let p = q.persistable();
+        assert_eq!(track_ids(&p), ["c1", "c2"]);
+        assert_eq!(p.len(), 2);
+        assert_eq!(p.visible_len(), 2);
+        assert_eq!(p.cursor(), 1);
+        assert_eq!(p.repeat(), RepeatMode::All);
+        assert_eq!(p.origin_at(0), QueueOrigin::Context);
+        assert_eq!(p.origin_at(1), QueueOrigin::Context);
+    }
+
+    #[test]
+    fn persistable_drops_autoplay_and_clamps_cursor_with_no_context_left() {
+        let mut q = PlaybackQueue::new();
+        q.push_autoplay(Track::new("a1", "Autoplay 1", "Artist"));
+        q.push_autoplay(Track::new("a2", "Autoplay 2", "Artist"));
+        q.set_cursor(1);
+
+        let p = q.persistable();
+        assert!(p.is_empty());
+        assert_eq!(p.len(), 0);
+        assert_eq!(p.visible_len(), 0);
+        assert_eq!(p.cursor(), 0);
+    }
+
+    #[test]
+    fn mutations_keep_origins_aligned() {
+        let mut q_empty = PlaybackQueue::new();
+        q_empty.insert_next(Track::new("u1", "User 1", "Artist"));
+        assert_eq!(q_empty.origin_at(0), QueueOrigin::User);
+        assert_eq!(q_empty.len(), 1);
+
+        let mut q = PlaybackQueue::new();
+        q.push(Track::new("c1", "Context 1", "Artist"));
+        q.push_autoplay(Track::new("a1", "Autoplay 1", "Artist"));
+        q.set_cursor(0);
+        q.insert_next(Track::new("u2", "User 2", "Artist"));
+        assert_eq!(track_ids(&q), ["c1", "u2", "a1"]);
+        assert_eq!(q.origin_at(0), QueueOrigin::Context);
+        assert_eq!(q.origin_at(1), QueueOrigin::User);
+        assert_eq!(q.origin_at(2), QueueOrigin::Autoplay);
+
+        q.replace(
+            vec![Track::new("r1", "Replace 1", "Artist"), Track::new("r2", "Replace 2", "Artist")],
+            0,
+        );
+        assert_eq!(q.origin_at(0), QueueOrigin::Context);
+        assert_eq!(q.origin_at(1), QueueOrigin::Context);
+
+        let mut q_shuf = PlaybackQueue::new();
+        q_shuf.push(Track::new("c", "C", "Artist"));
+        q_shuf.push_autoplay(Track::new("a", "A", "Artist"));
+        q_shuf.insert_next(Track::new("u", "U", "Artist"));
+        assert_eq!(q_shuf.origin_at(0), QueueOrigin::Context);
+        assert_eq!(q_shuf.origin_at(1), QueueOrigin::User);
+        assert_eq!(q_shuf.origin_at(2), QueueOrigin::Autoplay);
+        assert!(q_shuf.shuffle_with(&[2, 0, 1]));
+        assert_eq!(track_ids(&q_shuf), ["a", "c", "u"]);
+        assert_eq!(q_shuf.origin_at(0), QueueOrigin::Autoplay);
+        assert_eq!(q_shuf.origin_at(1), QueueOrigin::Context);
+        assert_eq!(q_shuf.origin_at(2), QueueOrigin::User);
+
+        q_shuf.set_cursor(2);
+        q_shuf.retain_current();
+        assert_eq!(track_ids(&q_shuf), ["u"]);
+        assert_eq!(q_shuf.origin_at(0), QueueOrigin::User);
+
+        let mut q_auto = PlaybackQueue::new();
+        q_auto.push_autoplay(Track::new("a", "A", "Artist"));
+        q_auto.retain_current();
+        assert_eq!(track_ids(&q_auto), ["a"]);
+        assert_eq!(q_auto.origin_at(0), QueueOrigin::Autoplay);
+
+        q_auto.clear();
+        assert!(q_auto.is_empty());
+        assert_eq!(q_auto.origin_at(0), QueueOrigin::Context);
+    }
+
+    #[test]
+    fn deserializing_without_origins_yields_context_for_every_entry() {
+        let json = r#"{"tracks":[{"id":"t1","title":"T1","artist":"A1"},{"id":"t2","title":"T2","artist":"A2"}],"cursor":0,"repeat":"Off"}"#;
+        let loaded: PlaybackQueue = serde_json::from_str(json).expect("deserialization succeeds");
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded.visible_len(), 2);
+        assert_eq!(loaded.origin_at(0), QueueOrigin::Context);
+        assert_eq!(loaded.origin_at(1), QueueOrigin::Context);
+        assert_eq!(loaded.origin_at(99), QueueOrigin::Context);
+        assert!(!loaded.is_autoplay_at(0));
+        assert!(!loaded.is_autoplay_at(1));
     }
 }

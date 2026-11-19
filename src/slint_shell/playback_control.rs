@@ -214,7 +214,7 @@ impl SlintAppState {
     fn clear_queue_keeping_current(&mut self) {
         self.queue.retain_current();
         self.gapless.reset();
-        let _ = self.queue_store.save(&self.queue);
+        let _ = self.queue_store.save(&self.queue.persistable());
     }
 
     fn clear_queue_fully(&mut self) {
@@ -225,7 +225,7 @@ impl SlintAppState {
         self.queue.clear();
         self.set_playback_phase(PlaybackPhase::Empty);
         self.sync_presence_playing(false);
-        let _ = self.queue_store.save(&self.queue);
+        let _ = self.queue_store.save(&self.queue.persistable());
     }
 
     /// Evaluates auto-skip intervals for active track, seeking past matched range.

@@ -150,7 +150,8 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-4: queue operations (add, remove, reorder, clear, shuffle, repeat off / all / one); starting playback of a
   container replaces the playback context, while "add to queue" and "play next" append explicitly.
 - FR-5: transport controls with seek and volume, including keyboard shortcuts.
-- FR-6: start radio from any track and keep an autoplay continuation queue.
+- FR-6: start radio from any track and keep an autoplay continuation queue as a transient layer
+  (not persisted and not part of the saved queue).
 - FR-7: read the signed-in library (playlists, likes, saved albums); like or dislike tracks.
   Note: authenticated library endpoints are pending; interim implementation operates as anonymous empty readers.
 - FR-8: display synced lyrics with a user-adjustable offset when LRCLIB has a match.
@@ -159,7 +160,9 @@ Explicitly not v1: downloads manager, casting, video, podcasts, plugin SDK.
 - FR-11: single instance; tray icon with play/pause/next and show/hide actions.
 - FR-12: check GitHub Releases for updates and offer the download page (no silent install).
   Note: unauthenticated checks return 404 on private repo and soft-fail to CheckFailed (see ADR-001).
-- FR-13: persistent playback queue across application restarts (serializes track list and position).
+- FR-13: persistent playback queue across application restarts (serializes track list and
+  position, holding the context plus explicitly queued tracks while omitting transient autoplay
+  recommendations).
 - FR-14: sleep timer with standard interval presets and stop-after-current-track option.
 - FR-15: DSP settings for skip-silence and -14 LUFS loudness normalization in playback.
 - FR-16: stream-cache LRU with user-sized storage budget and JSON library backup import/export.
