@@ -1,5 +1,6 @@
 import { Labels } from "../labels.slint";
-import { Theme } from "../theme.slint";
+import { PlayerUi, Theme } from "../theme.slint";
+import { PlayingBars } from "./playing_indicator.slint";
 import { ContextSurface, ContextUi } from "./context_menu.slint";
 
 export component TrackRow inherits Rectangle {
@@ -9,6 +10,7 @@ export component TrackRow inherits Rectangle {
     in property <string> duration;
     in property <string> kind;
     in property <int> index: -1;
+    in property <string> track-id: "";
     in property <ContextSurface> surface: ContextSurface.search;
     in property <image> cover;
     in property <bool> is-active: false;
@@ -18,6 +20,8 @@ export component TrackRow inherits Rectangle {
     callback remove-requested();
     callback move-up-requested();
     callback move-down-requested();
+
+    property <bool> is-current: root.track-id != "" && root.track-id == PlayerUi.track-id;
 
     property <string> subtitle-text: root.album != "" && root.artist != "" ? root.artist + " - " + root.album : (
         root.artist != "" ? root.artist : root.album
@@ -49,25 +53,68 @@ export component TrackRow inherits Rectangle {
 
         if !root.compact : VerticalLayout {
             alignment: center;
+
             Rectangle {
                 width: 40px;
                 height: 40px;
-                border-radius: 6px;
-                background: Theme.surface;
-                clip: true;
+                background: transparent;
 
-                Image {
+                Rectangle {
                     width: parent.width;
                     height: parent.height;
-                    source: root.cover;
-                    image-fit: ImageFit.cover;
+                    border-radius: 6px;
+                    background: Theme.surface;
+                    clip: true;
+
+                    Image {
+                        width: parent.width;
+                        height: parent.height;
+                        source: root.cover;
+                        image-fit: ImageFit.cover;
+                    }
+                }
+
+                if root.is-current : Rectangle {
+                    x: parent.width - 20px;
+                    y: parent.height - 20px;
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 10px;
+                    background: Theme.window;
+                    border-width: 1px;
+                    border-color: Theme.border;
+
+                    PlayingBars {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        width: 14px;
+                        height: 14px;
+                        playing: PlayerUi.is-playing;
+                        tint: Theme.accent;
+                    }
                 }
             }
         }
 
         if root.compact && root.index >= 0 : VerticalLayout {
             alignment: center;
-            Text {
+
+            if root.is-current : Rectangle {
+                width: 22px;
+                height: 16px;
+                background: transparent;
+
+                PlayingBars {
+                    x: parent.width - self.width;
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    playing: PlayerUi.is-playing;
+                    tint: Theme.accent;
+                }
+            }
+
+            if !root.is-current : Text {
                 width: 22px;
                 text: "\{root.index + 1}";
                 color: Theme.secondary;
@@ -84,7 +131,7 @@ export component TrackRow inherits Rectangle {
 
             Text {
                 text: root.title;
-                color: root.is-active ? Theme.accent : Theme.text;
+                color: root.is-active || root.is-current ? Theme.accent : Theme.text;
                 font-size: root.compact ? 13px : 14px;
                 font-weight: 600;
                 overflow: elide;

@@ -1,5 +1,6 @@
 import { Labels } from "../labels.slint";
-import { Theme, TrackRowData } from "../theme.slint";
+import { PlayerUi, Theme, TrackRowData } from "../theme.slint";
+import { PlayingBars } from "./playing_indicator.slint";
 import { ContextSurface, ContextUi } from "./context_menu.slint";
 import { DetailUi } from "./detail_ui.slint";
 
@@ -141,6 +142,7 @@ export component PlaylistRow inherits Rectangle {
     in property <int> track-index: -1;
     in property <TrackRowData> track;
     in property <bool> compact: false;
+    property <bool> is-current: root.track.id != "" && root.track.id == PlayerUi.track-id;
     callback clicked();
 
     height: root.compact ? 40px : 56px;
@@ -167,7 +169,22 @@ export component PlaylistRow inherits Rectangle {
         padding-right: PlaylistTableMetrics.row-padding;
         spacing: PlaylistTableMetrics.cell-spacing;
 
-        Text {
+        if root.is-current : Rectangle {
+            min-width: PlaylistTableMetrics.index-width;
+            max-width: PlaylistTableMetrics.index-width;
+            background: transparent;
+
+            PlayingBars {
+                x: parent.width - self.width;
+                y: (parent.height - self.height) / 2;
+                width: 14px;
+                height: 14px;
+                playing: PlayerUi.is-playing;
+                tint: Theme.accent;
+            }
+        }
+
+        if !root.is-current : Text {
             text: "\{root.number}";
             min-width: PlaylistTableMetrics.index-width;
             max-width: PlaylistTableMetrics.index-width;
@@ -210,7 +227,7 @@ export component PlaylistRow inherits Rectangle {
 
                 Text {
                     text: root.track.title;
-                    color: Theme.text;
+                    color: root.is-current ? Theme.accent : Theme.text;
                     font-size: root.compact ? 13px : 14px;
                     font-weight: 600;
                     overflow: elide;

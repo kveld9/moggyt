@@ -62,6 +62,11 @@ fn persistence_error_text(locale: Locale, error: Option<PersistenceError>) -> St
     error.and_then(persistence_error_key).map(|key| tr(locale, key).to_string()).unwrap_or_default()
 }
 
+/// Id of the track the player currently holds, or an empty string when the queue is empty.
+fn current_track_id(state: &SlintAppState) -> slint::SharedString {
+    state.queue.current().map(|track| track.id.as_str()).unwrap_or_default().into()
+}
+
 /// Synchronizes state with Slint window properties without performing blocking I/O.
 pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     apply_palette(window, &state.active_palette());
@@ -133,6 +138,7 @@ pub(crate) fn sync_window(window: &MoggytWindow, state: &mut SlintAppState) {
     };
     window.set_active_track_title(title.into());
     window.set_active_track_artist(artist.into());
+    player.set_track_id(current_track_id(state));
 
     let (pos_secs, decoded_secs) = state
         .audio
@@ -210,6 +216,7 @@ pub(crate) fn sync_shelves_and_queue(window: &MoggytWindow, state: &SlintAppStat
                 resolve_row_cover_image(row.artwork_url.as_deref(), &state.search_covers);
             tracks.push(TrackRowData {
                 index: global_idx,
+                id: row.id.clone().into(),
                 title: row.title.into(),
                 artist: row.subtitle.into(),
                 album: row.album.into(),
@@ -530,6 +537,7 @@ pub(crate) fn track_to_row_data(
     let cover = resolve_row_cover_image(track.artwork.as_deref(), covers);
     TrackRowData {
         index: index as i32,
+        id: track.id.clone().into(),
         title: track.title.clone().into(),
         artist: track.artist.clone().into(),
         album: track.album.clone().unwrap_or_default().into(),
@@ -572,6 +580,19 @@ mod tests {
         assert_eq!(row_data.title.as_str(), "Title");
         assert_eq!(row_data.artist.as_str(), "Artist");
         assert_eq!(row_data.kind.as_str(), "track");
+        assert_eq!(row_data.id.as_str(), "t1");
+    }
+
+    #[test]
+    fn current_track_projection_tracks_the_cursor() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        assert_eq!(current_track_id(&state).as_str(), "");
+        state.queue.push(Track::new("a", "A", "Artist"));
+        state.queue.push(Track::new("b", "B", "Artist"));
+        state.queue.advance();
+        assert_eq!(current_track_id(&state).as_str(), "b");
     }
 
     #[test]

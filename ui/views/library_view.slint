@@ -187,6 +187,7 @@ export component LibraryView inherits VerticalLayout {
 
         for row in root.song-rows : TrackRow {
             index: row.index;
+            track-id: row.id;
             title: row.title;
             artist: row.artist;
             album: row.album;
