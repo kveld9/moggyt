@@ -97,6 +97,13 @@ impl AudioBackend for LiveAudio {
         delegate_audio!(self, duration_secs)
     }
 
+    fn output_level(&self) -> Option<f32> {
+        match self {
+            Self::Live(backend) => backend.output_level(),
+            Self::Muted(_) => None,
+        }
+    }
+
     fn is_playing(&self) -> bool {
         delegate_audio!(self, is_playing)
     }
@@ -270,6 +277,15 @@ mod tests {
         let live = LiveAudio::Live(Box::new(reported_audio(false, false)));
         assert_eq!(live.duration_secs(), 213);
         assert_eq!(LiveAudio::muted().duration_secs(), 0);
+    }
+
+    #[test]
+    fn live_audio_forwards_output_level() {
+        let mut stub = AudioStub::new();
+        stub.set_output_level(Some(0.75));
+        let live = LiveAudio::Live(Box::new(stub));
+        assert_eq!(live.output_level(), Some(0.75));
+        assert_eq!(LiveAudio::muted().output_level(), None);
     }
 
     #[test]

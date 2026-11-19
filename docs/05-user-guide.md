@@ -125,6 +125,9 @@ The Now Playing view presents a full two-column playback dashboard:
   - **Cover & Vinyl Deck**: toggled with `Cover` and `Vinyl` buttons. Cover mode displays album
     artwork (or a placeholder when unavailable); Vinyl mode renders an animated turntable stage whose record
     spins and tonearm swings into place during active playback.
+  - **Live Level Meter**: overlays a rolling level meter on the bottom of the artwork fed by the samples
+    actually playing (one bar per half second). The meter flattens to silence when playback is paused
+    or stopped, rather than showing a precomputed track waveform.
   - **Fix Audio Version**: the `Fix version` button opens a search panel for alternative recordings
     of the current track. The chosen alternative is stored in `version_overrides.json` and used for
     playback only; the title, artwork, lyrics and scrobbling keep the original track.

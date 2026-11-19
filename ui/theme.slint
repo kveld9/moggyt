@@ -167,3 +167,8 @@ export global LyricsHighlight {
     in-out property <string> sung-text: "";
     in-out property <string> rest-text: "";
 }
+
+export global MeterUi {
+    // Rolling audible level history, oldest first, 0.0..=1.0. Owned by the Rust shell.
+    in-out property <[float]> levels: [];
+}

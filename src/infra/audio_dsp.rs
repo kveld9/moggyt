@@ -5,10 +5,14 @@
 //! 2. [`LoudnessNormalizer`]: Progressive -14 LUFS loudness normalization (first-order approximation).
 
 use std::collections::VecDeque;
+use std::sync::Arc;
+use std::sync::atomic::AtomicU32;
 use std::time::Duration;
 
 use rodio::source::SeekError;
 use rodio::{Sink, Source};
+
+pub use super::audio_level::LevelTap;
 
 /// Default silence threshold in linear amplitude (~-54 dBFS).
 ///
@@ -534,11 +538,31 @@ pub fn append_normalized<S>(sink: &Sink, source: S, stage: NormalizationStage)
 where
     S: Source<Item = f32> + Send + 'static,
 {
+    sink.append(normalized_source(source, stage));
+}
+
+/// Builds the normalized source chain shared by the level-aware append helper.
+fn normalized_source<S>(source: S, stage: NormalizationStage) -> Box<dyn Source<Item = f32> + Send>
+where
+    S: Source<Item = f32> + Send + 'static,
+{
     match stage {
-        NormalizationStage::Off => sink.append(source),
-        NormalizationStage::Static(gain) => sink.append(StaticGain::new(source, gain)),
-        NormalizationStage::Dynamic => sink.append(LoudnessNormalizer::new(source)),
+        NormalizationStage::Off => Box::new(source),
+        NormalizationStage::Static(gain) => Box::new(StaticGain::new(source, gain)),
+        NormalizationStage::Dynamic => Box::new(LoudnessNormalizer::new(source)),
     }
+}
+
+/// Appends the normalized source wrapped in a [`LevelTap`].
+pub fn append_normalized_with_level<S>(
+    sink: &Sink,
+    source: S,
+    stage: NormalizationStage,
+    level: Arc<AtomicU32>,
+) where
+    S: Source<Item = f32> + Send + 'static,
+{
+    sink.append(LevelTap::new(normalized_source(source, stage), level));
 }
 
 #[cfg(test)]
@@ -594,25 +618,18 @@ mod tests {
         assert!((linear_to_db(1.0) - 0.0).abs() < f32::EPSILON);
         assert!((linear_to_db(0.1) - (-20.0)).abs() < 1e-4);
         assert_eq!(linear_to_db(0.0), -180.0);
-
         assert!(is_silent_sample(0.001, 0.002));
         assert!(!is_silent_sample(0.003, 0.002));
-
         assert!(is_silent_frame(&[0.001, 0.0015], 0.002));
         assert!(!is_silent_frame(&[0.001, 0.05], 0.002));
-
         assert_eq!(calculate_rms(&[]), 0.0);
         assert!((calculate_rms(&[1.0, -1.0]) - 1.0).abs() < f32::EPSILON);
         assert!((calculate_rms(&[0.0, 0.0]) - 0.0).abs() < f32::EPSILON);
-
         assert!((rms_to_db(1.0) - 0.0).abs() < f32::EPSILON);
-
         let gain_atten = compute_target_gain(0.0, -14.0, 0.1, 3.0);
         assert!((gain_atten - db_to_linear(-14.0)).abs() < 1e-4);
-
         let gain_max_clamped = compute_target_gain(-40.0, -14.0, 0.1, 3.0);
         assert_eq!(gain_max_clamped, 3.0);
-
         let gain_min_clamped = compute_target_gain(20.0, -14.0, 0.1, 3.0);
         assert_eq!(gain_min_clamped, 0.1);
     }
@@ -649,12 +666,7 @@ mod tests {
 
     #[test]
     fn test_skip_silence_stereo_interleaved_channel_coherence() {
-        // Stereo interleaved: [L, R]
-        // Frame 1: [0.0, 0.0] (silent)
-        // Frame 2: [0.5, 0.0] (L is audible -> frame audible)
-        // Frame 3: [0.0, 0.8] (R is audible -> frame audible)
-        // Frame 4: [0.0, 0.0] (silent)
-        // Frame 5: [0.0, 0.0] (silent -> sustained trailing >= 2 frames)
+        // Stereo interleaved [L, R] frames: [0,0] silent, [0.5,0] audible, [0,0.8] audible, [0,0] silent x2.
         let input = vec![0.0, 0.0, 0.5, 0.0, 0.0, 0.8, 0.0, 0.0, 0.0, 0.0];
         let source = TestSampleSource::new(input, 2, 44100);
         let skipper = SkipSilence::with_frame_count(source, 0.002, 2);
@@ -669,10 +681,8 @@ mod tests {
         let input = vec![1.0; 100];
         let source = TestSampleSource::new(input, 1, 44100);
         let mut normalizer = LoudnessNormalizer::with_parameters(source, -14.0, 10, 0.05, 0.01);
-
         assert_eq!(normalizer.current_gain(), 1.0);
         let _output: Vec<f32> = normalizer.by_ref().collect();
-
         assert!(
             normalizer.current_gain() < 0.5,
             "expected gain to attenuate significantly toward target, got {}",
@@ -689,9 +699,7 @@ mod tests {
         let input = vec![near_target_amp; 100];
         let source = TestSampleSource::new(input, 1, 44100);
         let mut normalizer = LoudnessNormalizer::with_parameters(source, -14.0, 10, 0.05, 0.01);
-
         let _output: Vec<f32> = normalizer.by_ref().collect();
-
         assert!(
             (normalizer.current_gain() - 1.0).abs() < 0.05,
             "expected gain to remain near unity, got {}",
@@ -707,11 +715,9 @@ mod tests {
         let input = vec![quiet_amp; 100];
         let source = TestSampleSource::new(input, 1, 44100);
         let mut normalizer = LoudnessNormalizer::with_parameters(source, -14.0, 10, 0.05, 0.01);
-
         let _output: Vec<f32> = normalizer.by_ref().collect();
         assert!(normalizer.target_gain() <= 3.0);
         assert!(normalizer.current_gain() <= 3.0);
-
         // Sub-noise-gate silence (< -60 dBFS): should not trigger gain increase
         let silent_input = vec![1e-5; 50];
         let silent_source = TestSampleSource::new(silent_input, 1, 44100);
@@ -728,7 +734,6 @@ mod tests {
         let source = TestSampleSource::new(input, 1, 44100);
         let skip = SkipSilence::with_frame_count(source, 0.002, 2);
         let normalizer = LoudnessNormalizer::with_parameters(skip, -14.0, 2, 0.5, 0.01);
-
         let output: Vec<f32> = normalizer.collect();
         // Leading silence is trimmed (first sample corresponds to input 1.0)
         // Trailing silence is skipped
@@ -762,15 +767,11 @@ mod tests {
         assert_eq!(normalization_stage(false, Some(3.0)), NormalizationStage::Off);
         assert_eq!(normalization_stage(false, None), NormalizationStage::Off);
         match normalization_stage(true, Some(3.0)) {
-            NormalizationStage::Static(gain) => {
-                assert!((gain - 0.31622776).abs() < 1e-4);
-            }
+            NormalizationStage::Static(gain) => assert!((gain - 0.31622776).abs() < 1e-4),
             other => panic!("expected Static stage, got {other:?}"),
         }
         match normalization_stage(true, Some(-1.0)) {
-            NormalizationStage::Static(gain) => {
-                assert!((gain - 0.5011872).abs() < 1e-4);
-            }
+            NormalizationStage::Static(gain) => assert!((gain - 0.5011872).abs() < 1e-4),
             other => panic!("expected Static stage, got {other:?}"),
         }
         assert_eq!(normalization_stage(true, Some(-8.0)), NormalizationStage::Static(1.0));
