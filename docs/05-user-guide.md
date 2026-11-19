@@ -251,9 +251,28 @@ By default, link imports scrape Spotify embed pages without requiring any creden
 100 tracks directly from links or leverage ISRC catalog identifiers for improved matching:
 
 1. Create a developer application in the Spotify Developer Dashboard (<https://developer.spotify.com/dashboard>).
-2. Copy your **Client ID** and **Client Secret**.
+2. Open the app **Settings**, copy the **Client ID**, and reveal the **Client secret** via **View client secret**.
 3. In moggyt, open **Settings -> Integrations -> Spotify Web API**.
 4. Paste the credentials into the respective input fields and click **Save credentials**.
+
+The creation form asks for more than those two values. Fill it as follows:
+
+| Field | Value | Required |
+| --- | --- | --- |
+| **App name** | Any name you recognize, for example `moggyt` | Yes |
+| **App description** | A one-line summary, for example `Desktop client importing Spotify playlists` | Yes |
+| **Website** | Your own site or the project page; moggyt never reads it | No |
+| **Redirect URIs** | Any valid URL, for example `https://localhost:8888/callback` | Yes |
+| **Which API/SDKs are you planning to use?** | `Web API` alone | Yes |
+| **Developer Terms of Service** | Accept the checkbox | Yes |
+
+moggyt authenticates with the OAuth 2.0 *Client Credentials* flow, which never redirects a browser, so the redirect URI
+is required by the form but unused. The credentials are exchanged for a bearer token at
+`https://accounts.spotify.com/api/token`, and catalog requests go to `https://api.spotify.com/v1`.
+
+Spotify documents that development-mode apps, the default mode after creation and visible as **App Status** in
+**Settings**, support up to five authenticated users through an allowlist and require the app owner to hold a Spotify
+Premium account to function. moggyt never signs in as a Spotify user, so the allowlist is never used.
 
 When saved, credentials are held securely in your OS credential manager (`Secret Service` on Linux, `Credential
 Manager` on Windows, or `Keychain` on macOS). With complete credentials configured, link imports automatically use the
