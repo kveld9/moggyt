@@ -2,7 +2,9 @@
 //!
 //! Gapless hand-off decodes the next queue track while the active one is still playing,
 //! appends it behind the live sink, and advances the queue cursor only when the backend
-//! reports the sample boundary. Crossfade keeps priority when it is configured.
+//! reports the sample boundary. Gapless runs when crossfade is disabled; a configured
+//! crossfade owns the transition and replaces gapless. A failed preload is latched for that
+//! track instead of being retried every tick.
 
 use crate::domain::{PlaybackPhase, Track, should_arm};
 use crate::infra::{AudioBackend, Catalog};
@@ -13,12 +15,14 @@ use crate::slint_shell::sync::observe_playback_phase;
 
 /// UI-side latch for the sample-continuous hand-off.
 ///
-/// `armed_for` marks the queue track already dispatched for preloading; `pending` holds the
-/// preloaded result until the audio backend crosses the sample boundary.
+/// `armed_for` marks the queue track already dispatched for preloading, `pending` holds the
+/// preloaded result until the audio backend crosses the sample boundary, and `failed_for` blocks
+/// a second dispatch for a track whose preload already failed.
 #[derive(Default)]
 pub struct GaplessUi {
     armed_for: Option<String>,
     pending: Option<PlayTrackResult>,
+    failed_for: Option<String>,
 }
 
 impl GaplessUi {
@@ -27,8 +31,25 @@ impl GaplessUi {
         self.armed_for.is_none() && self.pending.is_none()
     }
 
-    /// Clears the arm marker and any pending preloaded result.
+    /// Returns whether a preload can be armed for the specified track id.
+    pub fn can_arm_for(&self, track_id: &str) -> bool {
+        self.is_free() && self.failed_for.as_deref() != Some(track_id)
+    }
+
+    /// Records a preload failure for the given track id to prevent re-dispatching.
+    pub fn mark_failed(&mut self, track_id: &str) {
+        self.failed_for = Some(track_id.to_owned());
+    }
+
+    /// Clears the arm marker, any pending preloaded result, and the failure latch.
     pub fn reset(&mut self) {
+        self.armed_for = None;
+        self.pending = None;
+        self.failed_for = None;
+    }
+
+    /// Clears the arm marker and pending result while retaining the failure latch.
+    pub fn reset_arm(&mut self) {
         self.armed_for = None;
         self.pending = None;
     }
@@ -36,6 +57,7 @@ impl GaplessUi {
     /// Tracks the queue id dispatched for preloading.
     pub fn mark_armed(&mut self, track_id: &str) {
         self.armed_for = Some(track_id.to_owned());
+        self.failed_for = None;
     }
 
     fn matches_arm(&self, track_id: &str) -> bool {
@@ -117,8 +139,13 @@ impl SlintAppState {
         Some((current_id.clone(), self.queue.peek_next().is_some()))
     }
 
+    /// Returns the crossfade candidate, or `None` while a gapless preload owns the sink.
+    ///
+    /// Crossfade takes precedence when configured, so a preload only exists when crossfade was
+    /// disabled for this transition. The guard matters when crossfade is enabled mid-track: the
+    /// sink already holds the appended next track and a fade would replace it.
     fn handle_playing_crossfade(&self, audio: &dyn AudioBackend) -> Option<(String, bool)> {
-        if self.crossfade_seconds == 0 {
+        if self.crossfade_seconds == 0 || !self.gapless.is_free() {
             return None;
         }
         self.crossfade_candidate(audio)
@@ -197,7 +224,10 @@ impl SlintAppState {
     }
 
     fn arm_gapless_if_due(&mut self) {
-        if !self.gapless.is_free() || self.sleep_timer_stops_after_track() {
+        let Some(next_id) = self.queue.peek_next().map(|track| track.id.clone()) else {
+            return;
+        };
+        if !self.gapless.can_arm_for(&next_id) || self.sleep_timer_stops_after_track() {
             return;
         }
         let remaining = self.remaining_secs_locked();
@@ -250,8 +280,13 @@ impl SlintAppState {
         if !result.gapless {
             return;
         }
-        if !result.success || !self.gapless.matches_arm(&result.track_id) {
-            self.gapless.reset();
+        if !result.success {
+            self.gapless.mark_failed(&result.track_id);
+            self.gapless.reset_arm();
+            return;
+        }
+        if !self.gapless.matches_arm(&result.track_id) {
+            self.gapless.reset_arm();
             return;
         }
         self.gapless.store(result);
@@ -321,6 +356,44 @@ mod tests {
 
         assert!(state.gapless.is_free());
         assert_eq!(state.queue.cursor(), 1, "crossfade owns the transition");
+    }
+
+    #[test]
+    fn crossfade_is_suppressed_while_a_preload_is_pending() {
+        let mut state = playing_state();
+        state.crossfade_seconds = 12;
+        state.audio.lock().unwrap().seek(90);
+        state.gapless.mark_armed("t2");
+        state.gapless.store(preloaded_result("t2", true));
+
+        let audio = state.audio.lock().unwrap();
+        assert!(state.handle_playing_crossfade(&**audio).is_none());
+    }
+
+    #[test]
+    fn failed_preload_latches_and_permits_crossfade() {
+        let mut state = playing_state();
+        state.crossfade_seconds = 5;
+        state.audio.lock().unwrap().seek(96);
+        state.gapless.mark_armed("t2");
+
+        state.on_gapless_preload_result(preloaded_result("t2", false));
+
+        assert!(!state.gapless.can_arm_for("t2"));
+        assert!(state.gapless.is_free());
+        let audio = state.audio.lock().unwrap();
+        assert_eq!(state.handle_playing_crossfade(&**audio), Some(("t1".to_string(), true)));
+    }
+
+    #[test]
+    fn reset_clears_the_failure_latch() {
+        let mut state = playing_state();
+        state.gapless.mark_armed("t2");
+        state.on_gapless_preload_result(preloaded_result("t2", false));
+        assert!(!state.gapless.can_arm_for("t2"));
+
+        state.gapless.reset();
+        assert!(state.gapless.can_arm_for("t2"));
     }
 
     #[test]
