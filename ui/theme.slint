@@ -74,6 +74,8 @@ export global PlaybackUi {
 
 export global PlayerUi {
     in-out property <bool> is-playing: false;
+    // True while the player is loading the next stream or stalled without progress.
+    in-out property <bool> is-buffering: false;
 
     // Id of the track the player currently holds. Rows compare their own id against it to
     // render the now-playing marker; `sync_window` in the Rust shell owns this property.

@@ -437,6 +437,8 @@ Users can customize the player bar appearance and element visibility under **Set
   reason and the track title, while the player bar shows `Retrying (1/2)` for a pending automatic
   retry or the short reason once retries are exhausted. Transient failures retry automatically
   twice (after 2s and 5s), and the inline `Retry` action replays the track immediately.
+- **Buffering and Stalls**: while a stream is loading or stalled the play button shows a rotating
+  ring, and a paused track never shows it.
 
 ## Context Menu
 

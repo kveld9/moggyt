@@ -8,6 +8,12 @@ import {
 
 export component PlayerCenterControls inherits VerticalLayout {
     in property <bool> is-playing: false;
+    in property <bool> is-buffering: false;
+    // Buffering ring geometry: eight 3px dots on an 8.5px radius around a 20x20 frame.
+    property <[length]> buffering-dot-x: [8.5px, 14.5px, 17px, 14.5px, 8.5px, 2.5px, 0px, 2.5px];
+    property <[length]> buffering-dot-y: [0px, 2.5px, 8.5px, 14.5px, 17px, 14.5px, 8.5px, 2.5px];
+    // Advances clockwise once per frame while buffering; drives the dot fade.
+    property <int> buffering-tick: 0;
     in property <bool> is-shuffle: false;
     in property <int> repeat-mode: 0;
     in property <int> position-secs: 0;
@@ -137,11 +143,39 @@ export component PlayerCenterControls inherits VerticalLayout {
                     text: @markdown("\{root.is-playing ? Labels.pause-tooltip : Labels.play-tooltip}");
                 }
 
-                if root.is-playing : IconPause {
+                // Buffering ring: eight dots with a fading trail using the button's foreground
+                // colors so they stay visible on the accent circle while the stream loads.
+                if root.is-buffering : Rectangle {
+                    width: 20px;
+                    height: 20px;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    background: transparent;
+
+                    Timer {
+                        interval: 90ms;
+                        running: root.is-buffering;
+                        triggered => {
+                            root.buffering-tick = Math.mod(root.buffering-tick + 1, 8);
+                        }
+                    }
+
+                    for dot in 8 : Rectangle {
+                        width: 3px;
+                        height: 3px;
+                        border-radius: 1.5px;
+                        x: root.buffering-dot-x[dot];
+                        y: root.buffering-dot-y[dot];
+                        background: pp.has-hover ? Theme.text : Theme.window;
+                        opacity: 0.15 + 0.85 * (Math.mod(dot + root.buffering-tick, 8) / 8.0);
+                    }
+                }
+
+                if root.is-playing && !root.is-buffering : IconPause {
                     tint: pp.has-hover ? Theme.text : Theme.window;
                     size: 20px;
                 }
-                if !root.is-playing : IconPlay {
+                if !root.is-playing && !root.is-buffering : IconPlay {
                     tint: pp.has-hover ? Theme.text : Theme.window;
                     size: 20px;
                 }

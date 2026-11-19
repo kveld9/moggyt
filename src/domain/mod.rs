@@ -4,6 +4,7 @@
 //! randomness stay behind ports in `crate::infra` or parameters.
 
 mod artist_match;
+mod buffering;
 pub mod detail_sort;
 mod gapless;
 mod library;
@@ -28,6 +29,7 @@ mod videos;
 pub use artist_match::{
     TOPIC_CHANNEL_SUFFIX, artist_score, split_source_artists, strip_topic_suffix,
 };
+pub use buffering::{BUFFERING_STALL_SAMPLES, BufferingWatch};
 pub use detail_sort::{DetailSort, SortColumn, SortDirection, next_sort, ordered_indices};
 pub use gapless::{
     GAPLESS_ARM_SECS, GaplessFact, GaplessSlot, GaplessState, StartedGapless, should_arm,

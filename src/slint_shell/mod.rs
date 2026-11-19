@@ -37,6 +37,7 @@ pub use MoggytWindow as AppWindow;
 pub mod app;
 pub mod audio_snapshot;
 mod auto_skip;
+pub mod buffering;
 pub mod callbacks;
 pub mod category;
 pub mod context_menu;
