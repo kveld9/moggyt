@@ -477,6 +477,7 @@ pub(crate) fn sync_playback_tick(window: &MoggytWindow, state: &mut SlintAppStat
 
     let catalog_dur = state.queue.current().and_then(|t| t.duration_secs);
     let dur = resolve_display_duration(catalog_dur, decoded_secs);
+    state.sync_presence_position(u64::from(pos_secs));
     let player = window.global::<PlayerUi>();
     push_time_labels(&player, pos_secs, dur);
     player.set_progress(progress_fraction(pos_secs, dur.unwrap_or(0)));

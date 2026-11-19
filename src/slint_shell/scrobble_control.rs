@@ -42,26 +42,32 @@ impl SlintAppState {
         }
     }
 
-    /// Resolves the catalog artwork URL of a queue track, if any.
-    pub fn resolve_presence_artwork(&self, track_id: &str) -> Option<String> {
-        self.queue.tracks().iter().find(|t| t.id == track_id).and_then(|t| t.artwork.clone())
+    /// Builds presence metadata for a track id, enriched with the queue track's artwork and duration.
+    pub fn resolve_presence_track(
+        &self,
+        track_id: &str,
+        artist: &str,
+        title: &str,
+    ) -> PresenceTrack {
+        let track = self.queue.tracks().iter().find(|t| t.id == track_id);
+        let artwork = track.and_then(|t| t.artwork.as_deref());
+        let duration = track.and_then(|t| t.duration_secs);
+        PresenceTrack::new(artist, title, artwork).with_duration(duration)
     }
 
     /// Synchronizes active track metadata with desktop presence and Discord presence.
-    pub fn sync_presence_track(
-        &mut self,
-        artist: &str,
-        title: &str,
-        artwork: Option<&str>,
-        is_playing: bool,
-    ) {
-        let key = PresenceTrack::new(artist, title, artwork);
-        if self.last_presence_key.as_ref() != Some(&key) {
-            self.presence.set_track(&key);
-            self.discord.set_track(&key);
-            self.last_presence_key = Some(key);
+    pub fn sync_presence_track(&mut self, track: PresenceTrack, is_playing: bool) {
+        if self.last_presence_key.as_ref() != Some(&track) {
+            self.presence.set_track(&track);
+            self.discord.set_track(&track);
+            self.last_presence_key = Some(track);
         }
         self.presence.set_playing(is_playing);
+    }
+
+    /// Reports the playback position to desktop presence.
+    pub fn sync_presence_position(&mut self, position_secs: u64) {
+        self.presence.set_position(position_secs);
     }
 
     /// Synchronizes playback status with desktop presence.
@@ -216,44 +222,58 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_presence_artwork_queued_unknown_and_absent() {
+    fn test_resolve_presence_track_known_and_unknown() {
         let mut state = test_wired();
         let art_url = "https://i.ytimg.com/vi/abc/hqdefault.jpg";
-        let track_art = Track::new("id-1", "Title 1", "Artist 1").with_artwork(art_url);
+        let track_art =
+            Track::new("id-1", "Title 1", "Artist 1").with_artwork(art_url).with_duration(180);
         let track_no_art = Track::new("id-2", "Title 2", "Artist 2");
         state.queue.push(track_art);
         state.queue.push(track_no_art);
 
-        assert_eq!(state.resolve_presence_artwork("id-1"), Some(art_url.to_string()));
-        assert_eq!(state.resolve_presence_artwork("unknown-id"), None);
-        assert_eq!(state.resolve_presence_artwork("id-2"), None);
+        let resolved = state.resolve_presence_track("id-1", "Artist 1", "Title 1");
+        assert_eq!(
+            resolved,
+            PresenceTrack::new("Artist 1", "Title 1", Some(art_url)).with_duration(Some(180))
+        );
+
+        let unknown = state.resolve_presence_track("unknown-id", "Unknown Artist", "Unknown Title");
+        assert_eq!(unknown, PresenceTrack::new("Unknown Artist", "Unknown Title", None));
+        assert_eq!(unknown.artwork, None);
+        assert_eq!(unknown.duration_secs, None);
+
+        let absent = state.resolve_presence_track("id-2", "Artist 2", "Title 2");
+        assert_eq!(absent.artwork, None);
+        assert_eq!(absent.duration_secs, None);
     }
 
     #[test]
-    fn test_sync_presence_track_stores_and_updates_artwork_key() {
+    fn test_sync_presence_track_stores_key_including_duration() {
         let mut state = test_wired();
         assert_eq!(state.last_presence_key, None);
 
         let art_v1 = "https://i.ytimg.com/vi/abc/hqdefault.jpg";
-        state.sync_presence_track("Artist", "Title", Some(art_v1), true);
-        assert_eq!(
-            state.last_presence_key,
-            Some(PresenceTrack::new("Artist", "Title", Some(art_v1)))
-        );
+        let track1 = PresenceTrack::new("Artist", "Title", Some(art_v1)).with_duration(Some(200));
+        state.sync_presence_track(track1.clone(), true);
+        assert_eq!(state.last_presence_key, Some(track1.clone()));
+        assert_eq!(state.presence.last_status(), Some(true));
 
         // Calling again with identical metadata keeps the same key
-        state.sync_presence_track("Artist", "Title", Some(art_v1), true);
-        assert_eq!(
-            state.last_presence_key,
-            Some(PresenceTrack::new("Artist", "Title", Some(art_v1)))
-        );
+        state.sync_presence_track(track1.clone(), true);
+        assert_eq!(state.last_presence_key, Some(track1));
 
-        // Calling with changed artwork replaces the key
-        let art_v2 = "https://i.ytimg.com/vi/def/hqdefault.jpg";
-        state.sync_presence_track("Artist", "Title", Some(art_v2), true);
-        assert_eq!(
-            state.last_presence_key,
-            Some(PresenceTrack::new("Artist", "Title", Some(art_v2)))
-        );
+        // Calling with changed duration replaces the key
+        let track2 = PresenceTrack::new("Artist", "Title", Some(art_v1)).with_duration(Some(240));
+        state.sync_presence_track(track2.clone(), true);
+        assert_eq!(state.last_presence_key, Some(track2));
+    }
+
+    #[test]
+    fn test_sync_presence_position_records_on_desktop_presence() {
+        let mut state = test_wired();
+        assert_eq!(state.presence.last_position(), Duration::ZERO);
+
+        state.sync_presence_position(75);
+        assert_eq!(state.presence.last_position(), Duration::from_secs(75));
     }
 }
