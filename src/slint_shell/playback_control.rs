@@ -322,7 +322,8 @@ pub fn apply_play_track_completion(
         window.set_now_playing_cover(slint::Image::default());
     }
 
-    state.sync_presence_track(&res.artist, &res.title, true);
+    let artwork = state.resolve_presence_artwork(&res.track_id);
+    state.sync_presence_track(&res.artist, &res.title, artwork.as_deref(), true);
     state.started_at =
         state.queue.tracks().iter().find(|t| t.id == res.track_id).cloned().map(StartedPlay::now);
     state.last_skip_target = None;

@@ -4,7 +4,7 @@ use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
 
 use souvlaki::{MediaControlEvent, MediaMetadata, MediaPlayback};
 
-use super::presence::Presence;
+use super::presence::{Presence, PresenceTrack};
 
 /// Default bounded capacity for the inbound media key action queue.
 pub const ACTION_QUEUE_CAPACITY: usize = 32;
@@ -61,12 +61,12 @@ fn clean_text<'a>(value: &'a str, fallback: &'static str) -> &'a str {
 /// Formats track metadata for OS media controls.
 ///
 /// Falls back to "Unknown title" or "Unknown artist" when input is blank or whitespace.
-pub fn metadata_for<'a>(artist: &'a str, title: &'a str) -> MediaMetadata<'a> {
+pub fn metadata_for(track: &PresenceTrack) -> MediaMetadata<'_> {
     MediaMetadata {
-        title: Some(clean_text(title, "Unknown title")),
-        artist: Some(clean_text(artist, "Unknown artist")),
+        title: Some(clean_text(&track.title, "Unknown title")),
+        artist: Some(clean_text(&track.artist, "Unknown artist")),
         album: None,
-        cover_url: None,
+        cover_url: track.artwork.as_deref(),
         duration: None,
     }
 }
@@ -83,7 +83,7 @@ pub fn status_for(playing: bool) -> MediaPlayback {
 /// Native desktop media presence (MPRIS on Linux, SMTC on Windows).
 pub struct DesktopPresence {
     controls: Option<souvlaki::MediaControls>,
-    last_published: Option<(String, String)>,
+    last_published: Option<PresenceTrack>,
     last_status: Option<bool>,
     action_sender: SyncSender<MediaKeyAction>,
     action_receiver: Receiver<MediaKeyAction>,
@@ -132,7 +132,7 @@ impl DesktopPresence {
     }
 
     /// Test seam accessor for the last published track metadata.
-    pub fn last_published(&self) -> Option<(String, String)> {
+    pub fn last_published(&self) -> Option<PresenceTrack> {
         self.last_published.clone()
     }
 
@@ -164,12 +164,12 @@ impl Default for DesktopPresence {
 }
 
 impl Presence for DesktopPresence {
-    fn set_track(&mut self, artist: &str, title: &str) {
-        self.last_published = Some((artist.to_string(), title.to_string()));
+    fn set_track(&mut self, track: &PresenceTrack) {
+        self.last_published = Some(track.clone());
         let Some(controls) = &mut self.controls else {
             return;
         };
-        let _ = controls.set_metadata(metadata_for(artist, title));
+        let _ = controls.set_metadata(metadata_for(track));
     }
 
     fn clear(&mut self) {
@@ -205,17 +205,24 @@ mod tests {
 
     #[test]
     fn metadata_for_populates_trimmed_fields_and_fallbacks() {
-        let meta = metadata_for(" Radiohead ", " Creep ");
+        let track =
+            PresenceTrack::new(" Radiohead ", " Creep ", Some(" https://example.com/art.jpg "));
+        let meta = metadata_for(&track);
         assert_eq!(meta.title, Some("Creep"));
         assert_eq!(meta.artist, Some("Radiohead"));
+        assert_eq!(meta.cover_url, Some("https://example.com/art.jpg"));
 
-        let fallback_title = metadata_for("Radiohead", "   ");
-        assert_eq!(fallback_title.title, Some("Unknown title"));
-        assert_eq!(fallback_title.artist, Some("Radiohead"));
+        let fallback_title = PresenceTrack::new("Radiohead", "   ", None);
+        let meta_fallback = metadata_for(&fallback_title);
+        assert_eq!(meta_fallback.title, Some("Unknown title"));
+        assert_eq!(meta_fallback.artist, Some("Radiohead"));
+        assert_eq!(meta_fallback.cover_url, None);
 
-        let fallback_artist = metadata_for("", "Creep");
-        assert_eq!(fallback_artist.title, Some("Creep"));
-        assert_eq!(fallback_artist.artist, Some("Unknown artist"));
+        let fallback_artist = PresenceTrack::new("", "Creep", None);
+        let meta_artist = metadata_for(&fallback_artist);
+        assert_eq!(meta_artist.title, Some("Creep"));
+        assert_eq!(meta_artist.artist, Some("Unknown artist"));
+        assert_eq!(meta_artist.cover_url, None);
     }
 
     #[test]
@@ -289,11 +296,10 @@ mod tests {
         assert_eq!(presence.last_published(), None);
         assert_eq!(presence.last_status(), None);
 
-        presence.set_track("Daft Punk", "Get Lucky");
-        assert_eq!(
-            presence.last_published(),
-            Some(("Daft Punk".to_string(), "Get Lucky".to_string()))
-        );
+        let track =
+            PresenceTrack::new("Daft Punk", "Get Lucky", Some("https://example.com/art.jpg"));
+        presence.set_track(&track);
+        assert_eq!(presence.last_published(), Some(track));
 
         presence.set_playing(true);
         assert_eq!(presence.last_status(), Some(true));

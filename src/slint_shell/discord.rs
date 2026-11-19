@@ -28,8 +28,8 @@ impl SlintAppState {
 
         if enabled {
             self.discord = make();
-            if let Some((artist, title)) = self.last_presence_key.clone() {
-                self.discord.set_track(&artist, &title);
+            if let Some(track) = self.last_presence_key.clone() {
+                self.discord.set_track(&track);
             }
         } else {
             self.discord.shutdown();
@@ -67,6 +67,7 @@ pub(crate) fn wire_discord_callbacks(window: &MoggytWindow, state_rc: &SharedSta
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::infra::PresenceTrack;
     use crate::slint_shell::test_support::test_wired;
 
     #[test]
@@ -84,7 +85,7 @@ mod tests {
     #[test]
     fn test_enabling_discord_presence_republishes_last_presence_key() {
         let mut state = test_wired();
-        state.last_presence_key = Some(("Radiohead".to_string(), "Karma Police".to_string()));
+        state.last_presence_key = Some(PresenceTrack::new("Radiohead", "Karma Police", None));
 
         state.set_discord_presence(true, DiscordPresence::dormant);
         assert_eq!(
@@ -96,7 +97,7 @@ mod tests {
     #[test]
     fn test_disabling_discord_presence_clears_last_published() {
         let mut state = test_wired();
-        state.last_presence_key = Some(("Radiohead".to_string(), "Karma Police".to_string()));
+        state.last_presence_key = Some(PresenceTrack::new("Radiohead", "Karma Police", None));
 
         state.set_discord_presence(true, DiscordPresence::dormant);
         assert!(state.discord.last_published().is_some());

@@ -17,9 +17,9 @@ use crate::i18n::{Locale, tr};
 use crate::infra::{
     AudioBackend, Catalog, CatalogError, CoverCache, CustomThemeFile, DesktopPresence,
     DeviceIdentityMonitor, DiscordPresence, LyricLine, LyricOverrideDir, LyricsSource,
-    MediaKeyAction, OutputDeviceWatch, PlayLogStore, QueueStore, ReleaseInfo, Scrobbler,
-    SessionStore, SettingsStore, SkipProvider, SkipStore, TrayAction, TrayHandle, decode_cover,
-    fetch_artwork,
+    MediaKeyAction, OutputDeviceWatch, PlayLogStore, PresenceTrack, QueueStore, ReleaseInfo,
+    Scrobbler, SessionStore, SettingsStore, SkipProvider, SkipStore, TrayAction, TrayHandle,
+    decode_cover, fetch_artwork,
 };
 use crate::slint_shell::auto_skip::{SponsorFetchOutcome, SponsorRangeState};
 use crate::slint_shell::covers::request_queue_track_cover;
@@ -109,7 +109,7 @@ pub struct SlintAppState {
     pub lyrics_key: Option<(String, String)>,
     pub cover_key: Option<String>,
     pub current_cover_image: Option<slint::Image>,
-    pub last_presence_key: Option<(String, String)>,
+    pub last_presence_key: Option<PresenceTrack>,
     pub started_at: Option<StartedPlay>,
     pub last_skip_target: Option<(String, u32)>,
     pub cached_skip_ranges: Option<(String, Option<SkipRanges>)>,

@@ -3,7 +3,7 @@
 use discord_rich_presence::activity::{Activity, ActivityType};
 use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
 
-use super::presence::Presence;
+use super::presence::{Presence, PresenceTrack};
 
 /// Application ID registered for "moggyt" with the Discord Developer Portal.
 ///
@@ -98,11 +98,12 @@ impl Default for DiscordPresence {
 impl Presence for DiscordPresence {
     /// Publishes track metadata to Discord Rich Presence when live; always records the test seam.
     ///
+    /// Discord presence ignores artwork because rich-presence assets need pre-registered asset keys, not arbitrary URLs.
     /// On IPC error, logs a warning and drops the client so subsequent tracks attempt reconnect.
     // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
     #[allow(clippy::cognitive_complexity)]
-    fn set_track(&mut self, artist: &str, title: &str) {
-        let (details, state) = activity_parts(artist, title);
+    fn set_track(&mut self, track: &PresenceTrack) {
+        let (details, state) = activity_parts(&track.artist, &track.title);
         self.last_published = Some((details.clone(), state.clone()));
         if self.client.is_none() && self.app_id != 0 {
             self.client = try_connect(self.app_id);
@@ -168,7 +169,9 @@ mod tests {
         assert!(!presence.is_live());
         assert_eq!(presence.last_published(), None);
 
-        presence.set_track("Daft Punk", "Get Lucky");
+        let track =
+            PresenceTrack::new("Daft Punk", "Get Lucky", Some("https://example.com/art.jpg"));
+        presence.set_track(&track);
         assert_eq!(
             presence.last_published(),
             Some(("Get Lucky".to_string(), "Daft Punk".to_string()))
@@ -190,7 +193,8 @@ mod tests {
     #[test]
     fn discord_presence_shutdown_clears_last_published() {
         let mut presence = DiscordPresence::dormant();
-        presence.set_track("Daft Punk", "Get Lucky");
+        let track = PresenceTrack::new("Daft Punk", "Get Lucky", None);
+        presence.set_track(&track);
         assert!(presence.last_published().is_some());
 
         presence.shutdown();

@@ -1,6 +1,6 @@
 //! Scrobble submission and presence sync for the playing track.
 
-use crate::infra::{Presence, should_scrobble};
+use crate::infra::{Presence, PresenceTrack, should_scrobble};
 use crate::slint_shell::state::SlintAppState;
 
 impl SlintAppState {
@@ -42,12 +42,23 @@ impl SlintAppState {
         }
     }
 
+    /// Resolves the catalog artwork URL of a queue track, if any.
+    pub fn resolve_presence_artwork(&self, track_id: &str) -> Option<String> {
+        self.queue.tracks().iter().find(|t| t.id == track_id).and_then(|t| t.artwork.clone())
+    }
+
     /// Synchronizes active track metadata with desktop presence and Discord presence.
-    pub fn sync_presence_track(&mut self, artist: &str, title: &str, is_playing: bool) {
-        let key = (artist.to_string(), title.to_string());
+    pub fn sync_presence_track(
+        &mut self,
+        artist: &str,
+        title: &str,
+        artwork: Option<&str>,
+        is_playing: bool,
+    ) {
+        let key = PresenceTrack::new(artist, title, artwork);
         if self.last_presence_key.as_ref() != Some(&key) {
-            self.presence.set_track(artist, title);
-            self.discord.set_track(artist, title);
+            self.presence.set_track(&key);
+            self.discord.set_track(&key);
             self.last_presence_key = Some(key);
         }
         self.presence.set_playing(is_playing);
@@ -65,7 +76,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use crate::domain::Track;
-    use crate::infra::{MemoryPlayLogStore, PlayLogStore, Scrobbler};
+    use crate::infra::{MemoryPlayLogStore, PlayLogStore, PresenceTrack, Scrobbler};
     use crate::slint_shell::playback_control::StartedPlay;
     use crate::slint_shell::test_support::{EndedAudio, test_wired};
 
@@ -202,5 +213,47 @@ mod tests {
         let records = memory_store.load().expect("load succeeds");
         assert!(records.is_empty());
         assert!(state.started_at.is_none());
+    }
+
+    #[test]
+    fn test_resolve_presence_artwork_queued_unknown_and_absent() {
+        let mut state = test_wired();
+        let art_url = "https://i.ytimg.com/vi/abc/hqdefault.jpg";
+        let track_art = Track::new("id-1", "Title 1", "Artist 1").with_artwork(art_url);
+        let track_no_art = Track::new("id-2", "Title 2", "Artist 2");
+        state.queue.push(track_art);
+        state.queue.push(track_no_art);
+
+        assert_eq!(state.resolve_presence_artwork("id-1"), Some(art_url.to_string()));
+        assert_eq!(state.resolve_presence_artwork("unknown-id"), None);
+        assert_eq!(state.resolve_presence_artwork("id-2"), None);
+    }
+
+    #[test]
+    fn test_sync_presence_track_stores_and_updates_artwork_key() {
+        let mut state = test_wired();
+        assert_eq!(state.last_presence_key, None);
+
+        let art_v1 = "https://i.ytimg.com/vi/abc/hqdefault.jpg";
+        state.sync_presence_track("Artist", "Title", Some(art_v1), true);
+        assert_eq!(
+            state.last_presence_key,
+            Some(PresenceTrack::new("Artist", "Title", Some(art_v1)))
+        );
+
+        // Calling again with identical metadata keeps the same key
+        state.sync_presence_track("Artist", "Title", Some(art_v1), true);
+        assert_eq!(
+            state.last_presence_key,
+            Some(PresenceTrack::new("Artist", "Title", Some(art_v1)))
+        );
+
+        // Calling with changed artwork replaces the key
+        let art_v2 = "https://i.ytimg.com/vi/def/hqdefault.jpg";
+        state.sync_presence_track("Artist", "Title", Some(art_v2), true);
+        assert_eq!(
+            state.last_presence_key,
+            Some(PresenceTrack::new("Artist", "Title", Some(art_v2)))
+        );
     }
 }
