@@ -11,7 +11,7 @@ use moggyt::infra::{
     CachedLyrics, CustomThemeFile, DiskPlayLogStore, DiskQueueStore, DiskSettingsStore,
     DiskSkipStore, DiskVersionOverrideStore, KeyringSessionStore, LastFmClient, LiveCatalog,
     LrcRedClient, LrclibClient, LyricOverrideDir, LyricsCascade, Scrobbler, SettingsStore,
-    SingleInstanceGuard, StreamDiskCache, TrayHandle, default_config_dir,
+    SingleInstanceGuard, StreamDiskCache, TrayHandle, TrayPublisher, default_config_dir,
 };
 use moggyt::slint_shell::app::AppDependencies;
 use moggyt::slint_shell::init::{
@@ -29,8 +29,8 @@ fn acquire_single_instance() -> Option<SingleInstanceGuard> {
 
 // NOTE(clippy): cognitive_complexity counts tracing expansion (rust-clippy#14417).
 #[allow(clippy::cognitive_complexity)]
-fn init_tray() -> Option<TrayHandle> {
-    let tray = TrayHandle::try_new();
+fn init_tray(locale: moggyt::i18n::Locale) -> Option<TrayHandle> {
+    let tray = TrayHandle::try_new(locale);
     if tray.is_none() {
         tracing::warn!("tray unavailable; running without system tray icon");
     }
@@ -83,7 +83,7 @@ fn main() -> anyhow::Result<()> {
 
     let lyric_overrides = Some(LyricOverrideDir::new(config_dir.join("lyrics")));
     let version_store = DiskVersionOverrideStore::new(config_dir.clone());
-    let tray = init_tray();
+    let tray = init_tray(settings.locale);
 
     let custom_theme = CustomThemeFile::new(&config_dir);
     let matugen_theme = CustomThemeFile::for_matugen(&config_dir);
@@ -113,7 +113,7 @@ fn main() -> anyhow::Result<()> {
         secondary_scrobbler: secondary_scrobbler.map(|c| Box::new(c) as Box<dyn Scrobbler>),
         lyric_overrides,
         version_store: Box::new(version_store),
-        tray,
+        tray: tray.map(|handle| Box::new(handle) as Box<dyn TrayPublisher>),
         custom_theme,
         matugen_theme,
     })
