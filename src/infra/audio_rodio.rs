@@ -2,15 +2,15 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use anyhow::Context;
 use rodio::{Decoder, OutputStream, Sink, Source};
 
 use super::audio::{AudioBackend, AudioError, clamp_speed};
-use super::audio_dsp::{SkipSilence, append_normalized_with_level, normalization_stage};
-use super::audio_fade::{spawn_fade_in, spawn_fade_out};
+use super::audio_dsp::{SkipSilence, level_tapped_source, normalization_stage};
+use super::audio_fade::{FadeControl, GainRamp, ramp_samples, release_after};
 use super::audio_resample::ResamplingSource;
 use super::audio_stream_cache_worker::cache_download_worker;
 use super::opus_source::{OpusWebmSource, is_opus_webm, sniff_webm_header};
@@ -76,7 +76,9 @@ pub struct RodioBackend {
     speed: f32,
     skip_silence: bool,
     loudness_normalization: bool,
-    fade_generation: Arc<AtomicU64>,
+    active_fade: Arc<FadeControl>,
+    /// Fade control of the gapless track appended behind the active one.
+    gapless_fade: Arc<FadeControl>,
     /// Next-track slot appended behind the active track.
     gapless: GaplessSlot,
     level: Arc<AtomicU32>,
@@ -114,7 +116,8 @@ impl RodioBackend {
             speed: 1.0,
             skip_silence: false,
             loudness_normalization: false,
-            fade_generation: Arc::new(AtomicU64::new(0)),
+            active_fade: Arc::new(FadeControl::new(1.0)),
+            gapless_fade: Arc::new(FadeControl::new(1.0)),
             gapless: GaplessSlot::default(),
             level: Arc::new(AtomicU32::new(0)),
             preview: PreviewSlot::Idle,
@@ -150,14 +153,16 @@ impl RodioBackend {
         sink: &Sink,
         source: Box<dyn Source<Item = f32> + Send>,
         loudness_db: Option<f32>,
+        fade: Arc<FadeControl>,
     ) {
         let stage = normalization_stage(self.loudness_normalization, loudness_db);
         let level = Arc::clone(&self.level);
-        if self.skip_silence {
-            append_normalized_with_level(sink, SkipSilence::new(source), stage, level);
+        let chained = if self.skip_silence {
+            level_tapped_source(SkipSilence::new(source), stage, level)
         } else {
-            append_normalized_with_level(sink, source, stage, level);
-        }
+            level_tapped_source(source, stage, level)
+        };
+        sink.append(GainRamp::new(chained, fade));
     }
 
     fn apply_playback_source(
@@ -168,7 +173,8 @@ impl RodioBackend {
     ) {
         self.gapless.reset();
         let total_duration = source.total_duration();
-        self.fade_generation.fetch_add(1, Ordering::SeqCst);
+        let fade = Arc::new(FadeControl::new(1.0));
+        self.active_fade = Arc::clone(&fade);
         let new_sink = Sink::connect_new(self._stream.mixer());
         let new_sink_arc = Arc::new(new_sink);
         let old_sink = std::mem::replace(&mut self.sink, Arc::clone(&new_sink_arc));
@@ -176,7 +182,7 @@ impl RodioBackend {
 
         new_sink_arc.set_speed(self.speed);
         new_sink_arc.set_volume(volume_to_amplitude(self.volume));
-        self.append_dsp_to_sink(&new_sink_arc, source, loudness_db);
+        self.append_dsp_to_sink(&new_sink_arc, source, loudness_db, fade);
         new_sink_arc.play();
 
         self.last_requested = Some(track_id.to_owned());
@@ -218,26 +224,23 @@ impl RodioBackend {
     ) {
         self.gapless.reset();
         let total_duration = source.total_duration();
+        let channels = source.channels();
         let new_sink = Sink::connect_new(self._stream.mixer());
         let new_sink_arc = Arc::new(new_sink);
         let old_sink = std::mem::replace(&mut self.sink, Arc::clone(&new_sink_arc));
-
-        spawn_fade_out(old_sink, duration);
+        let old_fade = Arc::clone(&self.active_fade);
+        let new_fade = Arc::new(FadeControl::new(0.0));
 
         new_sink_arc.set_speed(self.speed);
-        new_sink_arc.set_volume(0.0);
-        self.append_dsp_to_sink(&new_sink_arc, source, loudness_db);
+        new_sink_arc.set_volume(volume_to_amplitude(self.volume));
+        self.append_dsp_to_sink(&new_sink_arc, source, loudness_db, Arc::clone(&new_fade));
         new_sink_arc.play();
 
-        let target_vol = volume_to_amplitude(self.volume);
-        let generation_id = self.fade_generation.fetch_add(1, Ordering::SeqCst) + 1;
-        spawn_fade_in(
-            new_sink_arc,
-            target_vol,
-            duration,
-            Arc::clone(&self.fade_generation),
-            generation_id,
-        );
+        let samples = ramp_samples(duration, self.output_sample_rate(), channels);
+        old_fade.ramp_to(0.0, samples);
+        new_fade.ramp_to(1.0, samples);
+        release_after(old_sink, duration);
+        self.active_fade = new_fade;
 
         self.last_requested = Some(track_id.to_owned());
         self.track_duration = total_duration;
@@ -283,7 +286,9 @@ impl RodioBackend {
         loudness_db: Option<f32>,
     ) {
         let duration = source.total_duration();
-        self.append_dsp_to_sink(&self.sink, source, loudness_db);
+        let fade = Arc::new(FadeControl::new(1.0));
+        self.append_dsp_to_sink(&self.sink, source, loudness_db, Arc::clone(&fade));
+        self.gapless_fade = fade;
         self.gapless.arm(track_id.to_owned(), duration.map(|d| d.as_secs()));
         self.last_requested = Some(track_id.to_owned());
     }
@@ -541,6 +546,9 @@ impl AudioBackend for RodioBackend {
         }
         let started = self.gapless.observe(self.sink.len())?;
         self.track_duration = started.duration_secs.map(Duration::from_secs);
+        // The audible source's control replaces the previous track's so a later crossfade ramps
+        // the source the listener is hearing.
+        self.active_fade = Arc::clone(&self.gapless_fade);
         Some(started)
     }
 
@@ -570,7 +578,6 @@ impl AudioBackend for RodioBackend {
     }
 
     fn set_volume(&mut self, volume: u8) {
-        self.fade_generation.fetch_add(1, Ordering::SeqCst);
         self.volume = volume.min(100);
         let factor = if matches!(self.preview, PreviewSlot::Playing { .. }) {
             PREVIEW_DUCK_FACTOR

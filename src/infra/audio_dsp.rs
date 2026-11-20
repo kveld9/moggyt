@@ -553,16 +553,16 @@ where
     }
 }
 
-/// Appends the normalized source wrapped in a [`LevelTap`].
-pub fn append_normalized_with_level<S>(
-    sink: &Sink,
+/// Builds the normalized source chain wrapped in the level tap, without appending it.
+pub fn level_tapped_source<S>(
     source: S,
     stage: NormalizationStage,
     level: Arc<AtomicU32>,
-) where
+) -> Box<dyn Source<Item = f32> + Send>
+where
     S: Source<Item = f32> + Send + 'static,
 {
-    sink.append(LevelTap::new(normalized_source(source, stage), level));
+    Box::new(LevelTap::new(normalized_source(source, stage), level))
 }
 
 #[cfg(test)]

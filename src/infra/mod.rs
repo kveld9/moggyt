@@ -106,8 +106,10 @@ pub use audio_dsp::{
     DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, LoudnessNormalizer,
     NormalizationStage, PROVIDER_LOUDNESS_OFFSET_DB, SkipSilence, StaticGain, TARGET_LUFS_DB,
     append_normalized, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
-    is_silent_sample, linear_to_db, normalization_stage, replaygain_linear, rms_to_db,
+    is_silent_sample, level_tapped_source, linear_to_db, normalization_stage, replaygain_linear,
+    rms_to_db,
 };
+pub use audio_fade::{FadeControl, GainRamp, ramp_samples, release_after};
 pub use audio_level::{LEVEL_TAP_WINDOW_SAMPLES, LevelTap};
 pub use audio_live::LiveAudio;
 pub use audio_resample::ResamplingSource;

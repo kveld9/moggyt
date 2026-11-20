@@ -396,10 +396,12 @@ Playback options can be configured under **Settings -> Playback**:
   ahead of music videos, even with this option disabled.
 - **Autoplay similar tracks**: Appends similar tracks when the queue ends. It is off by default; when enabled,
   playback continues with catalog radio recommendations after the last track.
-- **Crossfade and gapless playback**: crossfade replaces gapless hand-off while it is enabled, since
-  a blend and a sample-continuous transition cannot apply to the same pair of tracks. With crossfade
-  off, the next track is preloaded for a gapless hand-off; if that preload fails, the shell does not
-  retry it in a loop and the normal end-of-track advance takes over.
+- **Crossfade and gapless playback**: crossfade replaces gapless hand-off while it is enabled,
+  since a blend and a sample-continuous transition cannot apply to the same pair of tracks; the
+  crossfade ramp is applied per sample by the audio source, so its curve does not depend on timer
+  or scheduler precision. With crossfade off, the next track is preloaded for a gapless hand-off;
+  if that preload fails, the shell does not retry it in a loop and the normal end-of-track advance
+  takes over.
 - **Cover cache limit**: selects the disk budget for cached cover art (Off, 64 MB, 128 MB, 256 MB, 512 MB,
   1 GB). Lowering the limit prunes the oldest covers immediately.
 
