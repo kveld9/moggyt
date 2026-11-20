@@ -113,13 +113,14 @@ pub use audio_live::LiveAudio;
 pub use audio_resample::ResamplingSource;
 pub use audio_rodio::{RodioBackend, volume_to_amplitude};
 pub use browser::{open_url, opener_command};
-pub use catalog::{Catalog, CatalogError};
+pub use catalog::{Catalog, CatalogError, CatalogFailure, catalog_error, classify_catalog_failure};
 pub use catalog_client::{CatalogClient, RawTrack, search_body, search_url};
 pub use catalog_live::LiveCatalog;
 pub use catalog_parse_playlist_create::parse_created_playlist_id;
 pub use catalog_requests::{
-    EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID,
-    LIBRARY_PLAYLISTS_BROWSE_ID, NEW_PLAYLIST_PRIVACY, playlist_create_body, playlist_create_url,
+    ENV_CATALOG_API_KEY, ENV_CATALOG_CLIENT_VERSION, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID,
+    HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, NEW_PLAYLIST_PRIVACY,
+    playlist_create_body, playlist_create_url, resolve_api_key, resolve_client_version,
 };
 pub use catalog_stub::CatalogStub;
 pub use clipboard::{Clipboard, MemoryClipboard, SystemClipboard, copy_text};

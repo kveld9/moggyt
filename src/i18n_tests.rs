@@ -580,4 +580,14 @@ mod tests {
             assert_ne!(en, es, "Spanish must differ from English for '{key}'");
         }
     }
+
+    #[test]
+    fn test_catalog_rejected_i18n_strings_exist_and_differ() {
+        let key = "Catalog rejected this client; update moggyt or set MOGGYT_CATALOG_API_KEY";
+        let expected_es =
+            "El catalogo rechazo este cliente; actualiza moggyt o define MOGGYT_CATALOG_API_KEY";
+        assert_eq!(tr(Locale::English, key), key);
+        assert_eq!(tr(Locale::Spanish, key), expected_es);
+        assert_ne!(tr(Locale::English, key), tr(Locale::Spanish, key));
+    }
 }

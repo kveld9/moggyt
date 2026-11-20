@@ -15,6 +15,7 @@ This guide provides diagnosis and remediation steps for common operational issue
 | Update check shows "Update check failed (offline?)" | GitHub API unauthenticated request returned 404 (expected for private repo pre-launch) | Expected behavior prior to public release launch per ADR-001. No action required. |
 | Inbound multimedia keys or media buttons do not control playback | Another running application or browser tab has acquired exclusive focus on media keys or desktop presence daemon | Close conflicting players or browser tabs, or verify desktop environment media key shortcut bindings. |
 | "Queue is empty" appears in Now Playing view | Playback attempted without queued tracks | Navigate to the Search page, type a query, and press Enter to enqueue a track first. |
+| Catalog reports a rejected client | YouTube rejected the client identity (invalid key or outdated version) | Update moggyt, or set `MOGGYT_CATALOG_API_KEY` / `MOGGYT_CATALOG_CLIENT_VERSION` to the values the current web client uses. |
 
 ## Playback Falls Back After a Bot Check
 
@@ -59,3 +60,9 @@ On Linux, the single-instance lock is an abstract Unix socket released automatic
 exit. Helper processes spawned by moggyt cannot keep the socket bound after the application closes because the
 socket is created close-on-exec (`SOCK_CLOEXEC`). If another launch reports that moggyt is already running, a
 leftover instance is still active in the background and can be terminated with `pkill -x moggyt`.
+
+## Catalog Reports a Rejected Client
+
+When the catalog reports that it rejected this client identity, YouTube has invalidated the pinned
+API key or client version. Update moggyt to the latest release, or set `MOGGYT_CATALOG_API_KEY` and
+`MOGGYT_CATALOG_CLIENT_VERSION` to the values the current YouTube Music web client uses.

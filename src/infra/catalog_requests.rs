@@ -44,6 +44,28 @@ pub const CATALOG_API_KEY: &str = "AIzaSyC1xlcUPO2SCEmJEWeeIg4X6KyWnhDk-4M";
 /// requests with HTTP 400 FAILED_PRECONDITION. No auto-discovery in v1.
 pub const CATALOG_CLIENT_VERSION: &str = "1.20251022.01.00";
 
+/// Runtime environment override for the catalog web key.
+pub const ENV_CATALOG_API_KEY: &str = "MOGGYT_CATALOG_API_KEY";
+
+/// Runtime environment override for the WEB_REMIX client version.
+pub const ENV_CATALOG_CLIENT_VERSION: &str = "MOGGYT_CATALOG_CLIENT_VERSION";
+
+/// Resolves the catalog key from an explicit override, falling back to the pinned web key.
+pub fn resolve_api_key(override_raw: Option<&str>) -> String {
+    override_raw
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map_or_else(|| CATALOG_API_KEY.to_string(), ToString::to_string)
+}
+
+/// Resolves the client version from an explicit override, falling back to the pinned version.
+pub fn resolve_client_version(override_raw: Option<&str>) -> String {
+    override_raw
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map_or_else(|| CATALOG_CLIENT_VERSION.to_string(), ToString::to_string)
+}
+
 /// Default region for catalog client requests.
 pub const CATALOG_CLIENT_GL: &str = "US";
 
@@ -59,9 +81,11 @@ pub fn next_url() -> String {
 
 /// Builds the client context payload for WEB_REMIX requests.
 pub fn client_context(locale: Locale) -> Value {
+    let client_version =
+        resolve_client_version(std::env::var(ENV_CATALOG_CLIENT_VERSION).ok().as_deref());
     serde_json::json!({
         "clientName": "WEB_REMIX",
-        "clientVersion": CATALOG_CLIENT_VERSION,
+        "clientVersion": client_version,
         "hl": locale.tag(),
         "gl": CATALOG_CLIENT_GL,
     })
@@ -324,5 +348,21 @@ mod tests {
             assert_eq!(body["context"]["client"]["hl"], expected_hl);
             assert_eq!(body["context"]["client"]["gl"], CATALOG_CLIENT_GL);
         }
+    }
+
+    #[test]
+    fn resolve_api_key_override_and_fallback() {
+        assert_eq!(resolve_api_key(None), CATALOG_API_KEY);
+        assert_eq!(resolve_api_key(Some(" key ")), "key");
+        assert_eq!(resolve_api_key(Some("")), CATALOG_API_KEY);
+        assert_eq!(resolve_api_key(Some("   ")), CATALOG_API_KEY);
+    }
+
+    #[test]
+    fn resolve_client_version_override_and_fallback() {
+        assert_eq!(resolve_client_version(None), CATALOG_CLIENT_VERSION);
+        assert_eq!(resolve_client_version(Some(" 1.20260101.00.00 ")), "1.20260101.00.00");
+        assert_eq!(resolve_client_version(Some("")), CATALOG_CLIENT_VERSION);
+        assert_eq!(resolve_client_version(Some("   ")), CATALOG_CLIENT_VERSION);
     }
 }
