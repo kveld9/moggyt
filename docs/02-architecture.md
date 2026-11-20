@@ -132,8 +132,14 @@ requests remain anonymous when no session is present.
    `loudnessDb` of +0.99 dB shifts to +7.99 dB and yields a real attenuation of
    ~0.40 linear gain (-7.99 dB) instead of near-unity gain. The dynamic
    `LoudnessNormalizer` is not chained in this case.
-2. When no `loudnessDb` is available (yt-dlp fallback path), the dynamic
-   `LoudnessNormalizer` keeps its existing behavior.
+2. When no `loudnessDb` is available (yt-dlp fallback path), the dynamic normalizer
+   measures **K-weighted** loudness (BS.1770 pre-filter: ~38 Hz high pass plus
+   ~+4 dB high shelf) in LUFS and drives the same streaming AGC (window, slew,
+   clamps, noise gate). The filters are designed with the RBJ analog prototype
+   at the stream sample rate, which measures about +0.44 dB at 1 kHz instead of
+   the reference 0 dB. This is still not a full BS.1770 integrated measurement
+   (no whole-track pre-scan, no relative gating) and the setting remains off
+   by default.
 
 Signal order is decoder -> optional `SkipSilence` -> static gain or dynamic
 normalizer -> sink. The static gain sits inside the source graph, so the sink

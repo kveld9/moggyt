@@ -10,8 +10,10 @@ mod audio;
 mod audio_device;
 mod audio_dsp;
 mod audio_fade;
+mod audio_kweighting;
 mod audio_level;
 mod audio_live;
+mod audio_loudness;
 pub mod audio_resample;
 mod audio_rodio;
 mod audio_stream_cache_worker;
@@ -103,15 +105,16 @@ pub use audio_device::{
     current_output_device_identity, current_output_device_name, parse_default_sink,
 };
 pub use audio_dsp::{
-    DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, LoudnessNormalizer,
-    NormalizationStage, PROVIDER_LOUDNESS_OFFSET_DB, SkipSilence, StaticGain, TARGET_LUFS_DB,
-    append_normalized, calculate_rms, compute_target_gain, db_to_linear, is_silent_frame,
-    is_silent_sample, level_tapped_source, linear_to_db, normalization_stage, replaygain_linear,
-    rms_to_db,
+    DEFAULT_MIN_TRAILING_SILENCE_SECS, DEFAULT_SILENCE_THRESHOLD_AMPLITUDE, NormalizationStage,
+    PROVIDER_LOUDNESS_OFFSET_DB, SkipSilence, StaticGain, TARGET_LUFS_DB, append_normalized,
+    calculate_rms, compute_target_gain, db_to_linear, is_silent_frame, is_silent_sample,
+    level_tapped_source, linear_to_db, normalization_stage, replaygain_linear, rms_to_db,
 };
 pub use audio_fade::{FadeControl, GainRamp, ramp_samples, release_after};
+pub use audio_kweighting::{KWeighting, LUFS_OFFSET_DB};
 pub use audio_level::{LEVEL_TAP_WINDOW_SAMPLES, LevelTap};
 pub use audio_live::LiveAudio;
+pub use audio_loudness::LoudnessNormalizer;
 pub use audio_resample::ResamplingSource;
 pub use audio_rodio::{RodioBackend, volume_to_amplitude};
 pub use browser::{open_url, opener_command};
