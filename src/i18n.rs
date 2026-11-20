@@ -118,6 +118,10 @@ static SPANISH_TRANSLATIONS: &[(&str, &str)] = &[
     ("Both Spotify credentials are required", "Se requieren ambas credenciales de Spotify"),
     ("CSV file path", "Ruta del archivo CSV"),
     ("Cancel", "Cancelar"),
+    (
+        "Catalog rejected this client; update moggyt or set MOGGYT_CATALOG_API_KEY",
+        "El catalogo rechazo este cliente; actualiza moggyt o define MOGGYT_CATALOG_API_KEY",
+    ),
     ("Category", "Categoria"),
     ("Choose a track", "Elegir una cancion"),
     ("Classic", "Clásica"),

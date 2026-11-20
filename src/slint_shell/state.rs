@@ -21,6 +21,7 @@ use crate::infra::{
     Scrobbler, SessionStore, SettingsStore, SkipProvider, SkipStore, TrayAction, TrayPublisher,
     decode_cover, fetch_artwork,
 };
+use crate::slint_shell::ContextIcon;
 use crate::slint_shell::auto_skip::{SponsorFetchOutcome, SponsorRangeState};
 use crate::slint_shell::covers::request_queue_track_cover;
 use crate::slint_shell::detail_history::DetailHistory;
@@ -220,6 +221,17 @@ impl SlintAppState {
         self.queue_store.clear_health();
     }
 
+    /// Reports a catalog failure the user has to act on; transport noise stays out of the toasts.
+    pub fn report_catalog_failure(&mut self, error: CatalogError) {
+        if error != CatalogError::Rejected {
+            return;
+        }
+        let locale = self.locale;
+        let message =
+            tr(locale, "Catalog rejected this client; update moggyt or set MOGGYT_CATALOG_API_KEY");
+        self.toasts.push(message, ContextIcon::Close);
+    }
+
     /// Stores the current playback phase; this is the only assignment site.
     ///
     /// Pausing cancels a pending automatic retry. Emits one INFO event per real change so
@@ -325,7 +337,10 @@ impl SlintAppState {
             .map_or(Err(CatalogError::Transport), |c| c.search_filtered(&parsed));
         match res {
             Ok(items) => self.apply_search_items(items),
-            Err(_) => self.search_phase = ViewPhase::Error,
+            Err(error) => {
+                self.search_phase = ViewPhase::Error;
+                self.report_catalog_failure(error);
+            }
         }
     }
 
@@ -703,5 +718,24 @@ mod tests {
         let stored = state.queue_store.load();
         assert_eq!(stored.len(), 2);
         assert_eq!(stored.tracks(), &[track1, track2]);
+    }
+
+    #[test]
+    fn report_catalog_failure_pushes_toast_only_on_rejected() {
+        let mut state = test_wired();
+        state.report_catalog_failure(CatalogError::Transport);
+        state.report_catalog_failure(CatalogError::Malformed);
+        state.report_catalog_failure(CatalogError::Unsupported);
+        state.report_catalog_failure(CatalogError::Unauthenticated);
+        assert!(state.toasts.visible().is_empty());
+
+        state.report_catalog_failure(CatalogError::Rejected);
+        assert_eq!(state.toasts.visible().len(), 1);
+        let expected = tr(
+            state.locale,
+            "Catalog rejected this client; update moggyt or set MOGGYT_CATALOG_API_KEY",
+        );
+        assert_eq!(state.toasts.visible()[0].text, expected);
+        assert_eq!(state.toasts.visible()[0].icon, ContextIcon::Close);
     }
 }

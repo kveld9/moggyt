@@ -1,6 +1,6 @@
 //! HTTP client implementation for YouTube Music catalog endpoints.
 
-use super::catalog::CatalogError;
+use super::catalog::{CatalogError, CatalogFailure, catalog_error, classify_catalog_failure};
 use super::catalog_client::parse_search_all;
 use super::catalog_live::{LiveCatalog, raw_to_track};
 use super::catalog_model::{RawTrack, SearchHits};
@@ -20,12 +20,11 @@ use super::catalog_parse_playlist_create::parse_created_playlist_id;
 use super::catalog_parse_radio::parse_radio_all;
 use super::catalog_parse_search::parse_search_tracks;
 use super::catalog_requests::{
-    CATALOG_API_KEY, EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID,
-    LIBRARY_ALBUMS_BROWSE_ID, LIBRARY_ARTISTS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID,
-    LIBRARY_PODCASTS_BROWSE_ID, LIBRARY_PROFILES_BROWSE_ID, LIBRARY_SONGS_BROWSE_ID, browse_body,
-    browse_body_with_params, browse_url, continuation_body, next_body, next_url,
-    playlist_create_body, playlist_create_url, search_body, search_body_with_params,
-    search_filter_params,
+    EXPLORE_BROWSE_ID, HISTORY_BROWSE_ID, HOME_BROWSE_ID, LIBRARY_ALBUMS_BROWSE_ID,
+    LIBRARY_ARTISTS_BROWSE_ID, LIBRARY_PLAYLISTS_BROWSE_ID, LIBRARY_PODCASTS_BROWSE_ID,
+    LIBRARY_PROFILES_BROWSE_ID, LIBRARY_SONGS_BROWSE_ID, browse_body, browse_body_with_params,
+    browse_url, continuation_body, next_body, next_url, playlist_create_body, playlist_create_url,
+    search_body, search_body_with_params, search_filter_params,
 };
 use crate::domain::{
     Album, Artist, Detail, DetailKind, Playlist, SearchQuery, SearchResult, Shelf, Track,
@@ -46,7 +45,7 @@ pub struct CatalogClient {
 impl std::fmt::Debug for CatalogClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CatalogClient")
-            .field("api_key", &self.api_key)
+            .field("api_key", &"<redacted>")
             .field("has_cookies", &self.cookies.is_some())
             .field("locale", &self.locale)
             .finish()
@@ -203,7 +202,14 @@ impl CatalogClient {
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
-        Self { client, api_key: CATALOG_API_KEY.to_owned(), cookies, locale: Locale::default() }
+        Self {
+            client,
+            api_key: super::catalog_requests::resolve_api_key(
+                std::env::var(super::catalog_requests::ENV_CATALOG_API_KEY).ok().as_deref(),
+            ),
+            cookies,
+            locale: Locale::default(),
+        }
     }
 
     /// Returns true if this client has credentials configured for authenticated requests.
@@ -250,7 +256,9 @@ impl CatalogClient {
         let response = self.signed_request(self.client.post(&url)).json(body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("CatalogClient search request failed with status: {status}");
+            let body = response.text().unwrap_or_default();
+            let failure = classify_catalog_failure(status.as_u16(), &body);
+            return Err(anyhow::Error::new(CatalogFailure(failure)));
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -271,7 +279,7 @@ impl CatalogClient {
 
     /// Performs search for `query` and returns parsed tracks.
     pub fn search(&self, query: &str) -> Result<Vec<Track>, CatalogError> {
-        let payload = self.search_payload(query).map_err(|_| CatalogError::Transport)?;
+        let payload = self.search_payload(query).map_err(catalog_error)?;
         let tracks: Vec<Track> =
             parse_search_tracks(&payload).into_iter().map(raw_to_track).collect();
         validate_search_result(tracks, &payload)
@@ -279,7 +287,7 @@ impl CatalogClient {
 
     /// Performs filtered search and returns domain search results.
     pub fn search_filtered(&self, query: &SearchQuery) -> Result<Vec<SearchResult>, CatalogError> {
-        let payload = self.search_payload_filtered(query).map_err(|_| CatalogError::Transport)?;
+        let payload = self.search_payload_filtered(query).map_err(catalog_error)?;
         let hits = parse_search_all(&payload);
         let results = LiveCatalog::map_hits(hits, query.filter());
         validate_search_result(results, &payload)
@@ -303,7 +311,9 @@ impl CatalogClient {
         let response = self.signed_request(self.client.post(&url)).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("CatalogClient next request failed with status: {status}");
+            let body = response.text().unwrap_or_default();
+            let failure = classify_catalog_failure(status.as_u16(), &body);
+            return Err(anyhow::Error::new(CatalogFailure(failure)));
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -315,7 +325,7 @@ impl CatalogClient {
         if trimmed.is_empty() {
             return Ok(Vec::new());
         }
-        let payload = self.next_payload(trimmed).map_err(|_| CatalogError::Transport)?;
+        let payload = self.next_payload(trimmed).map_err(catalog_error)?;
         let tracks: Vec<Track> = parse_radio_all(&payload).into_iter().map(raw_to_track).collect();
         validate_radio_result(tracks, &payload)
     }
@@ -331,7 +341,9 @@ impl CatalogClient {
         let response = self.signed_request(self.client.post(&url)).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("CatalogClient browse request failed with status: {status}");
+            let body = response.text().unwrap_or_default();
+            let failure = classify_catalog_failure(status.as_u16(), &body);
+            return Err(anyhow::Error::new(CatalogFailure(failure)));
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -352,9 +364,7 @@ impl CatalogClient {
         if trimmed.is_empty() {
             return Ok(Vec::new());
         }
-        let payload = self
-            .browse_payload_with_params(trimmed, params)
-            .map_err(|_| CatalogError::Transport)?;
+        let payload = self.browse_payload_with_params(trimmed, params).map_err(catalog_error)?;
         let shelves = parse_explore_all(&payload);
         validate_explore_result(shelves, &payload)
     }
@@ -367,8 +377,7 @@ impl CatalogClient {
 
     /// Queries the browse endpoint for explore shelves and returns parsed shelves.
     pub fn explore_shelves(&self) -> Result<Vec<Shelf>, CatalogError> {
-        let payload =
-            self.browse_payload(EXPLORE_BROWSE_ID).map_err(|_| CatalogError::Transport)?;
+        let payload = self.browse_payload(EXPLORE_BROWSE_ID).map_err(catalog_error)?;
         let shelves = parse_explore_all(&payload);
         validate_explore_result(shelves, &payload)
     }
@@ -394,7 +403,7 @@ impl CatalogClient {
         if trimmed == HISTORY_BROWSE_ID && !self.is_authenticated() {
             return Err(CatalogError::Unauthenticated);
         }
-        let payload = self.detail_payload(trimmed).map_err(|_| CatalogError::Transport)?;
+        let payload = self.detail_payload(trimmed).map_err(catalog_error)?;
         let detail = parse_detail_all(&payload, kind).ok_or(CatalogError::Malformed)?;
         Ok(Some(self.with_album_audio_tracks(detail, kind, &payload)))
     }
@@ -437,7 +446,7 @@ impl CatalogClient {
         if trimmed == HISTORY_BROWSE_ID && !self.is_authenticated() {
             return Err(CatalogError::Unauthenticated);
         }
-        let payload = self.detail_payload(trimmed).map_err(|_| CatalogError::Transport)?;
+        let payload = self.detail_payload(trimmed).map_err(catalog_error)?;
         Ok(parse_paginated_detail(&payload, kind, max_pages, |token| {
             self.continuation_payload(token).ok()
         }))
@@ -450,7 +459,9 @@ impl CatalogClient {
         let response = self.signed_request(self.client.post(&url)).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("CatalogClient continuation request failed with status: {status}");
+            let body = response.text().unwrap_or_default();
+            let failure = classify_catalog_failure(status.as_u16(), &body);
+            return Err(anyhow::Error::new(CatalogFailure(failure)));
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -466,7 +477,9 @@ impl CatalogClient {
         let response = self.signed_request(self.client.post(&url)).json(&body).send()?;
         let status = response.status();
         if !status.is_success() {
-            anyhow::bail!("CatalogClient library browse request failed with status: {status}");
+            let body = response.text().unwrap_or_default();
+            let failure = classify_catalog_failure(status.as_u16(), &body);
+            return Err(anyhow::Error::new(CatalogFailure(failure)));
         }
         let payload: Value = response.json()?;
         Ok(payload)
@@ -477,9 +490,8 @@ impl CatalogClient {
         if !self.is_authenticated() {
             return Err(CatalogError::Unauthenticated);
         }
-        let payload = self
-            .library_browse_payload(LIBRARY_PLAYLISTS_BROWSE_ID)
-            .map_err(|_| CatalogError::Transport)?;
+        let payload =
+            self.library_browse_payload(LIBRARY_PLAYLISTS_BROWSE_ID).map_err(catalog_error)?;
         let playlists = parse_library_playlists(&payload);
         validate_library_payload(playlists, &payload)
     }
@@ -489,9 +501,8 @@ impl CatalogClient {
         if !self.is_authenticated() {
             return Err(CatalogError::Unauthenticated);
         }
-        let payload = self
-            .library_browse_payload(LIBRARY_ALBUMS_BROWSE_ID)
-            .map_err(|_| CatalogError::Transport)?;
+        let payload =
+            self.library_browse_payload(LIBRARY_ALBUMS_BROWSE_ID).map_err(catalog_error)?;
         let albums = parse_library_albums(&payload);
         validate_library_payload(albums, &payload)
     }
@@ -501,9 +512,8 @@ impl CatalogClient {
         if !self.is_authenticated() {
             return Err(CatalogError::Unauthenticated);
         }
-        let payload = self
-            .library_browse_payload(LIBRARY_ARTISTS_BROWSE_ID)
-            .map_err(|_| CatalogError::Transport)?;
+        let payload =
+            self.library_browse_payload(LIBRARY_ARTISTS_BROWSE_ID).map_err(catalog_error)?;
         let artists = parse_library_artists(&payload);
         validate_library_payload(artists, &payload)
     }
@@ -513,9 +523,8 @@ impl CatalogClient {
         if !self.is_authenticated() {
             return Err(CatalogError::Unauthenticated);
         }
-        let payload = self
-            .library_browse_payload(LIBRARY_SONGS_BROWSE_ID)
-            .map_err(|_| CatalogError::Transport)?;
+        let payload =
+            self.library_browse_payload(LIBRARY_SONGS_BROWSE_ID).map_err(catalog_error)?;
         let songs = parse_library_songs(&payload);
         validate_library_payload(songs, &payload)
     }
@@ -525,9 +534,8 @@ impl CatalogClient {
         if !self.is_authenticated() {
             return Err(CatalogError::Unauthenticated);
         }
-        let payload = self
-            .library_browse_payload(LIBRARY_PODCASTS_BROWSE_ID)
-            .map_err(|_| CatalogError::Transport)?;
+        let payload =
+            self.library_browse_payload(LIBRARY_PODCASTS_BROWSE_ID).map_err(catalog_error)?;
         let podcasts = parse_library_podcasts(&payload);
         validate_library_payload(podcasts, &payload)
     }
@@ -537,9 +545,8 @@ impl CatalogClient {
         if !self.is_authenticated() {
             return Err(CatalogError::Unauthenticated);
         }
-        let payload = self
-            .library_browse_payload(LIBRARY_PROFILES_BROWSE_ID)
-            .map_err(|_| CatalogError::Transport)?;
+        let payload =
+            self.library_browse_payload(LIBRARY_PROFILES_BROWSE_ID).map_err(catalog_error)?;
         let profiles = parse_library_profiles(&payload);
         validate_library_payload(profiles, &payload)
     }
@@ -576,201 +583,5 @@ impl Default for CatalogClient {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cookie_value_reads_named_pairs() {
-        let cookies = "SID=abc; SAPISID=xyz;  SSID=q";
-        assert_eq!(cookie_value(cookies, "SAPISID"), Some("xyz"));
-        assert_eq!(cookie_value(cookies, "SID"), Some("abc"));
-        assert_eq!(cookie_value(cookies, "MISSING"), None);
-        assert_eq!(cookie_value("SAPISID=  ", "SAPISID"), None);
-    }
-
-    #[test]
-    fn sapisid_authorization_signs_the_catalog_origin() {
-        let cookies = "SID=abc; SAPISID=Y8DaQK1-VRZxrpWu/AOBQYOHADPvQdIhvU; SSID=q";
-        assert_eq!(
-            sapisid_authorization(cookies, 1_700_000_000).as_deref(),
-            Some("SAPISIDHASH 1700000000_50bc7ad615487c9316ec93da978bcb26411ca453")
-        );
-        assert_eq!(sapisid_authorization("SID=abc", 1_700_000_000), None);
-    }
-
-    #[test]
-    fn catalog_client_detail_blank_id_returns_none() {
-        let client = CatalogClient::new();
-        assert_eq!(client.detail("", DetailKind::Album), Ok(None));
-        assert_eq!(client.detail("   ", DetailKind::Artist), Ok(None));
-    }
-
-    #[test]
-    fn catalog_client_locale_configuration() {
-        let client = CatalogClient::new();
-        assert_eq!(client.locale(), Locale::English);
-
-        let es_client = CatalogClient::new().with_locale(Locale::Spanish);
-        assert_eq!(es_client.locale(), Locale::Spanish);
-
-        let mut mut_client = CatalogClient::new();
-        mut_client.set_locale(Locale::Spanish);
-        assert_eq!(mut_client.locale(), Locale::Spanish);
-    }
-
-    #[test]
-    fn catalog_client_cookies_masking_and_unauthenticated_guard() {
-        assert!(!CatalogClient::new().is_authenticated());
-        assert!(!CatalogClient::with_cookies("   ").is_authenticated());
-        let client = CatalogClient::with_cookies("secret-cookie-val");
-        assert!(client.is_authenticated());
-        let debug_str = format!("{client:?}");
-        assert!(!debug_str.contains("secret-cookie-val"));
-        assert!(debug_str.contains("has_cookies: true"));
-
-        let anon = CatalogClient::new();
-        assert_eq!(anon.library_playlists(), Err(CatalogError::Unauthenticated));
-        assert_eq!(anon.library_saved_albums(), Err(CatalogError::Unauthenticated));
-    }
-
-    #[test]
-    fn unauthenticated_library_is_distinct_from_empty() {
-        let anon = CatalogClient::new();
-        assert_eq!(anon.library_playlists(), Err(CatalogError::Unauthenticated));
-        assert_eq!(anon.library_saved_albums(), Err(CatalogError::Unauthenticated));
-    }
-
-    #[test]
-    fn empty_library_section_is_ok_empty() {
-        let empty_payload = serde_json::json!({
-            "sectionListRenderer": {
-                "contents": [{
-                    "gridRenderer": {
-                        "items": []
-                    }
-                }]
-            }
-        });
-        let playlists = parse_library_playlists(&empty_payload);
-        assert_eq!(validate_library_result(playlists, &empty_payload), Ok(Vec::new()));
-
-        let albums = parse_library_albums(&empty_payload);
-        assert_eq!(validate_library_result(albums, &empty_payload), Ok(Vec::new()));
-
-        let malformed_payload = serde_json::json!({});
-        let malformed_playlists = parse_library_playlists(&malformed_payload);
-        assert_eq!(
-            validate_library_result(malformed_playlists, &malformed_payload),
-            Err(CatalogError::Malformed)
-        );
-    }
-
-    #[test]
-    fn logged_out_library_payload_is_unauthenticated() {
-        let raw = include_str!("../../tests/fixtures/catalog_library_logged_out.json");
-        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
-
-        let playlists = parse_library_playlists(&payload);
-        assert_eq!(
-            validate_library_payload(playlists, &payload),
-            Err(CatalogError::Unauthenticated)
-        );
-
-        let albums = parse_library_albums(&payload);
-        assert_eq!(validate_library_payload(albums, &payload), Err(CatalogError::Unauthenticated));
-    }
-
-    #[test]
-    fn empty_search_section_is_ok_empty() {
-        let empty_payload = serde_json::json!({
-            "contents": {
-                "tabbedSearchResultsRenderer": {
-                    "tabs": []
-                }
-            }
-        });
-        let tracks: Vec<Track> = Vec::new();
-        assert_eq!(validate_search_result(tracks, &empty_payload), Ok(Vec::new()));
-
-        let malformed_payload = serde_json::json!({});
-        let malformed_tracks: Vec<Track> = Vec::new();
-        assert_eq!(
-            validate_search_result(malformed_tracks, &malformed_payload),
-            Err(CatalogError::Malformed)
-        );
-    }
-
-    #[test]
-    fn catalog_client_history_detail_unauthenticated_returns_unauthenticated() {
-        let client = CatalogClient::new();
-        assert_eq!(
-            client.detail(HISTORY_BROWSE_ID, DetailKind::Playlist),
-            Err(CatalogError::Unauthenticated)
-        );
-    }
-
-    #[test]
-    fn empty_explore_section_is_ok_empty() {
-        let empty_payload = serde_json::json!({
-            "sectionListRenderer": { "contents": [] }
-        });
-        let shelves: Vec<Shelf> = Vec::new();
-        assert_eq!(validate_explore_result(shelves, &empty_payload), Ok(Vec::new()));
-
-        let malformed_payload = serde_json::json!({});
-        let malformed_shelves: Vec<Shelf> = Vec::new();
-        assert_eq!(
-            validate_explore_result(malformed_shelves, &malformed_payload),
-            Err(CatalogError::Malformed)
-        );
-    }
-
-    #[test]
-    fn empty_radio_section_is_ok_empty() {
-        let empty_payload = serde_json::json!({
-            "playlistPanelRenderer": { "contents": [] }
-        });
-        let tracks: Vec<Track> = Vec::new();
-        assert_eq!(validate_radio_result(tracks, &empty_payload), Ok(Vec::new()));
-
-        let malformed_payload = serde_json::json!({});
-        let malformed_tracks: Vec<Track> = Vec::new();
-        assert_eq!(
-            validate_radio_result(malformed_tracks, &malformed_payload),
-            Err(CatalogError::Malformed)
-        );
-    }
-
-    #[test]
-    fn catalog_client_category_shelves_parses_minimal_payload_and_guards() {
-        let client = CatalogClient::new();
-        assert_eq!(client.category_shelves("", None), Ok(Vec::new()));
-        assert_eq!(client.category_shelves("   ", Some("p")), Ok(Vec::new()));
-
-        let payload = serde_json::json!({
-            "sectionListRenderer": { "contents": [{
-                "musicCarouselShelfRenderer": {
-                    "header": { "musicCarouselShelfBasicHeaderRenderer": { "title": { "runs": [{ "text": "Calm" }] } } },
-                    "contents": [{ "musicTwoRowItemRenderer": {
-                        "title": { "runs": [{ "text": "Piano" }] },
-                        "navigationEndpoint": { "browseEndpoint": { "browseId": "VL_piano" } }
-                    }}]
-                }
-            }] }
-        });
-        let shelves = parse_explore_all(&payload);
-        assert_eq!(shelves.len(), 1);
-        assert_eq!(shelves[0].title, "Calm");
-        assert_eq!(
-            shelves[0].items[0],
-            crate::domain::SearchResult::Playlist(Playlist::new("VL_piano", "Piano", 0, None))
-        );
-        assert!(parse_explore_all(&serde_json::json!({})).is_empty());
-        assert!(parse_explore_all(&serde_json::json!({"error": {"code": 404}})).is_empty());
-    }
-
-    #[test]
-    fn catalog_client_create_playlist_unauthenticated_returns_unauthenticated() {
-        assert_eq!(CatalogClient::new().create_playlist("Mix"), Err(CatalogError::Unauthenticated));
-    }
-}
+#[path = "catalog_client_tests.rs"]
+mod tests;

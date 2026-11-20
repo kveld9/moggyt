@@ -16,6 +16,8 @@ pub enum CatalogError {
     Malformed,
     /// The catalog implementation does not support account-write operations.
     Unsupported,
+    /// The catalog rejected this client identity (invalid key or outdated client version).
+    Rejected,
 }
 
 impl std::fmt::Display for CatalogError {
@@ -25,11 +27,46 @@ impl std::fmt::Display for CatalogError {
             Self::Transport => write!(f, "transport error"),
             Self::Malformed => write!(f, "malformed response"),
             Self::Unsupported => write!(f, "unsupported request"),
+            Self::Rejected => write!(f, "catalog rejected this client identity"),
         }
     }
 }
 
 impl std::error::Error for CatalogError {}
+
+/// Body markers YouTube returns when it refuses the client identity.
+const REJECTION_MARKERS: [&str; 3] =
+    ["FAILED_PRECONDITION", "API key not valid", "API_KEY_INVALID"];
+
+/// Classifies a failed catalog HTTP response.
+///
+/// A 400 or 403 whose body carries a rejection marker means the client identity is no longer
+/// accepted; every other failure stays a transport error.
+pub fn classify_catalog_failure(status: u16, body: &str) -> CatalogError {
+    let rejected_status = status == 400 || status == 403;
+    let marked = REJECTION_MARKERS.iter().any(|marker| body.contains(marker));
+    if rejected_status && marked {
+        return CatalogError::Rejected;
+    }
+    CatalogError::Transport
+}
+
+/// Typed failure carried through the payload helpers so the port surfaces the real cause.
+#[derive(Debug)]
+pub struct CatalogFailure(pub CatalogError);
+
+impl std::fmt::Display for CatalogFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for CatalogFailure {}
+
+/// Recovers the classified failure from a payload-helper error.
+pub fn catalog_error(err: anyhow::Error) -> CatalogError {
+    err.downcast_ref::<CatalogFailure>().map_or(CatalogError::Transport, |failure| failure.0)
+}
 
 /// Catalog port: search by free text and user library read/mutation access.
 pub trait Catalog {
@@ -202,8 +239,41 @@ mod tests {
         assert_eq!(CatalogError::Transport.to_string(), "transport error");
         assert_eq!(CatalogError::Malformed.to_string(), "malformed response");
         assert_eq!(CatalogError::Unsupported.to_string(), "unsupported request");
+        assert_eq!(CatalogError::Rejected.to_string(), "catalog rejected this client identity");
         assert_eq!(CatalogError::Unauthenticated, CatalogError::Unauthenticated);
         assert_ne!(CatalogError::Unauthenticated, CatalogError::Transport);
         assert_ne!(CatalogError::Unsupported, CatalogError::Transport);
+        assert_ne!(CatalogError::Rejected, CatalogError::Transport);
+    }
+
+    #[test]
+    fn classify_catalog_failure_distinguishes_rejection_from_transport() {
+        let cases = [
+            (400, "FAILED_PRECONDITION", CatalogError::Rejected),
+            (403, r#"{"error":{"message":"API key not valid"}}"#, CatalogError::Rejected),
+            (400, "API_KEY_INVALID", CatalogError::Rejected),
+            (400, "", CatalogError::Transport),
+            (500, "FAILED_PRECONDITION", CatalogError::Transport),
+            (200, "", CatalogError::Transport),
+        ];
+
+        for (status, body, expected) in cases {
+            assert_eq!(
+                classify_catalog_failure(status, body),
+                expected,
+                "status={status}, body={body}"
+            );
+        }
+    }
+
+    #[test]
+    fn catalog_failure_downcast_and_recovery() {
+        let failure = CatalogFailure(CatalogError::Rejected);
+        assert_eq!(failure.to_string(), "catalog rejected this client identity");
+        let err = anyhow::Error::new(failure);
+        assert_eq!(catalog_error(err), CatalogError::Rejected);
+
+        let generic = anyhow::anyhow!("random network failure");
+        assert_eq!(catalog_error(generic), CatalogError::Transport);
     }
 }

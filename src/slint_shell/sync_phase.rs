@@ -27,6 +27,7 @@ pub(crate) fn library_failure_phase(error: CatalogError, signed_in: bool) -> Vie
         CatalogError::Transport | CatalogError::Malformed | CatalogError::Unsupported => {
             ViewPhase::Error
         }
+        CatalogError::Rejected => ViewPhase::Error,
     }
 }
 
@@ -51,6 +52,7 @@ impl SlintAppState {
             }
             Err(error) => {
                 self.library_phase = library_failure_phase(error, self.signed_in);
+                self.report_catalog_failure(error);
             }
         }
     }
@@ -177,6 +179,30 @@ mod tests {
     fn library_phase_error_for_transport_failure() {
         assert_eq!(library_failure_phase(CatalogError::Transport, true), ViewPhase::Error);
         assert_eq!(library_failure_phase(CatalogError::Unsupported, true), ViewPhase::Error);
+        assert_eq!(library_failure_phase(CatalogError::Rejected, true), ViewPhase::Error);
+        assert_eq!(library_failure_phase(CatalogError::Rejected, false), ViewPhase::Error);
+    }
+
+    #[test]
+    fn library_outcome_rejected_pushes_localized_toast() {
+        use crate::slint_shell::test_support::test_wired;
+
+        let mut state = test_wired();
+        state.apply_library_outcome(LibraryFetch {
+            playlists: Err(CatalogError::Rejected),
+            songs: Ok(Vec::new()),
+            albums: Ok(Vec::new()),
+            artists: Ok(Vec::new()),
+            podcasts: Ok(Vec::new()),
+            profiles: Ok(Vec::new()),
+        });
+        assert_eq!(state.library_phase, ViewPhase::Error);
+        assert_eq!(state.toasts.visible().len(), 1);
+        let expected = crate::i18n::tr(
+            state.locale,
+            "Catalog rejected this client; update moggyt or set MOGGYT_CATALOG_API_KEY",
+        );
+        assert_eq!(state.toasts.visible()[0].text, expected);
     }
 
     #[test]

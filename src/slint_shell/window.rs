@@ -301,6 +301,7 @@ fn apply_async_library_outcome(
         }
         Err(error) => {
             state.library_phase = library_failure_phase(error, state.signed_in);
+            state.report_catalog_failure(error);
             false
         }
     }

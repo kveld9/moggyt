@@ -402,3 +402,16 @@ track, and chained overrides are rejected.
   `set -a; . ~/.config/moggyt/lastfm-dev.env; set +a`); the per-user session key lives in the OS keyring; requests
   are sent off the UI thread with a 10 s timeout; connect via Settings > Integrations > Connect with Last.fm, which
   opens the browser authorization flow; authorize within 3 minutes; Disconnect removes the session from the keyring.
+
+## Environment Variables
+
+### Catalog Client Identity Overrides
+
+The catalog client supports two runtime environment variables: `MOGGYT_CATALOG_API_KEY` overrides the InnerTube
+API key, and `MOGGYT_CATALOG_CLIENT_VERSION` overrides the `WEB_REMIX` client version sent in request context
+payloads. When unset or empty, moggyt falls back to its pinned defaults, which correspond to the public web client
+key and version.
+
+Unlike build-time environment variables (such as `MOGGYT_LASTFM_API_KEY` and `MOGGYT_LASTFM_SECRET` used for Last.fm
+integration), these variables take effect immediately at runtime without recompiling. They exist to unblock
+catalog browsing and search without requiring a new release whenever YouTube changes or rotates either value.
